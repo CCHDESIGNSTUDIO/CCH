@@ -1,0 +1,17 @@
+{
+  "hosting": {
+    "target": "platform",
+    "public": "platform",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "functions": {
+    "source": "Functions",
+    "runtime": "nodejs20"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "cch-design-boards"
+  },
+  "targets": {
+    "cch-design-boards": {
+      "hosting": {
+        "platform": [
+          "cch-platform"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
