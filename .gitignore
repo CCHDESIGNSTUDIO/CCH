@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+functions/node_modules/
+
+# Firebase
+.firebase/
+.fuse_hidden*
+
+# Sensitive data
+platform/payment_data.json
+platform/payment_compact.json
+platform/product_library_import.json
+*.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temp files
+*.log
+*.tmp
