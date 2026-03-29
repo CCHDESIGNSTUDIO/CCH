@@ -1,0 +1,410 @@
+const functions = require("firebase-functions");
+const admin = require("firebase-admin");
+admin.initializeApp();
+const db = admin.firestore();
+
+// Config: firebase functions:config:set qb.clientid="..." qb.clientsecret="..." qb.realmid="..."
+//         twilio.sid="AC..." twilio.token="..." twilio.number="+1..."
+//         microsoft.tenantid="..." microsoft.clientid="..." microsoft.clientsecret="..."
+const QB = functions.config().qb || {};
+const TW = functions.config().twilio || {};
+const MS = functions.config().microsoft || {};
+
+// ==================== QB: HELPERS ====================
+async function getQBToken() {
+  const cfg = (await db.collection("admin").doc("qb").get()).data() || {};
+  if (!cfg.refreshToken) throw new functions.https.HttpsError("failed-precondition", "QB not connected");
+  const res = await fetch("https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Authorization": "Basic " + Buffer.from(QB.clientid + ":" + QB.clientsecret).toString("base64")
+    },
+    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: cfg.refreshToken })
+  });
+  if (!res.ok) throw new functions.https.HttpsError("internal", "QB token refresh failed");
+  const tokens = await res.json();
+  await db.collection("admin").doc("qb").set({ refreshToken: tokens.refresh_token, lastRefresh: new Date().toISOString() }, { merge: true });
+  return tokens.access_token;
+}
+
+async function qbApi(method, endpoint, token, body) {
+  const url = `https://quickbooks.api.intuit.com/v3/company/${QB.realmid}/${endpoint}`;
+  const opts = { method, headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json", "Accept": "application/json" } };
+  if (body) opts.body = JSON.stringify(body);
+  const data = await (await fetch(url, opts)).json();
+  if (data.Fault) throw new functions.https.HttpsError("internal", data.Fault.Error?.[0]?.Message || "QB error");
+  return data;
+}
+
+async function findOrCreateCustomer(token, name, email, projRef) {
+  const proj = (await projRef.get()).data() || {};
+  if (proj.qbCustomerId) return proj.qbCustomerId;
+  const search = await qbApi("GET", `query?query=SELECT * FROM Customer WHERE DisplayName = '${name.replace(/'/g, "\\'")}'`, token);
+  if (search.QueryResponse?.Customer?.[0]) {
+    const id = search.QueryResponse.Customer[0].Id;
+    await projRef.update({ qbCustomerId: id });
+    return id;
+  }
+  const payload = { DisplayName: name };
+  if (email) payload.PrimaryEmailAddr = { Address: email };
+  const result = await qbApi("POST", "customer", token, payload);
+  const id = result.Customer.Id;
+  await projRef.update({ qbCustomerId: id });
+  return id;
+}
+
+async function findOrCreateVendor(token, name) {
+  const search = await qbApi("GET", `query?query=SELECT * FROM Vendor WHERE DisplayName = '${name.replace(/'/g, "\\'")}'`, token);
+  if (search.QueryResponse?.Vendor?.[0]) return search.QueryResponse.Vendor[0].Id;
+  const result = await qbApi("POST", "vendor", token, { DisplayName: name });
+  return result.Vendor.Id;
+}
+
+// ==================== QB: PUSH INVOICE ====================
+exports.pushInvoiceToQB = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Sign in required");
+  const { projectId, docId, sendEmail } = data;
+  const docRef = db.collection("boards").doc(projectId).collection("invoices").doc(docId);
+  const inv = (await docRef.get()).data();
+  if (!inv) throw new functions.https.HttpsError("not-found", "Invoice not found");
+  if (inv.qbDocId) return { success: true, qbDocId: inv.qbDocId, message: "Already synced to QB" };
+
+  const token = await getQBToken();
+  const projRef = db.collection("boards").doc(projectId);
+  const proj = (await projRef.get()).data() || {};
+  const custId = await findOrCreateCustomer(token, proj.clientName || proj.name || "Client", proj.clientEmail, projRef);
+
+  const payload = {
+    CustomerRef: { value: custId },
+    Line: (inv.items || []).map((item, i) => ({
+      Amount: parseFloat(item.clientPrice || item.amount || 0),
+      LineNum: i + 1,
+      Description: [item.title || item.name, item.vendor, item.room].filter(Boolean).join(" — "),
+      DetailType: "SalesItemLineDetail",
+      SalesItemLineDetail: { ItemRef: { value: "1", name: "Services" }, Qty: parseFloat(item.qty || 1), UnitPrice: parseFloat(item.clientPrice || item.amount || 0) }
+    })),
+    PrivateNote: `CCH — ${proj.name || projectId} — ${inv.invoiceNum || docId}`
+  };
+  if (inv.dueDate) payload.DueDate = inv.dueDate;
+  if (proj.clientEmail) {
+    payload.BillEmail = { Address: proj.clientEmail };
+    if (sendEmail) payload.EmailStatus = "NeedToSend";
+  }
+
+  const result = await qbApi("POST", "invoice", token, payload);
+  const qbInv = result.Invoice;
+  await docRef.update({ qbDocId: qbInv.Id, qbDocNumber: qbInv.DocNumber, qbSyncDate: new Date().toISOString() });
+
+  let emailSent = false;
+  if (sendEmail && proj.clientEmail) {
+    try { await qbApi("POST", `invoice/${qbInv.Id}/send`, token); emailSent = true; } catch (e) { console.warn("QB email failed:", e.message); }
+  }
+
+  try { await db.collection("activity").add({ type: "invoice", action: "qb-pushed", description: `Invoice ${inv.invoiceNum || ""} → QB #${qbInv.DocNumber}${emailSent ? " + emailed" : ""}`, projectId, projectName: proj.name || projectId, meta: { qbDocId: qbInv.Id, qbDocNumber: qbInv.DocNumber, emailSent }, createdAt: new Date().toISOString(), userId: context.auth.uid }); } catch (e) {}
+  return { success: true, qbDocId: qbInv.Id, qbDocNumber: qbInv.DocNumber, emailSent };
+});
+
+// ==================== QB: PUSH PO ====================
+exports.pushPOToQB = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Sign in required");
+  const { projectId, docId } = data;
+  const docRef = db.collection("boards").doc(projectId).collection("pos").doc(docId);
+  const po = (await docRef.get()).data();
+  if (!po) throw new functions.https.HttpsError("not-found", "PO not found");
+  if (po.qbDocId) return { success: true, qbDocId: po.qbDocId, message: "Already synced to QB" };
+
+  const token = await getQBToken();
+  const vendorId = await findOrCreateVendor(token, po.vendor || po.vendorName || "Vendor");
+  const proj = (await db.collection("boards").doc(projectId).get()).data() || {};
+
+  const payload = {
+    VendorRef: { value: vendorId },
+    Line: (po.items || []).map((item, i) => ({
+      Amount: parseFloat(item.cost || item.amount || 0), LineNum: i + 1,
+      Description: [item.title || item.name, item.sku, item.room].filter(Boolean).join(" — "),
+      DetailType: "ItemBasedExpenseLineDetail",
+      ItemBasedExpenseLineDetail: { ItemRef: { value: "1", name: "Services" }, Qty: parseFloat(item.qty || 1), UnitPrice: parseFloat(item.cost || item.amount || 0) }
+    })),
+    Memo: `CCH — ${proj.name || projectId} — ${po.poNum || po.number || docId}`
+  };
+
+  const result = await qbApi("POST", "purchaseorder", token, payload);
+  const qbPo = result.PurchaseOrder;
+  await docRef.update({ qbDocId: qbPo.Id, qbDocNumber: qbPo.DocNumber, qbVendorId: vendorId, qbSyncDate: new Date().toISOString() });
+  try { await db.collection("activity").add({ type: "po", action: "qb-pushed", description: `PO ${po.poNum || ""} → QB #${qbPo.DocNumber}`, projectId, projectName: proj.name || projectId, meta: { qbDocId: qbPo.Id, vendor: po.vendor }, createdAt: new Date().toISOString(), userId: context.auth.uid }); } catch (e) {}
+  return { success: true, qbDocId: qbPo.Id, qbDocNumber: qbPo.DocNumber };
+});
+
+// ==================== QB: OAUTH CALLBACK ====================
+exports.qbOAuthCallback = functions.https.onRequest(async (req, res) => {
+  const code = req.query.code;
+  if (!code) return res.status(400).send("Missing auth code");
+  const tokenRes = await fetch("https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", "Authorization": "Basic " + Buffer.from(QB.clientid + ":" + QB.clientsecret).toString("base64") },
+    body: new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: `https://us-central1-cch-design-boards.cloudfunctions.net/qbOAuthCallback` })
+  });
+  const tokens = await tokenRes.json();
+  await db.collection("admin").doc("qb").set({ refreshToken: tokens.refresh_token, realmId: req.query.realmId || QB.realmid, connectedAt: new Date().toISOString() }, { merge: true });
+  res.send(`<h2>✅ QuickBooks Connected!</h2><p>You can close this window.</p>`);
+});
+
+// ==================== TWILIO: SEND SMS ====================
+exports.sendClientText = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Sign in required");
+  const { projectId, toPhone, message } = data;
+  if (!toPhone || !message) throw new functions.https.HttpsError("invalid-argument", "Phone and message required");
+
+  const twilio = require("twilio");
+  const client = twilio(TW.sid, TW.token);
+  const msg = await client.messages.create({
+    body: `[CCH Studio] ${message}`,
+    from: TW.number,
+    to: toPhone
+  });
+
+  // Save to Firestore — appears in messages and activity feed
+  const proj = (await db.collection("boards").doc(projectId).get()).data() || {};
+  await db.collection("boards").doc(projectId).collection("messages").add({
+    type: "sms", from: "CCH Design", to: toPhone, text: message,
+    twilioSid: msg.sid, timestamp: new Date().toISOString()
+  });
+  try { await db.collection("activity").add({ type: "sms", action: "sent", description: `SMS to ${toPhone}: ${message.substring(0, 80)}`, projectId, projectName: proj.name || projectId, meta: { twilioSid: msg.sid, phone: toPhone }, createdAt: new Date().toISOString(), userId: context.auth.uid }); } catch (e) {}
+  return { success: true, sid: msg.sid };
+});
+
+// ==================== TWILIO: INBOUND WEBHOOK ====================
+exports.twilioWebhook = functions.https.onRequest(async (req, res) => {
+  const { From, Body, MessageSid } = req.body || {};
+  if (!From || !Body) return res.status(200).send("<Response></Response>");
+
+  // Find project by client phone
+  const snap = await db.collection("boards").where("clientPhone", "==", From).limit(1).get();
+  if (snap.empty) {
+    // Try without +1 prefix
+    const alt = From.startsWith("+1") ? From.slice(2) : "+1" + From;
+    const snap2 = await db.collection("boards").where("clientPhone", "==", alt).limit(1).get();
+    if (snap2.empty) return res.status(200).send("<Response></Response>");
+    snap2.forEach(doc => processInboundSMS(doc, From, Body, MessageSid));
+  } else {
+    snap.forEach(doc => processInboundSMS(doc, From, Body, MessageSid));
+  }
+  res.status(200).send("<Response></Response>");
+});
+
+async function processInboundSMS(projDoc, from, body, sid) {
+  const projectId = projDoc.id;
+  const proj = projDoc.data() || {};
+  await db.collection("boards").doc(projectId).collection("messages").add({
+    type: "sms", from: "Client", author: "client", to: TW.number,
+    text: body, twilioSid: sid, timestamp: new Date().toISOString()
+  });
+  try { await db.collection("activity").add({ type: "sms", action: "received", icon: "📱", description: `SMS from client: ${body.substring(0, 80)}`, projectId, projectName: proj.name || projectId, meta: { from, sid }, createdAt: new Date().toISOString() }); } catch (e) {}
+}
+
+// ==================== MICROSOFT GRAPH: TOKEN ====================
+async function getMSToken() {
+  const cfg = (await db.collection("admin").doc("microsoft").get()).data() || {};
+  const tenantId = cfg.tenantId || MS.tenantid;
+  const clientId = cfg.clientId || MS.clientid;
+  const clientSecret = cfg.clientSecret || MS.clientsecret;
+  if (!tenantId || !clientId) throw new Error("Microsoft not configured");
+
+  const res = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ client_id: clientId, scope: "https://graph.microsoft.com/.default", client_secret: clientSecret, grant_type: "client_credentials" })
+  });
+  return (await res.json()).access_token;
+}
+
+// ==================== MICROSOFT: WEBHOOK RECEIVER ====================
+exports.microsoftWebhook = functions.https.onRequest(async (req, res) => {
+  // Validation ping
+  if (req.query.validationToken) return res.status(200).send(req.query.validationToken);
+
+  const notifications = req.body?.value || [];
+  for (const n of notifications) {
+    const source = (n.clientState || "").toLowerCase();
+    const icon = source === "teams" ? "💬" : source === "sharepoint" ? "📁" : "✉️";
+    // Find project by resource or clientState tag
+    // (You tag subscriptions with projectId as clientState when setting up)
+    const projectId = n.clientState?.split(":")[1] || "general";
+    try {
+      await db.collection("activity").add({
+        type: "microsoft", source, icon,
+        description: `New ${source} activity: ${n.resource || "update"}`,
+        projectId, timestamp: new Date().toISOString()
+      });
+    } catch (e) {}
+  }
+  res.status(202).send();
+});
+
+// ==================== MICROSOFT: SETUP SUBSCRIPTIONS ====================
+exports.setupMicrosoftSubscriptions = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Sign in required");
+  const token = await getMSToken();
+  const webhookUrl = `https://us-central1-cch-design-boards.cloudfunctions.net/microsoftWebhook`;
+  const expiry = new Date(Date.now() + 29 * 24 * 60 * 60 * 1000).toISOString();
+
+  const resources = [
+    { resource: "/me/chats", state: "teams" },
+    { resource: "/me/drive/root", state: "sharepoint" },
+    { resource: "/me/mailFolders/Inbox/messages", state: "email" }
+  ];
+
+  for (const r of resources) {
+    await fetch("https://graph.microsoft.com/v1.0/subscriptions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ changeType: "created,updated", notificationUrl: webhookUrl, resource: r.resource, expirationDateTime: expiry, clientState: r.state })
+    });
+  }
+  return { success: true };
+});
+
+// ==================== CLIPPER: LOG SAVE ====================
+exports.logClipperSave = functions.https.onCall(async (data) => {
+  const { projectId, source, url, title } = data;
+  if (!projectId) return { success: false };
+  const proj = (await db.collection("boards").doc(projectId).get()).data() || {};
+  await db.collection("activity").add({
+    type: "clipper", source: source || "web", icon: "📌",
+    description: `Saved from ${source || "web"}: ${(title || "item").substring(0, 80)}`,
+    url, projectId, projectName: proj.name || projectId,
+    createdAt: new Date().toISOString()
+  });
+  return { success: true };
+});
+
+// ==================== WEEKLY AI REPORT ====================
+// Runs every Monday at 8am CT, or on-demand via callable
+exports.weeklyReport = functions.pubsub.schedule("every monday 08:00")
+  .timeZone("America/Chicago")
+  .onRun(async () => {
+    const report = await buildWeeklyReport();
+    await db.collection("reports").add(report);
+    console.log("Weekly report generated:", report.title);
+    return null;
+  });
+
+// On-demand version (call from frontend)
+exports.generateWeeklyReport = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Sign in required");
+  const report = await buildWeeklyReport(data.weeksBack || 0);
+  const ref = await db.collection("reports").add(report);
+  return { success: true, reportId: ref.id, report };
+});
+
+async function buildWeeklyReport(weeksBack = 0) {
+  const now = new Date();
+  const start = new Date(now);
+  start.setDate(start.getDate() - 7 * (weeksBack + 1));
+  const end = new Date(now);
+  end.setDate(end.getDate() - 7 * weeksBack);
+
+  const startStr = start.toISOString().slice(0, 10);
+  const endStr = end.toISOString().slice(0, 10);
+
+  // Pull time entries
+  let timeSnap;
+  try { timeSnap = await db.collection("timeEntries").where("date", ">=", startStr).where("date", "<=", endStr).get(); }
+  catch(e) { timeSnap = { docs: [], size: 0 }; }
+  let totalHours = 0, totalBillable = 0;
+  const timeByProject = {};
+  timeSnap.docs.forEach(d => {
+    const t = d.data();
+    const hrs = parseFloat(t.hours) || 0;
+    const total = parseFloat(t.total) || 0;
+    totalHours += hrs;
+    if (t.billable) totalBillable += total;
+    const pn = t.project || "Unassigned";
+    if (!timeByProject[pn]) timeByProject[pn] = { hours: 0, billable: 0, entries: 0 };
+    timeByProject[pn].hours += hrs;
+    timeByProject[pn].billable += total;
+    timeByProject[pn].entries++;
+  });
+
+  // Pull open invoices
+  let openInvoices = [], overdueInvoices = [];
+  try {
+    const invSnap = await db.collectionGroup("invoices").get();
+    invSnap.docs.forEach(d => {
+      const inv = d.data();
+      if (inv.status === "Paid" || inv.status === "Cancelled") return;
+      const total = parseFloat(inv.total) || 0;
+      const paid = (inv.payments || []).reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+      const bal = total - paid;
+      if (bal <= 0) return;
+      const invObj = { id: d.id, number: inv.invoiceNum || inv.number || d.id.slice(0, 8), projectName: inv.projectName || "", total, balance: bal, status: inv.status || "Draft", dueDate: inv.dueDate || inv.date || "" };
+      openInvoices.push(invObj);
+      if (inv.dueDate && new Date(inv.dueDate) < now) overdueInvoices.push(invObj);
+    });
+  } catch(e) {}
+
+  // Pull POs needing follow-up
+  let pendingPOs = [];
+  try {
+    const poSnap = await db.collectionGroup("purchaseOrders").get();
+    poSnap.docs.forEach(d => {
+      const po = d.data();
+      if (["Installed", "Received", "Cancelled"].includes(po.status)) return;
+      const eta = po.eta ? new Date(po.eta) : null;
+      const isLate = eta && eta < now;
+      pendingPOs.push({ id: d.id, vendor: po.vendor || "—", number: po.number || po.num || d.id.slice(0, 8), status: po.status || "Draft", eta: po.eta || "—", isLate, total: parseFloat(po.total) || 0 });
+    });
+  } catch(e) {}
+
+  // Pull activity count
+  let activityCount = 0;
+  try {
+    const actSnap = await db.collection("activity").where("createdAt", ">=", start.toISOString()).where("createdAt", "<=", end.toISOString()).get();
+    activityCount = actSnap.size;
+  } catch(e) {}
+
+  const totalOpenBalance = openInvoices.reduce((s, i) => s + i.balance, 0);
+  const latePOs = pendingPOs.filter(p => p.isLate);
+
+  // Health score
+  let health = 100;
+  health -= overdueInvoices.length * 10;
+  health -= latePOs.length * 12;
+  if (totalHours < 10) health -= 15;
+  health = Math.max(20, Math.min(100, health));
+
+  const healthLabel = health > 80 ? "Strong" : health > 55 ? "Needs Attention" : "At Risk";
+
+  return {
+    title: `CCH Studio Weekly Report — ${startStr} to ${endStr}`,
+    period: { start: startStr, end: endStr },
+    generatedAt: now.toISOString(),
+    summary: {
+      totalHours: Math.round(totalHours * 10) / 10,
+      totalBillable: Math.round(totalBillable * 100) / 100,
+      timeEntryCount: timeSnap.size,
+      activityCount,
+      health, healthLabel
+    },
+    timeByProject,
+    invoices: {
+      openCount: openInvoices.length,
+      overdueCount: overdueInvoices.length,
+      totalOpenBalance: Math.round(totalOpenBalance * 100) / 100,
+      overdue: overdueInvoices.slice(0, 10),
+      open: openInvoices.slice(0, 20)
+    },
+    purchaseOrders: {
+      pendingCount: pendingPOs.length,
+      lateCount: latePOs.length,
+      late: latePOs.slice(0, 10),
+      pending: pendingPOs.slice(0, 20)
+    },
+    followUps: [
+      ...overdueInvoices.map(i => ({ type: "invoice", priority: "high", text: `Chase payment: Invoice #${i.number} — $${i.balance.toFixed(2)} overdue` })),
+      ...latePOs.map(p => ({ type: "po", priority: "high", text: `Follow up: PO #${p.number} from ${p.vendor} — past ETA ${p.eta}` })),
+      ...pendingPOs.filter(p => !p.isLate && p.status === "Waiting for Confirmation").slice(0, 5).map(p => ({ type: "po", priority: "medium", text: `Confirm: PO #${p.number} from ${p.vendor} — still waiting` }))
+    ]
+  };
+}

@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CCH Studio — Houzz Time Entry Import</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'DM Sans',Arial,sans-serif; background:#0D0D0D; color:#E0E0E0; padding:24px; }
+  h1 { font-family:'Playfair Display',serif; color:#00B8D4; font-size:28px; margin-bottom:8px; }
+  .subtitle { color:#888; font-size:14px; margin-bottom:32px; }
+  .card { background:#1A1A1A; border:1px solid #333; border-radius:12px; padding:24px; margin-bottom:20px; }
+  .card h2 { color:#C8B99A; font-size:18px; margin-bottom:12px; }
+  label { display:block; color:#AAA; font-size:13px; margin-bottom:6px; }
+  input[type="file"] { background:#222; border:1px solid #444; border-radius:8px; padding:12px; color:#FFF; width:100%; margin-bottom:16px; cursor:pointer; }
+  select, input[type="text"] { background:#222; border:1px solid #444; border-radius:8px; padding:10px 14px; color:#FFF; width:100%; margin-bottom:12px; font-size:14px; }
+  button { background:#00B8D4; color:#000; border:none; border-radius:8px; padding:12px 24px; font-size:14px; font-weight:600; cursor:pointer; transition:all .2s; }
+  button:hover { background:#00E5FF; }
+  button:disabled { background:#333; color:#666; cursor:not-allowed; }
+  button.danger { background:#FF4444; color:#FFF; }
+  button.danger:hover { background:#FF6666; }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin:16px 0; }
+  .stat { background:#222; border-radius:8px; padding:16px; text-align:center; }
+  .stat .num { font-size:28px; font-weight:700; color:#00B8D4; }
+  .stat .lbl { font-size:12px; color:#888; margin-top:4px; }
+  .progress { height:8px; background:#333; border-radius:4px; overflow:hidden; margin:12px 0; }
+  .progress-bar { height:100%; background:linear-gradient(90deg,#00B8D4,#00E5FF); transition:width .3s; border-radius:4px; }
+  .log { background:#111; border:1px solid #333; border-radius:8px; padding:16px; max-height:300px; overflow-y:auto; font-family:monospace; font-size:12px; line-height:1.6; }
+  .log .ok { color:#4CAF50; }
+  .log .warn { color:#FF9800; }
+  .log .err { color:#FF4444; }
+  .log .info { color:#00B8D4; }
+  table { width:100%; border-collapse:collapse; margin-top:12px; }
+  th { background:#222; color:#C8B99A; padding:10px 12px; text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:.5px; border-bottom:2px solid #333; }
+  td { padding:8px 12px; border-bottom:1px solid #222; font-size:13px; }
+  tr:hover td { background:#1E1E1E; }
+  .tag { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
+  .tag-billable { background:rgba(0,184,212,.15); color:#00B8D4; }
+  .tag-nonbill { background:rgba(255,68,68,.15); color:#FF4444; }
+  .tag-internal { background:rgba(136,136,136,.15); color:#888; }
+  .step { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid #222; }
+  .step-num { width:32px; height:32px; border-radius:50%; background:#333; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; color:#888; flex-shrink:0; }
+  .step-num.active { background:#00B8D4; color:#000; }
+  .step-num.done { background:#4CAF50; color:#FFF; }
+  .rules-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0; }
+  .rule { background:#222; border-radius:6px; padding:10px; font-size:12px; }
+  .rule strong { color:#C8B99A; }
+  #preview-container { max-height:400px; overflow-y:auto; }
+</style>
+</head>
+<body>
+
+<h1>Houzz Time Entry Import</h1>
+<p class="subtitle">Upload Houzz time exports into CCH Studio's Firestore <code>timeEntries</code> collection</p>
+
+<!-- STEP 1: Firebase Auth -->
+<div class="card" id="step-auth">
+  <h2><span class="step-num active" id="sn1">1</span> Authenticate</h2>
+  <p style="color:#888;font-size:13px;margin-bottom:12px;">Sign in with your CCH Studio email and password.</p>
+  <input type="text" id="email" placeholder="Email" value="cynthiacbh@gmail.com">
+  <input type="password" id="password" placeholder="Password (your CCH Studio password)">
+  <button onclick="doLogin()">Sign In</button>
+  <p id="auth-status" style="margin-top:8px;font-size:13px;"></p>
+</div>
+
+<!-- STEP 2: Upload File -->
+<div class="card" id="step-upload" style="opacity:.5;pointer-events:none;">
+  <h2><span class="step-num" id="sn2">2</span> Upload Houzz Export</h2>
+  <label>Select the Houzz time entries .xlsx file:</label>
+  <input type="file" id="file-input" accept=".xlsx,.xls,.csv" onchange="parseFile(this)">
+
+  <div id="file-stats" style="display:none;">
+    <div class="stats" id="stats-grid"></div>
+
+    <h3 style="color:#C8B99A;margin:16px 0 8px;">Import Rules Applied:</h3>
+    <div class="rules-grid">
+      <div class="rule"><strong>CCH/CBH projects:</strong> Rate → $0, marked Not Billable (internal)</div>
+      <div class="rule"><strong>Not Billable entries:</strong> Rate → $0 (regardless of system rate)</div>
+      <div class="rule"><strong>Duplicate check:</strong> Match on project+member+date+service+hours</div>
+      <div class="rule"><strong>Source tag:</strong> All entries tagged <code>source: "houzz-import"</code></div>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 3: Preview & Map -->
+<div class="card" id="step-preview" style="display:none;">
+  <h2><span class="step-num" id="sn3">3</span> Preview & Confirm Mapping</h2>
+  <p style="color:#888;font-size:13px;margin-bottom:12px;">First 50 entries shown. Rates corrected per CCH rules.</p>
+
+  <div style="margin-bottom:12px;">
+    <label>Filter by member:</label>
+    <select id="member-filter" onchange="filterPreview()">
+      <option value="all">All Members</option>
+    </select>
+  </div>
+
+  <div id="preview-container"></div>
+</div>
+
+<!-- STEP 4: Import -->
+<div class="card" id="step-import" style="display:none;">
+  <h2><span class="step-num" id="sn4">4</span> Import to Firestore</h2>
+
+  <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;">
+    <button id="btn-import" onclick="startImport()">Import All Entries to Firestore</button>
+    <button class="danger" onclick="startImport(true)" style="font-size:12px;">Dry Run (no writes)</button>
+    <span id="import-status" style="font-size:13px;color:#888;"></span>
+  </div>
+
+  <div class="progress" id="progress-wrap" style="display:none;">
+    <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+  </div>
+
+  <div class="stats" id="import-stats" style="display:none;"></div>
+
+  <div class="log" id="import-log"></div>
+</div>
+
+<script>
+// ============================================
+// Firebase Init
+// ============================================
+const firebaseConfig = {
+  apiKey: "AIzaSyAd24U5ArVGrA24IxNcYD2NYiTVycyF4og",
+  authDomain: "cch-design-boards.firebaseapp.com",
+  projectId: "cch-design-boards",
+  storageBucket: "cch-design-boards.appspot.com"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+let parsedEntries = [];
+let projectMap = {}; // name -> Firestore project ID
+
+// ============================================
+// STEP 1: Auth
+// ============================================
+async function doLogin() {
+  const email = document.getElementById('email').value.trim();
+  const pw = document.getElementById('password').value;
+  const status = document.getElementById('auth-status');
+
+  if (!pw) {
+    status.innerHTML = '<span style="color:#FF9800;">Enter your CCH Studio password</span>';
+    return;
+  }
+
+  status.innerHTML = '<span style="color:#888;">Signing in...</span>';
+
+  try {
+    await auth.signInWithEmailAndPassword(email, pw);
+    status.innerHTML = '<span style="color:#4CAF50;">✓ Signed in as ' + email + '</span>';
+    document.getElementById('sn1').className = 'step-num done';
+    document.getElementById('sn2').className = 'step-num active';
+    document.getElementById('step-upload').style.opacity = '1';
+    document.getElementById('step-upload').style.pointerEvents = 'auto';
+    await loadProjectMap();
+  } catch(e) {
+    if (e.code === 'auth/invalid-login-credentials' || e.code === 'auth/wrong-password') {
+      status.innerHTML = '<span style="color:#FF4444;">Wrong password. Use the same password you log into cch-platform.web.app with.</span>';
+    } else if (e.code === 'auth/user-not-found') {
+      status.innerHTML = '<span style="color:#FF4444;">No account found for that email. Try your other CCH email.</span>';
+    } else if (e.code === 'auth/too-many-requests') {
+      status.innerHTML = '<span style="color:#FF9800;">Too many attempts — wait a minute and try again.</span>';
+    } else {
+      status.innerHTML = '<span style="color:#FF4444;">✗ ' + e.code + ': ' + e.message + '</span>';
+    }
+  }
+}
+
+async function loadProjectMap() {
+  const snap = await db.collection('boards').get();
+  snap.forEach(doc => {
+    const d = doc.data();
+    const name = (d.name || d.projectName || '').trim();
+    if (name) projectMap[name] = doc.id;
+    if (d.clientName) projectMap[d.clientName.trim()] = doc.id;
+  });
+  log('info', 'Loaded ' + Object.keys(projectMap).length + ' projects from Firestore');
+}
+
+// ============================================
+// STEP 2: Parse File
+// ============================================
+const NON_BILLABLE_PROJECTS = new Set(['CCH', 'CBH']);
+
+function correctEntry(entry) {
+  const proj = (entry.project || '').trim();
+  const isInternal = NON_BILLABLE_PROJECTS.has(proj);
+  const isNB = entry.billable === 'Not Billable';
+
+  entry.correctedRate = (isInternal || isNB) ? 0 : entry.rate;
+  entry.correctedTotal = entry.hours * entry.correctedRate;
+  entry.category = isInternal ? 'internal' : (isNB ? 'non-billable' : 'billable');
+  return entry;
+}
+
+function parseFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+
+    parsedEntries = [];
+    const members = new Set();
+    const projects = new Set();
+    let totalHrs = 0, totalVal = 0, internal = 0, billable = 0;
+
+    rows.forEach(r => {
+      if (!r['Project'] || !r['Reported By']) return;
+      if (String(r['Project']).includes('Total')) return;
+
+      // The decimal hours column has no header in Houzz export — XLSX.js names it __EMPTY, __EMPTY_1, etc.
+      // Try all possible names, then fall back to parsing the HH:MM "Hours" column
+      let hrs = 0;
+      const possibleHrsCols = ['__EMPTY', '__EMPTY_1', '__EMPTY_2', 'Unnamed: 6', 'Hours Dec', 'Decimal Hours'];
+      for (const col of possibleHrsCols) {
+        if (r[col] !== undefined && r[col] !== '' && !isNaN(parseFloat(r[col]))) {
+          hrs = parseFloat(r[col]);
+          break;
+        }
+      }
+      // If still 0, try to find ANY numeric column between Hours and Rate
+      if (hrs === 0) {
+        const keys = Object.keys(r);
+        const hoursIdx = keys.indexOf('Hours');
+        const rateIdx = keys.indexOf('Rate');
+        if (hoursIdx >= 0 && rateIdx > hoursIdx) {
+          for (let ki = hoursIdx + 1; ki < rateIdx; ki++) {
+            const v = parseFloat(r[keys[ki]]);
+            if (!isNaN(v) && v > 0) { hrs = v; break; }
+          }
+        }
+      }
+      // Last resort: parse "HH:MM" from Hours column
+      if (hrs === 0 && r['Hours']) {
+        const hm = String(r['Hours']).match(/(\d+):(\d+)/);
+        if (hm) hrs = parseInt(hm[1]) + parseInt(hm[2]) / 60;
+      }
+      const rate = parseFloat(r['Rate']) || 0;
+      let dt = r['Date'];
+      if (dt instanceof Date) {
+        dt = dt.toISOString().split('T')[0];
+      } else {
+        dt = String(dt).split('T')[0];
+      }
+
+      const entry = correctEntry({
+        project: String(r['Project']).trim(),
+        member: String(r['Reported By']).trim(),
+        date: dt,
+        service: String(r['Service'] || '').trim(),
+        description: String(r['Description'] || '').trim(),
+        hoursRaw: String(r['Hours'] || ''),
+        hours: hrs,
+        rate: rate,
+        total: parseFloat(r['Total']) || 0,
+        billable: String(r['Billable'] || 'Billable').trim(),
+        taxable: String(r['Taxable'] || '').trim(),
+        invoiceRef: String(r['Invoice'] || '').trim(),
+      });
+
+      parsedEntries.push(entry);
+      members.add(entry.member);
+      projects.add(entry.project);
+      totalHrs += hrs;
+      if (entry.category === 'internal') internal++;
+      if (entry.category === 'billable') billable++;
+      totalVal += entry.correctedTotal;
+    });
+
+    // Stats
+    document.getElementById('file-stats').style.display = 'block';
+    document.getElementById('stats-grid').innerHTML = `
+      <div class="stat"><div class="num">${parsedEntries.length.toLocaleString()}</div><div class="lbl">Total Entries</div></div>
+      <div class="stat"><div class="num">${totalHrs.toFixed(1)}</div><div class="lbl">Total Hours</div></div>
+      <div class="stat"><div class="num">$${totalVal.toLocaleString(undefined,{minimumFractionDigits:2})}</div><div class="lbl">Corrected Value</div></div>
+      <div class="stat"><div class="num">${members.size}</div><div class="lbl">Team Members</div></div>
+      <div class="stat"><div class="num">${projects.size}</div><div class="lbl">Projects</div></div>
+      <div class="stat"><div class="num">${billable}</div><div class="lbl">Billable</div></div>
+      <div class="stat"><div class="num">${internal}</div><div class="lbl">Internal ($0)</div></div>
+    `;
+
+    // Member filter
+    const sel = document.getElementById('member-filter');
+    sel.innerHTML = '<option value="all">All Members</option>';
+    Array.from(members).sort().forEach(m => {
+      sel.innerHTML += `<option value="${m}">${m}</option>`;
+    });
+
+    document.getElementById('sn2').className = 'step-num done';
+    document.getElementById('sn3').className = 'step-num active';
+    document.getElementById('step-preview').style.display = 'block';
+    document.getElementById('step-import').style.display = 'block';
+
+    filterPreview();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function filterPreview() {
+  const filter = document.getElementById('member-filter').value;
+  const filtered = filter === 'all' ? parsedEntries : parsedEntries.filter(e => e.member === filter);
+  const show = filtered.slice(0, 50);
+
+  let html = '<table><thead><tr>';
+  html += '<th>Project</th><th>Member</th><th>Date</th><th>Service</th><th>Hrs</th><th>Sys Rate</th><th>Corrected</th><th>Total</th><th>Status</th>';
+  html += '</tr></thead><tbody>';
+
+  show.forEach(e => {
+    const tag = e.category === 'internal' ? 'tag-internal' : (e.category === 'billable' ? 'tag-billable' : 'tag-nonbill');
+    const label = e.category === 'internal' ? 'Internal $0' : (e.category === 'billable' ? 'Billable' : 'Non-Bill $0');
+    const rateChanged = e.correctedRate !== e.rate;
+    html += `<tr>
+      <td>${e.project}</td>
+      <td>${e.member}</td>
+      <td>${e.date}</td>
+      <td style="font-size:11px;">${e.service}</td>
+      <td>${e.hours.toFixed(2)}</td>
+      <td>${rateChanged ? '<span style="color:#FF4444;text-decoration:line-through;">$'+e.rate.toFixed(0)+'</span>' : '$'+e.rate.toFixed(0)}</td>
+      <td style="color:${rateChanged?'#00B8D4':'#888'};">$${e.correctedRate.toFixed(0)}</td>
+      <td>$${e.correctedTotal.toFixed(2)}</td>
+      <td><span class="tag ${tag}">${label}</span></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  if (filtered.length > 50) html += `<p style="color:#888;margin-top:8px;font-size:12px;">Showing 50 of ${filtered.length.toLocaleString()} entries</p>`;
+
+  document.getElementById('preview-container').innerHTML = html;
+}
+
+// ============================================
+// STEP 4: Import to Firestore
+// ============================================
+function log(type, msg) {
+  const el = document.getElementById('import-log');
+  const ts = new Date().toLocaleTimeString();
+  el.innerHTML += `<div class="${type}">[${ts}] ${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+async function startImport(dryRun = false) {
+  const btn = document.getElementById('btn-import');
+  btn.disabled = true;
+  document.getElementById('progress-wrap').style.display = 'block';
+  document.getElementById('import-stats').style.display = 'grid';
+
+  const total = parsedEntries.length;
+  let imported = 0, skipped = 0, errors = 0, dupes = 0;
+  const batchSize = 450; // Firestore max 500 per batch, leave room
+
+  log('info', `${dryRun ? 'DRY RUN — ' : ''}Starting import of ${total.toLocaleString()} entries...`);
+
+  // Process in batches
+  for (let i = 0; i < total; i += batchSize) {
+    const chunk = parsedEntries.slice(i, i + batchSize);
+    const batch = dryRun ? null : db.batch();
+
+    for (const entry of chunk) {
+      // Build Firestore document
+      const doc = {
+        project: entry.project,
+        projectId: projectMap[entry.project] || null,
+        member: entry.member,
+        memberEmail: getMemberEmail(entry.member),
+        date: entry.date,
+        service: entry.service,
+        description: entry.description,
+        hours: entry.hours,
+        hoursFormatted: entry.hoursRaw,
+        rate: entry.correctedRate,
+        systemRate: entry.rate,
+        total: entry.correctedTotal,
+        systemTotal: entry.total,
+        billable: entry.category === 'billable',
+        billableLabel: entry.billable,
+        taxable: entry.taxable === 'Taxable',
+        source: 'houzz-import',
+        importedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        invoiceRef: entry.invoiceRef || null,
+        invoicedAmount: null,
+        invoiceId: null,
+      };
+
+      // Generate a deterministic ID to prevent duplicates on re-import
+      const docId = generateEntryId(entry);
+
+      if (!dryRun) {
+        const ref = db.collection('timeEntries').doc(docId);
+        batch.set(ref, doc, { merge: true });
+      }
+      imported++;
+    }
+
+    if (!dryRun && batch) {
+      try {
+        await batch.commit();
+        log('ok', `Batch ${Math.floor(i/batchSize)+1}: wrote ${chunk.length} entries`);
+      } catch(e) {
+        log('err', `Batch error: ${e.message}`);
+        errors += chunk.length;
+        imported -= chunk.length;
+      }
+    } else {
+      log('info', `[DRY RUN] Batch ${Math.floor(i/batchSize)+1}: would write ${chunk.length} entries`);
+    }
+
+    // Update progress
+    const pct = Math.min(100, ((i + chunk.length) / total * 100));
+    document.getElementById('progress-bar').style.width = pct + '%';
+    updateImportStats(imported, skipped, errors, dupes, total);
+
+    // Small delay to not overwhelm Firestore
+    if (!dryRun) await new Promise(r => setTimeout(r, 200));
+  }
+
+  log('ok', `✓ Import complete! ${imported} entries ${dryRun ? 'would be ' : ''}written to timeEntries collection`);
+  document.getElementById('sn4').className = 'step-num done';
+  btn.disabled = false;
+}
+
+function generateEntryId(entry) {
+  // Deterministic ID: project-member-date-service-hours
+  const parts = [
+    (entry.project || '').replace(/[^a-zA-Z0-9]/g, ''),
+    (entry.member || '').replace(/[^a-zA-Z0-9]/g, ''),
+    entry.date,
+    (entry.service || '').replace(/[^a-zA-Z0-9]/g, '').substring(0, 20),
+    String(entry.hours)
+  ];
+  // Simple hash
+  const str = parts.join('-');
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + ch;
+    hash |= 0;
+  }
+  return 'houzz-' + Math.abs(hash).toString(36) + '-' + entry.date;
+}
+
+function getMemberEmail(name) {
+  const map = {
+    'Cynthia Holloway': 'cynthiacbh@gmail.com',
+    'Vanessa Holliday': 'vanessa@cchdesign.com',
+    'Chelsea Newton': 'chelsea@cchdesign.com',
+    'Celeste Wayne': 'celeste@cchdesign.com',
+    'Isa Dargel': 'isa@cchdesign.com',
+    'Kolle Smith': 'kolle@cchdesign.com',
+    'Jackie Moss': 'jackie@cchdesign.com',
+    'Carol Gonzalez': 'carol@cchdesign.com',
+  };
+  return map[name] || (name.toLowerCase().replace(/\s/g,'.') + '@cchdesign.com');
+}
+
+function updateImportStats(imported, skipped, errors, dupes, total) {
+  document.getElementById('import-stats').innerHTML = `
+    <div class="stat"><div class="num" style="color:#4CAF50;">${imported.toLocaleString()}</div><div class="lbl">Imported</div></div>
+    <div class="stat"><div class="num" style="color:#FF9800;">${skipped}</div><div class="lbl">Skipped</div></div>
+    <div class="stat"><div class="num" style="color:#FF4444;">${errors}</div><div class="lbl">Errors</div></div>
+    <div class="stat"><div class="num">${total.toLocaleString()}</div><div class="lbl">Total</div></div>
+  `;
+}
+</script>
+</body>
+</html>

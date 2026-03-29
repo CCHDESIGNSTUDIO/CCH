@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CCH Studio — Houzz Data Enrichment</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <style>
+    :root { --navy: #0E1629; --gold: #C8B99A; --green: #6BAF78; --red: #D4736A; --blue: #7AAFCF; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'DM Sans', -apple-system, sans-serif; background: var(--navy); color: #EDE8E0; min-height: 100vh; padding: 32px; }
+    h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 32px; font-weight: 300; color: var(--gold); margin-bottom: 8px; }
+    h2 { font-size: 16px; font-weight: 600; color: var(--gold); margin: 24px 0 12px; letter-spacing: 0.5px; }
+    .subtitle { font-size: 13px; color: #A89970; margin-bottom: 24px; }
+    .card { background: #111D33; border: 1px solid rgba(200,185,154,0.08); padding: 24px; margin-bottom: 16px; }
+    .btn { padding: 10px 24px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit; letter-spacing: 0.3px; }
+    .btn-gold { background: var(--gold); color: var(--navy); }
+    .btn-gold:hover { background: #D8C9AA; }
+    .btn-outline { background: transparent; color: var(--gold); border: 1px solid rgba(200,185,154,0.2); }
+    .btn-outline:hover { border-color: var(--gold); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    input[type="file"] { display: none; }
+    .file-label { display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; background: rgba(200,185,154,0.06); border: 1px dashed rgba(200,185,154,0.2); cursor: pointer; font-size: 13px; color: var(--gold); }
+    .file-label:hover { border-color: var(--gold); background: rgba(200,185,154,0.1); }
+    .stats { display: flex; gap: 16px; flex-wrap: wrap; margin: 16px 0; }
+    .stat { background: rgba(200,185,154,0.04); border: 1px solid rgba(200,185,154,0.08); padding: 16px; min-width: 140px; }
+    .stat-val { font-size: 24px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    .stat-label { font-size: 10px; color: #A89970; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { text-align: left; padding: 8px 10px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #A89970; border-bottom: 1px solid rgba(200,185,154,0.1); }
+    td { padding: 7px 10px; border-bottom: 1px solid rgba(200,185,154,0.04); }
+    .match { color: var(--green); }
+    .no-match { color: var(--red); opacity: 0.5; }
+    .update { color: var(--blue); }
+    .log { background: #0A1220; padding: 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; margin-top: 12px; }
+    .progress { height: 4px; background: rgba(200,185,154,0.1); margin: 12px 0; }
+    .progress-bar { height: 100%; background: var(--gold); transition: width 0.3s; }
+    .tabs { display: flex; gap: 0; margin-bottom: 16px; }
+    .tab { padding: 10px 20px; font-size: 12px; font-weight: 600; color: #A89970; cursor: pointer; border-bottom: 2px solid transparent; background: none; border-top: none; border-left: none; border-right: none; font-family: inherit; }
+    .tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+    .hidden { display: none; }
+    .auth-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; padding: 12px 16px; background: rgba(200,185,154,0.04); border: 1px solid rgba(200,185,154,0.08); }
+    .auth-bar input { padding: 8px 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(200,185,154,0.1); color: #EDE8E0; font-size: 13px; font-family: inherit; }
+    .auth-bar input:focus { outline: none; border-color: var(--gold); }
+    .badge { display: inline-block; padding: 2px 8px; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; }
+    .badge-green { background: rgba(107,175,120,0.12); color: var(--green); }
+    .badge-red { background: rgba(212,115,106,0.12); color: var(--red); }
+    .badge-blue { background: rgba(122,175,207,0.12); color: var(--blue); }
+    .badge-gold { background: rgba(200,185,154,0.12); color: var(--gold); }
+  </style>
+</head>
+<body>
+
+<h1>Houzz Data Enrichment</h1>
+<p class="subtitle">Import payment status, balances, and document linkage from Houzz transaction reports into CCH Studio</p>
+
+<div class="auth-bar" id="authBar">
+  <span style="font-size:12px;color:#A89970;">Sign in to CCH Studio:</span>
+  <input type="email" id="authEmail" placeholder="Email" style="width:220px;">
+  <input type="password" id="authPass" placeholder="Password" style="width:160px;">
+  <button class="btn btn-gold" onclick="signIn()">Sign In</button>
+  <span id="authStatus" style="font-size:12px;color:#A89970;"></span>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('transactions')">Transaction Report</button>
+  <button class="tab" onclick="switchTab('tracker')">Global Tracker</button>
+</div>
+
+<!-- TRANSACTION REPORT TAB -->
+<div id="tab-transactions">
+  <div class="card">
+    <h2>Step 1: Load Houzz Transaction Report (.xlsx)</h2>
+    <p style="font-size:12px;color:#A89970;margin-bottom:12px;">This is the "All Transactions" report from Houzz Pro with payment status, balances, and QB IDs.</p>
+    <label class="file-label">
+      <span>Choose Transaction Report</span>
+      <input type="file" accept=".xlsx,.xls" onchange="loadTransactionReport(this.files[0])">
+    </label>
+    <span id="txFileStatus" style="margin-left:12px;font-size:12px;color:#A89970;"></span>
+  </div>
+
+  <div id="txPreview" class="hidden">
+    <div class="card">
+      <h2>Step 2: Preview — Match Against Firestore</h2>
+      <div id="txStats" class="stats"></div>
+      <button class="btn btn-outline" onclick="matchTransactions()" id="btnMatch">Match Against Firestore</button>
+      <div class="progress hidden" id="txMatchProgress"><div class="progress-bar" style="width:0%"></div></div>
+    </div>
+
+    <div id="txMatchResults" class="hidden">
+      <div class="card">
+        <h2>Step 3: Review Matches</h2>
+        <div id="txMatchStats" class="stats"></div>
+        <div style="margin:12px 0;display:flex;gap:8px;">
+          <button class="tab active" onclick="filterTxTable('all')">All</button>
+          <button class="tab" onclick="filterTxTable('updates')">Has Updates</button>
+          <button class="tab" onclick="filterTxTable('unmatched')">Unmatched</button>
+        </div>
+        <div style="max-height:400px;overflow-y:auto;">
+          <table id="txTable"></table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Step 4: Apply Updates</h2>
+        <p style="font-size:12px;color:#A89970;margin-bottom:12px;">This will update Firestore records with payment status, balance, and connected docs from Houzz.</p>
+        <button class="btn btn-gold" onclick="applyTransactionUpdates()" id="btnApply">Apply Updates to Firestore</button>
+        <div class="progress hidden" id="txApplyProgress"><div class="progress-bar" style="width:0%"></div></div>
+        <div class="log hidden" id="txLog"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GLOBAL TRACKER TAB -->
+<div id="tab-tracker" class="hidden">
+  <div class="card">
+    <h2>Step 1: Load Houzz Global Tracker (.xlsx)</h2>
+    <p style="font-size:12px;color:#A89970;margin-bottom:12px;">This is the Selection Tracker export with per-item approval status and document linkage.</p>
+    <label class="file-label">
+      <span>Choose Global Tracker</span>
+      <input type="file" accept=".xlsx,.xls" onchange="loadGlobalTracker(this.files[0])">
+    </label>
+    <span id="gtFileStatus" style="margin-left:12px;font-size:12px;color:#A89970;"></span>
+  </div>
+
+  <div id="gtPreview" class="hidden">
+    <div class="card">
+      <h2>Preview: Items by Project</h2>
+      <div id="gtStats" class="stats"></div>
+      <div style="max-height:400px;overflow-y:auto;">
+        <table id="gtTable"></table>
+      </div>
+      <p style="font-size:11px;color:#A89970;margin-top:12px;">Global tracker enrichment updates clip records with approval status and document linkage. Coming soon.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Firebase config
+  var firebaseConfig = {
+    apiKey: "AIzaSyADendDkbOF0FGo-Gv2PB40KJpGOPMgfL8",
+    authDomain: "cch-design-boards.firebaseapp.com",
+    projectId: "cch-design-boards",
+    storageBucket: "cch-design-boards.appspot.com",
+    messagingSenderId: "1062753540867",
+    appId: "1:1062753540867:web:c1a2f3b4c5d6e7f8a9b0c1"
+  };
+  firebase.initializeApp(firebaseConfig);
+  var db = firebase.firestore();
+  var auth = firebase.auth();
+
+  var txData = [];
+  var txMatches = [];
+  var currentUser = null;
+
+  async function signIn() {
+    var email = document.getElementById('authEmail').value;
+    var pass = document.getElementById('authPass').value;
+    try {
+      var cred = await auth.signInWithEmailAndPassword(email, pass);
+      currentUser = cred.user;
+      document.getElementById('authStatus').textContent = 'Signed in as ' + currentUser.email;
+      document.getElementById('authStatus').style.color = '#6BAF78';
+    } catch(e) {
+      document.getElementById('authStatus').textContent = 'Error: ' + e.message;
+      document.getElementById('authStatus').style.color = '#D4736A';
+    }
+  }
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('tab-transactions').classList.toggle('hidden', tab !== 'transactions');
+    document.getElementById('tab-tracker').classList.toggle('hidden', tab !== 'tracker');
+  }
+
+  // ==================== TRANSACTION REPORT ====================
+
+  function loadTransactionReport(file) {
+    if (!file) return;
+    document.getElementById('txFileStatus').textContent = 'Reading...';
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var wb = XLSX.read(e.target.result, { type: 'array' });
+      var sheet = wb.Sheets[wb.SheetNames[0]];
+      txData = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      document.getElementById('txFileStatus').textContent = txData.length + ' transactions loaded from ' + file.name;
+
+      // Show stats
+      var types = {};
+      var statuses = {};
+      txData.forEach(function(r) {
+        var t = r['Transaction Type'] || 'unknown';
+        types[t] = (types[t] || 0) + 1;
+        var s = r['Status'] || 'unknown';
+        statuses[s] = (statuses[s] || 0) + 1;
+      });
+
+      var hasQB = txData.filter(function(r) { return r['Quickbooks Doc id']; }).length;
+      var hasBal = txData.filter(function(r) { return parseFloat(r[' Balance ']) > 0; }).length;
+
+      document.getElementById('txStats').innerHTML =
+        stat(txData.length, 'Total Transactions') +
+        stat(types['invoice'] || 0, 'Invoices') +
+        stat(types['Purchase Order'] || 0, 'Purchase Orders') +
+        stat(types['proposal'] || 0, 'Proposals') +
+        stat(types['retainer'] || 0, 'Retainers') +
+        stat(hasQB, 'Have QB ID') +
+        stat(hasBal, 'Balance > $0');
+
+      document.getElementById('txPreview').classList.remove('hidden');
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function stat(val, label) {
+    return '<div class="stat"><div class="stat-val">' + val + '</div><div class="stat-label">' + label + '</div></div>';
+  }
+
+  // ==================== MATCH AGAINST FIRESTORE ====================
+
+  async function matchTransactions() {
+    if (!currentUser) { alert('Please sign in first.'); return; }
+    var btn = document.getElementById('btnMatch');
+    btn.disabled = true;
+    btn.textContent = 'Matching...';
+    var prog = document.getElementById('txMatchProgress');
+    prog.classList.remove('hidden');
+
+    // Load ALL invoices and POs from Firestore
+    var allProjects = [];
+    try {
+      var projSnap = await db.collection('boards').get();
+      projSnap.forEach(function(d) { allProjects.push({ id: d.id, name: d.data().name || d.id }); });
+    } catch(e) { alert('Error loading projects: ' + e.message); btn.disabled = false; return; }
+
+    // Build a map of doc number → Firestore doc
+    var fsMap = {}; // { 'IN-10066': { projectId, docId, collection, data } }
+    var loaded = 0;
+    var total = allProjects.length;
+
+    for (var i = 0; i < allProjects.length; i++) {
+      var p = allProjects[i];
+      loaded++;
+      prog.querySelector('.progress-bar').style.width = Math.round((loaded / total) * 100) + '%';
+
+      try {
+        var [invSnap, poSnap, proSnap] = await Promise.all([
+          db.collection('boards').doc(p.id).collection('invoices').get(),
+          db.collection('boards').doc(p.id).collection('purchaseOrders').get(),
+          db.collection('boards').doc(p.id).collection('proposals').get()
+        ]);
+
+        invSnap.forEach(function(d) {
+          var data = d.data();
+          var num = data.number || data.invoiceNum || '';
+          if (num) fsMap[num.toUpperCase()] = { projectId: p.id, projectName: p.name, docId: d.id, collection: 'invoices', data: data };
+        });
+        poSnap.forEach(function(d) {
+          var data = d.data();
+          var num = data.number || data.poNum || '';
+          if (num) fsMap[num.toUpperCase()] = { projectId: p.id, projectName: p.name, docId: d.id, collection: 'purchaseOrders', data: data };
+        });
+        proSnap.forEach(function(d) {
+          var data = d.data();
+          var num = data.number || data.proposalNum || data.name || '';
+          if (num) fsMap[num.toUpperCase()] = { projectId: p.id, projectName: p.name, docId: d.id, collection: 'proposals', data: data };
+        });
+      } catch(e) { /* skip errors for individual projects */ }
+    }
+
+    // Match Houzz transactions to Firestore
+    txMatches = [];
+    txData.forEach(function(tx) {
+      var code = (tx['Code'] || '').toUpperCase();
+      var fs = fsMap[code];
+      var updates = {};
+      var hasUpdates = false;
+
+      if (fs) {
+        // Check what needs updating
+        var houzzStatus = tx['Status'] || '';
+        var houzzBalance = parseFloat(tx[' Balance ']) || 0;
+        var houzzAmount = parseFloat(tx[' Amount ']) || 0;
+        var houzzQB = tx['Quickbooks Doc id'] || '';
+        var houzzConnected = (tx['Connected Docs'] || '').replace(/\r\n/g, ', ').trim();
+        var houzzMarkup = tx[' Markup '] !== '-' ? parseFloat(tx[' Markup ']) : null;
+        var houzzTax = parseFloat(tx[' Tax Amount ']) || 0;
+        var houzzShipping = parseFloat(tx[' Shipping ']) || 0;
+
+        // Status mapping
+        var statusMap = { 'Paid': 'Paid', 'Partially Paid': 'Partial', 'Sent': 'Sent', 'Open': 'Sent', 'Invoiced': 'Sent', 'Closed': 'Paid', 'Approved': 'Approved', 'Partially Invoiced': 'Sent' };
+        var mappedStatus = statusMap[houzzStatus] || houzzStatus;
+
+        if (mappedStatus && fs.data.status !== mappedStatus && fs.data.houzzStatus !== houzzStatus) {
+          updates.houzzStatus = houzzStatus;
+          if (!fs.data.status || fs.data.status === 'Draft') updates.status = mappedStatus;
+          hasUpdates = true;
+        }
+        if (houzzBalance >= 0 && fs.data.houzzBalance === undefined) {
+          updates.houzzBalance = houzzBalance;
+          hasUpdates = true;
+        }
+        if (houzzAmount > 0 && (!fs.data.total || parseFloat(fs.data.total) === 0)) {
+          updates.houzzAmount = houzzAmount;
+          hasUpdates = true;
+        }
+        if (houzzQB && !fs.data.qbDocId) {
+          updates.qbDocId = String(houzzQB);
+          updates.qbSynced = true;
+          hasUpdates = true;
+        }
+        if (houzzConnected && !fs.data.houzzConnectedDocs) {
+          updates.houzzConnectedDocs = houzzConnected;
+          hasUpdates = true;
+        }
+        if (houzzTax > 0 && !fs.data.houzzTax) {
+          updates.houzzTax = houzzTax;
+          hasUpdates = true;
+        }
+        if (houzzShipping > 0 && !fs.data.houzzShipping) {
+          updates.houzzShipping = houzzShipping;
+          hasUpdates = true;
+        }
+      }
+
+      txMatches.push({
+        code: tx['Code'],
+        project: tx['__EMPTY'] || '',
+        type: tx['Transaction Type'],
+        houzzStatus: tx['Status'],
+        amount: parseFloat(tx[' Amount ']) || 0,
+        balance: parseFloat(tx[' Balance ']) || 0,
+        qbId: tx['Quickbooks Doc id'] || '',
+        matched: !!fs,
+        fsRef: fs || null,
+        updates: updates,
+        hasUpdates: hasUpdates
+      });
+    });
+
+    // Show results
+    var matched = txMatches.filter(function(m) { return m.matched; }).length;
+    var withUpdates = txMatches.filter(function(m) { return m.hasUpdates; }).length;
+    var unmatched = txMatches.filter(function(m) { return !m.matched; }).length;
+    var qbUpdates = txMatches.filter(function(m) { return m.updates.qbDocId; }).length;
+    var statusUpdates = txMatches.filter(function(m) { return m.updates.houzzStatus; }).length;
+
+    document.getElementById('txMatchStats').innerHTML =
+      stat(matched, 'Matched in Firestore') +
+      stat(withUpdates, 'Have Updates') +
+      stat(statusUpdates, 'Status Updates') +
+      stat(qbUpdates, 'QB ID Updates') +
+      stat(unmatched, 'Unmatched');
+
+    renderTxTable('all');
+    document.getElementById('txMatchResults').classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = 'Re-Match';
+    prog.classList.add('hidden');
+  }
+
+  function renderTxTable(filter) {
+    var rows = txMatches;
+    if (filter === 'updates') rows = rows.filter(function(m) { return m.hasUpdates; });
+    if (filter === 'unmatched') rows = rows.filter(function(m) { return !m.matched; });
+
+    var html = '<thead><tr><th>Code</th><th>Project</th><th>Type</th><th>Houzz Status</th><th>Amount</th><th>Balance</th><th>QB ID</th><th>Match</th><th>Updates</th></tr></thead><tbody>';
+    rows.slice(0, 200).forEach(function(m) {
+      var matchClass = m.matched ? (m.hasUpdates ? 'update' : 'match') : 'no-match';
+      var matchLabel = m.matched ? (m.hasUpdates ? 'UPDATE' : 'OK') : 'NO MATCH';
+      var badgeClass = m.hasUpdates ? 'badge-blue' : (m.matched ? 'badge-green' : 'badge-red');
+      var updateList = Object.keys(m.updates).join(', ') || '—';
+      html += '<tr><td>' + esc(m.code) + '</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;">' + esc(m.project) + '</td><td>' + esc(m.type) + '</td><td>' + esc(m.houzzStatus) + '</td><td style="text-align:right;">$' + m.amount.toLocaleString() + '</td><td style="text-align:right;' + (m.balance > 0 ? 'color:var(--red);' : '') + '">$' + m.balance.toLocaleString() + '</td><td>' + esc(String(m.qbId)) + '</td><td><span class="badge ' + badgeClass + '">' + matchLabel + '</span></td><td style="font-size:10px;color:#A89970;">' + updateList + '</td></tr>';
+    });
+    if (rows.length > 200) html += '<tr><td colspan="9" style="text-align:center;color:#A89970;">Showing 200 of ' + rows.length + '...</td></tr>';
+    html += '</tbody>';
+    document.getElementById('txTable').innerHTML = html;
+  }
+
+  function filterTxTable(filter) {
+    document.querySelectorAll('#txMatchResults .tab').forEach(function(t) { t.classList.remove('active'); });
+    event.target.classList.add('active');
+    renderTxTable(filter);
+  }
+
+  // ==================== APPLY UPDATES ====================
+
+  async function applyTransactionUpdates() {
+    if (!currentUser) { alert('Please sign in first.'); return; }
+    var toUpdate = txMatches.filter(function(m) { return m.hasUpdates && m.fsRef; });
+    if (toUpdate.length === 0) { alert('No updates to apply.'); return; }
+    if (!confirm('Apply ' + toUpdate.length + ' updates to Firestore? This will update payment status, balances, QB IDs, and connected docs.')) return;
+
+    var btn = document.getElementById('btnApply');
+    btn.disabled = true;
+    btn.textContent = 'Applying...';
+    var prog = document.getElementById('txApplyProgress');
+    prog.classList.remove('hidden');
+    var log = document.getElementById('txLog');
+    log.classList.remove('hidden');
+    log.textContent = '';
+
+    var success = 0;
+    var errors = 0;
+
+    for (var i = 0; i < toUpdate.length; i++) {
+      var m = toUpdate[i];
+      prog.querySelector('.progress-bar').style.width = Math.round(((i + 1) / toUpdate.length) * 100) + '%';
+
+      try {
+        var ref = db.collection('boards').doc(m.fsRef.projectId).collection(m.fsRef.collection).doc(m.fsRef.docId);
+        var updateData = Object.assign({}, m.updates, { houzzEnrichedAt: new Date().toISOString() });
+        await ref.update(updateData);
+        success++;
+        if (i < 20 || i % 50 === 0) {
+          log.textContent += 'Updated ' + m.code + ' (' + m.fsRef.collection + ') — ' + Object.keys(m.updates).join(', ') + '\n';
+        }
+      } catch(e) {
+        errors++;
+        log.textContent += 'ERROR ' + m.code + ': ' + e.message + '\n';
+      }
+    }
+
+    log.textContent += '\n--- DONE ---\nSuccess: ' + success + '\nErrors: ' + errors + '\nTotal: ' + toUpdate.length;
+    btn.disabled = false;
+    btn.textContent = 'Done! (' + success + ' updated)';
+    prog.classList.add('hidden');
+  }
+
+  // ==================== GLOBAL TRACKER ====================
+
+  function loadGlobalTracker(file) {
+    if (!file) return;
+    document.getElementById('gtFileStatus').textContent = 'Reading...';
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var wb = XLSX.read(e.target.result, { type: 'array' });
+      var sheet = wb.Sheets[wb.SheetNames[0]];
+      var data = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      document.getElementById('gtFileStatus').textContent = data.length + ' items loaded from ' + file.name;
+
+      // Group by project
+      var projects = {};
+      data.forEach(function(r) {
+        var p = r['Project Name'] || 'Unknown';
+        if (!projects[p]) projects[p] = { items: 0, invoiced: 0, pending: 0, approved: 0 };
+        projects[p].items++;
+        var status = r['Approval Status'] || '';
+        if (status.indexOf('Invoiced') >= 0) projects[p].invoiced++;
+        else if (status.indexOf('pending') >= 0) projects[p].pending++;
+        else if (status.indexOf('approved') >= 0) projects[p].approved++;
+      });
+
+      var invCount = data.filter(function(r) { return r['Invoice']; }).length;
+      var poCount = data.filter(function(r) { return r['Purchase Order']; }).length;
+
+      document.getElementById('gtStats').innerHTML =
+        stat(data.length, 'Total Items') +
+        stat(Object.keys(projects).length, 'Projects') +
+        stat(invCount, 'With Invoice Status') +
+        stat(poCount, 'With PO Status');
+
+      var html = '<thead><tr><th>Project</th><th>Items</th><th>Invoiced</th><th>Pending</th><th>Approved</th></tr></thead><tbody>';
+      Object.entries(projects).sort(function(a, b) { return b[1].items - a[1].items; }).forEach(function(entry) {
+        html += '<tr><td>' + esc(entry[0]) + '</td><td style="text-align:right;">' + entry[1].items + '</td><td style="text-align:right;">' + entry[1].invoiced + '</td><td style="text-align:right;">' + entry[1].pending + '</td><td style="text-align:right;">' + entry[1].approved + '</td></tr>';
+      });
+      html += '</tbody>';
+      document.getElementById('gtTable').innerHTML = html;
+      document.getElementById('gtPreview').classList.remove('hidden');
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function esc(t) { if (t == null) return ''; var d = document.createElement('div'); d.textContent = String(t); return d.innerHTML; }
+</script>
+</body>
+</html>

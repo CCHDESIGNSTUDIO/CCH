@@ -1139,8 +1139,10 @@
     .ib-section-title {
       font-family: var(--font-display); font-size: 26px; font-weight: 600;
       border: none; background: none; flex: 1; padding: 4px 0;
-      color: #0E1629; letter-spacing: 0.3px;
+      color: var(--text-primary); text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+      letter-spacing: 0.3px;
     }
+    .classic-theme .ib-section-title { color: #1a1a2e; text-shadow: none; }
     .ib-section-title:focus { outline: none; border-bottom: 2px solid var(--cyan); }
     .ib-section-desc {
       font-size: 12px; color: var(--gray-400); border: none; background: none;
@@ -1155,19 +1157,19 @@
       display: flex; align-items: center; justify-content: center; transition: all 0.15s;
       flex-shrink: 0;
     }
-    .ib-section-menu-btn:hover { background: rgba(14,22,41,0.05); color: #0E1629; }
+    .ib-section-menu-btn:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
     .ib-section-dropdown {
-      position: absolute; top: 100%; right: 0; background: #FFFFFF; border: 1px solid rgba(14,22,41,0.12);
-      border-radius:0; box-shadow: 0 8px 32px rgba(14,22,41,0.15); z-index: 100;
+      position: absolute; top: 100%; right: 0; background: #1E1E2A; border: 1px solid rgba(14,22,41,0.12);
+      border-radius:0; box-shadow: 0 8px 32px rgba(0,0,0,0.5); z-index: 100;
       min-width: 200px; padding: 4px 0; display: none;
     }
     .ib-section-dropdown.open { display: block; }
     .ib-section-dropdown button {
       display: flex; width: 100%; align-items: center; gap: 10px; padding: 10px 16px;
-      border: none; background: none; cursor: pointer; font-size: 13px; color: #0E1629;
+      border: none; background: none; cursor: pointer; font-size: 12px; color: var(--gray-400);
       text-align: left; transition: background 0.1s;
     }
-    .ib-section-dropdown button:hover { background: #F5F3EE; color: #0E1629; }
+    .ib-section-dropdown button:hover { background: rgba(255,255,255,0.06); color: var(--text-primary); }
     .ib-section-dropdown button.danger { color: var(--red); }
     .ib-section-dropdown button.danger:hover { background: rgba(239,83,80,0.06); }
     .ib-section-dropdown .divider { height: 1px; background: var(--gray-100); margin: 4px 0; }
@@ -1199,12 +1201,12 @@
 
     .ib-item {
       break-inside: avoid; position: relative; border-radius: 8px; overflow: hidden;
-      background: #FFFFFF; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+      background: var(--gray-800); cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
       margin-bottom: 20px; display: inline-block; width: 100%;
-      border: 1px solid rgba(14,22,41,0.08);
-      box-shadow: 0 2px 8px rgba(14,22,41,0.06);
+      border: 1px solid rgba(255,255,255,0.10);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
-    .ib-item:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(14,22,41,0.12); }
+    .ib-item:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
     .ib-item img {
       width: 100%; display: block; object-fit: cover; border-radius: 8px 8px 0 0;
     }
@@ -1216,10 +1218,11 @@
       display: flex; justify-content: space-between; align-items: center;
     }
     .ib-item-caption-bar {
-      font-size: 13px; font-weight: 600; color: #0E1629;
+      font-size: 12px; font-weight: 600; color: var(--white, #fff);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
     }
     .ib-item-caption-bar[contenteditable="true"] { cursor: text; white-space: normal; text-overflow: unset; }
+    [data-theme="classic"] .ib-item-caption-bar { color: #0E1629; }
     .ib-item-price-bar {
       font-size: 12px; font-weight: 700; color: var(--gold); font-family: var(--font-mono);
       flex-shrink: 0; margin-left: 8px;
@@ -1478,9 +1481,7 @@
     .badge-icon { font-size: 10px; margin-right: 2px; }
 
     /* Ideabook cards */
-    .ideabook-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 28px; }
-    @media (max-width: 1200px) { .ideabook-grid { grid-template-columns: repeat(3, 1fr); } }
-    @media (max-width: 900px) { .ideabook-grid { grid-template-columns: repeat(2, 1fr); } }
+    .ideabook-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 24px; }
     .asset-masonry { columns: 5; column-gap: 12px; }
     .asset-masonry .asset-item { break-inside: avoid; margin-bottom: 12px; border-radius: 0; overflow: hidden; cursor: pointer; position: relative; background: var(--gray-100); }
     .asset-masonry .asset-item img { width: 100%; display: block; }
@@ -1504,11 +1505,11 @@
     .ideabook-cover.imgs-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
     .ideabook-cover img { width: 100%; height: 100%; object-fit: cover; border-radius: 0; }
     .ideabook-cover div.ib-placeholder { background: linear-gradient(135deg, var(--gray-100) 0%, var(--gray-200) 100%); display: flex; align-items: center; justify-content: center; font-size: 36px; color: var(--gray-300); }
-    .ideabook-card-body { padding: 14px 6px 8px; display: flex; justify-content: space-between; align-items: flex-start; }
-    .ideabook-card-name { font-weight: 800; font-size: 22px; color: #0E1629; font-family: var(--font-display); letter-spacing: 0.3px; line-height: 1.3; }
-    .ideabook-card-count { font-size: 13px; color: #7A7060; margin-top: 4px; }
-    .ideabook-card-menu { font-size: 20px; color: #7A7060; cursor: pointer; padding: 2px 6px; line-height: 1; }
-    .ideabook-card-menu:hover { color: #0E1629; }
+    .ideabook-card-body { padding: 10px 4px 4px; display: flex; justify-content: space-between; align-items: flex-start; }
+    .ideabook-card-name { font-weight: 600; font-size: 14px; color: var(--gray-800); }
+    .ideabook-card-count { font-size: 11px; color: var(--gray-400); margin-top: 3px; }
+    .ideabook-card-menu { font-size: 18px; color: var(--gray-400); cursor: pointer; padding: 0 4px; line-height: 1; }
+    .ideabook-card-menu:hover { color: var(--gray-600); }
 
     /* Modals */
     .modal-overlay {
@@ -1778,48 +1779,6 @@
     .sched-title { font-size:13px; font-weight:600; color:var(--black); }
     .sched-sub { font-size:12px; color:var(--gray-400); margin-top:2px; }
     .sched-actions { display:flex; gap:6px; margin-top:6px; }
-
-    /* ================================================
-       DUAL THEME — CLASSIC (default) + STUDIO DARK
-       ================================================ */
-    :root {
-      --bg: #F5F1EB;
-      --text: #0E1629;
-      --accent: #C8B99A;
-      --card: #FFFFFF;
-      --border: #E6E0D6;
-      --gray: #9B958D;
-    }
-
-    body[data-theme="studio"] {
-      --bg: #0E1629;
-      --text: #EDE8E0;
-      --accent: #C8B99A;
-      --card: #0E1629;
-      --border: #C8B99A20;
-      --gray: #C8B99A80;
-    }
-
-    body, .main, .contentArea, .modal, .card, .table, .sidebar, .topbar,
-    .modal-body, .modal-footer, .modal-header {
-      background: var(--bg) !important;
-      color: var(--text) !important;
-      border-color: var(--border) !important;
-    }
-
-    .btn-primary { background: var(--accent) !important; color: #0E1629 !important; border: 1px solid var(--accent) !important; }
-    .btn-secondary { background: transparent !important; border: 1px solid var(--accent) !important; color: var(--accent) !important; }
-    .btn:hover, .btn-primary:hover { opacity: 0.85; }
-
-    th, .form-label, .section-title { color: var(--accent) !important; }
-    .card, .modal, .action-dropdown { background: var(--card) !important; border-color: var(--border) !important; }
-    .page-title, .modal-title { color: var(--text) !important; }
-
-    *[style*="background:#000"], *[style*="background:#1a1a2e"],
-    *[style*="background:#252528"], *[style*="background:black"] {
-      background: var(--bg) !important;
-    }
-
   </style>
 </head>
 <body>
@@ -1929,7 +1888,7 @@
       </div>
       <div class="sidebar-footer">
         <div id="themeToggle" style="display:flex;gap:2px;margin-bottom:10px;">
-          <button onclick="toggleTheme()" style="width:100%;background:#0E1629;color:#C8B99A;border:1px solid #C8B99A;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">🌗 <span id="themeLabel">Classic</span></button>
+          <!-- Theme toggle removed — unified hybrid theme -->
         </div>
         <div class="sidebar-user" id="sidebarUser"></div>
         <div id="buildTag" style="font-size:9px;color:rgba(255,255,255,0.25);text-align:center;margin:6px 0 2px;letter-spacing:0.5px;cursor:pointer;" onclick="if(typeof CCH_BUILD!=='undefined')alert('CCH Studio Build '+CCH_BUILD.version+'\nDate: '+CCH_BUILD.date+'\nTag: '+CCH_BUILD.tag)" title="Click for build info"></div>
@@ -2012,42 +1971,8 @@
     })();
 
     // ── Security: HTML escaping (must be at top) ──
-    // ── Theme Toggle ──
-    function toggleTheme() {
-      var body = document.body;
-      var current = body.getAttribute('data-theme') || 'classic';
-      var next = current === 'classic' ? 'studio' : 'classic';
-      body.setAttribute('data-theme', next);
-      localStorage.setItem('cch-theme', next);
-      var label = document.getElementById('themeLabel');
-      if (label) label.textContent = next === 'classic' ? 'Classic' : 'Studio Dark';
-    }
-    (function loadSavedTheme() {
-      var saved = localStorage.getItem('cch-theme') || 'classic';
-      document.body.setAttribute('data-theme', saved);
-      var label = document.getElementById('themeLabel');
-      if (label) label.textContent = saved === 'classic' ? 'Classic' : 'Studio Dark';
-    })();
-
     function esc(t) { if (t == null) return ''; const d = document.createElement('div'); d.textContent = String(t); return d.innerHTML; }
     function escAttr(t) { if (t == null) return ''; t = String(t); return t.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-    // ── Global boards cache — prevents 33+ redundant Firestore reads ──
-    var _boardsCacheData = null;
-    var _boardsCacheTime = 0;
-    var _boardsCacheTTL = 120000; // 2 minutes
-    var _boardsCachePromise = null;
-    async function getCachedBoards() {
-      if (_boardsCacheData && Date.now() - _boardsCacheTime < _boardsCacheTTL) return _boardsCacheData;
-      if (_boardsCachePromise) return _boardsCachePromise;
-      _boardsCachePromise = db.collection('boards').get().then(function(snap) {
-        _boardsCacheData = snap;
-        _boardsCacheTime = Date.now();
-        _boardsCachePromise = null;
-        return snap;
-      }).catch(function(e) { _boardsCachePromise = null; throw e; });
-      return _boardsCachePromise;
-    }
 
     // Normalize any date value to YYYY-MM-DD string for comparison
     function normalizeDate(d) {
@@ -2082,7 +2007,7 @@
     const TEAM_CONFIG = {
       owner: { names: ['cynthia', 'cindy', 'holloway'], rate: 250, label: 'Cindy Holloway' },
       contractors: [
-        { names: ['vanessa', 'vanessaholiday', 'vanessa-holiday', 'vanessa-holliday', 'vholliday'], rate: 125, label: 'Vanessa Holliday' }
+        { names: ['vanessa'], rate: 125, label: 'Vanessa Holliday' }
       ],
       blendedRate: 195,
       installationRate: 125,
@@ -2149,7 +2074,7 @@
       var toast = document.createElement('div');
       toast.id = 'cchToast';
       toast.textContent = msg;
-      toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0E1629;color:#e8e8e8;padding:12px 24px;border-radius:0;font-size:13px;font-weight:600;z-index:99999;box-shadow:0 8px 24px rgba(0,0,0,0.25);border:1px solid rgba(196,160,82,0.3);transition:opacity 0.3s;';
+      toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0E1629;color:#0E1629;padding:12px 24px;border-radius:0;font-size:13px;font-weight:600;z-index:99999;box-shadow:0 8px 24px rgba(0,0,0,0.25);border:1px solid rgba(196,160,82,0.3);transition:opacity 0.3s;';
       document.body.appendChild(toast);
       setTimeout(function() { toast.style.opacity = '0'; setTimeout(function() { toast.remove(); }, 300); }, duration);
     }
@@ -2324,7 +2249,8 @@
         loadSavedRates().then(function() {
           navigate(window.location.hash || '#/projects');
         });
-        // Asset cache now lazy-loads when Design Hub is visited (was causing slowdown on every login)
+        // Background preload asset cache for instant Assets view
+        setTimeout(function() { preloadAssetCache(); }, 3000);
       } else if (isClientRoute) {
         // Client accessing shared link — show app shell without auth, hide sidebar/topbar
         currentUser = null;
@@ -2522,7 +2448,7 @@
 
     async function buildSearchCache() {
       if (searchCache) return searchCache;
-      const projSnap = await getCachedBoards();
+      const projSnap = await db.collection('boards').get();
       const cache = { projects: [], invoices: [], proposals: [], pos: [], clips: [], loaded: false };
       const projNames = {};
       projSnap.forEach(d => {
@@ -2882,7 +2808,7 @@
       const showOwnerView = isOwner && window._dashboardView === 'owner';
 
       // Load all projects
-      const snap = await getCachedBoards();
+      const snap = await db.collection('boards').get();
       const allProjects = [];
       snap.forEach(d => allProjects.push({ id: d.id, ...d.data() }));
       allProjects.sort((a, b) => (b.updatedAt || '') > (a.updatedAt || '') ? 1 : -1);
@@ -3090,12 +3016,12 @@
       const totalSubcontractors = periodEntries.filter(t => {
         var m = (t.member || t.user || '').toLowerCase();
         return !TEAM_CONFIG.owner.names.some(n => m.includes(n));
-      }).reduce((s,t) => s + ((parseFloat(t.hours)||0) * (parseFloat(t.internalCostRate) || (TEAM_CONFIG.contractors[0] ? TEAM_CONFIG.contractors[0].rate : DEFAULT_CONTRACTOR_RATE))), 0);
+      }).reduce((s,t) => s + ((parseFloat(t.hours)||0) * (parseFloat(t.internalCostRate) || (TEAM_CONFIG.contractors[0] ? TEAM_CONFIG.contractors[0].rate : 125))), 0);
       const totalCOGS = projectFinancials.reduce((s,p) => s + p.costs, 0);
       const totalLaborCost = projectFinancials.reduce((s,p) => s + p.laborCost, 0);
       const totalVendorCost = totalCOGS;
       const totalFees = totalInvoicedAll;
-      const totalProfit = totalInvoicedAll - totalCOGS - totalSubcontractors - totalLaborCost;
+      const totalProfit = totalInvoicedAll - totalCOGS - totalSubcontractors;
       const profitMargin = totalInvoicedAll > 0 ? Math.round((totalProfit / totalInvoicedAll) * 100) : 0;
       const loggedHours = periodEntries.reduce((s,t) => s + (parseFloat(t.hours)||0), 0);
       const loggedValue = periodEntries.filter(t => _isBillableEntry(t)).reduce((s,t) => s + ((parseFloat(t.hours)||0) * (parseFloat(t.rate)||userRate)), 0);
@@ -3203,12 +3129,12 @@
               <div class="db-date">${dateStr}</div>
             </div>
             <div style="display:flex;gap:8px;align-items:center;">
-              ${isOwner ? '<div style="display:flex;gap:0;margin-right:12px;border:1px solid rgba(14,22,41,0.12);overflow:hidden;"><button onclick="toggleDashboardView(\'owner\')" style="padding:8px 16px;font-size:12px;font-weight:600;border:none;cursor:pointer;letter-spacing:0.5px;' + (window._dashboardView === 'owner' ? 'background:#0E1629;color:#EDE8E0;' : 'background:#FFFFFF;color:#7A7060;') + '">Owner</button><button onclick="toggleDashboardView(\'contractor\')" style="padding:8px 16px;font-size:12px;font-weight:600;border:none;border-left:1px solid rgba(14,22,41,0.08);cursor:pointer;letter-spacing:0.5px;' + (window._dashboardView === 'contractor' ? 'background:#0E1629;color:#EDE8E0;' : 'background:#FFFFFF;color:#7A7060;') + '">Vanessa</button></div>' : ''}
+              ${isOwner ? '<div style="display:flex;gap:2px;margin-right:12px;"><button onclick="toggleDashboardView(\'owner\')" style="padding:6px 14px;font-size:11px;font-weight:600;border:1px solid ' + (window._dashboardView === 'owner' ? 'var(--cyan)' : 'rgba(255,255,255,0.1)') + ';background:' + (window._dashboardView === 'owner' ? 'rgba(0,184,212,0.12)' : 'transparent') + ';color:' + (window._dashboardView === 'owner' ? 'var(--cyan)' : 'var(--gray-400)') + ';cursor:pointer;border-radius:0;letter-spacing:0.5px;">Owner</button><button onclick="toggleDashboardView(\'contractor\')" style="padding:6px 14px;font-size:11px;font-weight:600;border:1px solid ' + (window._dashboardView === 'contractor' ? 'var(--gold)' : 'rgba(255,255,255,0.1)') + ';background:' + (window._dashboardView === 'contractor' ? 'rgba(200,185,154,0.12)' : 'transparent') + ';color:' + (window._dashboardView === 'contractor' ? 'var(--gold)' : 'var(--gray-400)') + ';cursor:pointer;border-radius:0;letter-spacing:0.5px;">Vanessa</button></div>' : ''}
               <div style="display:flex;gap:1px;margin-right:12px;background:rgba(14,22,41,0.03);border:1px solid rgba(14,22,41,0.08);border-radius:0;overflow:hidden;">
                 ${['month','year','week','all'].map(function(p) {
                   var labels = { week: 'This Week', month: 'MTD', year: 'YTD', all: 'All Time' };
                   var active = window._dashPeriod === p;
-                  return '<button onclick="window._dashPeriod=\'' + p + '\';renderDashboard()" style="padding:6px 14px;font-size:11px;font-weight:600;border:none;cursor:pointer;letter-spacing:0.3px;' + (active ? 'background:#C4A464;color:#FFFFFF;' : 'background:#FFFFFF;color:#7A7060;') + '">' + labels[p] + '</button>';
+                  return '<button onclick="window._dashPeriod=\'' + p + '\';renderDashboard()" style="padding:5px 12px;font-size:10px;font-weight:600;border:none;cursor:pointer;letter-spacing:0.3px;' + (active ? 'background:var(--gold);color:white;' : 'background:transparent;color:var(--gray-400);') + '">' + labels[p] + '</button>';
                 }).join('')}
               </div>
               <button class="db-action" onclick="showNewProjectModal()" style="border-color:rgba(0,184,212,0.2);color:var(--cyan);">+ New Project</button>
@@ -3291,13 +3217,13 @@
                   const lastAct = projectActivity[p.id];
                   const lastActLabel = lastAct ? new Date(lastAct + 'T12:00:00').toLocaleDateString('en-US', {month:'short',day:'numeric'}) : '';
                   const pctCollected = pf.fee > 0 ? Math.round((pf.collected || 0) / pf.fee * 100) : 0;
-                  var statusColor = (p.status || 'Active') === 'Active' ? 'var(--green)' : (p.status === 'On Hold' ? 'var(--gold)' : '#7A7060');
-                  return '<div class="db-pcard" onclick="navigate(\'#/project/' + p.id + '\')" style="border-left:3px solid ' + statusColor + ';">' +
+                  return '<div class="db-pcard" onclick="navigate(\'#/project/' + p.id + '\')">' +
+                      '<div class="db-pcard-img">' +
+                        (cv ? '<img src="' + escAttr(cv) + '" onerror="this.style.display=\'none\'">' : '') +
+                        '<div class="db-pcard-tag">' + esc(p.status || 'Active') + '</div>' +
+                      '</div>' +
                       '<div class="db-pcard-body">' +
-                        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">' +
-                          '<div class="db-pcard-name">' + esc(p.name || p.id) + '</div>' +
-                          '<div class="db-pcard-tag">' + esc(p.status || 'Active') + '</div>' +
-                        '</div>' +
+                        '<div class="db-pcard-name">' + esc(p.name || p.id) + '</div>' +
                         '<div class="db-pcard-sub">' + esc(p.clientName || '') + (lastActLabel ? ' · Last: ' + lastActLabel : '') + '</div>' +
                         '<div class="db-pcard-row"><span class="db-pcard-rl">Fee</span><span class="db-pcard-rv">' + formatMoney(pf.fee || 0) + '</span></div>' +
                         '<div class="db-pcard-row"><span class="db-pcard-rl">Costs</span><span class="db-pcard-rv">' + formatMoney((pf.costs || 0) + (pf.laborCost || 0)) + '</span></div>' +
@@ -3345,12 +3271,12 @@
                 '<div id="dbOlderProjects" class="db-pcards" style="display:none;">' +
                   olderProjects.slice(0, 20).map(function(p) {
                     var name = p.name || p.id;
-                    return '<div class="db-pcard" style="opacity:0.6;border-left:3px solid #7A7060;" onclick="navigate(\'#/project/' + p.id + '\')">' +
+                    return '<div class="db-pcard" style="opacity:0.6;" onclick="navigate(\'#/project/' + p.id + '\')">' +
+                      '<div class="db-pcard-img" style="height:70px;">' +
+                        '<div class="db-pcard-tag" style="background:rgba(200,185,154,0.2);color:var(--gold);">Inactive</div>' +
+                      '</div>' +
                       '<div class="db-pcard-body" style="padding:10px 14px;">' +
-                        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-                          '<div class="db-pcard-name" style="font-size:13px;">' + esc(name) + '</div>' +
-                          '<div class="db-pcard-tag" style="background:rgba(200,185,154,0.2);color:var(--gold);">Inactive</div>' +
-                        '</div>' +
+                        '<div class="db-pcard-name" style="font-size:13px;">' + esc(name) + '</div>' +
                         '<div class="db-pcard-sub">' + esc(p.clientName || '') + '</div>' +
                       '</div>' +
                     '</div>';
@@ -3553,7 +3479,7 @@
                 ${['month','year','week','all'].map(function(p) {
                   var labels = { week: 'This Week', month: 'MTD', year: 'YTD', all: 'All Time' };
                   var active = window._dashPeriod === p;
-                  return '<button onclick="window._dashPeriod=\'' + p + '\';renderDashboard()" style="padding:6px 14px;font-size:11px;font-weight:600;border:none;cursor:pointer;letter-spacing:0.3px;' + (active ? 'background:#C4A464;color:#FFFFFF;' : 'background:#FFFFFF;color:#7A7060;') + '">' + labels[p] + '</button>';
+                  return '<button onclick="window._dashPeriod=\'' + p + '\';renderDashboard()" style="padding:5px 12px;font-size:10px;font-weight:600;border:none;cursor:pointer;letter-spacing:0.3px;' + (active ? 'background:var(--gold);color:white;' : 'background:transparent;color:var(--gray-400);') + '">' + labels[p] + '</button>';
                 }).join('')}
               </div>
               ${isOwner ? '<div style="display:flex;gap:2px;"><button onclick="toggleDashboardView(\'owner\')" style="padding:6px 14px;font-size:11px;font-weight:600;border:1px solid rgba(14,22,41,0.12);background:transparent;color:var(--gray-400);cursor:pointer;border-radius:0;letter-spacing:0.5px;">Owner</button><button onclick="toggleDashboardView(\'contractor\')" style="padding:6px 14px;font-size:11px;font-weight:600;border:1px solid var(--gold);background:rgba(200,185,154,0.12);color:var(--gold);cursor:pointer;border-radius:0;letter-spacing:0.5px;">Vanessa</button></div>' : ''}
@@ -3634,9 +3560,10 @@
                     const cv = matched ? (roomCovers[matched.id] || '') : '';
                     const projId = matched ? matched.id : '';
                     return '<div class="vd-rev-proj"' + (projId ? ' onclick="navigate(\'#/project/' + projId + '\')"' : '') + '>' +
+                      '<div class="vd-rev-proj-img">' + (cv ? '<img src="' + escAttr(cv) + '" onerror="this.style.display=\'none\'">' : '') + '</div>' +
                       '<div class="vd-rev-proj-body">' +
                         '<div class="vd-rev-proj-name">' + esc(proj) + '</div>' +
-                        '<div class="vd-rev-proj-val">' + formatMoney(data.billable * userRate) + ' · ' + data.billable.toFixed(1) + 'h</div>' +
+                        '<div class="vd-rev-proj-val">' + formatMoney(data.billable * userRate) + '</div>' +
                       '</div>' +
                     '</div>';
                   }).join('')}
@@ -3884,78 +3811,13 @@
     let projectsSortDir = 'asc';
     let projectsFilterText = '';
 
-    async function autoArchiveInactiveProjects() {
-      // Known active projects (last payment within 12 months from payment data analysis)
-      var activeProjectNames = [
-        'Katke - Graceland Dr.', 'Day - 2590 Monaco Drive', 'Schneider- East Coast Hwy.',
-        'Bradbury - High Drive', 'Cloud - Rolling Hills', 'Cloud - Mustang', 'Polito  BVR',
-        'Bradbury - Blue Bird', 'Cloud - Huntington Beach', 'Cloud - Parker', 'CCH',
-        'Shimano- Maverick Cir.', '7225 Bugletrail', 'Valentine', 'Greene- Hixson',
-        '31 Whitesail', 'West Avalon', 'Holtz Hill', 'Shauna Cernovich',
-        'Hess- Archipelago', 'Eikanas', 'Davis- Carreterra Dr.', 'Schneider- Michael'
-      ];
-      var activeSet = new Set(activeProjectNames.map(function(n) { return n.toLowerCase(); }));
-
-      var projSnap = await getCachedBoards();
-      var allProjs = [];
-      projSnap.forEach(function(d) { allProjs.push({ id: d.id, ...d.data() }); });
-
-      // Build preview list
-      var toArchive = [];
-      var toKeep = [];
-      allProjs.forEach(function(p) {
-        if (p.status === 'Completed' || p.status === 'Archived') return;
-        var name = (p.name || p.id || '').toLowerCase();
-        // Check if name matches any active project (fuzzy)
-        var isActive = activeSet.has(name);
-        if (!isActive) {
-          // Fuzzy match — check if any active name is contained in project name or vice versa
-          activeProjectNames.forEach(function(an) {
-            var anLow = an.toLowerCase();
-            if (name.indexOf(anLow) >= 0 || anLow.indexOf(name) >= 0) isActive = true;
-            // Also match on last name
-            var lastName = anLow.split(/[\s-]+/).pop();
-            if (lastName && lastName.length > 3 && name.indexOf(lastName) >= 0) isActive = true;
-          });
-        }
-        if (!isActive) toArchive.push(p);
-        else toKeep.push(p);
-      });
-
-      var msg = 'Found ' + toArchive.length + ' inactive projects to mark as Completed:\n\n' +
-        toArchive.slice(0, 15).map(function(p) { return '  • ' + (p.name || p.id); }).join('\n') +
-        (toArchive.length > 15 ? '\n  ... and ' + (toArchive.length - 15) + ' more' : '') +
-        '\n\nKeeping ' + toKeep.length + ' active projects.\nProceed?';
-
-      if (!confirm(msg)) return;
-
-      showToast('Archiving ' + toArchive.length + ' projects...');
-      var batch = db.batch();
-      var count = 0;
-      for (var p of toArchive) {
-        batch.update(db.collection('boards').doc(p.id), {
-          status: 'Completed',
-          archivedAt: new Date().toISOString(),
-          archivedReason: 'No payment activity in 12+ months'
-        });
-        count++;
-        if (count % 450 === 0) {
-          await batch.commit();
-          batch = db.batch();
-        }
-      }
-      if (count % 450 !== 0) await batch.commit();
-      showToast('Done! Marked ' + toArchive.length + ' projects as Completed.');
-      renderProjectsList();
-    }
-
     async function renderProjectsList() {
       setBreadcrumb([{ label: 'Projects' }]);
-      setTopbarActions('<button class="btn btn-secondary btn-sm" onclick="autoArchiveInactiveProjects()" style="margin-right:8px;" title="Mark projects with no activity in 1+ year as Completed">🗄️ Archive Inactive</button><button class="btn btn-secondary" onclick="showImportModal()" style="margin-right:8px;">📂 Import from Houzz</button><button class="btn btn-primary" onclick="showNewProjectModal()">+ New Project</button>');
+      setTopbarActions('<button class="btn btn-secondary" onclick="showImportModal()" style="margin-right:8px;">📂 Import from Houzz</button><button class="btn btn-primary" onclick="showNewProjectModal()">+ New Project</button>');
       const C = document.getElementById('contentArea');
       C.innerHTML = '<div class="page-header"><div class="page-title">Projects</div></div><div style="text-align: center; padding: 40px; color: var(--gray-400);">Loading...</div>';
 
-      const snap = await getCachedBoards();
+      const snap = await db.collection('boards').get();
       projects = [];
       snap.forEach(d => projects.push({ id: d.id, ...d.data() }));
 
@@ -4660,148 +4522,41 @@
           <table style="width:100%;border-collapse:collapse;font-size:12px;">
             <thead>
               <tr style="border-bottom:2px solid var(--gray-200);">
-                <th style="padding:10px;width:30px;"><input type="checkbox" onchange="document.querySelectorAll('.sel-cb').forEach(cb=>cb.checked=this.checked)"></th>
-                <th style="padding:10px;width:80px;">Image</th>
-                <th style="padding:10px;text-align:left;font-size:13px;">Product</th>
-                <th style="padding:10px;text-align:left;font-size:13px;">Vendor</th>
-                <th style="padding:10px;text-align:left;font-size:13px;">Room</th>
-                <th style="padding:10px;text-align:right;font-size:13px;">Cost</th>
-                <th style="padding:10px;text-align:right;font-size:13px;">Markup %</th>
-                <th style="padding:10px;text-align:right;font-size:13px;">Sell</th>
-                <th style="padding:10px;text-align:left;font-size:13px;">Documents</th>
-                <th style="padding:10px;text-align:center;font-size:13px;">Source</th>
-                <th style="padding:10px;width:60px;"></th>
+                <th style="padding:8px;width:30px;"><input type="checkbox" onchange="document.querySelectorAll('.sel-cb').forEach(cb=>cb.checked=this.checked)"></th>
+                <th style="padding:8px;width:50px;">Image</th>
+                <th style="padding:8px;text-align:left;">Product</th>
+                <th style="padding:8px;text-align:left;">Vendor</th>
+                <th style="padding:8px;text-align:left;">Room</th>
+                <th style="padding:8px;text-align:right;">Cost</th>
+                <th style="padding:8px;text-align:right;">Sell</th>
+                <th style="padding:8px;text-align:center;">Source</th>
+                <th style="padding:8px;text-align:left;">Status</th>
               </tr>
             </thead>
             <tbody>
               ${filtered.slice(0, 100).map(function(item, idx) {
-                var sourceIcon = item.source === 'library' ? '📚' : item.source === 'invoice' ? '💰' : item.source === 'clip' ? '📌' : item.source === 'proposal' ? '📋' : '📦';
+                var sourceIcon = item.source === 'library' ? '📚' : item.source === 'invoice' ? '💰' : item.source === 'clip' ? '📌' : '📦';
                 var imgHtml = item.image && item.image.startsWith('http')
-                  ? '<img src="' + esc(item.image) + '" style="width:60px;height:60px;object-fit:cover;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,0.1);" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">'
-                  : '<div style="width:60px;height:60px;background:var(--gray-100);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:20px;">🛋️</div>';
-                var markupPct = (item.cost > 0 && item.sell > 0) ? Math.round(((item.sell - item.cost) / item.cost) * 100) : 0;
-                return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onmouseover="this.style.background=\'#F5F3EE\'" onmouseout="this.style.background=\'#FFFFFF\'">' +
-                  '<td style="padding:10px;text-align:center;" onclick="event.stopPropagation()"><input type="checkbox" class="sel-cb" data-idx="' + idx + '"></td>' +
-                  '<td style="padding:10px;">' + imgHtml + '</td>' +
-                  '<td style="padding:10px;"><strong style="font-size:14px;">' + esc(item.title) + '</strong>' + (item.sku ? '<br><span style="font-size:11px;color:var(--gray-400);">SKU: ' + esc(item.sku) + '</span>' : '') + '</td>' +
-                  '<td style="padding:10px;font-size:13px;color:var(--gray-500);">' + esc(item.vendor) + '</td>' +
-                  '<td style="padding:10px;font-size:13px;color:var(--gray-500);">' + esc(item.room) + '</td>' +
-                  '<td style="padding:10px;text-align:right;font-family:var(--font-mono);font-size:13px;">' + (item.cost > 0 ? formatMoney(item.cost) : '—') + '</td>' +
-                  '<td style="padding:10px;text-align:right;font-size:13px;color:' + (markupPct > 0 ? 'var(--green)' : 'var(--gray-400)') + ';">' + (markupPct > 0 ? markupPct + '%' : '—') + '</td>' +
-                  '<td style="padding:10px;text-align:right;font-family:var(--font-mono);font-size:14px;font-weight:600;">' + (item.sell > 0 ? formatMoney(item.sell) : '—') + '</td>' +
-                  '<td style="padding:10px;font-size:11px;color:var(--gray-500);white-space:nowrap;">' +
-                    (item.invoice ? '<div title="Invoice">💰 ' + esc(item.invoice) + '</div>' : '') +
-                    (item.po ? '<div title="Purchase Order">📦 ' + esc(item.po) + '</div>' : '') +
-                    (item.proposal ? '<div title="Proposal">📋 ' + esc(item.proposal) + '</div>' : '') +
-                    (!item.invoice && !item.po && !item.proposal ? '<span style="color:var(--gray-300);">—</span>' : '') +
-                  '</td>' +
-                  '<td style="padding:10px;text-align:center;" title="' + esc(item.source) + '">' + sourceIcon + '</td>' +
-                  '<td style="padding:10px;text-align:center;"><button class="btn btn-sm" style="padding:4px 8px;font-size:11px;" onclick="event.stopPropagation();editSelectionItem(' + idx + ')">✏️</button></td>' +
+                  ? '<img src="' + esc(item.image) + '" style="width:40px;height:40px;object-fit:cover;border-radius:4px;" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">'
+                  : '<div style="width:40px;height:40px;background:var(--gray-100);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:16px;">🛋️</div>';
+                return '<tr style="border-bottom:1px solid var(--gray-100);">' +
+                  '<td style="padding:8px;text-align:center;"><input type="checkbox" class="sel-cb" data-idx="' + idx + '"></td>' +
+                  '<td style="padding:8px;">' + imgHtml + '</td>' +
+                  '<td style="padding:8px;font-weight:600;">' + esc(item.title) + (item.sku ? '<br><span style="font-size:10px;color:var(--gray-400);">SKU: ' + esc(item.sku) + '</span>' : '') + '</td>' +
+                  '<td style="padding:8px;color:var(--gray-500);">' + esc(item.vendor) + '</td>' +
+                  '<td style="padding:8px;color:var(--gray-500);">' + esc(item.room) + '</td>' +
+                  '<td style="padding:8px;text-align:right;font-family:var(--font-mono);">' + (item.cost > 0 ? formatMoney(item.cost) : '—') + '</td>' +
+                  '<td style="padding:8px;text-align:right;font-family:var(--font-mono);font-weight:600;">' + (item.sell > 0 ? formatMoney(item.sell) : '—') + '</td>' +
+                  '<td style="padding:8px;text-align:center;" title="' + esc(item.source) + '">' + sourceIcon + '</td>' +
+                  '<td style="padding:8px;font-size:11px;color:var(--gray-400);">' + esc(item.status) + '</td>' +
                 '</tr>';
               }).join('')}
-              ${filtered.length === 0 ? '<tr><td colspan="11" style="padding:40px;text-align:center;color:var(--gray-400);">No selections found for this project. Import products from the Product Library or clip items from Inspiration boards.</td></tr>' : ''}
-              ${filtered.length > 100 ? '<tr><td colspan="11" style="padding:12px;text-align:center;color:var(--gray-400);font-size:11px;">Showing 100 of ' + filtered.length + ' — use search to find more</td></tr>' : ''}
+              ${filtered.length === 0 ? '<tr><td colspan="9" style="padding:40px;text-align:center;color:var(--gray-400);">No selections found for this project. Import products from the Product Library or clip items from Inspiration boards.</td></tr>' : ''}
+              ${filtered.length > 100 ? '<tr><td colspan="9" style="padding:12px;text-align:center;color:var(--gray-400);font-size:11px;">Showing 100 of ' + filtered.length + ' — use search to find more</td></tr>' : ''}
             </tbody>
           </table>
         </div>
       `;
-    }
-
-    // Edit a selection item inline
-    function editSelectionItem(idx) {
-      var items = window._projSelections || [];
-      var item = items[idx];
-      if (!item) return;
-      var markupPct = (item.cost > 0 && item.sell > 0) ? Math.round(((item.sell - item.cost) / item.cost) * 100) : 0;
-      var overlay = document.createElement('div');
-      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:2000;display:flex;align-items:center;justify-content:center;';
-      overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
-      overlay.innerHTML = '<div style="background:#FFFFFF;width:560px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(14,22,41,0.25);padding:0;">' +
-        '<div style="padding:18px 24px;border-bottom:1px solid rgba(14,22,41,0.08);display:flex;justify-content:space-between;align-items:center;"><span style="font-size:17px;font-weight:700;color:#0E1629;">Edit Selection Item</span><button onclick="this.closest(\'div[style*=fixed]\').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#7A7060;">&times;</button></div>' +
-        '<div style="padding:20px 24px;">' +
-          '<div style="margin-bottom:14px;">' +
-            '<label style="font-size:12px;font-weight:600;color:#0E1629;display:block;margin-bottom:4px;">Product Image</label>' +
-            '<div style="display:flex;gap:10px;align-items:center;">' +
-              (item.image ? '<img src="' + escAttr(item.image) + '" style="width:80px;height:80px;object-fit:cover;border-radius:4px;" referrerpolicy="no-referrer">' : '<div style="width:80px;height:80px;background:#F5F3EE;display:flex;align-items:center;justify-content:center;font-size:28px;">📦</div>') +
-              '<div><input class="form-input" id="selEditImage" value="' + escAttr(item.image || '') + '" placeholder="Image URL" style="font-size:12px;margin-bottom:6px;">' +
-              '<label class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:11px;">📷 Upload<input type="file" accept="image/*" style="display:none;" onchange="selEditUploadImage(this)"></label></div>' +
-            '</div>' +
-          '</div>' +
-          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">' +
-            '<div><label style="font-size:12px;font-weight:600;color:#0E1629;display:block;margin-bottom:4px;">Product Name</label><input class="form-input" id="selEditTitle" value="' + escAttr(item.title || '') + '" style="font-size:14px;"></div>' +
-            '<div><label style="font-size:12px;font-weight:600;color:#0E1629;display:block;margin-bottom:4px;">Vendor</label><input class="form-input" id="selEditVendor" value="' + escAttr(item.vendor || '') + '" style="font-size:14px;"></div>' +
-          '</div>' +
-          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">' +
-            '<div><label style="font-size:12px;font-weight:600;color:#0E1629;display:block;margin-bottom:4px;">Room</label><input class="form-input" id="selEditRoom" value="' + escAttr(item.room || '') + '" style="font-size:14px;"></div>' +
-            '<div><label style="font-size:12px;font-weight:600;color:#0E1629;display:block;margin-bottom:4px;">SKU</label><input class="form-input" id="selEditSku" value="' + escAttr(item.sku || '') + '" style="font-size:14px;"></div>' +
-          '</div>' +
-          '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">' +
-            '<div><label style="font-size:12px;font-weight:600;color:#0E1629;display:block;margin-bottom:4px;">Cost (Trade)</label><input class="form-input" id="selEditCost" type="number" step="0.01" value="' + (parseFloat(item.cost) || 0) + '" onchange="selEditRecalc()" style="font-size:14px;"></div>' +
-            '<div><label style="font-size:12px;font-weight:600;color:#0E1629;display:block;margin-bottom:4px;">Markup %</label><input class="form-input" id="selEditMarkup" type="number" step="0.5" value="' + markupPct + '" onchange="selEditRecalc()" style="font-size:14px;"></div>' +
-            '<div><label style="font-size:12px;font-weight:600;color:#0E1629;display:block;margin-bottom:4px;">Sell Price</label><input class="form-input" id="selEditSell" type="number" step="0.01" value="' + (parseFloat(item.sell) || 0) + '" style="font-size:14px;font-weight:700;color:var(--gold);"></div>' +
-          '</div>' +
-          '<div style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;color:#0E1629;display:block;margin-bottom:4px;">Description</label><textarea class="form-input" id="selEditDesc" rows="2" style="font-size:13px;">' + esc(item.description || '') + '</textarea></div>' +
-        '</div>' +
-        '<div style="padding:14px 24px;border-top:1px solid rgba(14,22,41,0.08);display:flex;justify-content:flex-end;gap:10px;">' +
-          '<button class="btn btn-secondary" onclick="this.closest(\'div[style*=fixed]\').remove()">Cancel</button>' +
-          '<button class="btn btn-primary" onclick="selEditSave(' + idx + ');this.closest(\'div[style*=fixed]\').remove()">Save Changes</button>' +
-        '</div></div>';
-      document.body.appendChild(overlay);
-    }
-
-    function selEditRecalc() {
-      var cost = parseFloat(document.getElementById('selEditCost').value) || 0;
-      var markup = parseFloat(document.getElementById('selEditMarkup').value) || 0;
-      var sell = cost * (1 + markup / 100);
-      document.getElementById('selEditSell').value = sell.toFixed(2);
-    }
-
-    async function selEditSave(idx) {
-      var items = window._projSelections || [];
-      var item = items[idx];
-      if (!item) return;
-      var projectId = window._projSelProjectId;
-      var title = document.getElementById('selEditTitle').value;
-      var vendor = document.getElementById('selEditVendor').value;
-      var room = document.getElementById('selEditRoom').value;
-      var sku = document.getElementById('selEditSku').value;
-      var cost = parseFloat(document.getElementById('selEditCost').value) || 0;
-      var sell = parseFloat(document.getElementById('selEditSell').value) || 0;
-      var image = document.getElementById('selEditImage').value;
-      var desc = document.getElementById('selEditDesc').value;
-
-      // Update the source record in Firestore
-      if (item.source === 'library' && item.id) {
-        try {
-          await db.collection('productLibrary').doc(item.id).update({
-            title: title, vendor: vendor, room: room, sku: sku,
-            unitCost: cost, sellPrice: sell, image: image, description: desc
-          });
-        } catch(e) {
-          try {
-            await db.collection('products').doc(item.id).update({
-              title: title, vendor: vendor, room: room, sku: sku,
-              costPrice: cost, sellPrice: sell, image: image, description: desc
-            });
-          } catch(e2) { console.warn('Could not update product:', e2); }
-        }
-      }
-      showToast('✅ Item updated');
-      // Refresh
-      if (window._currentProject) renderSelectionsTab(document.getElementById('projectTabContent'), window._currentProject);
-    }
-
-    async function selEditUploadImage(input) {
-      if (!input.files || !input.files[0]) return;
-      var file = input.files[0];
-      showToast('Uploading image...');
-      try {
-        var storageRef = firebase.storage().ref('selections/' + Date.now() + '-' + file.name);
-        var snap = await storageRef.put(file);
-        var url = await snap.ref.getDownloadURL();
-        document.getElementById('selEditImage').value = url;
-        showToast('✅ Image uploaded');
-      } catch(e) { showToast('❌ Upload failed: ' + e.message, 3000); }
     }
 
     // Move selected selections to a room board
@@ -5120,9 +4875,9 @@
                 '<div>' +
                   '<div class="ideabook-card-name">' + esc(b.name || 'Untitled Board') + '</div>' +
                   '<div class="ideabook-card-count">' + (b.type || 'Design Board') + ' · ' + count + ' element' + (count !== 1 ? 's' : '') + (dateStr ? ' · ' + dateStr : '') + '</div>' +
-                  '<div style="display:flex;gap:8px;margin-top:10px;">' +
-                    '<button style="background:#0E1629;color:#EDE8E0;border:none;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;" onclick="event.stopPropagation();editDesignBoard(\'' + proj.id + '\',\'' + b.id + '\')">✏️ Edit</button>' +
-                    '<button style="background:#FFFFFF;color:#0E1629;border:1px solid rgba(14,22,41,0.15);padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;" onclick="event.stopPropagation();navigate(\'#/clientview/' + proj.id + '\')">❤️ Client View</button>' +
+                  '<div style="display:flex;gap:8px;margin-top:8px;">' +
+                    '<button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();editDesignBoard(\'' + proj.id + '\',\'' + b.id + '\')">✏️ Edit</button>' +
+                    '<button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();navigate(\'#/clientview/' + proj.id + '\')">❤️ Client View</button>' +
                   '</div>' +
                 '</div>' +
                 '<div style="display:flex;gap:4px;">' +
@@ -5262,11 +5017,7 @@
           var items = dbGetSourceItems();
           var it = items[idx];
           if (!it) return;
-          // Place new images in a grid pattern to avoid overlap
-          var existingCount = window._dbElements.filter(function(e) { return e.type === 'image'; }).length;
-          var col = existingCount % 4;
-          var row = Math.floor(existingCount / 4);
-          var el = { id: Date.now() + '_' + Math.random().toString(36).substr(2,4), type: 'image', x: 40 + col * 230, y: 40 + row * 260, w: 210, h: 210, title: it.title, vendor: it.vendor, price: it.price, img: it.img, rotation: 0 };
+          var el = { id: Date.now() + '_' + Math.random().toString(36).substr(2,4), type: 'image', x: 100 + Math.random()*200, y: 100 + Math.random()*200, w: 200, h: 200, title: it.title, vendor: it.vendor, price: it.price, img: it.img, rotation: 0 };
           window._dbElements.push(el);
           dbRenderCanvas();
           dbSave();
@@ -5312,7 +5063,7 @@
             var border = sel ? '2px solid var(--gold)' : '1px solid transparent';
             var shadow = sel ? '0 0 0 2px rgba(196,164,100,0.3)' : 'none';
             if (el.type === 'text') {
-              html += '<div class="db-el" data-idx="' + idx + '" style="position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;width:' + el.w + 'px;min-height:' + (el.h||30) + 'px;border:' + border + ';box-shadow:' + shadow + ';cursor:move;padding:8px;font-size:' + (el.fontSize||18) + 'px;font-weight:' + (el.fontWeight||'normal') + ';color:' + (el.color||'#333') + ';line-height:1.4;background:' + (sel ? 'rgba(255,255,255,0.9)' : 'transparent') + ';" onmousedown="dbStartDrag(event,' + idx + ')" onclick="dbSelect(' + idx + ')" ondblclick="event.stopPropagation();dbEditTextInline(this,' + idx + ')">' + esc(el.text||'') + '</div>';
+              html += '<div class="db-el" data-idx="' + idx + '" style="position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;width:' + el.w + 'px;border:' + border + ';box-shadow:' + shadow + ';cursor:move;padding:4px;font-size:' + (el.fontSize||18) + 'px;font-weight:' + (el.fontWeight||'normal') + ';color:' + (el.color||'#333') + ';" onmousedown="dbStartDrag(event,' + idx + ')" onclick="dbSelect(' + idx + ')">' + esc(el.text||'') + '</div>';
             } else if (el.type === 'line') {
               html += '<div class="db-el" data-idx="' + idx + '" style="position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;width:' + el.w + 'px;height:' + el.h + 'px;background:' + (el.color||'#333') + ';border:' + border + ';box-shadow:' + shadow + ';cursor:move;" onmousedown="dbStartDrag(event,' + idx + ')" onclick="dbSelect(' + idx + ')"></div>';
             } else {
@@ -5357,33 +5108,6 @@
         window.dbSelect = function(idx) { window._dbSelected = idx; dbRenderCanvas(); };
         window.dbUpdateProp = function(idx, prop, val) { window._dbElements[idx][prop] = val; dbRenderCanvas(); dbSave(); };
         window.dbDeleteEl = function(idx) { window._dbElements.splice(idx, 1); window._dbSelected = null; dbRenderCanvas(); dbSave(); };
-        window.dbEditTextInline = function(div, idx) {
-          div.contentEditable = 'true';
-          div.style.cursor = 'text';
-          div.style.background = 'rgba(255,255,255,0.95)';
-          div.style.outline = '2px solid #C4A464';
-          div.focus();
-          // Select all text
-          var range = document.createRange();
-          range.selectNodeContents(div);
-          var sel = window.getSelection();
-          sel.removeAllRanges();
-          sel.addRange(range);
-          div.onblur = function() {
-            div.contentEditable = 'false';
-            div.style.cursor = 'move';
-            div.style.outline = '';
-            window._dbElements[idx].text = div.textContent;
-            dbRenderCanvas();
-            dbSave();
-          };
-          div.onkeydown = function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); div.blur(); }
-            if (e.key === 'Escape') { div.blur(); }
-          };
-          // Prevent drag while editing
-          div.onmousedown = function(e) { e.stopPropagation(); };
-        };
 
         window.dbStartDrag = function(e, idx) {
           e.preventDefault();
@@ -5671,13 +5395,8 @@
       const _pSubCost = pTimeEntries.filter(function(t){
         var m = (t.member || t.user || '').toLowerCase();
         return !TEAM_CONFIG.owner.names.some(function(n){ return m.includes(n); });
-      }).reduce(function(s,t){ return s + ((parseFloat(t.hours)||0) * (parseFloat(t.internalCostRate) || (TEAM_CONFIG.contractors[0] ? TEAM_CONFIG.contractors[0].rate : DEFAULT_CONTRACTOR_RATE))); }, 0);
-      // Owner labor cost for this project
-      const _pOwnerLabor = pTimeEntries.filter(function(t){
-        var m = (t.member || t.user || '').toLowerCase();
-        return TEAM_CONFIG.owner.names.some(function(n){ return m.includes(n); });
-      }).reduce(function(s,t){ return s + ((parseFloat(t.hours)||0) * TEAM_CONFIG.owner.rate); }, 0);
-      const _pProfit = totalInvoiced - totalPOCost - _pSubCost - _pOwnerLabor;
+      }).reduce(function(s,t){ return s + ((parseFloat(t.hours)||0) * (parseFloat(t.internalCostRate) || (TEAM_CONFIG.contractors[0] ? TEAM_CONFIG.contractors[0].rate : 125))); }, 0);
+      const _pProfit = totalInvoiced - totalPOCost - _pSubCost;
       const margin = totalInvoiced > 0 ? Math.round((_pProfit / totalInvoiced) * 100) : 0;
 
       // Group clips by room
@@ -5705,28 +5424,28 @@
 
       T.innerHTML = `
         <style>
-          .dpo-card { background:#FFFFFF; border:1px solid rgba(14,22,41,0.08); border-radius:0; padding:0; overflow:hidden; transition:all 0.3s ease; }
-          .dpo-card:hover { border-color:rgba(14,22,41,0.15); box-shadow:0 8px 32px rgba(14,22,41,0.08); transform:translateY(-2px); }
-          .dpo-wrap { background:#FFFFFF; border-radius:0; padding:28px; margin:-8px -8px 0 -8px; }
+          .dpo-card { background:var(--card-bg, #0F1928); border:1px solid var(--border, rgba(200,185,154,0.08)); border-radius:0; padding:0; overflow:hidden; transition:all 0.3s ease; }
+          .dpo-card:hover { border-color:rgba(200,185,154,0.2); box-shadow:0 8px 32px rgba(0,0,0,0.3); transform:translateY(-2px); }
+          .dpo-wrap { background:linear-gradient(180deg,#141414 0%,#1A1A1A 100%); border-radius:0; padding:28px; margin:-8px -8px 0 -8px; }
           .dpo-section { margin-bottom:28px; }
-          .dpo-section-title { font-family:'Playfair Display',Georgia,serif; font-size:18px; color:#0E1629; margin-bottom:16px; letter-spacing:0.5px; }
+          .dpo-section-title { font-family:'Playfair Display',Georgia,serif; font-size:18px; color:#C8B99A; margin-bottom:16px; letter-spacing:0.5px; }
           .dpo-fin-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; }
-          .dpo-fin-card { background:#FFFFFF; border:1px solid rgba(14,22,41,0.1); border-radius:0; padding:20px; text-align:center; transition:all 0.25s ease; }
-          .dpo-fin-card:hover { border-color:rgba(196,164,100,0.4); }
-          .dpo-fin-value { font-size:26px; font-weight:700; font-family:'JetBrains Mono',monospace; margin-bottom:4px; color:#0E1629; }
-          .dpo-fin-label { font-size:11px; text-transform:uppercase; letter-spacing:0.12em; color:#C4A464; font-family:'DM Sans','Montserrat',sans-serif; }
+          .dpo-fin-card { background:#0E1629; border:1px solid rgba(200,185,154,0.12); border-radius:0; padding:20px; text-align:center; transition:all 0.25s ease; }
+          .dpo-fin-card:hover { border-color:rgba(200,185,154,0.25); }
+          .dpo-fin-value { font-size:26px; font-weight:700; font-family:'JetBrains Mono',monospace; margin-bottom:4px; }
+          .dpo-fin-label { font-size:10px; text-transform:uppercase; letter-spacing:0.12em; color:var(--gold); font-family:'DM Sans','Montserrat',sans-serif; }
           .dpo-room-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; }
-          .dpo-room-card { background:#FFFFFF; border-radius:0; overflow:hidden; cursor:pointer; transition:all 0.3s ease; border:1px solid rgba(14,22,41,0.08); }
-          .dpo-room-card:hover { border-color:#C4A464; transform:translateY(-3px); box-shadow:0 8px 24px rgba(14,22,41,0.1); }
-          .dpo-room-img { width:100%; height:140px; object-fit:cover; background:#F5F3EE; }
+          .dpo-room-card { background:#0E1629; border-radius:0; overflow:hidden; cursor:pointer; transition:all 0.3s ease; border:1px solid rgba(200,185,154,0.08); }
+          .dpo-room-card:hover { border-color:#C8B99A; transform:translateY(-3px); box-shadow:0 8px 24px rgba(0,0,0,0.4); }
+          .dpo-room-img { width:100%; height:140px; object-fit:cover; background:#333; }
           .dpo-room-body { padding:14px; }
           .dpo-room-name { font-family:'Playfair Display',Georgia,serif; font-size:15px; color:#0E1629; margin-bottom:4px; }
-          .dpo-room-count { font-size:11px; color:#C4A464; }
+          .dpo-room-count { font-size:11px; color:var(--gold); }
           .dpo-activity { max-height:400px; overflow-y:auto; }
-          .dpo-act-item { display:flex; gap:12px; padding:12px 0; border-bottom:1px solid rgba(14,22,41,0.06); }
+          .dpo-act-item { display:flex; gap:12px; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.05); }
           .dpo-act-dot { width:8px; height:8px; border-radius:50%; margin-top:6px; flex-shrink:0; }
           .dpo-act-text { font-size:13px; color:#0E1629; line-height:1.4; }
-          .dpo-act-time { font-size:10px; color:#C4A464; margin-top:2px; }
+          .dpo-act-time { font-size:10px; color:var(--gold); margin-top:2px; }
           .dpo-docs-table { width:100%; border-collapse:collapse; }
           .dpo-docs-table th { text-align:left; padding:10px 12px; font-size:10px; text-transform:uppercase; letter-spacing:0.1em; color:var(--gold); border-bottom:1px solid rgba(14,22,41,0.08); font-family:'DM Sans','Montserrat',sans-serif; }
           .dpo-docs-table td { padding:10px 12px; font-size:13px; color:#0E1629; border-bottom:1px solid rgba(14,22,41,0.06); }
@@ -6225,47 +5944,6 @@
         rm.forEach(d => { const data = d.data(); if (data.name) roomMeta[data.name] = data; });
       } catch(e){}
 
-      // Auto-sync clips to productLibrary (throttled — max once per 5 min per project)
-      if (clips.length > 0) {
-        var syncKey = 'libSync_' + proj.id;
-        var lastSync = parseInt(sessionStorage.getItem(syncKey) || '0');
-        if (Date.now() - lastSync > 300000) { // 5 minutes
-          sessionStorage.setItem(syncKey, String(Date.now()));
-          (async function() {
-            try {
-              var existing = new Set();
-              var libSnap = await db.collection('productLibrary').where('project', '==', (proj.name || '')).limit(5000).get();
-              libSnap.forEach(function(d) {
-                var dd = d.data();
-                existing.add((dd.title + '|' + dd.vendor).toLowerCase().trim());
-              });
-              var batch = db.batch();
-              var count = 0;
-              clips.forEach(function(c) {
-                var title = (c.title || '').trim();
-                if (!title) return;
-                var key = (title + '|' + (c.vendor || '')).toLowerCase().trim();
-                if (existing.has(key)) return;
-                existing.add(key);
-                var ref = db.collection('productLibrary').doc();
-                batch.set(ref, {
-                  title: title, vendor: c.vendor || '', room: c.room || '', category: c.category || '',
-                  image: c.imageUrl || '', imageUrl: c.imageUrl || '',
-                  unitCost: parseFloat(c.cost) || 0, sellPrice: parseFloat(c.clientPrice) || parseFloat(c.totalSelling) || 0,
-                  sku: c.sku || '', description: c.description || '', project: proj.name || '',
-                  invoice: c.invoiceNum || '', po: c.poNum || '', proposal: c.proposalNum || '',
-                  status: c.approvalStatus || '', dimensions: c.dimensions || '', finish: c.finish || '',
-                  syncedAt: new Date().toISOString(), _fromClip: true
-                });
-                count++;
-                if (count >= 400) return;
-              });
-              if (count > 0) await batch.commit();
-            } catch(e) { console.warn('Library sync:', e); }
-          })();
-        }
-      }
-
       // Sort clips
       clips.sort((a, b) => {
         let va = a[boardSortField] || '', vb = b[boardSortField] || '';
@@ -6364,12 +6042,10 @@
         </div>
         <div class="room-cards-grid" id="roomCardsGrid">
           ${roomCards.map(rc => `
-            <div class="room-card" onclick="scrollToRoom('${escAttr(rc.name)}')" style="position:relative;">
+            <div class="room-card" onclick="scrollToRoom('${escAttr(rc.name)}')">
               <div class="room-card-cover">
                 ${rc.coverImg ? '<img src="' + escAttr(rc.coverImg) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' : ''}<div class="room-card-placeholder" style="${rc.coverImg ? 'display:none;' : 'display:flex;'}background:linear-gradient(135deg,#2a2a2a,#3a3a3a);align-items:center;justify-content:center;width:100%;height:100%;color:var(--gold);font-size:28px;flex-direction:column;gap:4px;">🏠<span style="font-size:9px;color:var(--gold);">Upload cover</span></div>
                 <div class="room-card-upload" onclick="event.stopPropagation();uploadRoomCover('${escAttr(proj.id)}','${escAttr(rc.name)}',this)" title="Upload cover image">📷</div>
-                <div onclick="event.stopPropagation();renameRoom('${escAttr(proj.id)}','${escAttr(rc.name)}')" style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,0.7);color:white;border:none;padding:4px 8px;font-size:10px;cursor:pointer;border-radius:2px;z-index:2;" title="Rename room">✏️</div>
-                <div onclick="event.stopPropagation();deleteRoom('${escAttr(proj.id)}','${escAttr(rc.name)}')" style="position:absolute;top:6px;right:32px;background:rgba(229,57,53,0.8);color:white;border:none;padding:4px 8px;font-size:10px;cursor:pointer;border-radius:2px;z-index:2;" title="Delete room">🗑️</div>
               </div>
               <div class="room-card-info">
                 <div class="room-card-name">${esc(rc.name)}</div>
@@ -6439,10 +6115,10 @@
                 ${grouped[rm].map(clip => {
                   const imgSrc = clip.imageUrl || (clip.images && clip.images[0]) || '';
                   const imgTag = imgSrc ? '<img src="' + escAttr(imgSrc) + '" referrerpolicy="no-referrer" style="width:40px;height:40px;border-radius:4px;object-fit:cover;background:var(--gray-100);" onerror="this.outerHTML=\'<div style=padding:8px;color:var(--gray-300);>📷</div>\'">' : '<div style="padding:8px;color:var(--gray-300);">📷</div>';
-                  const qty = parseFloat(clip.qty || clip.quantity) || 1;
-                  const cost = parseFloat(clip.cost) || parseFloat(clip.costPrice) || parseFloat(clip.tradeCost) || parseFloat(clip.unitCost) || (parseFloat(clip.totalCost) ? parseFloat(clip.totalCost) / qty : 0) || 0;
-                  const sell = parseFloat(clip.clientPrice) || parseFloat(clip.sellPrice) || parseFloat(clip.unitSellingPrice) || (parseFloat(clip.totalSelling) ? parseFloat(clip.totalSelling) / qty : 0) || parseFloat(clip.totalSell) || parseFloat(clip.price) || parseFloat(clip.retailPrice) || 0;
-                  const markup = clip.markupPct || (cost > 0 && sell > 0 ? Math.round((sell - cost) / cost * 100) : 0);
+                  const cost = parseFloat(clip.cost) || 0;
+                  const sell = parseFloat(clip.clientPrice) || 0;
+                  const markup = clip.markupPct || (cost > 0 ? Math.round((sell - cost) / cost * 100) : 0);
+                  const qty = parseFloat(clip.qty) || 1;
                   const total = parseFloat(clip.totalSelling) || (sell * qty);
                   const status = clip.approvalStatus || clip.approval || clip.proposalStatus || '';
                   return '<tr style="cursor:pointer;">' +
@@ -6530,10 +6206,7 @@
                 ' ondragover="event.preventDefault();this.style.background=\'var(--gold)\';this.style.color=\'white\'"' +
                 ' ondragleave="this.style.background=\'\';this.style.color=\'\'"' +
                 ' ondrop="event.preventDefault();ibDropOnTab(event,\'' + proj.id + '\',\'' + s.id + '\');this.style.background=\'\';this.style.color=\'\'"' +
-                '>' + esc(s.name || 'Untitled') + '<span class="ib-tab-count">' + imgCount + '</span>' +
-                '<span onclick="event.stopPropagation();ibRenameSection(\'' + proj.id + '\',\'' + s.id + '\',\'' + escAttr(s.name || '') + '\')" style="margin-left:4px;font-size:9px;cursor:pointer;opacity:0.5;" title="Rename">✏️</span>' +
-                '<span onclick="event.stopPropagation();ibDeleteSection(\'' + proj.id + '\',\'' + s.id + '\',\'' + escAttr(s.name || '') + '\',' + imgCount + ')" style="margin-left:2px;font-size:9px;cursor:pointer;opacity:0.5;" title="Delete section">🗑️</span>' +
-                '</button>';
+                '>' + esc(s.name || 'Untitled') + '<span class="ib-tab-count">' + imgCount + '</span></button>';
             }).join('')}
             <button class="ib-section-tab add-tab" onclick="ibAddSection('${proj.id}')">+ Section</button>
             <button class="ib-section-tab add-tab" onclick="ibImportNiice('${proj.id}')" style="color:var(--gold);opacity:0.7;">Import Niice</button>
@@ -6901,7 +6574,7 @@
       // If projects not loaded yet, fetch from Firestore
       if (!projList.length) {
         try {
-          var snap = await getCachedBoards();
+          var snap = await db.collection('boards').get();
           projList = snap.docs.map(function(d) { return { id: d.id, name: d.data().name || d.id }; });
         } catch(e) {}
       }
@@ -6954,67 +6627,6 @@
         closeModal();
         renderIdeabooksList();
       } catch(e) { alert('Error creating board: ' + e.message); }
-    }
-
-    // ── Board Edit/Delete Functions ──
-
-    async function renameRoom(projectId, oldName) {
-      var newName = prompt('Rename room "' + oldName + '" to:', oldName);
-      if (!newName || newName === oldName) return;
-      try {
-        // Update all clips in this room
-        var snap = await db.collection('boards').doc(projectId).collection('clips').where('room', '==', oldName).get();
-        var batch = db.batch();
-        snap.forEach(function(d) { batch.update(d.ref, { room: newName }); });
-        await batch.commit();
-        showToast('Renamed "' + oldName + '" to "' + newName + '"');
-        renderProjectDetail(projectId);
-      } catch(e) { showToast('Error: ' + e.message, 'error'); }
-    }
-
-    async function deleteRoom(projectId, roomName) {
-      if (!confirm('Delete room "' + roomName + '" and ALL its items? This cannot be undone.')) return;
-      try {
-        var snap = await db.collection('boards').doc(projectId).collection('clips').where('room', '==', roomName).get();
-        var batch = db.batch();
-        snap.forEach(function(d) { batch.delete(d.ref); });
-        await batch.commit();
-        showToast('Deleted room "' + roomName + '" (' + snap.size + ' items)');
-        renderProjectDetail(projectId);
-      } catch(e) { showToast('Error: ' + e.message, 'error'); }
-    }
-
-    async function ibRenameSection(projectId, sectionId, oldName) {
-      var newName = prompt('Rename section "' + oldName + '" to:', oldName);
-      if (!newName || newName === oldName) return;
-      try {
-        await db.collection('boards').doc(projectId).collection('ideabooks').doc(sectionId).update({ name: newName });
-        showToast('Renamed to "' + newName + '"');
-        renderProjectDetail(projectId);
-      } catch(e) { showToast('Error: ' + e.message, 'error'); }
-    }
-
-    async function ibDeleteSection(projectId, sectionId, sectionName, imageCount) {
-      if (!confirm('Delete section "' + sectionName + '"' + (imageCount > 0 ? ' and its ' + imageCount + ' images' : '') + '? This cannot be undone.')) return;
-      try {
-        await db.collection('boards').doc(projectId).collection('ideabooks').doc(sectionId).delete();
-        ibActiveSection = null;
-        showToast('Deleted section "' + sectionName + '"');
-        renderProjectDetail(projectId);
-      } catch(e) { showToast('Error: ' + e.message, 'error'); }
-    }
-
-    async function deleteIdeabookImage(projectId, sectionId, imageIdx) {
-      if (!confirm('Delete this image?')) return;
-      try {
-        var doc = await db.collection('boards').doc(projectId).collection('ideabooks').doc(sectionId).get();
-        var data = doc.data() || {};
-        var images = data.images || [];
-        images.splice(imageIdx, 1);
-        await db.collection('boards').doc(projectId).collection('ideabooks').doc(sectionId).update({ images: images });
-        showToast('Image deleted');
-        ibSwitchSection(projectId, sectionId);
-      } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
 
     async function ibAddSection(projectId) {
@@ -8568,21 +8180,20 @@
                       ${!p.linkedInvoiceId && !p.linkedPOId ? '<a onclick="linkDocModal(\''+proj.id+'\',\'proposals\',\''+p.id+'\')" style="color:var(--gray-400);cursor:pointer;font-size:10px;" title="Link to other docs">🔗 Link</a>' : ''}
                     </td>
                     <td style="padding:10px 12px;white-space:nowrap;" onclick="event.stopPropagation()">
-                      <div class="action-menu-wrap" style="display:flex;align-items:center;gap:4px;position:relative;">
-                        <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:5px 14px;white-space:nowrap;display:flex;align-items:center;gap:4px;" onclick="event.stopPropagation();toggleActionMenu(this)">Actions <span style="font-size:9px;">▾</span></button>
+                      <div class="action-menu-wrap" style="display:flex;align-items:center;gap:4px;">
+                        <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 10px;white-space:nowrap;" onclick="event.stopPropagation();navigate('#/project/${proj.id}/proposal/${p.id}')">✏️ Edit</button>
+                        ${p.status === 'Approved' || p.status === 'Invoiced'
+                          ? '<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 12px;white-space:nowrap;" onclick="event.stopPropagation();navigate(\'#/project/'+proj.id+'/proposal/'+p.id+'\')">View Proposal</button>'
+                          : '<button class="btn btn-primary btn-sm" style="font-size:11px;padding:4px 12px;white-space:nowrap;" onclick="event.stopPropagation();navigate(\'#/project/'+proj.id+'/proposal/'+p.id+'\')">Send Proposal</button>'}
+                        <button class="action-dots" onclick="event.stopPropagation();toggleActionMenu(this)">⋮</button>
                         <div class="action-dropdown" style="display:none">
-                          <a onclick="navigate('#/project/${proj.id}/proposal/${p.id}');closeAllMenus()">✏️ Edit Proposal</a>
-                          ${p.status === 'Approved' || p.status === 'Invoiced'
-                            ? '<a onclick="navigate(\'#/project/'+proj.id+'/proposal/'+p.id+'\');closeAllMenus()">👁️ View Proposal</a>'
-                            : '<a onclick="navigate(\'#/project/'+proj.id+'/proposal/'+p.id+'\');closeAllMenus()">📨 Send Proposal</a>'}
-                          <div class="divider"></div>
                           <a onclick="convertProposalToInvoice('${proj.id}','${p.id}');closeAllMenus()">🧾 Start Invoice</a>
-                          <a onclick="togglePublished('${proj.id}','${p.id}',${!p.published},'proposals');closeAllMenus()">${p.published ? '🔒 Unpublish' : '🌐 Publish to Client'}</a>
-                          <a onclick="previewDocument('proposal','${proj.id}','${p.id}');closeAllMenus()">📄 PDF Preview</a>
+                          <a onclick="togglePublished('${proj.id}','${p.id}',${!p.published},'proposals');closeAllMenus()">${p.published ? 'Unpublish' : 'Publish to Client'}</a>
+                          <a onclick="previewDocument('proposal','${proj.id}','${p.id}');closeAllMenus()">PDF</a>
                           <a onclick="linkDocModal('${proj.id}','proposals','${p.id}');closeAllMenus()">🔗 Link Docs</a>
                           <a onclick="setQBSynced('${proj.id}','proposals','${p.id}');closeAllMenus()">${getQbId(p) ? '✅ QB Synced' : '📤 Mark QB Synced'}</a>
                           <div class="divider"></div>
-                          <a class="danger" onclick="deleteDoc('${proj.id}','proposals','${p.id}');closeAllMenus()">🗑️ Delete</a>
+                          <a class="danger" onclick="deleteDoc('${proj.id}','proposals','${p.id}');closeAllMenus()">Delete</a>
                         </div>
                       </div>
                     </td>
@@ -8730,9 +8341,8 @@
                 <th style="cursor:pointer;" onclick="projTabSortBy('sent')">Sent${projSortArrow('sent')}</th>
                 <th style="cursor:pointer;" onclick="projTabSortBy('status')">Status${projSortArrow('status')}</th>
                 <th style="cursor:pointer;" onclick="projTabSortBy('date')">Due Date${projSortArrow('date')}</th>
-                <th style="text-align:right;cursor:pointer;" onclick="projTabSortBy('total')">Total${projSortArrow('total')}</th>
-                <th style="text-align:right;cursor:pointer;" onclick="projTabSortBy('paid')">Paid${projSortArrow('paid')}</th>
                 <th style="text-align:right;cursor:pointer;" onclick="projTabSortBy('balance')">Balance${projSortArrow('balance')}</th>
+                <th style="text-align:right;cursor:pointer;" onclick="projTabSortBy('total')">Total${projSortArrow('total')}</th>
                 <th>Connected Docs</th>
                 <th>Actions</th>
               </tr></thead>
@@ -8752,9 +8362,8 @@
                     '<td style="padding:10px 12px;font-size:12px;">' + (inv.sentDate ? formatDate(inv.sentDate) : '<span style="color:var(--gray-300);">—</span>') + '</td>' +
                     '<td style="padding:10px 12px;"><span class="badge badge-' + (inv.status||'draft').toLowerCase() + '">' + esc(inv.status||'Draft') + '</span></td>' +
                     '<td style="padding:10px 12px;color:var(--gray-400);font-size:12px;">' + formatDate(inv.dueDate || inv.date) + '</td>' +
+                    '<td style="padding:10px 12px;text-align:right;font-family:monospace;font-weight:600;color:' + bc + ';">' + (bal > 0 ? formatMoney(bal) : '$0.00') + '</td>' +
                     '<td style="padding:10px 12px;text-align:right;font-weight:600;font-family:monospace;">' + formatMoney(it) + '</td>' +
-                    '<td style="padding:10px 12px;text-align:right;font-family:monospace;color:' + (tp > 0 ? '#5FA56B' : 'var(--gray-400)') + ';">' + (tp > 0 ? formatMoney(tp) : '—') + '</td>' +
-                    '<td style="padding:10px 12px;text-align:right;font-family:monospace;font-weight:600;color:' + (bal > 0 ? '#C8B99A' : '#5FA56B') + ';">' + formatMoney(bal) + '</td>' +
                     '<td style="padding:10px 12px;font-size:11px;" onclick="event.stopPropagation()">' +
                       lp.map(function(p) { return '<a onclick="navigate(\'#/project/' + proj.id + '/proposal/' + p.id + '\')" style="color:var(--teal);cursor:pointer;margin-right:4px;" title="' + esc(p.proposalNum||p.name||'PR') + '">&#x1F4CB;</a>'; }).join('') +
                       lo.map(function(p) { return '<a onclick="navigate(\'#/project/' + proj.id + '/po/' + p.id + '\')" style="color:var(--teal);cursor:pointer;margin-right:4px;" title="' + esc(p.number||p.num||'PO') + '">&#x1F4E6;</a>'; }).join('') +
@@ -8962,8 +8571,6 @@
                 <th style="cursor:pointer;" onclick="projTabSortBy('date')">Date${projSortArrow('date')}</th>
                 <th style="cursor:pointer;" onclick="projTabSortBy('status')">Status${projSortArrow('status')}</th>
                 <th class="amount" style="cursor:pointer;" onclick="projTabSortBy('total')">Amount${projSortArrow('total')}</th>
-                <th class="amount" style="cursor:pointer;" onclick="projTabSortBy('paidAmount')">Paid${projSortArrow('paidAmount')}</th>
-                <th class="amount" style="cursor:pointer;" onclick="projTabSortBy('balance')">Balance${projSortArrow('balance')}</th>
                 <th style="cursor:pointer;" onclick="projTabSortBy('shipTo')">Ship To${projSortArrow('shipTo')}</th>
                 <th style="cursor:pointer;text-align:center;" onclick="projTabSortBy('qb')">QB${projSortArrow('qb')}</th>
                 <th>Docs</th>
@@ -8980,8 +8587,6 @@
                     <td>${formatDate(po.issueDate || po.orderDate || po.poDate || po.date || po.createdAt)}</td>
                     <td><span class="badge badge-${(po.status||'draft').toLowerCase()}">${esc(po.status||'Draft')}</span></td>
                     <td class="amount">${formatMoney(po.total || 0)}</td>
-                    <td class="amount" style="color:${(parseFloat(po.paidAmount) || 0) > 0 ? '#5FA56B' : 'var(--gray-400)'};">${(parseFloat(po.paidAmount) || 0) > 0 ? formatMoney(po.paidAmount) : '—'}</td>
-                    <td class="amount" style="font-weight:600;color:${((parseFloat(po.total) || 0) - (parseFloat(po.paidAmount) || 0)) > 0 ? '#C8B99A' : '#5FA56B'};">${formatMoney((parseFloat(po.total) || 0) - (parseFloat(po.paidAmount) || 0))}</td>
                     <td style="font-size:12px;color:var(--gray-500);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escAttr(po.shipTo || po.deliverTo || po.receiver || '')}">${esc(po.shipTo || po.deliverTo || po.receiver || '—')}</td>
                     <td style="text-align:center;" onclick="event.stopPropagation()">
                       <span style="cursor:pointer;" onclick="setQBSynced('${proj.id}','purchaseOrders','${po.id}')" title="${getQbId(po) ? 'QB #'+esc(String(getQbId(po))) : 'Click to sync to QB'}">${qbCellBadge(getQbId(po))}</span>
@@ -12768,7 +12373,7 @@
       try {
         const nameSet = new Set();
         // Pull from projects (boards)
-        const projSnap = await getCachedBoards();
+        const projSnap = await db.collection('boards').get();
         projSnap.forEach(d => {
           const n = d.data().clientName || d.data().client || '';
           if (n) nameSet.add(n);
@@ -13141,25 +12746,17 @@
       if (!_docEdit) return;
       try {
         var products = [];
-        var seen = new Set();
-        // Load from products collection
         try {
-          var snap1 = await db.collection('products').limit(2000).get();
-          snap1.forEach(function(d) { var p = d.data(); if (p.title) { var k = (p.title+'|'+p.vendor).toLowerCase(); if (!seen.has(k)) { seen.add(k); products.push(p); } } });
+          var snap1 = await db.collection('products').limit(500).get();
+          snap1.forEach(function(d) { var p = d.data(); if (p.title) products.push(p); });
         } catch(e) {}
-        // Also load from productLibrary
-        try {
-          var snap2 = await db.collection('productLibrary').limit(2000).get();
-          snap2.forEach(function(d) { var p = d.data(); if (p.title) { var k = (p.title+'|'+p.vendor).toLowerCase(); if (!seen.has(k)) { seen.add(k); products.push(p); } } });
-        } catch(e) {}
-        // Also load project's own clips
-        if (_docEdit && _docEdit.projectId) {
+        if (!products.length) {
           try {
-            var snap3 = await db.collection('boards').doc(_docEdit.projectId).collection('clips').get();
-            snap3.forEach(function(d) { var p = d.data(); if (p.title) { var k = (p.title+'|'+p.vendor).toLowerCase(); if (!seen.has(k)) { seen.add(k); products.push(p); } } });
+            var snap2 = await db.collection('productLibrary').limit(500).get();
+            snap2.forEach(function(d) { var p = d.data(); if (p.title) products.push(p); });
           } catch(e) {}
         }
-        if (!products.length) { showToast('No products found. Import from Houzz or clip products first.'); return; }
+        if (!products.length) { showToast('Product library is empty.'); return; }
         products.sort(function(a,b) { return (a.title||'').localeCompare(b.title||''); });
         var picker = document.createElement('div');
         picker.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:2000;display:flex;align-items:center;justify-content:center;';
@@ -13210,137 +12807,6 @@
           showToast('Added ' + checked.length + ' item' + (checked.length > 1 ? 's' : '') + ' from library');
         };
       } catch(e) { alert('Error loading library: ' + e.message); }
-    }
-
-    // ========== MY ITEMS PANEL (Houzz-style persistent right panel) ==========
-    var _myItemsPanelOpen = false;
-    var _myItemsProducts = [];
-
-    async function toggleMyItemsPanel() {
-      var existing = document.getElementById('myItemsPanel');
-      if (existing) { existing.remove(); _myItemsPanelOpen = false; return; }
-      _myItemsPanelOpen = true;
-
-      // Load products from all sources
-      var products = [];
-      var seen = new Set();
-      try {
-        // Project clips first (most relevant)
-        if (_docEdit && _docEdit.projectId) {
-          var snap3 = await db.collection('boards').doc(_docEdit.projectId).collection('clips').get();
-          snap3.forEach(function(d) { var p = d.data(); p._source = 'project'; if (p.title) { var k = (p.title+'|'+(p.vendor||'')).toLowerCase(); if (!seen.has(k)) { seen.add(k); products.push(p); } } });
-        }
-      } catch(e) {}
-      try {
-        var snap1 = await db.collection('products').limit(3000).get();
-        snap1.forEach(function(d) { var p = d.data(); p._source = 'library'; if (p.title) { var k = (p.title+'|'+(p.vendor||'')).toLowerCase(); if (!seen.has(k)) { seen.add(k); products.push(p); } } });
-      } catch(e) {}
-      try {
-        var snap2 = await db.collection('productLibrary').limit(3000).get();
-        snap2.forEach(function(d) { var p = d.data(); p._source = 'library'; if (p.title) { var k = (p.title+'|'+(p.vendor||'')).toLowerCase(); if (!seen.has(k)) { seen.add(k); products.push(p); } } });
-      } catch(e) {}
-
-      // Sort: project items first, then by most recent
-      products.sort(function(a, b) {
-        if (a._source === 'project' && b._source !== 'project') return -1;
-        if (b._source === 'project' && a._source !== 'project') return 1;
-        return (a.title || '').localeCompare(b.title || '');
-      });
-      _myItemsProducts = products;
-
-      // Build panel HTML
-      var panel = document.createElement('div');
-      panel.id = 'myItemsPanel';
-      panel.style.cssText = 'position:fixed;top:0;right:0;width:340px;height:100vh;background:#FFFFFF;box-shadow:-4px 0 24px rgba(0,0,0,0.15);z-index:1500;display:flex;flex-direction:column;border-left:1px solid #E5E2DA;';
-      panel.innerHTML =
-        '<div style="padding:16px 20px;border-bottom:1px solid #E5E2DA;display:flex;justify-content:space-between;align-items:center;">' +
-          '<div style="font-size:16px;font-weight:700;color:#0E1629;">My Items</div>' +
-          '<button onclick="toggleMyItemsPanel()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#7A7060;">&times;</button>' +
-        '</div>' +
-        '<div style="padding:10px 16px;border-bottom:1px solid #E5E2DA;">' +
-          '<input type="text" id="myItemsSearch" placeholder="Search..." oninput="filterMyItemsPanel()" style="width:100%;padding:8px 12px;border:1px solid #E5E2DA;font-size:13px;outline:none;background:#F9F8F5;">' +
-        '</div>' +
-        '<div style="padding:8px 16px;border-bottom:1px solid #E5E2DA;display:flex;gap:6px;flex-wrap:wrap;">' +
-          '<button class="mip-tab" data-filter="all" onclick="filterMyItemsPanel(\'all\')" style="padding:4px 10px;font-size:11px;border:1px solid #0E1629;background:#0E1629;color:#EDE8E0;cursor:pointer;font-weight:600;">All</button>' +
-          '<button class="mip-tab" data-filter="product" onclick="filterMyItemsPanel(\'product\')" style="padding:4px 10px;font-size:11px;border:1px solid #E5E2DA;background:#fff;color:#0E1629;cursor:pointer;">Product</button>' +
-          '<button class="mip-tab" data-filter="service" onclick="filterMyItemsPanel(\'service\')" style="padding:4px 10px;font-size:11px;border:1px solid #E5E2DA;background:#fff;color:#0E1629;cursor:pointer;">Service</button>' +
-        '</div>' +
-        '<div style="padding:6px 16px;border-bottom:1px solid #F0EDE6;display:flex;gap:4px;">' +
-          '<div onclick="filterMyItemsPanel(\'project\')" style="cursor:pointer;padding:6px 12px;font-size:11px;font-weight:600;color:#0E1629;border-bottom:2px solid var(--gold);">In this Project</div>' +
-          '<div onclick="filterMyItemsPanel(\'library\')" style="cursor:pointer;padding:6px 12px;font-size:11px;font-weight:600;color:#7A7060;">In My Library</div>' +
-        '</div>' +
-        '<div id="myItemsList" style="flex:1;overflow-y:auto;"></div>';
-      document.body.appendChild(panel);
-      filterMyItemsPanel('all');
-    }
-
-    var _myItemsFilter = 'all';
-    var _myItemsSourceFilter = '';
-
-    function filterMyItemsPanel(filter) {
-      if (filter === 'project' || filter === 'library') {
-        _myItemsSourceFilter = filter;
-      } else if (filter) {
-        _myItemsFilter = filter;
-      }
-      // Update tab styles
-      document.querySelectorAll('.mip-tab').forEach(function(t) {
-        var isActive = t.dataset.filter === _myItemsFilter;
-        t.style.background = isActive ? '#0E1629' : '#fff';
-        t.style.color = isActive ? '#EDE8E0' : '#0E1629';
-        t.style.borderColor = isActive ? '#0E1629' : '#E5E2DA';
-      });
-
-      var search = (document.getElementById('myItemsSearch') || {}).value || '';
-      var q = search.toLowerCase();
-      var products = _myItemsProducts || [];
-
-      var filtered = products.filter(function(p) {
-        if (q && !(p.title || '').toLowerCase().includes(q) && !(p.vendor || '').toLowerCase().includes(q)) return false;
-        if (_myItemsSourceFilter === 'project' && p._source !== 'project') return false;
-        if (_myItemsSourceFilter === 'library' && p._source === 'project') return false;
-        if (_myItemsFilter === 'service' && (p.category || '').toLowerCase() !== 'service') return false;
-        if (_myItemsFilter === 'product' && (p.category || '').toLowerCase() === 'service') return false;
-        return true;
-      });
-
-      var list = document.getElementById('myItemsList');
-      if (!list) return;
-      if (filtered.length === 0) {
-        list.innerHTML = '<div style="padding:40px 20px;text-align:center;color:#7A7060;">No items found</div>';
-        return;
-      }
-      list.innerHTML = filtered.map(function(p, i) {
-        var sell = parseFloat(p.sellPrice) || parseFloat(p.clientPrice) || parseFloat(p.totalSell) || parseFloat(p.amount) || 0;
-        var imgUrl = p.imageUrl || p.image || p.thumbnail || '';
-        var realIdx = _myItemsProducts.indexOf(p);
-        return '<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #F0EDE6;cursor:pointer;transition:background 0.1s;" onmouseover="this.style.background=\'#F9F8F5\'" onmouseout="this.style.background=\'#fff\'">' +
-          '<button onclick="event.stopPropagation();addMyItemToDoc(' + realIdx + ')" style="width:28px;height:28px;border-radius:50%;border:2px solid var(--gold);background:none;color:var(--gold);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Add to document">+</button>' +
-          (imgUrl ? '<img src="' + escAttr(imgUrl) + '" style="width:56px;height:56px;object-fit:cover;flex-shrink:0;" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div style="width:56px;height:56px;background:#F5F3EE;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">📦</div>') +
-          '<div style="flex:1;min-width:0;">' +
-            '<div style="font-size:13px;font-weight:600;color:#0E1629;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(p.title || '') + '</div>' +
-            '<div style="font-size:11px;color:#7A7060;">Product</div>' +
-            '<div style="font-size:13px;font-weight:700;color:#0E1629;font-family:monospace;">$' + sell.toFixed(2) + '</div>' +
-          '</div>' +
-        '</div>';
-      }).join('');
-    }
-
-    function addMyItemToDoc(idx) {
-      var p = _myItemsProducts[idx];
-      if (!p || !_docEdit) return;
-      var cost = parseFloat(p.costPrice) || parseFloat(p.cost) || parseFloat(p.unitCost) || parseFloat(p.totalCost) || 0;
-      var sell = parseFloat(p.sellPrice) || parseFloat(p.clientPrice) || parseFloat(p.totalSell) || parseFloat(p.amount) || 0;
-      var mkup = cost > 0 ? Math.round(((sell - cost) / cost) * 100) : 0;
-      _docEdit.items.push({
-        title: p.title || '', vendor: p.vendor || '', category: p.category || '',
-        room: p.room || '', qty: 1, cost: cost, markupPct: mkup, shipping: 0,
-        amount: sell, imageUrl: p.imageUrl || p.image || '', description: p.description || '',
-        shipTo: '', expenseType: 'product'
-      });
-      docEditRenderItems();
-      docEditAutoSave();
-      showToast('Added: ' + (p.title || 'item').substring(0, 40));
     }
 
     async function docEditPickFromSelections() {
@@ -13675,15 +13141,12 @@
         const invNum = await getNextDocNumber('INV');
 
         var _cUser = (currentUser && currentUser.displayName) || (currentUser && currentUser.email) || 'Unknown';
-        // Pull client info from proposal first, then fall back to project
-        var _projDoc = await db.collection('boards').doc(projectId).get();
-        var _projInfo = _projDoc.exists ? _projDoc.data() : {};
         const invRef = await db.collection('boards').doc(projectId).collection('invoices').add({
           invoiceNum: invNum, number: invNum,
           status: 'Draft', total, items,
           vendor: prop.vendor || '', documentTags: prop.documentTags || prop.tags || prop.vendor || '',
-          clientName: prop.clientName || _projInfo.clientName || '', clientEmail: prop.clientEmail || _projInfo.clientEmail || '',
-          clientPhone: prop.clientPhone || _projInfo.clientPhone || '', clientAddress: prop.clientAddress || _projInfo.clientAddress || '',
+          clientName: prop.clientName || '', clientEmail: prop.clientEmail || '',
+          clientPhone: prop.clientPhone || '', clientAddress: prop.clientAddress || '',
           taxRate: prop.taxRate || 0,
           linkedProposalId: proposalId,
           linkedProposalNum: prop.proposalNum || prop.number || prop.name || '',
@@ -13966,7 +13429,6 @@
           <div class="doc-edit-add" style="display:flex;gap:12px;align-items:center;">
             <button onclick="docEditAddItem()" style="background:#0E1629;color:#EDE8E0;border:none;padding:10px 20px;font-size:14px;cursor:pointer;font-weight:600;">+ Add another item</button>
             <button onclick="docEditPickFromSelections()" style="background:#FFFFFF;border:2px solid #0E1629;color:#0E1629;padding:8px 18px;font-size:13px;cursor:pointer;font-weight:600;">📋 Add from Selections</button>
-            <button onclick="toggleMyItemsPanel()" style="background:#FFFFFF;border:2px solid var(--gold);color:var(--gold);padding:8px 18px;font-size:13px;cursor:pointer;font-weight:600;">🛍️ My Items</button>
           </div>
         </div>`;
 
@@ -14307,7 +13769,7 @@
       _cachedAssets = [];
       var tags = new Set();
       try {
-        var projSnap = await getCachedBoards();
+        var projSnap = await db.collection('boards').get();
         for (var pd of projSnap.docs) {
           var pName = pd.data().name || pd.id;
           var pid = pd.id;
@@ -14364,7 +13826,7 @@
 
       try {
       // Build project list
-      const projSnap = await getCachedBoards();
+      const projSnap = await db.collection('boards').get();
       const projectMap = {};
       projSnap.docs.forEach(d => { projectMap[d.id] = d.data().name || d.id; });
 
@@ -14418,15 +13880,15 @@
       else boardsList.sort((a,b) => (b.latestDate||'').localeCompare(a.latestDate||''));
 
       C.innerHTML = `
-        <div style="text-align:center;margin-bottom:40px;">
-          <div style="font-family:var(--font-display);font-size:52px;color:#0E1629;font-weight:400;letter-spacing:6px;">CCH</div>
-          <div style="font-size:28px;color:#C4A464;letter-spacing:8px;text-transform:uppercase;margin-top:6px;font-weight:700;">Design Hub</div>
+        <div style="text-align:center;margin-bottom:32px;">
+          <div style="font-family:'Playfair Display',serif;font-size:32px;color:var(--gold);font-weight:700;letter-spacing:2px;">CCH</div>
+          <div style="font-size:14px;color:var(--gray-400);letter-spacing:3px;text-transform:uppercase;margin-top:4px;">Design Hub</div>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;">
           <div style="display:flex;align-items:center;gap:12px;">
             <div style="display:flex;border:1px solid var(--gray-200);border-radius:0;overflow:hidden;">
-              <button style="padding:8px 18px;font-size:13px;font-weight:700;border:none;cursor:pointer;background:#C4A464;color:#FFFFFF;" onclick="ideabookViewMode='boards';renderIdeabooksList()">Boards</button>
-              <button style="padding:8px 18px;font-size:13px;font-weight:700;border:none;cursor:pointer;background:#FFFFFF;color:#7A7060;border-left:1px solid rgba(14,22,41,0.1);" onclick="ideabookViewMode='assets';renderIdeabooksList()">Assets</button>
+              <button style="padding:6px 14px;font-size:12px;font-weight:600;border:none;cursor:pointer;background:var(--gold);color:white;" onclick="ideabookViewMode='boards';renderIdeabooksList()">Boards</button>
+              <button style="padding:6px 14px;font-size:12px;font-weight:600;border:none;cursor:pointer;background:white;color:var(--gray-500);border-left:1px solid var(--gray-200);" onclick="ideabookViewMode='assets';renderIdeabooksList()">Assets</button>
             </div>
             <span style="background:var(--gold);color:white;padding:4px 10px;border-radius:0;font-size:12px;font-weight:600;">${boardsList.length}</span>
             <span style="color:var(--gray-400);font-size:12px;">projects · ${allBooks.length} boards · ${boardsList.reduce((s,b) => s + b.totalImages, 0)} images</span>
@@ -14457,16 +13919,12 @@
                 (imgTags || '<div class="ib-placeholder">🎨</div>') +
               '</div>' +
               '<div class="ideabook-card-body"><div><div class="ideabook-card-name">' + esc(b.projectName || 'Untitled') + '</div><div class="ideabook-card-count">' + b.totalImages + ' images · ' + b.sections.length + ' boards</div>' +
-              (sectionNames ? '<div style="font-size:12px;color:#7A7060;margin-top:4px;">' + esc(sectionNames) + (b.sections.length > 3 ? '...' : '') + '</div>' : '') +
+              (sectionNames ? '<div style="font-size:10px;color:var(--gray-400);margin-top:2px;">' + esc(sectionNames) + (b.sections.length > 3 ? '...' : '') + '</div>' : '') +
               '</div>' +
               '<div class="action-menu-wrap" style="position:relative;">' +
                 '<span class="ideabook-card-menu" onclick="event.stopPropagation();toggleActionMenu(this)">···</span>' +
-                '<div class="action-dropdown" style="display:none;right:0;left:auto;min-width:180px;">' +
+                '<div class="action-dropdown" style="display:none;right:0;left:auto;min-width:160px;">' +
                   '<a onclick="event.stopPropagation();navigate(\'#/project/' + b.projectId + '/ideabooks\');closeAllMenus()">📂 Open Project Boards</a>' +
-                  b.sections.map(function(s) {
-                    return '<a onclick="event.stopPropagation();renameIdeabookFromList(\'' + b.projectId + '\',\'' + s.id + '\',\'' + escAttr(s.name || '') + '\');closeAllMenus()">✏️ Rename: ' + esc((s.name || '').substring(0, 20)) + '</a>' +
-                    '<a onclick="event.stopPropagation();deleteIdeabookFromList(\'' + b.projectId + '\',\'' + s.id + '\',\'' + escAttr(s.name || '') + '\');closeAllMenus()" style="color:var(--red);">🗑️ Delete: ' + esc((s.name || '').substring(0, 20)) + '</a>';
-                  }).join('') +
                 '</div>' +
               '</div></div>' +
             '</div>';
@@ -14579,7 +14037,7 @@
     async function _loadBoardList() {
       if (window._cachedBoardList) return window._cachedBoardList;
       var boards = [];
-      var projSnap = await getCachedBoards();
+      var projSnap = await db.collection('boards').get();
       for (var pd of projSnap.docs) {
         var pName = pd.data().name || pd.id;
         var pid = pd.id;
@@ -14850,9 +14308,9 @@
       }).join('');
 
       C.innerHTML = `
-        <div style="text-align:center;margin-bottom:40px;">
-          <div style="font-family:var(--font-display);font-size:52px;color:#0E1629;font-weight:400;letter-spacing:6px;">CCH</div>
-          <div style="font-size:28px;color:#C4A464;letter-spacing:8px;text-transform:uppercase;margin-top:6px;font-weight:700;">Design Hub</div>
+        <div style="text-align:center;margin-bottom:24px;">
+          <div style="font-family:'Playfair Display',serif;font-size:32px;color:var(--gold);font-weight:700;letter-spacing:2px;">CCH</div>
+          <div style="font-size:14px;color:var(--gray-400);letter-spacing:3px;text-transform:uppercase;margin-top:4px;">Design Hub</div>
         </div>
 
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
@@ -14977,7 +14435,7 @@
       C.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Loading profit data...</div>';
 
       // Load all projects
-      const snap = await getCachedBoards();
+      const snap = await db.collection('boards').get();
       const allProjects = [];
       snap.forEach(d => allProjects.push({ id: d.id, ...d.data() }));
       const active = allProjects.filter(p => p.status !== 'Completed');
@@ -15382,7 +14840,7 @@
       const C = document.getElementById('contentArea');
       C.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400)">Loading financials...</div>';
 
-      const projSnap = await getCachedBoards();
+      const projSnap = await db.collection('boards').get();
       let allInvoices = [], allPOs = [];
 
       // Also check top-level collections
@@ -15641,7 +15099,7 @@
 
       try {
         // Load all data
-        var projSnap = await getCachedBoards();
+        var projSnap = await db.collection('boards').get();
         var projectMap = {};
         projSnap.docs.forEach(function(d) { projectMap[d.id] = d.data(); });
 
@@ -16064,7 +15522,7 @@
           // Load all Firestore invoices and POs
           prog.innerHTML += '<div style="padding:4px 8px;font-size:12px;">Loading Firestore data...</div>';
 
-          var projSnap = await getCachedBoards();
+          var projSnap = await db.collection('boards').get();
           var allInvoices = [], allPOs = [], allProposals = [];
 
           for (var pd of projSnap.docs) {
@@ -16269,7 +15727,7 @@
           // Load all clips from Firestore
           prog.innerHTML += '<div style="padding:4px 8px;font-size:12px;">Loading clips from Firestore...</div>';
 
-          var projSnap = await getCachedBoards();
+          var projSnap = await db.collection('boards').get();
           var allClips = [];
           for (var pd of projSnap.docs) {
             try {
@@ -16521,17 +15979,6 @@
     }
     window._selectedCaptures = new Set();
 
-    // Force refresh Smart Time after any time entry save/update/delete
-    async function refreshSmartTimeView() {
-      var hash = window.location.hash || '';
-      if (hash.includes('timetracker') || hash.includes('time')) {
-        _boardsCacheTime = 0; // bust boards cache
-        window._pendingCaptures = null; // force rescan
-        await autoScanCaptures();
-        renderTimeView();
-      }
-    }
-
     async function renderTimeTracker() {
       setBreadcrumb([{ label: 'Smart Time' }]);
       setTopbarActions('<button class="btn btn-secondary" onclick="importDesktopLog()" style="margin-right:8px;">📁 Import Desktop Log</button><button class="btn btn-secondary" onclick="showNewTimeEntryModal()">+ Manual Entry</button>');
@@ -16583,7 +16030,7 @@
         if (!window._captureProjectList) {
           window._captureProjectList = [];
           try {
-            var projSnap = await getCachedBoards();
+            var projSnap = await db.collection('boards').get();
             projSnap.forEach(function(d) {
               var name = d.data().name || d.data().title || d.id;
               if (name && window._captureProjectList.indexOf(name) < 0) window._captureProjectList.push(name);
@@ -16849,29 +16296,16 @@
               });
             }
 
-            // Check if Timely Memory data exists for this date — if so, prefer it over our agent
-            var hasTimelyDoc = false;
-            var hasAgentDoc = false;
-            deskSnap.forEach(function(doc) {
-              var src = (doc.data().source || '').toLowerCase();
-              var did = doc.id.toLowerCase();
-              if (src.indexOf('timely') >= 0 || did.indexOf('timely') >= 0) hasTimelyDoc = true;
-              if (src.indexOf('desktop-agent') >= 0 || (!did.includes('timely') && did.match(/^\d{4}-\d{2}-\d{2}-[a-z]/))) hasAgentDoc = true;
-            });
-
             deskSnap.forEach(function(doc) {
               var data = doc.data();
               var docId = doc.id;
               var docMember = (data.member || '').toLowerCase();
               var docIdLower = docId.toLowerCase();
-              var docSource = (data.source || '').toLowerCase();
-
-              // Tag source on each item for filter buttons
-              var _itemSource = (docSource.indexOf('timely') >= 0 || docIdLower.indexOf('timely') >= 0) ? 'timely' : 'agent';
 
               // SKIP old shared/poisoned docs
               // Trust: v3 timestamped docs, docs with email-based ID, or docs with member field set
-              var isV3 = data.format === 'timestamped' || docSource.includes('desktop-agent') || docSource.includes('timely');
+              var docSource = (data.source || '').toLowerCase();
+              var isV3 = data.format === 'timestamped' || docSource.includes('desktop-agent');
               var hasEmailSlug = docIdLower.match(/^\d{4}-\d{2}-\d{2}-[a-z]/);
               var hasMemberField = !!data.member;
 
@@ -16986,8 +16420,7 @@
                       type: 'desktop',
                       startTime: startTime,
                       endTime: endTime,
-                      parentApp: isBrowserApp ? _normApp : '',
-                      source: _itemSource || 'agent'
+                      parentApp: isBrowserApp ? _normApp : ''
                     });
                     return; // skip v2 processing below
                   }
@@ -17059,8 +16492,7 @@
                           type: 'desktop',
                           parentApp: _normApp,
                           startTime: startTime,
-                          endTime: endTime,
-                          source: _itemSource || 'agent'
+                          endTime: endTime
                         });
                       });
                       return; // skip the default push below
@@ -17083,8 +16515,7 @@
                     titles: titlesStr,
                     type: 'desktop',
                     startTime: startTime,
-                    endTime: endTime,
-                    source: _itemSource || 'agent'
+                    endTime: endTime
                   });
                 });
               }
@@ -17101,8 +16532,7 @@
                     minutes: Math.round(secs / 60),
                     count: parseInt(p.count) || 1,
                     titles: p.apps || '',
-                    type: 'desktop',
-                    source: _itemSource || 'agent'
+                    type: 'desktop'
                   });
                 });
               }
@@ -17135,16 +16565,26 @@
         if (!window._tlDismissedKeys) window._tlDismissedKeys = new Set();
         window._tlDismissedKeys.forEach(function(k) { prevDismissed.add(k); });
 
-        // Consolidate browser captures by site — only merge same-page captures, NOT all captures for same domain
-        // This prevents "claude.ai: 6 hours" when you actually had two separate 30-min sessions
+        // Consolidate browser captures by site (not per-page) for cleaner view
         var consolidated = [];
+        var siteMap = {}; // key: 'date|app' → merged capture
         allSuggestions.forEach(function(s) {
           // Only consolidate browser-split captures that have parentApp (came from title splitting)
           var isWebSplit = s.parentApp && (s.parentApp.toLowerCase().includes('chrome') || s.parentApp.toLowerCase().includes('firefox') || s.parentApp.toLowerCase().includes('edge') || s.parentApp.toLowerCase().includes('safari'));
           if (isWebSplit && s.app && s.app.match(/\.[a-z]{2,}$/i)) {
-            // Don't pre-merge by site — let the smart consolidation handle time-gap-aware merging
-            // Just pass through as individual captures with proper parentApp
-            consolidated.push(s);
+            // Extract base domain (e.g., "claude.ai", "x.com") — keep as-is for grouping
+            var siteKey = s.date + '|' + s.app;
+            if (siteMap[siteKey]) {
+              siteMap[siteKey].minutes += s.minutes;
+              siteMap[siteKey].count = (siteMap[siteKey].count || 1) + 1;
+              if (s.titles) siteMap[siteKey].titles = (siteMap[siteKey].titles || '') + ' | ' + s.titles;
+              // Keep earliest start and latest end
+              if (s.startTime && (!siteMap[siteKey].startTime || s.startTime < siteMap[siteKey].startTime)) siteMap[siteKey].startTime = s.startTime;
+              if (s.endTime && (!siteMap[siteKey].endTime || s.endTime > siteMap[siteKey].endTime)) siteMap[siteKey].endTime = s.endTime;
+            } else {
+              siteMap[siteKey] = Object.assign({}, s);
+              consolidated.push(siteMap[siteKey]);
+            }
           } else {
             consolidated.push(s);
           }
@@ -17250,11 +16690,9 @@
         allSuggestions = smartConsolidated;
 
         allSuggestions.forEach(function(s) {
-          // Use stable key without minutes (minutes change after consolidation)
-          var stableKey = s.app + '|' + s.date + '|' + (s.startTime||'').substring(0,19) + '|' + (s.titles||'').substring(0,30);
-          var legacyKey = s.app + '|' + s.date + '|' + s.minutes + '|' + (s.titles||'').substring(0,30);
-          if (prevDismissed.has(stableKey) || prevDismissed.has(legacyKey)) s._dismissed = true;
-          if (window._tlLoggedKeys && (window._tlLoggedKeys.has(stableKey) || window._tlLoggedKeys.has(legacyKey))) s._logged = true;
+          var key = s.app + '|' + s.date + '|' + s.minutes + '|' + (s.titles||'').substring(0,30);
+          if (prevDismissed.has(key)) s._dismissed = true;
+          if (window._tlLoggedKeys && window._tlLoggedKeys.has(key)) s._logged = true;
         });
         window._pendingCaptures = allSuggestions;
         window._capturesLastScan = new Date();
@@ -17312,6 +16750,7 @@
         var rate = getMemberRate(_userEmail);
         var today = new Date().toISOString().slice(0,10);
 
+        // Category icon map
         var catIcons = {
           '3D Design': '🎨', 'Rendering': '🖼️', 'Documentation': '📄', 'Web Browser': '🌐',
           'Email': '📧', 'Communication': '💬', 'AI Assistant': '🤖', 'Design': '✏️',
@@ -17320,50 +16759,6 @@
           'Platform': '⚡', 'Desktop': '🖥️', 'Notes': '📝', 'Other': '📋',
           'File Sync': '☁️', 'Accounting': '💰', 'Presentation': '📺', 'Inspiration': '💡'
         };
-        var appIcons = {
-          'Chrome': '🌐', 'Google Chrome': '🌐', 'Edge': '🌐', 'Microsoft Edge': '🌐', 'Firefox': '🌐', 'Safari': '🌐',
-          'Claude': '🤖', 'ChatGPT': '🤖', 'Gemini': '🤖', 'Grok': '🤖',
-          'Microsoft Teams': '📞', 'Teams': '📞', 'Zoom': '📞', 'Google Meet': '📞', 'Slack': '💬', 'Discord': '💬',
-          'Outlook': '📧', 'Microsoft Outlook': '📧', 'Gmail': '📧', 'Mail': '📧', 'Thunderbird': '📧',
-          'Word': '📝', 'Microsoft Word': '📝', 'Google Docs': '📝',
-          'Excel': '📊', 'Microsoft Excel': '📊', 'Google Sheets': '📊',
-          'PowerPoint': '📺', 'Microsoft PowerPoint': '📺', 'Google Slides': '📺', 'Keynote': '📺',
-          'SketchUp': '🎨', 'SketchUp 2023': '🎨', 'SketchUp 2024': '🎨', 'Trimble': '🎨',
-          'Layout': '📐', 'LayOut': '📐',
-          'AutoCAD': '📐', 'Revit': '📐', 'Rhino': '📐',
-          'Photoshop': '🖌️', 'Adobe Photoshop': '🖌️', 'Illustrator': '🖌️', 'Adobe Illustrator': '🖌️',
-          'InDesign': '📄', 'Adobe InDesign': '📄',
-          'Lightroom': '📸', 'Adobe Lightroom': '📸',
-          'Creative Cloud': '☁️', 'Adobe Creative Cloud': '☁️',
-          'Figma': '✏️', 'Canva': '🎨', 'Miro': '📌',
-          'Finder': '📁', 'File Explorer': '📁', 'Windows Explorer': '📁',
-          'Terminal': '⌨️', 'Windows Terminal Host': '⌨️', 'iTerm': '⌨️', 'PowerShell': '⌨️', 'cmd': '⌨️',
-          'QuickBooks': '💰', 'Xero': '💰', 'FreshBooks': '💰',
-          'Pinterest': '📌', 'Houzz': '🏠', 'Houzz Pro': '🏠',
-          'CCH Studio': '⚡', 'CCH Platform': '⚡',
-          'Notion': '📝', 'Evernote': '📝', 'OneNote': '📝',
-          'Dropbox': '☁️', 'Google Drive': '☁️', 'OneDrive': '☁️', 'iCloud': '☁️',
-          'RescueTime': '⏱️', 'Timely': '⏱️', 'Toggl': '⏱️', 'Memory': '⏱️',
-          'SnippingTool': '✂️', 'Snipping Tool': '✂️',
-          'Preview': '👁️', 'Photos': '📸', 'Microsoft Photos': '📸',
-          'Spotify': '🎵', 'Apple Music': '🎵',
-          'VS Code': '💻', 'Visual Studio Code': '💻', 'Cursor': '💻', 'Sublime': '💻',
-          'GitHub': '💻', 'GitKraken': '💻',
-          'Midjourney': '✨', 'DALL-E': '✨', 'Stable Diffusion': '✨',
-          'Task Manager': '⚙️', 'Activity Monitor': '⚙️', 'System Preferences': '⚙️'
-        };
-        // Helper to get icon for any app name (global)
-        window.getAppIcon = function getAppIcon(appName) {
-          if (appIcons[appName]) return appIcons[appName];
-          // Try case-insensitive match
-          var low = (appName || '').toLowerCase();
-          for (var key in appIcons) { if (key.toLowerCase() === low) return appIcons[key]; }
-          // Try partial match
-          for (var key in appIcons) { if (low.indexOf(key.toLowerCase()) >= 0) return appIcons[key]; }
-          // Domain-based
-          if (low.match(/\.(com|org|net|io|app)/)) return '🌐';
-          return '🖥️';
-        }
 
         var html = '';
 
@@ -17768,7 +17163,7 @@
           var mins = s.minutes;
           var isToday = s.date === today;
           var dateLabel = isToday ? 'Today' : 'Yesterday';
-          var icon = getAppIcon(s.app) || catIcons[s.category] || '📋';
+          var icon = catIcons[s.category] || '📋';
 
           // Color by app name
           var colors = ['#0288D1','#E91E63','#FFB300','#43A047','#7E57C2','#00897B','#D84315','#5C6BC0','#8D6E63','#5A5245'];
@@ -17961,7 +17356,7 @@
       if (!actType) { alert('Please select an activity type'); return; }
       if (totalHrs <= 0) { alert('Please enter time'); return; }
 
-      var rate = ACTIVITY_TYPES[actType] ? ACTIVITY_TYPES[actType].rate : (TEAM_CONFIG.contractors[0] ? TEAM_CONFIG.contractors[0].rate : DEFAULT_CONTRACTOR_RATE);
+      var rate = ACTIVITY_TYPES[actType] ? ACTIVITY_TYPES[actType].rate : (TEAM_CONFIG.contractors[0] ? TEAM_CONFIG.contractors[0].rate : 125);
       var billable = rate > 0;
       var today = new Date().toISOString().slice(0, 10);
 
@@ -18122,13 +17517,6 @@
     }
 
     function renderTimeView() {
-      try { _renderTimeViewInner(); } catch(e) {
-        console.error('[Smart Time Render Error]', e);
-        var T = document.getElementById('contentArea');
-        if (T) T.innerHTML = '<div style="padding:40px;color:red;"><h2>Smart Time Error</h2><pre>' + e.message + '\n' + e.stack + '</pre><button class="btn btn-primary" onclick="_renderTimeViewInner()">Retry</button></div>';
-      }
-    }
-    function _renderTimeViewInner() {
       const T = document.getElementById('contentArea');
       const admin = isTimeAdmin();
       const allProjects = [...new Set(timeEntries.map(t => t.project).filter(Boolean))].sort();
@@ -18502,7 +17890,7 @@
                   <td>
                     ${t.invoiceId ? `<span class="badge badge-paid" style="font-size:10px;">Invoiced</span>` : t.billable ? '<span class="badge badge-draft" style="font-size:10px;">Billable</span>' : '<span style="font-size:10px;color:var(--gray-400);">Non-Bill</span>'}
                   </td>` : ''}
-                  <td><button class="btn btn-secondary btn-sm" style="padding:6px 14px;font-size:13px;font-weight:600;min-width:70px;" onclick="editTimeEntry('${t.id}')">✏️ Edit</button></td>
+                  <td><button class="btn btn-secondary btn-sm" style="padding:4px 10px;font-size:12px;" onclick="editTimeEntry('${t.id}')">✏️ Edit</button></td>
                 </tr>
               `).join('')}
             </tbody>
@@ -19293,8 +18681,7 @@
               if (!icon) icon = appLow.match(/\.[a-z]{2,}/) ? '🌐' : '📸';
             }
           }
-          var _capMins = Math.round(cap.minutes || 0);
-          var durLabel = _capMins >= 60 ? Math.floor(_capMins/60)+'h'+(_capMins%60?' '+_capMins%60+'m':'') : _capMins+'m';
+          var durLabel = cap.minutes >= 60 ? Math.floor(cap.minutes/60)+'h'+(cap.minutes%60?' '+cap.minutes%60+'m':'') : cap.minutes+'m';
           var showDetails = height > 32;
           var showTitle = height > 48;
 
@@ -19558,8 +18945,7 @@
           var info = bucketApps[groupKey];
           var color = bucketAppColor(groupKey);
           var appMins = info.mins;
-          var appMinsR = Math.round(appMins);
-          var appDur = appMinsR >= 60 ? Math.floor(appMinsR/60) + 'h ' + (appMinsR%60>0? (appMinsR%60<10?'0':'') + appMinsR%60 + 'm':'') : appMinsR + 'm';
+          var appDur = appMins >= 60 ? Math.floor(appMins/60) + 'h ' + (appMins%60>0? (appMins%60<10?'0':'') + appMins%60 + 'm':'') : appMins + 'm';
           var displayName = domainLabels[groupKey] || info.name;
           var totalAvail = dayAppTotals[groupKey] || info.count;
           var countLabel = info.count + '/' + totalAvail + ' memor' + (totalAvail===1?'y':'ies');
@@ -19579,7 +18965,6 @@
 
           html += '<div style="display:flex;align-items:center;padding:6px 12px;gap:8px;border-bottom:1px solid rgba(255,255,255,0.03);position:relative;" class="tl-bucket-item" onmouseenter="this.querySelector(\'.tl-bi-x\').style.opacity=\'1\'" onmouseleave="this.querySelector(\'.tl-bi-x\').style.opacity=\'0\'">' +
             '<div style="width:4px;height:28px;border-radius:2px;background:' + color + ';flex-shrink:0;"></div>' +
-            '<div style="font-size:16px;flex-shrink:0;width:20px;text-align:center;">' + (typeof getAppIcon === 'function' ? getAppIcon(displayName) : '🖥️') + '</div>' +
             '<div style="flex:1;min-width:0;">' +
               '<div style="font-size:11px;font-weight:600;color:#ddd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(displayName) + '</div>' +
               '<div style="font-size:9px;color:var(--gold);">' + countLabel + sourceLabel + '</div>' +
@@ -19986,8 +19371,7 @@
       sorted.forEach(function(g, gi) {
         var isInBucket = g.indices.some(function(i){ return bucketed.has(i); });
         var color = appColor(g.app);
-        var _gMins = Math.round(g.totalMins || 0);
-        var dur = _gMins >= 60 ? Math.floor(_gMins/60)+'h'+(_gMins%60>0?' '+_gMins%60+'m':'') : _gMins+'m';
+        var dur = g.totalMins >= 60 ? Math.floor(g.totalMins/60)+'h'+(g.totalMins%60>0?' '+g.totalMins%60+'m':'') : g.totalMins+'m';
         var previewTitles = g.titles.slice(0,2).join(' · ');
         // Collapse groups beyond MAX_VISIBLE behind a "show more" toggle
         if (gi === MAX_VISIBLE) {
@@ -20149,17 +19533,17 @@
             // Stats row
             '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">' +
               (timeLabel ? '<span style="font-size:10px;background:rgba(25,118,210,0.15);padding:3px 8px;border-radius:4px;color:#64B5F6;font-weight:600;">🕐 ' + timeLabel + '</span>' : '') +
-              '<span style="font-size:10px;background:rgba(200,185,154,0.12);padding:3px 8px;border-radius:4px;color:#C8B99A;">⏱ ' + dur + '</span>' +
-              '<span style="font-size:10px;background:rgba(200,185,154,0.12);padding:3px 8px;border-radius:4px;color:#C8B99A;">📝 ' + totalSessions + ' capture' + (totalSessions===1?'':'s') + '</span>' +
-              (Object.keys(categories).length > 0 ? '<span style="font-size:10px;background:rgba(200,185,154,0.12);padding:3px 8px;border-radius:4px;color:#C8B99A;">📂 ' + esc(Object.keys(categories).join(', ')) + '</span>' : '') +
+              '<span style="font-size:10px;background:rgba(14,22,41,0.04);padding:3px 8px;border-radius:4px;color:#0E1629;">⏱ ' + dur + '</span>' +
+              '<span style="font-size:10px;background:rgba(14,22,41,0.04);padding:3px 8px;border-radius:4px;color:#0E1629;">📝 ' + totalSessions + ' capture' + (totalSessions===1?'':'s') + '</span>' +
+              (Object.keys(categories).length > 0 ? '<span style="font-size:10px;background:rgba(14,22,41,0.04);padding:3px 8px;border-radius:4px;color:#0E1629;">📂 ' + esc(Object.keys(categories).join(', ')) + '</span>' : '') +
             '</div>' +
 
             // Project assignment dropdown
             '<div style="margin-bottom:6px;">' +
-              '<label style="font-size:10px;color:#C8B99A;font-weight:600;display:block;margin-bottom:3px;">Assign to Project:</label>' +
+              '<label style="font-size:10px;color:#0E1629;font-weight:600;display:block;margin-bottom:3px;">Assign to Project:</label>' +
               '<select id="tlMemProj-' + gi + '" onchange="window._tlAssignMemProject(' + gi + ',' + escAttr(JSON.stringify(g.indices)) + ',this.value)" ' +
                 'onclick="event.stopPropagation()" ' +
-                'style="width:100%;padding:6px 8px;background:#1a2236;color:#e8e8e8;border:1px solid rgba(200,185,154,0.3);border-radius:4px;font-size:11px;outline:none;cursor:pointer;">' +
+                'style="width:100%;padding:6px 8px;background:#FFFFFF;color:#0E1629;border:1px solid rgba(14,22,41,0.15);border-radius:4px;font-size:11px;outline:none;cursor:pointer;">' +
                 '<option value="">— Select project —</option>' +
                 (function() {
                   var projList = window._captureProjectList || [];
@@ -20184,33 +19568,12 @@
             // AI suggestion hint (compact)
             (aiSug && aiSug.project && !isInBucket ? '<div style="font-size:10px;color:#F9A825;margin-bottom:4px;padding:3px 8px;background:rgba(249,168,37,0.08);border-radius:4px;">🤖 AI suggests: <strong>' + esc(aiSug.project) + '</strong>' + (aiSug.confidence ? ' (' + Math.round(aiSug.confidence * 100) + '%)' : '') + '</div>' : '') +
 
-            // Individual captures with checkboxes
-            (g.caps.length > 0 ? '<div style="font-size:10px;color:#C8B99A;margin-bottom:3px;font-weight:600;">Individual captures:</div>' +
-              '<div style="max-height:180px;overflow-y:auto;margin-bottom:4px;">' +
-                g.caps.map(function(c, ci) {
-                  var capIdx = g.indices[ci];
-                  var capDur = c.minutes >= 60 ? Math.floor(c.minutes/60)+'h '+c.minutes%60+'m' : c.minutes+'m';
-                  var capTitle = (c.titles || '').split(/[|]/)[0].trim().substring(0, 60) || c.app || '';
-                  var capTime = '';
-                  if (c.startTime) {
-                    var st = String(c.startTime);
-                    var tm = st.match(/T(\d{1,2}):(\d{2})/);
-                    if (tm) {
-                      var h = parseInt(tm[1]), m = tm[2];
-                      capTime = (h > 12 ? h-12 : h || 12) + ':' + m + (h >= 12 ? 'pm' : 'am');
-                    }
-                  }
-                  return '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);">' +
-                    '<input type="checkbox" class="tl-cap-check" data-cap-idx="' + capIdx + '" onclick="event.stopPropagation()" style="width:14px;height:14px;accent-color:var(--gold);cursor:pointer;flex-shrink:0;" />' +
-                    (capTime ? '<span style="font-size:9px;color:#888;flex-shrink:0;width:45px;">' + capTime + '</span>' : '') +
-                    '<span style="font-size:10px;color:var(--gold);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="' + escAttr(capTitle) + '">' + esc(capTitle) + '</span>' +
-                    '<span style="font-size:9px;color:#888;flex-shrink:0;">' + capDur + '</span>' +
-                  '</div>';
+            // Window titles
+            (allTitles.length > 0 ? '<div style="font-size:10px;color:#0E1629;margin-bottom:3px;font-weight:600;">Window titles:</div>' +
+              '<div style="max-height:120px;overflow-y:auto;margin-bottom:4px;">' +
+                allTitles.map(function(t) {
+                  return '<div style="font-size:10px;color:var(--gold);padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.05);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escAttr(t) + '">' + esc(t) + '</div>';
                 }).join('') +
-              '</div>' +
-              '<div style="display:flex;gap:6px;margin-top:4px;">' +
-                '<button onclick="event.stopPropagation();window._tlMoveSelectedCaps(\'' + detailId + '\')" style="flex:1;font-size:10px;padding:4px 8px;background:rgba(196,160,82,0.15);color:var(--gold);border:1px solid rgba(196,160,82,0.3);border-radius:4px;cursor:pointer;font-weight:600;">→ Move Selected to Bucket</button>' +
-                '<button onclick="event.stopPropagation();window._tlMarkSelectedLogged(\'' + detailId + '\')" style="flex:1;font-size:10px;padding:4px 8px;background:rgba(60,179,113,0.15);color:#3CB371;border:1px solid rgba(60,179,113,0.3);border-radius:4px;cursor:pointer;font-weight:600;">✓ Mark Selected Logged</button>' +
               '</div>' : '') +
 
             // Individual captures breakdown with checkboxes (if multiple)
@@ -20420,17 +19783,17 @@
       var optionsHtml = projects.map(function(p) {
         return '<option value="' + escAttr(p) + '"' + (p === defaultVal ? ' selected' : '') + '>' + esc(p) + '</option>';
       }).join('');
-      modal.innerHTML = '<div style="background:var(--gray-900, #0E1629);border:1px solid rgba(196,160,82,0.3);border-radius:0;padding:20px;width:300px;box-shadow:0 16px 48px rgba(0,0,0,0.4);">' +
-        '<div style="font-size:13px;font-weight:700;color:var(--text-primary, #e8e8e8);margin-bottom:12px;">Select Project</div>' +
-        '<select id="tlProjectPickerSelect" style="width:100%;padding:10px;background:var(--gray-800, #1a2236);color:var(--text-primary, #e8e8e8);border:1px solid rgba(200,185,154,0.3);border-radius:0;font-size:13px;margin-bottom:8px;outline:none;">' +
+      modal.innerHTML = '<div style="background:#0E1629;border:1px solid rgba(196,160,82,0.3);border-radius:0;padding:20px;width:300px;box-shadow:0 16px 48px rgba(0,0,0,0.4);">' +
+        '<div style="font-size:13px;font-weight:700;color:#e8e8e8;margin-bottom:12px;">Select Project</div>' +
+        '<select id="tlProjectPickerSelect" style="width:100%;padding:10px;background:#FFFFFF;color:#0E1629;border:1px solid rgba(14,22,41,0.15);border-radius:0;font-size:13px;margin-bottom:8px;outline:none;">' +
           '<option value="">— Choose project —</option>' +
           optionsHtml +
           '<option value="__custom__">+ Custom name...</option>' +
         '</select>' +
-        '<input id="tlProjectPickerCustom" placeholder="Custom project name" style="display:none;width:100%;padding:10px;background:var(--gray-800, #1a2236);color:var(--text-primary, #e8e8e8);border:1px solid rgba(200,185,154,0.3);border-radius:0;font-size:13px;margin-bottom:12px;outline:none;box-sizing:border-box;" />' +
+        '<input id="tlProjectPickerCustom" placeholder="Custom project name" style="display:none;width:100%;padding:10px;background:#FFFFFF;color:#0E1629;border:1px solid rgba(14,22,41,0.15);border-radius:0;font-size:13px;margin-bottom:12px;outline:none;box-sizing:border-box;" />' +
         '<div style="display:flex;gap:8px;">' +
           '<button id="tlProjectPickerOk" style="flex:1;padding:10px;background:var(--gold);color:white;border:none;border-radius:0;cursor:pointer;font-size:13px;font-weight:700;">Select</button>' +
-          '<button id="tlProjectPickerCancel" style="padding:10px 16px;background:rgba(255,255,255,0.06);color:var(--text-primary, #e8e8e8);border:1px solid rgba(14,22,41,0.12);border-radius:0;cursor:pointer;font-size:13px;">Cancel</button>' +
+          '<button id="tlProjectPickerCancel" style="padding:10px 16px;background:rgba(255,255,255,0.06);color:var(--gold);border:1px solid rgba(14,22,41,0.12);border-radius:0;cursor:pointer;font-size:13px;">Cancel</button>' +
         '</div>' +
       '</div>';
       document.body.appendChild(modal);
@@ -20521,50 +19884,6 @@
       } catch(e) { window._tlLoggedKeys = new Set(); }
     }
 
-    // Move selected individual captures to a different bucket
-    window._tlMoveSelectedCaps = function(detailId) {
-      var panel = document.getElementById(detailId);
-      if (!panel) return;
-      var checks = panel.querySelectorAll('.tl-cap-check:checked');
-      if (checks.length === 0) { showToast('Select captures first using the checkboxes', 'error'); return; }
-      var indices = [];
-      checks.forEach(function(cb) { indices.push(parseInt(cb.dataset.capIdx)); });
-      _tlPickProject('', function(proj) {
-        if (!window._projectBuckets) window._projectBuckets = [];
-        // Remove from any existing bucket
-        window._projectBuckets.forEach(function(b) {
-          b.items = (b.items || []).filter(function(i) { return indices.indexOf(i) < 0; });
-        });
-        var existing = window._projectBuckets.find(function(b) { return b.project === proj; });
-        if (existing) {
-          indices.forEach(function(idx) { if (existing.items.indexOf(idx) < 0) existing.items.push(idx); });
-        } else {
-          var caps = window._pendingCaptures || [];
-          var dropMins = indices.reduce(function(s, idx) { return s + (caps[idx] ? caps[idx].minutes : 0); }, 0);
-          window._projectBuckets.push({ project: proj, description: '', comment: '', items: indices, dropMinutes: dropMins });
-        }
-        _tlSaveBuckets();
-        showToast('Moved ' + indices.length + ' capture(s) to ' + proj);
-        var bl = document.getElementById('tlBucketsList');
-        if (bl) bl.innerHTML = _tlRenderBucketsPanel();
-        var ml = document.getElementById('tlMemoriesList');
-        if (ml) ml.innerHTML = _tlRenderMemoriesPanel(_tlDay, []);
-        _tlInitDragDrop();
-        _tlRefreshGrid();
-      });
-    };
-
-    // Mark selected individual captures as logged
-    window._tlMarkSelectedLogged = function(detailId) {
-      var panel = document.getElementById(detailId);
-      if (!panel) return;
-      var checks = panel.querySelectorAll('.tl-cap-check:checked');
-      if (checks.length === 0) { showToast('Select captures first using the checkboxes', 'error'); return; }
-      var indices = [];
-      checks.forEach(function(cb) { indices.push(parseInt(cb.dataset.capIdx)); });
-      window._tlMarkLogged(indices);
-    };
-
     window._tlDeleteMemory = function(indices) {
       if (!indices || !Array.isArray(indices) || indices.length === 0) {
         showToast('No captures to dismiss', 'error');
@@ -20583,12 +19902,8 @@
         indices.forEach(function(idx) {
           if (caps[idx]) {
             caps[idx]._dismissed = true;
-            // Use stable key (startTime instead of minutes, which changes after consolidation)
-            var stableKey = caps[idx].app + '|' + caps[idx].date + '|' + (caps[idx].startTime||'').substring(0,19) + '|' + (caps[idx].titles||'').substring(0,30);
-            window._tlDismissedKeys.add(stableKey);
-            // Also add legacy key for backwards compat
-            var legacyKey = caps[idx].app + '|' + caps[idx].date + '|' + caps[idx].minutes + '|' + (caps[idx].titles||'').substring(0,30);
-            window._tlDismissedKeys.add(legacyKey);
+            var key = caps[idx].app + '|' + caps[idx].date + '|' + caps[idx].minutes + '|' + (caps[idx].titles||'').substring(0,30);
+            window._tlDismissedKeys.add(key);
             dismissedCount++;
           }
         });
@@ -21408,17 +20723,8 @@
       var dayDt = new Date(_tlDay + 'T12:00:00');
       var dayLabel = dayDt.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric'});
       var dayIsToday = _tlDay === todayStr;
-      // Apply source filter
-      var _srcFilter = window._tlSourceFilter || '';
-      if (_srcFilter === 'logged') {
-        // Show only logged entries, hide captures
-        dayEntries = dayEntries; // keep as-is
-      }
       var totalHrs = dayEntries.reduce(function(s,t) { return s+(parseFloat(t.hours)||0); }, 0);
       var totalBillable = dayEntries.reduce(function(s,t) { return s+(parseFloat(t.total)||0); }, 0);
-      var allCapsToday = (window._pendingCaptures||[]).filter(function(c) { return c.date === _tlDay && !c._dismissed; });
-      var filteredCaps = _srcFilter && _srcFilter !== 'logged' ? allCapsToday.filter(function(c) { return (c.source || 'agent') === _srcFilter; }) : allCapsToday;
-      var capCount = filteredCaps.length;
       var unassignedCount = dayEntries.filter(function(t) { return !t.project || t.project==='Unassigned'; }).length;
 
       // Check for potential duplicates
@@ -21545,28 +20851,13 @@
       var memoriesHtml = _tlRenderMemoriesPanel(_tlDay, allProjects);
 
       container.innerHTML =
-        // Navy header block
-        '<div style="background:#0E1629;border:1px solid rgba(200,185,154,0.15);padding:14px 20px;margin-bottom:12px;">' +
-          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
-            '<div style="display:flex;align-items:center;gap:8px;">' + navBtns + '</div>' +
-            '<div style="font-weight:700;font-size:18px;color:#EDE8E0;">' + dayLabel +
-              (dayIsToday ? ' <span style="font-size:12px;color:var(--gold);font-weight:400;">· Today</span>' : '') + '</div>' +
-            '<div style="display:flex;align-items:center;gap:8px;">' + viewToggle + ' ' + memberSelector + '</div>' +
-          '</div>' +
-          '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">' +
-            '<div style="display:flex;gap:20px;align-items:center;">' +
-              '<div><span style="font-size:22px;font-weight:700;color:var(--gold);font-family:var(--font-mono);">' + totalHrs.toFixed(1) + 'h</span> <span style="font-size:11px;color:var(--gray-400);">logged</span></div>' +
-              '<div><span style="font-size:22px;font-weight:700;color:#5FA56B;font-family:var(--font-mono);">' + (totalBillable > 0 ? '$' + Math.round(totalBillable) : '$0') + '</span> <span style="font-size:11px;color:var(--gray-400);">billable</span></div>' +
-              '<div><span style="font-size:22px;font-weight:700;color:#00BCD4;font-family:var(--font-mono);">' + capCount + '</span> <span style="font-size:11px;color:var(--gray-400);">captures</span></div>' +
-            '</div>' +
-            '<div style="display:flex;gap:8px;align-items:center;font-size:11px;font-weight:600;">' +
-              '<span onclick="window._tlSourceFilter=window._tlSourceFilter===\'timely\'?\'\':\'timely\';renderTimeView();" style="padding:4px 10px;border-radius:12px;cursor:pointer;transition:all 0.15s;' + (window._tlSourceFilter === 'timely' ? 'background:#4CAF50;color:white;box-shadow:0 0 0 2px white;' : window._tlSourceFilter ? 'background:rgba(76,175,80,0.2);color:#4CAF50;' : 'background:#4CAF50;color:white;') + '">⏱ Timely</span>' +
-              '<span onclick="window._tlSourceFilter=window._tlSourceFilter===\'agent\'?\'\':\'agent\';renderTimeView();" style="padding:4px 10px;border-radius:12px;cursor:pointer;transition:all 0.15s;' + (window._tlSourceFilter === 'agent' ? 'background:#00BCD4;color:white;box-shadow:0 0 0 2px white;' : window._tlSourceFilter ? 'background:rgba(0,184,212,0.2);color:#00BCD4;' : 'background:#00BCD4;color:white;') + '">🖥 Agent</span>' +
-              '<span onclick="window._tlSourceFilter=window._tlSourceFilter===\'logged\'?\'\':\'logged\';renderTimeView();" style="padding:4px 10px;border-radius:12px;cursor:pointer;transition:all 0.15s;' + (window._tlSourceFilter === 'logged' ? 'background:#C8B99A;color:#0E1629;box-shadow:0 0 0 2px white;' : window._tlSourceFilter ? 'background:rgba(200,185,154,0.2);color:#C8B99A;' : 'background:#C8B99A;color:#0E1629;') + '">📋 Logged</span>' +
-            '</div>' +
-            '<div style="display:flex;gap:6px;align-items:center;">' + aiBtn + '</div>' +
-          '</div>' +
+        // Top nav bar
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">' +
+          '<div style="display:flex;align-items:center;gap:8px;">' + navBtns + ' ' + viewToggle + ' ' + memberSelector + '</div>' +
+          dayLabelHtml +
+          '<div style="display:flex;gap:12px;align-items:center;">' + statsHtml + aiBtn + '</div>' +
         '</div>' +
+        // Unlogged time notification
         unloggedBanner +
         // Duplicate warning
         (dupeWarnings.length > 0 ? '<div style="background:#FFF3E0;border:1px solid #F57C00;border-radius:0;padding:8px 12px;margin-bottom:8px;font-size:12px;color:#E65100;display:flex;align-items:center;gap:8px;">' +
@@ -21966,8 +21257,8 @@
         var projectNames = {};
         g.caps.forEach(function(c) { if (c.projectName) projectNames[c.projectName] = true; });
 
-        // Icon — use app-specific icons
-        var icon = getAppIcon(g.app) || catIcons[g.app] || (g.key.indexOf('web:') === 0 ? '🌐' : '🖥️');
+        // Icon
+        var icon = catIcons[g.app] || (g.key.indexOf('web:') === 0 ? '🌐' : '🖥️');
         if (isMeeting) icon = '📞';
 
         // Website check
@@ -22669,7 +21960,7 @@
       // Also load board names async
       let boardNames = [];
       try {
-        const bSnap = await getCachedBoards();
+        const bSnap = await db.collection('boards').get();
         bSnap.forEach(d => {
           const name = d.data().name || d.id.split('-').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
           boardNames.push(name);
@@ -23794,17 +23085,13 @@
 
     // Sync clips from project collections to master products library
     async function syncClipsToMasterLibrary() {
-      // Throttle: only run once per session
-      if (window._clipSyncDone) return;
-      window._clipSyncDone = true;
       try {
         // Build set of existing product titles for dedup
         var existingTitles = new Set();
         libraryProducts.forEach(function(p) { if (p.title) existingTitles.add(p.title.toLowerCase().trim()); });
 
         var synced = 0;
-        // Only sync active projects (not all 90+)
-        var projSnap = await db.collection('boards').limit(25).get();
+        var projSnap = await db.collection('boards').get();
         for (var pd of projSnap.docs) {
           var projName = pd.data().name || pd.id;
           try {
@@ -23823,7 +23110,6 @@
                 category: c.category || '',
                 room: c.room || '',
                 imageUrl: c.imageUrl || '',
-                sourceUrl: c.pageUrl || c.sourceUrl || '',
                 cost: _clipCost,
                 costPrice: _clipCost,
                 clientPrice: _clipSell,
@@ -23862,54 +23148,22 @@
       const T = document.getElementById('contentArea');
       T.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Loading products...</div>';
 
-      // Load from products collection - paginated load for large libraries
+      // Load from products collection - LIMIT to prevent browser crash
       try {
+        const snap = await db.collection('products').orderBy('updatedAt', 'desc').limit(300).get();
         libraryProducts = [];
-        let lastDoc = null;
-        let batchSize = 500;
-        let keepGoing = true;
-        while (keepGoing) {
-          let q = db.collection('products').limit(batchSize);
-          if (lastDoc) q = q.startAfter(lastDoc);
-          const snap = await q.get();
-          snap.forEach(d => libraryProducts.push({ id: d.id, ...d.data() }));
-          if (snap.docs.length < batchSize) {
-            keepGoing = false;
-          } else {
-            lastDoc = snap.docs[snap.docs.length - 1];
-          }
-        }
-        libraryProducts.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+        snap.forEach(d => libraryProducts.push({ id: d.id, ...d.data() }));
       } catch(e) {
         try {
-          const snap = await db.collection('products').limit(6000).get();
+          const snap = await db.collection('products').limit(300).get();
           libraryProducts = [];
           snap.forEach(d => libraryProducts.push({ id: d.id, ...d.data() }));
+          libraryProducts.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
         } catch(e2) { libraryProducts = []; }
       }
 
       // Filter out junk
       libraryProducts = libraryProducts.filter(isRealProduct);
-
-      // Normalize categories on loaded products
-      var _catNorm = {
-        'Fabric  + Trim':'Fabric & Trim','Fabric + Trim':'Fabric & Trim','Fabric':'Fabric & Trim','Fabri':'Fabric & Trim',
-        'Furniture & Upholstery':'Furniture','Mirrors & Accessories':'Accessories','mirror':'Accessories',
-        'Floor Covering':'Flooring','floor':'Flooring','Stone & Tile':'Tile & Stone',
-        'Wall':'Wall Covering','Appliances  & Plumbing':'Plumbing & Appliances','Kitchen and Bath':'Plumbing & Appliances',
-        'Cushions':'Bedding & Pillows','Architecural':'Architectural','Florals':'Accessories'
-      };
-      var _roomToCat = {'Furnishings':'Furniture','LIGHTING':'Lighting','Pillows & Bedding':'Bedding & Pillows','Rug':'Flooring','Outdoors':'Outdoor'};
-      libraryProducts.forEach(function(p) {
-        if (p.category && _catNorm[p.category]) p.category = _catNorm[p.category];
-        if (p.room && _roomToCat[p.room]) {
-          if (!p.category) p.category = _roomToCat[p.room];
-          p.room = '';
-        }
-        // Remove service categories from display
-        if (['Time Track','Expense','Project Management','Designer Fee','Service','Labor','Fee'].indexOf(p.category) >= 0) p._hidden = true;
-      });
-      libraryProducts = libraryProducts.filter(function(p) { return !p._hidden; });
 
       // Auto-sync: check for recently clipped items not yet in master products
       syncClipsToMasterLibrary();
@@ -23942,166 +23196,12 @@
       }, 300);
     }
 
-    // Import payment data from Houzz payment exports
-    async function importPaymentData() {
-      if (!confirm('Import payment data from Houzz? This will update Paid amounts on ~3,700 invoices and POs.')) return;
-      showToast('Loading payment data...');
-      try {
-        var resp = await fetch('/payment_compact.json');
-        var paymentsByDoc = await resp.json();
-        var docNums = Object.keys(paymentsByDoc);
-        showToast('Found ' + docNums.length + ' documents with payments. Matching to Firestore...');
-
-        // Load all projects to scan their invoices/POs subcollections
-        var projSnap = await db.collection('projects').get();
-        var projectIds = [];
-        projSnap.forEach(function(d) { projectIds.push(d.id); });
-
-        // Also check boards collection
-        var boardSnap = await getCachedBoards();
-        boardSnap.forEach(function(d) { if (projectIds.indexOf(d.id) < 0) projectIds.push(d.id); });
-
-        var matched = 0, updated = 0, skipped = 0;
-
-        for (var pi = 0; pi < projectIds.length; pi++) {
-          var projId = projectIds[pi];
-
-          // Check invoices — try multiple number formats
-          try {
-            var invSnap = await db.collection('boards').doc(projId).collection('invoices').get();
-            for (var invDoc of invSnap.docs) {
-              var inv = invDoc.data();
-              var invNum = inv.invoiceNum || inv.number || inv.num || '';
-              // Try exact, with/without IN- prefix
-              var payInfo = paymentsByDoc[invNum]
-                || paymentsByDoc['IN-' + invNum]
-                || paymentsByDoc[invNum.replace(/^IN-?/i, 'IN-')]
-                || paymentsByDoc[invNum.replace(/^IN-?/i, '')];
-              if (invNum && payInfo) {
-                matched++;
-                var existingPaid = parseFloat(inv.paidAmount) || 0;
-                if (Math.abs(existingPaid - payInfo.total) > 0.01) {
-                  await db.collection('boards').doc(projId).collection('invoices').doc(invDoc.id).update({
-                    paidAmount: payInfo.total,
-                    payments: payInfo.payments,
-                    paymentCount: payInfo.count,
-                    _paymentImportedAt: new Date().toISOString()
-                  });
-                  updated++;
-                } else { skipped++; }
-              }
-            }
-          } catch(e) {}
-
-          // Check POs — try multiple number formats
-          try {
-            var poSnap = await db.collection('boards').doc(projId).collection('purchaseOrders').get();
-            for (var poDoc of poSnap.docs) {
-              var po = poDoc.data();
-              var poNum = po.number || po.num || po.poNum || '';
-              // Try exact match, then with/without PO- prefix
-              var payInfoPO = paymentsByDoc[poNum]
-                || paymentsByDoc['PO-' + poNum]
-                || paymentsByDoc[poNum.replace(/^PO-?/i, 'PO-')]
-                || paymentsByDoc[poNum.replace(/^PO-?/i, '')];
-              if (poNum && payInfoPO) {
-                matched++;
-                var existingPaidPO = parseFloat(po.paidAmount) || 0;
-                if (Math.abs(existingPaidPO - payInfoPO.total) > 0.01) {
-                  await db.collection('boards').doc(projId).collection('purchaseOrders').doc(poDoc.id).update({
-                    paidAmount: payInfoPO.total,
-                    payments: payInfoPO.payments,
-                    paymentCount: payInfoPO.count,
-                    _paymentImportedAt: new Date().toISOString()
-                  });
-                  updated++;
-                } else { skipped++; }
-              }
-            }
-          } catch(e) {}
-
-          // Also check clips collection for PO data
-          try {
-            var clipSnap = await db.collection('boards').doc(projId).collection('clips').get();
-            for (var clipDoc of clipSnap.docs) {
-              var clip = clipDoc.data();
-              var clipPoNum = clip.poNum || '';
-              var clipPayInfo = paymentsByDoc[clipPoNum]
-                || paymentsByDoc['PO-' + clipPoNum]
-                || paymentsByDoc[clipPoNum.replace(/^PO-?/i, 'PO-')];
-              if (clipPoNum && clipPayInfo) {
-                matched++;
-                var clipPaid = parseFloat(clip.paidAmount) || 0;
-                if (Math.abs(clipPaid - clipPayInfo.total) > 0.01) {
-                  await db.collection('boards').doc(projId).collection('clips').doc(clipDoc.id).update({
-                    paidAmount: clipPayInfo.total,
-                    _paymentImportedAt: new Date().toISOString()
-                  });
-                  updated++;
-                } else { skipped++; }
-              }
-            }
-          } catch(e) {}
-
-          // Progress every 10 projects
-          if (pi % 10 === 0) showToast('Scanning... ' + pi + '/' + projectIds.length + ' projects (' + updated + ' updated)');
-        }
-
-        // Also update top-level invoices/purchaseOrders collections if they exist
-        try {
-          var topInvSnap = await db.collection('invoices').get();
-          for (var tid of topInvSnap.docs) {
-            var tinv = tid.data();
-            var tnum = tinv.invoiceNum || tinv.number || '';
-            if (tnum && paymentsByDoc[tnum]) {
-              matched++;
-              var tpay = paymentsByDoc[tnum];
-              if (Math.abs((parseFloat(tinv.paidAmount)||0) - tpay.total) > 0.01) {
-                await db.collection('invoices').doc(tid.id).update({
-                  paidAmount: tpay.total, payments: tpay.payments, paymentCount: tpay.count,
-                  _paymentImportedAt: new Date().toISOString()
-                });
-                updated++;
-              }
-            }
-          }
-        } catch(e) {}
-
-        showToast('Payment import complete! Matched: ' + matched + ' | Updated: ' + updated + ' | Already current: ' + skipped, 'success');
-        alert('Payment import done!\\n\\nMatched: ' + matched + ' documents\\nUpdated: ' + updated + '\\nAlready current: ' + skipped + '\\n\\nRefresh the page to see updated Paid/Balance columns.');
-      } catch(e) {
-        showToast('Error: ' + e.message, 'error');
-        alert('Payment import failed: ' + e.message);
-      }
-    }
-
     // Import Houzz product library from JSON export
     async function importHouzzProductLibrary() {
-      var mode = prompt('Import mode:\\n\\n1 = ADD new products only (skip existing)\\n2 = FULL REBUILD (delete all, reimport clean)\\n\\nEnter 1 or 2:');
-      if (mode !== '1' && mode !== '2') return;
-
-      if (mode === '2') {
-        if (!confirm('This will DELETE all existing products and reimport ~6,000 clean products. Are you sure?')) return;
-        showToast('Deleting existing products...');
-        var delSnap = await db.collection('productLibrary').get();
-        var delBatch = db.batch();
-        var delCount = 0;
-        for (var delDoc of delSnap.docs) {
-          delBatch.delete(delDoc.ref);
-          delCount++;
-          if (delCount % 450 === 0) {
-            await delBatch.commit();
-            delBatch = db.batch();
-            showToast('Deleted ' + delCount + '...');
-          }
-        }
-        if (delCount % 450 !== 0) await delBatch.commit();
-        showToast('Deleted ' + delCount + ' old products. Now importing...');
-      }
-
+      if (!confirm('Import Houzz product library? This will add ~5,600 products from your project tracker exports. Existing products will not be duplicated.')) return;
       showToast('Loading product data...');
       try {
-        var resp = await fetch('/product_library_import.json?v=' + Date.now());
+        var resp = await fetch('/product_library_import.json');
         var data = await resp.json();
         var products = [];
         Object.entries(data.byProject || {}).forEach(function(entry) {
@@ -24126,21 +23226,16 @@
           var key = (p.title + '|' + p.vendor + '|' + p.project).toLowerCase();
           if (existingKeys.has(key)) { skipped++; continue; }
           var ref = db.collection('productLibrary').doc();
-          // Normalize category before import
-          var importCatNorm = {'Fabric  + Trim':'Fabric & Trim','Fabric + Trim':'Fabric & Trim','Fabric':'Fabric & Trim','Fabri':'Fabric & Trim','Furniture & Upholstery':'Furniture','Mirrors & Accessories':'Accessories','mirror':'Accessories','Floor Covering':'Flooring','floor':'Flooring','Stone & Tile':'Tile & Stone','Wall':'Wall Covering','Appliances  & Plumbing':'Plumbing & Appliances','Kitchen and Bath':'Plumbing & Appliances','Cushions':'Bedding & Pillows','Architecural':'Architectural','Florals':'Accessories'};
-          var importCat = importCatNorm[p.category] || p.category || '';
           batch.set(ref, {
-            title: p.title || '', vendor: p.vendor || '', category: importCat,
+            title: p.title || '', vendor: p.vendor || '', category: p.category || '',
             room: p.room || '', sku: p.sku || '',
             unitCost: p.unitCost || 0, sellPrice: p.sellPrice || 0,
             totalCost: p.totalCost || 0, totalSell: p.totalSell || 0,
             qty: p.qty || 1, materials: p.materials || '', finish: p.finish || '',
             description: p.description || '', status: p.status || '',
             project: p.project || '', assignee: p.assignee || '',
-            proposal: p.proposal || '', proposalStatus: p.proposalStatus || '',
-            invoice: p.invoice || '', invoiceStatus: p.invoiceStatus || '',
-            po: p.po || '', poStatus: p.poStatus || '',
-            image: p.image || '',
+            proposal: p.proposal || '', invoice: p.invoice || '',
+            po: p.po || '', image: p.image || '',
             source: 'houzz-import', importedAt: new Date().toISOString()
           });
           batchCount++;
@@ -24169,8 +23264,8 @@
       const catSet = new Set([...libraryProducts.map(p => p.category).filter(Boolean), ...(window._globalCategories || [])]);
       const vendors = [...vendorSet].sort();
       const categories = [...catSet].sort();
-      // Standard interior design categories (matches cleaned Houzz import)
-      ['Accessories','Architectural','Art','Bedding & Pillows','Fabric & Trim','Flooring','Furniture','Hardware','Lighting','Outdoor','Plumbing & Appliances','Tile & Stone','Wall Covering','Window Treatments'].forEach(function(c) { if (categories.indexOf(c) < 0) categories.push(c); });
+      // Add proper interior design categories
+      ['Lighting','Fabric','Furniture','Accessories','Plumbing','Hardware','Tile','Stone','Rugs','Art','Wallcovering','Window Treatments','Outdoor','Appliances'].forEach(function(c) { if (categories.indexOf(c) < 0) categories.push(c); });
       categories.sort();
       const filtered = libraryProducts.filter(p => {
         if (libraryFilter.search) {
@@ -24197,8 +23292,7 @@
         <button class="${libraryViewMode==='grid'?'active':''}" onclick="libraryViewMode='grid';renderLibraryView()">▦</button>
       </div>`;
 
-      if (!window._libDisplayLimit) window._libDisplayLimit = 100;
-      const DISPLAY_LIMIT = window._libDisplayLimit;
+      const DISPLAY_LIMIT = 50;
 
       // Sort filtered results
       const sortArrow = function(field) {
@@ -24277,7 +23371,7 @@
           <h1 class="page-title" style="margin:0;">Product Library</h1>
           <button class="btn btn-secondary" onclick="importHouzzProductLibrary()" style="font-size:12px;">📦 Import Houzz Products</button>
         </div>
-        <p style="color:var(--gray-400);margin-bottom:20px;">${hasMore ? 'Showing ' + DISPLAY_LIMIT + ' of ' + filtered.length : filtered.length} product${filtered.length !== 1 ? 's' : ''}${hasMore ? ' — <button class="btn btn-secondary btn-sm" onclick="window._libDisplayLimit+=100;renderLibraryView()">Load More</button> or use search to narrow down' : ''}</p>
+        <p style="color:var(--gray-400);margin-bottom:20px;">${hasMore ? 'Showing ' + DISPLAY_LIMIT + ' of ' + filtered.length : filtered.length} product${filtered.length !== 1 ? 's' : ''}${hasMore ? ' — use search to find more' : ''}</p>
 
         <div style="display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap;align-items:center;">
           <input type="text" class="form-input" id="librarySearchInput" placeholder="Search products..." value="${esc(libraryFilter.search)}"
@@ -24894,7 +23988,7 @@
       panel.style.display = 'block';
       list.innerHTML = '<div style="color:var(--gray-400);">Loading projects...</div>';
       try {
-        var snap = await getCachedBoards();
+        var snap = await db.collection('boards').get();
         var projs = [];
         snap.forEach(function(d) {
           var data = d.data();
@@ -25002,7 +24096,7 @@
       if (!el) return;
       try {
         // Search all POs across all projects for this product by title/vendor/sku match
-        const projSnap = await getCachedBoards();
+        const projSnap = await db.collection('boards').get();
         const matched = [];
         const searchTitle = (product.title || '').toLowerCase();
         const searchVendor = (product.vendor || '').toLowerCase();
@@ -25050,7 +24144,7 @@
       const sel = document.getElementById('addToProjectSelect');
       if (!sel) return;
       try {
-        const snap = await getCachedBoards();
+        const snap = await db.collection('boards').get();
         const projs = [];
         snap.forEach(d => projs.push({ id: d.id, name: d.data().name || d.id.split('-').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ') }));
         projs.sort((a, b) => a.name.localeCompare(b.name));
@@ -25316,7 +24410,7 @@
       // Build clients from projects
       const clientMap = {};
       try {
-        const snap = await getCachedBoards();
+        const snap = await db.collection('boards').get();
         snap.forEach(d => {
           const p = d.data();
           const c = p.client || p.clientName || '';
@@ -25687,7 +24781,7 @@
       // Load POs for this vendor across all projects
       let vendorPOs = [];
       try {
-        const projSnap = await getCachedBoards();
+        const projSnap = await db.collection('boards').get();
         for (const projDoc of projSnap.docs) {
           const projName = projDoc.data().name || projDoc.id.split('-').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
           try {
@@ -25725,7 +24819,7 @@
       // Load invoices for this vendor across all projects
       let vendorInvoices = [];
       try {
-        const projSnap2 = await getCachedBoards();
+        const projSnap2 = await db.collection('boards').get();
         for (const projDoc of projSnap2.docs) {
           const projName2 = projDoc.data().name || projDoc.id;
           try {
@@ -26533,66 +25627,6 @@
     }
 
     // ==================== SETTINGS PAGE ====================
-    // ── Timely OAuth Integration ──
-    var TIMELY_CLIENT_ID = 'X0t2mXABI8R81qN8PDzX1iSAfMybb6cdpzfUT1Z1Otc';
-    var TIMELY_REDIRECT = 'https://cch-platform.web.app';
-    var TIMELY_AUTH_FN = 'https://us-central1-cch-design-boards.cloudfunctions.net/timelyAuth';
-    var TIMELY_SYNC_FN = 'https://us-central1-cch-design-boards.cloudfunctions.net/timelySyncEntries';
-
-    function connectTimely() {
-      // Open Timely OAuth in a popup
-      var authUrl = 'https://app.timelyapp.com/874495/oauth/authorize?response_type=code&client_id=' + TIMELY_CLIENT_ID + '&redirect_uri=' + encodeURIComponent(TIMELY_REDIRECT);
-      var popup = window.open(authUrl, 'timely_auth', 'width=600,height=700');
-      if (!popup) {
-        // Popup blocked — redirect instead
-        window.location.href = authUrl;
-      }
-    }
-
-    // Check for OAuth callback code on page load
-    (function checkTimelyCallback() {
-      var params = new URLSearchParams(window.location.search);
-      var code = params.get('code');
-      if (code && window.location.href.includes('cch-platform.web.app')) {
-        // Remove code from URL
-        window.history.replaceState({}, '', window.location.pathname + window.location.hash);
-        // Exchange code for token via Cloud Function
-        showToast('Connecting to Timely...');
-        fetch(TIMELY_AUTH_FN, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: code })
-        }).then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (data.error) {
-            showToast('Timely connection failed: ' + data.error, 'error');
-          } else {
-            showToast('Timely connected! Syncing time entries...');
-            syncTimelyEntries();
-          }
-        }).catch(function(e) { showToast('Timely error: ' + e.message, 'error'); });
-      }
-    })();
-
-    async function syncTimelyEntries(startDate, endDate) {
-      if (!startDate) startDate = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-      if (!endDate) endDate = new Date().toISOString().slice(0, 10);
-      showToast('Syncing Timely entries (' + startDate + ' to ' + endDate + ')...');
-      try {
-        var resp = await fetch(TIMELY_SYNC_FN, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ startDate: startDate, endDate: endDate })
-        });
-        var data = await resp.json();
-        if (data.error) {
-          showToast('Timely sync error: ' + data.error, 'error');
-        } else {
-          showToast('Timely: synced ' + data.saved + ' entries from ' + data.startDate + ' to ' + data.endDate);
-        }
-      } catch(e) { showToast('Timely sync error: ' + e.message, 'error'); }
-    }
-
     async function renderSettingsPage() {
       var isAdmin = currentUser && ADMIN_EMAILS.includes((currentUser.email || '').toLowerCase());
       if (!isAdmin) {
@@ -26780,18 +25814,10 @@
           <div style="display:grid;gap:12px;">
             <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(0,0,0,0.2);border-radius:0;border:1px solid rgba(255,255,255,0.04);">
               <div>
-                <div style="font-weight:600;font-size:13px;color:#EDE8E0;">⏱️ Connect Timely</div>
-                <div style="font-size:11px;color:var(--gray-400);">Link your Timely account to pull time entries into Smart Time automatically</div>
-                <div id="timelyConnectionStatus" style="font-size:11px;color:var(--gold);margin-top:4px;"></div>
-              </div>
-              <button class="btn btn-primary btn-sm" onclick="connectTimely()">Connect Timely</button>
-            </div>
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(0,0,0,0.2);border-radius:0;border:1px solid rgba(255,255,255,0.04);">
-              <div>
                 <div style="font-weight:600;font-size:13px;color:#EDE8E0;">💰 Import Houzz Payments</div>
-                <div style="font-size:11px;color:var(--gray-400);">Use Invoices page → 💰 Import Payments button</div>
+                <div style="font-size:11px;color:var(--gray-400);">Push $10.36M in payment history to invoices & POs (4,657 records → 3,739 documents)</div>
               </div>
-              <span style="font-size:11px;color:var(--gray-400);">Use Invoices page</span>
+              <button class="btn btn-primary btn-sm" onclick="importHouzzPayments()">Import Payments</button>
             </div>
             <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(0,0,0,0.2);border-radius:0;border:1px solid rgba(255,255,255,0.04);">
               <div>
@@ -26807,7 +25833,7 @@
       // Load project Teams status
       (async function() {
         try {
-          var snap = await getCachedBoards();
+          var snap = await db.collection('boards').get();
           var connected = [], notConnected = [];
           snap.forEach(function(d) {
             var p = d.data();
@@ -26947,7 +25973,7 @@
     }
 
     async function _doLoadFinancialData(forceRefresh) {
-      const projSnap = await getCachedBoards();
+      const projSnap = await db.collection('boards').get();
       _cachedProjNames = {}; _cachedProjList = [];
       projSnap.forEach(d => { _cachedProjNames[d.id] = d.data().name || d.id; _cachedProjList.push({ id: d.id, name: d.data().name || d.id }); });
 
@@ -26989,11 +26015,9 @@
                 poMap[c.poNum] = { id: 'clip-po-' + c.poNum, projectId: pid, projectName: _cachedProjNames[pid],
                   number: c.poNum, num: c.poNum, vendor: c.vendor || '', status: c.status || 'Ordered',
                   date: c.poDate || '', orderDate: c.poDate || '', createdAt: c.savedAt || '',
-                  total: 0, paidAmount: 0, items: [], source: 'clip-derived' };
+                  total: 0, items: [], source: 'clip-derived' };
               }
               poMap[c.poNum].total += (c.totalCost || c.cost || 0);
-              // Take paid amount from clips (same across all clips in this PO, so take max)
-              if (c.paidAmount) poMap[c.poNum].paidAmount = Math.max(poMap[c.poNum].paidAmount, parseFloat(c.paidAmount) || 0);
               poMap[c.poNum].items.push(c);
               if (c.vendor && !poMap[c.poNum].vendor) poMap[c.poNum].vendor = c.vendor;
             }
@@ -27011,49 +26035,9 @@
         });
       });
 
-      // Deduplicate invoices — same invoice number in same project = duplicate
-      // Also catch cross-project dupes (same invoiceNum regardless of project)
-      var invSeen = {};
-      var invIdSeen = {};
-      _cachedInvoices = _cachedInvoices.filter(function(inv) {
-        // Dedup by Firestore doc ID first
-        if (invIdSeen[inv.id]) return false;
-        invIdSeen[inv.id] = true;
-        // Then by invoice number within project
-        var num = inv.invoiceNum || inv.number || '';
-        if (!num) return true; // keep unnumbered ones
-        var key = inv.projectId + '|' + num;
-        if (invSeen[key]) return false;
-        invSeen[key] = true;
-        return true;
-      });
-
-      // Deduplicate POs — same PO number in same project = duplicate
-      var poSeen = {};
-      _cachedPOs = _cachedPOs.filter(function(po) {
-        var num = po.number || po.num || '';
-        if (!num) return true;
-        var key = po.projectId + '|' + num;
-        if (poSeen[key]) return false;
-        poSeen[key] = true;
-        return true;
-      });
-
       // Normalize statuses globally
       _cachedInvoices.forEach(inv => { if (inv.status === 'Estimated') inv.status = 'Invoiced'; });
       _cachedProposals.forEach(pr => { if (pr.status === 'Estimated') pr.status = 'Approved'; });
-
-      // Calculate balance for invoices that have payment data
-      _cachedInvoices.forEach(function(inv) {
-        var total = parseFloat(inv.total) || 0;
-        var paid = parseFloat(inv.paidAmount) || 0;
-        if (!paid && inv.payments && inv.payments.length) {
-          paid = inv.payments.reduce(function(s, p) { return s + (parseFloat(p.amount) || 0); }, 0);
-        }
-        if (inv.status === 'Paid') paid = total;
-        inv._paidAmount = paid;
-        inv._balance = total - paid;
-      });
 
       _cacheTime = Date.now();
     }
@@ -27203,97 +26187,9 @@
     }
 
     // ==================== GLOBAL INVOICES PAGE ====================
-    async function bulkInvoiceCleanup() {
-      await loadFinancialData(true);
-      var open = _cachedInvoices.filter(function(inv) {
-        var st = (inv.status || '').toLowerCase();
-        return st !== 'paid' && st !== 'cancelled' && st !== 'written off';
-      });
-      if (open.length === 0) { alert('No open invoices to clean up!'); return; }
-
-      // Group by project
-      var byProject = {};
-      open.forEach(function(inv) {
-        var proj = inv.projectName || 'Unknown';
-        if (!byProject[proj]) byProject[proj] = [];
-        byProject[proj].push(inv);
-      });
-
-      var html = '<div style="max-height:70vh;overflow-y:auto;">';
-      html += '<p style="margin-bottom:12px;color:var(--gray-400);font-size:13px;">Check invoices to update. Leave unchecked to keep as-is.</p>';
-      html += '<div style="margin-bottom:12px;display:flex;gap:8px;">' +
-        '<button class="btn btn-sm" onclick="document.querySelectorAll(\'.cleanup-cb\').forEach(c=>c.checked=true)" style="font-size:11px;">Select All</button>' +
-        '<button class="btn btn-sm" onclick="document.querySelectorAll(\'.cleanup-cb\').forEach(c=>c.checked=false)" style="font-size:11px;">Deselect All</button>' +
-        '</div>';
-
-      Object.keys(byProject).sort().forEach(function(proj) {
-        var invs = byProject[proj];
-        html += '<div style="margin-bottom:16px;">';
-        html += '<div style="font-weight:700;font-size:13px;margin-bottom:4px;color:var(--gold);">' + esc(proj) + ' (' + invs.length + ')</div>';
-        invs.forEach(function(inv) {
-          var num = inv.invoiceNum || inv.number || inv.id.slice(0,8);
-          var total = parseFloat(inv.total) || 0;
-          var date = inv.date || inv.dateSent || inv.createdAt || '';
-          html += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(0,0,0,0.05);font-size:12px;">' +
-            '<input type="checkbox" class="cleanup-cb" data-project-id="' + escAttr(inv.projectId) + '" data-id="' + escAttr(inv.id) + '" style="accent-color:var(--gold);">' +
-            '<span style="width:90px;font-family:monospace;font-weight:600;">' + esc(num) + '</span>' +
-            '<span style="width:80px;color:var(--gray-400);">' + formatDate(date) + '</span>' +
-            '<span style="width:70px;">' + statusBadge(inv.status) + '</span>' +
-            '<span style="width:90px;text-align:right;font-family:monospace;">' + formatMoney(total) + '</span>' +
-            '<select class="cleanup-action" style="font-size:11px;padding:2px 6px;border:1px solid var(--border);border-radius:3px;">' +
-              '<option value="Cancelled">Cancel (never sent)</option>' +
-              '<option value="Paid">Mark Paid</option>' +
-              '<option value="Written Off">Write Off</option>' +
-            '</select>' +
-          '</div>';
-        });
-        html += '</div>';
-      });
-      html += '</div>';
-
-      document.getElementById('modalContainer').innerHTML =
-        '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">' +
-        '<div class="modal" style="width:700px;">' +
-        '<div class="modal-header"><div class="modal-title">Cleanup Open Invoices (' + open.length + ' open)</div><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
-        '<div class="modal-body">' + html + '</div>' +
-        '<div class="modal-footer">' +
-          '<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>' +
-          '<button class="btn btn-primary" onclick="executeInvoiceCleanup()">Apply Changes</button>' +
-        '</div></div></div>';
-    }
-
-    async function executeInvoiceCleanup() {
-      var checked = document.querySelectorAll('.cleanup-cb:checked');
-      if (checked.length === 0) { alert('No invoices selected.'); return; }
-      if (!confirm('Update ' + checked.length + ' invoices?')) return;
-      var updated = 0;
-      for (var cb of checked) {
-        var projId = cb.dataset.projectId;
-        var docId = cb.dataset.id;
-        var action = cb.parentElement.querySelector('.cleanup-action').value;
-        try {
-          var updateData = { status: action, updatedAt: new Date().toISOString() };
-          if (action === 'Paid') {
-            // Get the total and set paidAmount
-            var invDoc = await db.collection('boards').doc(projId).collection('invoices').doc(docId).get();
-            if (invDoc.exists) {
-              updateData.paidAmount = parseFloat(invDoc.data().total) || 0;
-              updateData.datePaid = new Date().toISOString();
-            }
-          }
-          await db.collection('boards').doc(projId).collection('invoices').doc(docId).update(updateData);
-          updated++;
-        } catch(e) { console.warn('Failed to update', docId, e); }
-      }
-      closeModal();
-      showToast('Updated ' + updated + ' invoices!', 'success');
-      loadFinancialData(true);
-      renderAllInvoices();
-    }
-
     async function renderAllInvoices() {
       setBreadcrumb([{ label: 'Invoices' }]);
-      setTopbarActions('<button class="btn btn-secondary" style="margin-right:8px;" onclick="importPaymentData()">💰 Import Payments</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="bulkInvoiceCleanup()">🧹 Cleanup</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="bulkMarkQBSynced(\'invoices\')">Sync All QB</button><button class="btn btn-primary" onclick="showNewInvoiceModalGlobal()">+ New Invoice</button>');
+      setTopbarActions('<button class="btn btn-secondary" style="margin-right:8px;" onclick="bulkMarkQBSynced(\'invoices\')">Sync All QB</button><button class="btn btn-primary" onclick="showNewInvoiceModalGlobal()">+ New Invoice</button>');
       const T = document.getElementById('contentArea');
       T.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Loading invoices...</div>';
       try {
@@ -27354,9 +26250,8 @@
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('createdAt','invoices')">Created${sortArrow('createdAt','invoices')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('date','invoices')">Date Sent${sortArrow('date','invoices')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('datePaid','invoices')">Date Paid${sortArrow('datePaid','invoices')}</th>
-                  <th style="${thStyle}text-align:right;cursor:pointer;" onclick="sortByField('amount','invoices')">Total${sortArrow('amount','invoices')}</th>
-                  <th style="${thStyle}text-align:right;cursor:pointer;" onclick="sortByField('paidAmount','invoices')">Paid${sortArrow('paidAmount','invoices')}</th>
                   <th style="${thStyle}text-align:right;cursor:pointer;" onclick="sortByField('balance','invoices')">Balance${sortArrow('balance','invoices')}</th>
+                  <th style="${thStyle}text-align:right;cursor:pointer;" onclick="sortByField('amount','invoices')">Total${sortArrow('amount','invoices')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('qb','invoices')">QB Sync${sortArrow('qb','invoices')}</th>
                   <th style="${thStyle}text-align:center;">Actions</th>
                 </tr>
@@ -27378,9 +26273,8 @@
                     <td style="${tdStyle}color:var(--gray-400);font-size:12px;">${formatDate(inv.createdAt)}</td>
                     <td style="${tdStyle}color:var(--gray-400);font-size:12px;">${formatDate(inv.dateSent || inv.date)}</td>
                     <td style="${tdStyle}color:var(--gray-400);font-size:12px;">${inv.datePaid ? formatDate(inv.datePaid) : (inv.status==='Paid' && inv.paidAt ? formatDate(inv.paidAt) : '—')}</td>
+                    <td style="${tdStyle}text-align:right;font-family:monospace;${bal > 0 ? 'color:var(--red);font-weight:600;' : bal <= 0 ? 'color:var(--green);' : ''}">${formatMoney(bal)}</td>
                     <td style="${tdStyle}text-align:right;font-weight:600;font-family:monospace;">$${(parseFloat(inv.total)||0).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
-                    <td style="${tdStyle}text-align:right;font-family:monospace;color:${(parseFloat(inv.total)||0) - bal > 0 ? '#5FA56B' : 'var(--gray-400)'};">${(parseFloat(inv.total)||0) - bal > 0 ? formatMoney((parseFloat(inv.total)||0) - bal) : '—'}</td>
-                    <td style="${tdStyle}text-align:right;font-family:monospace;font-weight:600;${bal > 0 ? 'color:#C8B99A;' : 'color:#5FA56B;'}">${formatMoney(bal)}</td>
                     <td style="${tdStyle}">${qbCellBadge(getQbId(inv))}</td>
                     <td style="${tdStyle}text-align:center;" onclick="event.stopPropagation()">
                       <div class="action-menu-wrap" style="display:flex;align-items:center;justify-content:center;gap:6px;">
@@ -27413,7 +26307,7 @@
     // New Invoice from global page — pick project first
     async function showNewInvoiceModalGlobal() {
       try {
-        var snap = await getCachedBoards();
+        var snap = await db.collection('boards').get();
         var projects = [];
         snap.forEach(function(d) { projects.push({ id: d.id, name: d.data().name || d.data().projectName || d.id }); });
         projects.sort(function(a,b) { return (a.name||'').localeCompare(b.name||''); });
@@ -27502,8 +26396,6 @@
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('receiver','pos')">Receiver${sortArrow('receiver','pos')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('eta','pos')">ETA${sortArrow('eta','pos')}</th>
                   <th style="${thStyle}text-align:right;cursor:pointer;" onclick="sortByField('amount','pos')">Total${sortArrow('amount','pos')}</th>
-                  <th style="${thStyle}text-align:right;cursor:pointer;" onclick="sortByField('paidAmount','pos')">Paid${sortArrow('paidAmount','pos')}</th>
-                  <th style="${thStyle}text-align:right;cursor:pointer;" onclick="sortByField('balance','pos')">Balance${sortArrow('balance','pos')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('qb','pos')">QB Sync${sortArrow('qb','pos')}</th>
                   <th style="${thStyle}text-align:center;">Actions</th>
                 </tr>
@@ -27527,8 +26419,6 @@
                     <td style="${tdStyle}font-size:12px;">${receiver ? '<span style="font-size:11px;padding:3px 8px;border-radius:0;background:#E3F2FD;color:#1565C0;font-weight:500;">'+esc(receiver)+'</span>' : '—'}</td>
                     <td style="${tdStyle}color:var(--gray-500);font-size:12px;">${esc(po.eta||'—')}</td>
                     <td style="${tdStyle}text-align:right;font-weight:600;font-family:monospace;">$${(parseFloat(po.total)||0).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
-                    <td style="${tdStyle}text-align:right;font-family:monospace;color:${(parseFloat(po.paidAmount)||0) > 0 ? '#5FA56B' : 'var(--gray-400)'};">${(parseFloat(po.paidAmount)||0) > 0 ? '$'+(parseFloat(po.paidAmount)).toLocaleString('en-US',{minimumFractionDigits:2}) : '—'}</td>
-                    <td style="${tdStyle}text-align:right;font-weight:600;font-family:monospace;color:${((parseFloat(po.total)||0)-(parseFloat(po.paidAmount)||0)) > 0 ? '#C8B99A' : '#5FA56B'};">$${((parseFloat(po.total)||0)-(parseFloat(po.paidAmount)||0)).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
                     <td style="${tdStyle}">${qbCellBadge(getQbId(po))}</td>
                     <td style="${tdStyle}text-align:center;" onclick="event.stopPropagation()">
                       <div class="action-menu-wrap" style="display:flex;align-items:center;justify-content:center;gap:4px;">
@@ -29151,7 +28041,7 @@
       // Load projects for dropdown
       let projects = [];
       try {
-        const s = await getCachedBoards();
+        const s = await db.collection('boards').get();
         s.forEach(d => projects.push({ id: d.id, name: d.data().name || d.id.split('-').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ') }));
         projects.sort((a,b) => a.name.localeCompare(b.name));
       } catch(e) {}
@@ -29729,11 +28619,11 @@
                   <div class="form-row">
                     <div class="form-group">
                       <label class="form-label">Cost (yours)</label>
-                      <input class="form-input" id="cdCost" value="${escAttr(clip.cost || clip.costPrice || clip.tradeCost || clip.unitCost || '')}">
+                      <input class="form-input" id="cdCost" value="${escAttr(clip.cost || '')}">
                     </div>
                     <div class="form-group">
                       <label class="form-label">Client Price</label>
-                      <input class="form-input" id="cdClientPrice" value="${escAttr(clip.clientPrice || clip.sellPrice || clip.price || clip.retailPrice || '')}">
+                      <input class="form-input" id="cdClientPrice" value="${escAttr(clip.clientPrice || '')}">
                     </div>
                   </div>
 
@@ -31043,7 +29933,7 @@
       showToast('Rebuilding activity feed...');
       var count = 0;
       try {
-        var projSnap = await getCachedBoards();
+        var projSnap = await db.collection('boards').get();
         for (var pd of projSnap.docs) {
           var projName = pd.data().name || pd.id;
           var pid = pd.id;
@@ -31081,7 +29971,7 @@
       showToast('Processing ' + invNums.length + ' documents...');
 
       // Build lookup: invoice/PO number → { projectId, docId, collection }
-      var projSnap = await getCachedBoards();
+      var projSnap = await db.collection('boards').get();
       var docMap = {}; // invoiceNum → { projectId, docId, type }
       var projCount = 0;
 
@@ -31160,7 +30050,7 @@
 
     function showNewNoteModal() {
       // Gather projects for dropdown
-      getCachedBoards().then(function(snap) {
+      db.collection('boards').get().then(function(snap) {
         var projs = [];
         snap.forEach(function(d) { projs.push({ id: d.id, name: d.data().name || d.id }); });
         projs.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
@@ -31375,7 +30265,7 @@
       C.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Loading schedule...</div>';
 
       // Load all projects and their milestones
-      var projSnap = await getCachedBoards();
+      var projSnap = await db.collection('boards').get();
       var allProjects = [];
       projSnap.forEach(function(d) { allProjects.push({ id: d.id, ...d.data() }); });
       allProjects.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
