@@ -2910,7 +2910,7 @@
       // Load time entries
       let _allTimeEntries = [];
       try {
-        const teSnap = await db.collection('timeEntries').limit(500).get();
+        const teSnap = await db.collection('timeEntries').limit(5000).get();
         teSnap.forEach(d => _allTimeEntries.push({ id: d.id, ...d.data() }));
       } catch(e) {}
       const memberName = currentMemberName();
@@ -6212,7 +6212,31 @@
     let boardSortField = 'title';
     let boardSortDir = 'asc';
 
-    async function renderBoardsTab(T, proj) {
+    
+    function renderBoardTileView(groupedData, projId) {
+      return Object.keys(groupedData).map(function(rm) {
+        var items = groupedData[rm] || [];
+        return '<div style="margin-bottom:24px;">' +
+          '<div style="font-size:15px;font-weight:600;margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid var(--gold);">' + esc(rm) + ' <span style="font-size:12px;color:var(--gray-400);font-weight:400;">' + items.length + ' items</span></div>' +
+          '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">' +
+          items.map(function(clip) {
+            var imgSrc = clip.imageUrl || (clip.images && clip.images[0]) || '';
+            var sell = parseFloat(clip.clientPrice) || parseFloat(clip.totalSelling) || 0;
+            var isValid = imgSrc && (imgSrc.startsWith('http') || imgSrc.startsWith('data:'));
+            return '<div style="background:var(--card,white);border:1px solid var(--border,#eee);overflow:hidden;cursor:pointer;" onclick="showClipDetail(\'' + escAttr(projId) + '\',\'' + escAttr(clip.id) + '\')">' +
+              (isValid ? '<img src="' + escAttr(imgSrc) + '" style="width:100%;aspect-ratio:1;object-fit:cover;" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:var(--gray-100);color:var(--gray-300);font-size:32px;">📷</div>') +
+              '<div style="padding:10px;">' +
+                '<div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(clip.title || 'Untitled') + '</div>' +
+                '<div style="font-size:11px;color:var(--gray-400);">' + esc(clip.vendor || '') + '</div>' +
+                '<div style="font-size:11px;color:var(--gray-500);">' + esc(clip.room || '') + ' · ' + esc(clip.category || '') + '</div>' +
+                (sell > 0 ? '<div style="font-size:13px;font-weight:600;color:var(--gold);font-family:monospace;margin-top:4px;">' + formatMoney(sell) + '</div>' : '') +
+              '</div></div>';
+          }).join('') +
+          '</div></div>';
+      }).join('');
+    }
+
+async function renderBoardsTab(T, proj) {
       // Load clips from boards subcollection (published) or show instruction
       let clips = [];
       try {
@@ -6355,6 +6379,8 @@
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
           <div class="section-title" style="margin:0;">${roomNames.length} Rooms · ${catNames.length} Categories · ${clips.length} Items</div>
           <div style="display: flex; gap: 8px;">
+            <button class="btn ${window._boardDisplayMode==='tile'?'btn-secondary':'btn-primary'} btn-sm" onclick="window._boardDisplayMode='table';renderBoardsTab(document.getElementById('tabContent'),{id:'${escAttr(proj.id)}',name:'${escAttr(proj.name)}'})">📊 Table</button>
+            <button class="btn ${window._boardDisplayMode==='tile'?'btn-primary':'btn-secondary'} btn-sm" onclick="window._boardDisplayMode='tile';renderBoardsTab(document.getElementById('tabContent'),{id:'${escAttr(proj.id)}',name:'${escAttr(proj.name)}'})">🖼️ Tiles</button>
             <button class="btn btn-secondary btn-sm" onclick="showImageManager('${proj.id}','${escAttr(proj.name)}')">🖼️ Image Manager</button>
             <button class="btn btn-secondary btn-sm" onclick="previewRoomBoard('${proj.id}')">👁️ Preview</button>
             <button class="btn ${window._boardViewMode==='category'?'btn-secondary':'btn-primary'} btn-sm" onclick="window._boardViewMode='room';renderBoardsTab(document.getElementById('tabContent'),{id:'${escAttr(proj.id)}',name:'${escAttr(proj.name)}'})">🏠 Room Boards</button><button class="btn ${window._boardViewMode==='category'?'btn-primary':'btn-secondary'} btn-sm" onclick="window._boardViewMode='category';renderBoardsTab(document.getElementById('tabContent'),{id:'${escAttr(proj.id)}',name:'${escAttr(proj.name)}'})">🏷️ Category Boards</button>
@@ -6401,7 +6427,7 @@
             </div>
           `).join('')}
         </div>` : ''}
-        ${clips.length === 0 ? `
+        ${window._boardDisplayMode === 'tile' ? renderBoardTileView(window._boardViewMode === 'category' ? catGrouped : grouped, proj.id) : clips.length === 0 ? `
           <div class="empty-state">
             <div class="empty-icon">🛋️</div>
             <div class="empty-text">No items published yet. Use the CCH Clipper extension to add products, then publish to web.</div>
