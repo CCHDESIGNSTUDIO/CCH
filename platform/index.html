@@ -1216,7 +1216,7 @@
       display: flex; justify-content: space-between; align-items: center;
     }
     .ib-item-caption-bar {
-      font-size: 13px; font-weight: 600; color: #0E1629;
+      font-size: 13px; font-weight: 600; color: var(--text, #0E1629);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
     }
     .ib-item-caption-bar[contenteditable="true"] { cursor: text; white-space: normal; text-overflow: unset; }
@@ -1237,14 +1237,10 @@
     /* Hover overlay with quick actions */
     .ib-item-overlay {
       position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.4) 100%);
-      opacity: 0; transition: opacity 0.2s; pointer-events: none; border-radius: 8px;
+      opacity: 0; transition: opacity 0.2s; pointer-events: none; border-radius: 0;
     }
     .ib-item:hover .ib-item-overlay { opacity: 1; }
-    .ib-item-hover-actions {
-      position: absolute; bottom: 50px; left: 0; right: 0;
-      display: flex; justify-content: center; gap: 6px; padding: 0 10px;
-      opacity: 0; transition: opacity 0.2s; pointer-events: auto;
-    }
+    .ib-item-hover-actions { position: absolute; bottom: 8px; left: 0; right: 0; display: flex; justify-content: center; gap: 6px; padding: 0 10px; opacity: 0; transition: opacity 0.2s; pointer-events: auto; z-index: 5; }
     .ib-item:hover .ib-item-hover-actions { opacity: 1; }
     .ib-hover-btn {
       padding: 5px 12px; border-radius: 4px; border: none;
@@ -1820,7 +1816,13 @@
       background: var(--bg) !important;
     }
 
-  </style>
+  
+    /* SIDEBAR ALWAYS NAVY */
+    .sidebar, nav.sidebar { background: #0E1629 !important; color: #EDE8E0 !important; }
+    .sidebar a, .sidebar button, .sidebar .nav-item, .sidebar .nav-label, .sidebar .sidebar-section-label, .sidebar .sidebar-footer, .sidebar .sidebar-logout { color: #EDE8E0 !important; }
+    .sidebar .nav-item:hover { background: rgba(200,185,154,0.08) !important; color: #C8B99A !important; }
+    .sidebar .nav-item.active { background: rgba(200,185,154,0.15) !important; color: #C8B99A !important; }
+</style>
 </head>
 <body>
 
@@ -6334,6 +6336,7 @@
       const roomNames = Object.keys(roomGrouped).sort();
       const catNames = Object.keys(catGrouped).sort();
       const allNames = Object.keys(grouped).sort();
+      if (!window._boardViewMode) window._boardViewMode = "room";
       function _buildCards(nameList, dataMap) {
         return nameList.map(rm => {
           const items = dataMap[rm] || [];
@@ -6354,7 +6357,7 @@
           <div style="display: flex; gap: 8px;">
             <button class="btn btn-secondary btn-sm" onclick="showImageManager('${proj.id}','${escAttr(proj.name)}')">🖼️ Image Manager</button>
             <button class="btn btn-secondary btn-sm" onclick="previewRoomBoard('${proj.id}')">👁️ Preview</button>
-            <button class="btn btn-secondary btn-sm" onclick="toggleRoomView()">Toggle View</button>
+            <button class="btn ${window._boardViewMode==='category'?'btn-secondary':'btn-primary'} btn-sm" onclick="window._boardViewMode='room';renderBoardsTab(document.getElementById('tabContent'),{id:'${escAttr(proj.id)}',name:'${escAttr(proj.name)}'})">🏠 Room Boards</button><button class="btn ${window._boardViewMode==='category'?'btn-primary':'btn-secondary'} btn-sm" onclick="window._boardViewMode='category';renderBoardsTab(document.getElementById('tabContent'),{id:'${escAttr(proj.id)}',name:'${escAttr(proj.name)}'})">🏷️ Category Boards</button>
             <button class="btn btn-secondary btn-sm" onclick="generateProposalFromClips('${proj.id}')">📋 Generate Proposal</button>
             <button class="btn btn-secondary btn-sm" onclick="generateTearSheets('${proj.id}','${escAttr(proj.name)}')">📄 Tear Sheets</button>
             <button class="btn btn-primary btn-sm" onclick="showImportTearSheetModal('${proj.id}','${escAttr(proj.name)}')">📦 Import Tear Sheet</button>
@@ -6363,13 +6366,13 @@
           </div>
         </div>
         <div class="room-cards-grid" id="roomCardsGrid">
-          ${roomCards.map(rc => `
+          ${(window._boardViewMode === "category" ? catCards : roomCards).map(rc => `
             <div class="room-card" onclick="scrollToRoom('${escAttr(rc.name)}')" style="position:relative;">
               <div class="room-card-cover">
                 ${rc.coverImg ? '<img src="' + escAttr(rc.coverImg) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' : ''}<div class="room-card-placeholder" style="${rc.coverImg ? 'display:none;' : 'display:flex;'}background:linear-gradient(135deg,#2a2a2a,#3a3a3a);align-items:center;justify-content:center;width:100%;height:100%;color:var(--gold);font-size:28px;flex-direction:column;gap:4px;">🏠<span style="font-size:9px;color:var(--gold);">Upload cover</span></div>
                 <div class="room-card-upload" onclick="event.stopPropagation();uploadRoomCover('${escAttr(proj.id)}','${escAttr(rc.name)}',this)" title="Upload cover image">📷</div>
                 <div onclick="event.stopPropagation();renameRoom('${escAttr(proj.id)}','${escAttr(rc.name)}')" style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,0.7);color:white;border:none;padding:4px 8px;font-size:10px;cursor:pointer;border-radius:2px;z-index:2;" title="Rename room">✏️</div>
-                <div onclick="event.stopPropagation();deleteRoom('${escAttr(proj.id)}','${escAttr(rc.name)}')" style="position:absolute;top:6px;right:32px;background:rgba(229,57,53,0.8);color:white;border:none;padding:4px 8px;font-size:10px;cursor:pointer;border-radius:2px;z-index:2;" title="Delete room">🗑️</div>
+                <div onclick="event.stopPropagation();event.preventDefault();deleteRoom('${escAttr(proj.id)}','${escAttr(rc.name)}')" style="position:absolute;top:6px;right:6px;background:rgba(229,57,53,0.9);color:white;border:none;padding:6px 10px;font-size:14px;cursor:pointer;border-radius:4px;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.3);" title="Delete room ${escAttr(rc.name)}">🗑️</div>
               </div>
               <div class="room-card-info">
                 <div class="room-card-name">${esc(rc.name)}</div>
@@ -6403,7 +6406,7 @@
             <div class="empty-icon">🛋️</div>
             <div class="empty-text">No items published yet. Use the CCH Clipper extension to add products, then publish to web.</div>
           </div>
-        ` : Object.keys(grouped).map(rm => {
+        ` : Object.keys(window._boardViewMode === "category" ? catGrouped : grouped).map(rm => {
           const isUnassigned = rm === 'Unassigned';
           const availableRooms = roomNames.filter(r => r !== 'Unassigned');
           return `
@@ -14460,7 +14463,7 @@
               (sectionNames ? '<div style="font-size:12px;color:#7A7060;margin-top:4px;">' + esc(sectionNames) + (b.sections.length > 3 ? '...' : '') + '</div>' : '') +
               '</div>' +
               '<div class="action-menu-wrap" style="position:relative;">' +
-                '<span class="ideabook-card-menu" onclick="event.stopPropagation();toggleActionMenu(this)">···</span>' +
+                '<button class="ideabook-card-menu" onclick="event.stopPropagation();toggleActionMenu(this)" style="background:none;border:1px solid var(--gray-200);border-radius:4px;padding:4px 10px;cursor:pointer;font-size:18px;color:var(--gray-500);line-height:1;">⋮</button>' +
                 '<div class="action-dropdown" style="display:none;right:0;left:auto;min-width:180px;">' +
                   '<a onclick="event.stopPropagation();navigate(\'#/project/' + b.projectId + '/ideabooks\');closeAllMenus()">📂 Open Project Boards</a>' +
                   b.sections.map(function(s) {
@@ -32872,6 +32875,38 @@ ${pages}
         if (btn) { btn.disabled = false; btn.textContent = '✅ Import to Room Board'; }
         if (status) status.innerHTML = `<div style="color:var(--red);">Import error: ${esc(err.message)}</div>`;
       }
+    }
+
+
+    // Remove time billing boards from all projects
+    async function removeTimeBillingBoards() {
+      if (!confirm('Remove all Design Fees / Time Billing / Service items from Room Boards across ALL projects? This removes clips with categories like Design Fees, Design Services, Blended Design, Consultation, Project Management, Pass-Through, Freight, Client Admin etc.')) return;
+      showToast('Scanning projects...');
+      var snap = await getCachedBoards();
+      var totalDeleted = 0;
+      var serviceCategories = ['design fees','design services','blended design fees','blended design services','consultation','project management','pass-through','freight','shipping','client admin','client project services','expense','time track','time tracking','time billing'];
+      for (var doc of snap.docs) {
+        try {
+          var clips = await db.collection('boards').doc(doc.id).collection('clips').get();
+          var batch = db.batch();
+          var count = 0;
+          clips.forEach(function(d) {
+            var c = d.data();
+            var room = (c.room || '').toLowerCase().trim();
+            var cat = (c.category || '').toLowerCase().trim();
+            if (serviceCategories.includes(room) || serviceCategories.includes(cat)) {
+              batch.delete(d.ref);
+              count++;
+            }
+          });
+          if (count > 0) {
+            await batch.commit();
+            totalDeleted += count;
+          }
+        } catch(e) {}
+      }
+      showToast('Removed ' + totalDeleted + ' service/billing items from Room Boards');
+      alert('Done! Removed ' + totalDeleted + ' Design Fees / Time Billing items across all projects.');
     }
 
     // ==================== UTILITIES ====================
