@@ -1822,7 +1822,14 @@
     .sidebar a, .sidebar button, .sidebar .nav-item, .sidebar .nav-label, .sidebar .sidebar-section-label, .sidebar .sidebar-footer, .sidebar .sidebar-logout { color: #EDE8E0 !important; }
     .sidebar .nav-item:hover { background: rgba(200,185,154,0.08) !important; color: #C8B99A !important; }
     .sidebar .nav-item.active { background: rgba(200,185,154,0.15) !important; color: #C8B99A !important; }
-</style>
+
+    /* PAGE LAYOUT FIX */
+    .main { margin-left: var(--sidebar-w, 220px); min-height: 100vh; }
+    .content { padding: 24px 32px; overflow-y: auto; box-sizing: border-box; }
+    .topbar { position: sticky; top: 0; z-index: 100; }
+    @media (max-width: 1200px) { .content { padding: 16px; } }
+
+  </style>
 </head>
 <body>
 
@@ -7002,15 +7009,27 @@ async function renderBoardsTab(T, proj) {
     }
 
     async function deleteRoom(projectId, roomName) {
+      console.log("DELETE ROOM CALLED:", projectId, roomName);
       if (!confirm('Delete room "' + roomName + '" and ALL its items? This cannot be undone.')) return;
       try {
-        var snap = await db.collection('boards').doc(projectId).collection('clips').where('room', '==', roomName).get();
+        showToast('Deleting room...');
+        // Get ALL clips and filter client-side (handles case/whitespace mismatches)
+        var allClips = await db.collection('boards').doc(projectId).collection('clips').get();
+        var targetName = (roomName || '').trim().toLowerCase();
         var batch = db.batch();
-        snap.forEach(function(d) { batch.delete(d.ref); });
-        await batch.commit();
-        showToast('Deleted room "' + roomName + '" (' + snap.size + ' items)');
-        renderProjectDetail(projectId);
-      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+        var count = 0;
+        allClips.forEach(function(d) {
+          var clipRoom = (d.data().room || '').trim().toLowerCase();
+          if (clipRoom === targetName) { batch.delete(d.ref); count++; }
+        });
+        if (count > 0) {
+          await batch.commit();
+          showToast('Deleted room "' + roomName + '" (' + count + ' items)');
+        } else {
+          showToast('No items found in room "' + roomName + '"', 'error');
+        }
+        renderProjectDetail();
+      } catch(e) { console.error(e); showToast('Error: ' + e.message, 'error'); }
     }
 
     async function ibRenameSection(projectId, sectionId, oldName) {
@@ -11204,6 +11223,7 @@ async function renderBoardsTab(T, proj) {
                     <th style="width:100px;">Image</th>
                     <th style="font-size:14px;">Item</th>
                     <th style="font-size:14px;">Vendor</th>
+                    <th>Room</th>
                     <th class="amount" style="font-size:14px;">Qty</th>
                     <th class="amount" style="font-size:14px;">Cost</th>
                     <th class="amount" style="font-size:14px;">Markup %</th>
