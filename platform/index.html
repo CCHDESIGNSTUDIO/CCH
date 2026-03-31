@@ -1117,9 +1117,9 @@
       box-shadow: 0 3px 12px rgba(0,0,0,0.3); border-bottom: 1px solid rgba(14,22,41,0.08);
       background: rgba(13,13,18,0.95); backdrop-filter: blur(12px);
     }
-    .ib-section-tab { padding: 8px 16px; font-size: 13px; font-weight: 600; color: var(--text, #0E1629); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
-    .ib-section-tab:hover { color: var(--text-primary); }
-    .ib-section-tab.active { color: var(--text-primary); border-bottom-color: var(--cyan); font-weight: 600; }
+    .ib-section-tab { padding: 10px 16px; font-size: 14px; font-weight: 700; color: #0E1629 !important; cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+    .ib-section-tab:hover { color: #C8B99A !important; }
+    .ib-section-tab.active { color: #C8B99A !important; border-bottom-color: #C8B99A; font-weight: 700; }
     .ib-section-tab .ib-tab-count {
       font-size: 10px; color: var(--gray-300); margin-left: 4px; font-weight: 400;
     }
@@ -1180,16 +1180,16 @@
     .ib-img-count { font-size: 11px; color: var(--gray-400); margin-right: 4px; }
 
     /* True Masonry Grid using CSS columns (Niice-style varied heights) */
-    .ib-grid { display: grid; grid-template-columns: repeat(var(--ib-cols, 3), 1fr); gap: 4px; width: 100%; }
+    .ib-grid { column-count: 3; column-gap: 4px; width: 100%; }
     .ib-grid.cols-2 { column-count: 2 !important; }
     .ib-grid.cols-3 { column-count: 3 !important; }
     .ib-grid.cols-4 { column-count: 4 !important; }
     .ib-grid.cols-5 { column-count: 5 !important; }
     .ib-grid.cols-6 { column-count: 6 !important; }
 
-    .ib-item { position: relative; overflow: hidden; aspect-ratio: 1; cursor: pointer; border-radius: 0; }
+    .ib-item { position: relative; overflow: hidden; cursor: pointer; border-radius: 0; break-inside: avoid; margin-bottom: 4px; }
     .ib-item:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(14,22,41,0.12); }
-    .ib-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .ib-item img { width: 100%; height: auto; display: block; }
     /* Info bar below image */
     .ib-item-info {
       padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;
@@ -1560,9 +1560,9 @@
     .ideabook-img-wrap { position: relative; border-radius:0; overflow: hidden; }
     .ideabook-img-wrap img { width: 100%; height: 200px; object-fit: cover; display: block; }
     /* Masonry doesn't use fixed heights — these are max-heights for size control */
-    .ib-grid.size-S .ib-item img { max-height: 160px !important; }
-    .ib-grid.size-M .ib-item img { max-height: 320px !important; }
-    .ib-grid.size-L .ib-item img { max-height: 500px !important; }
+    
+    
+    
     .ideabook-img-remove {
       position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.6);
       color: white; border: none; border-radius: 50%; width: 24px; height: 24px;
