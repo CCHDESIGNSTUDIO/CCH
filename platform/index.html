@@ -4473,7 +4473,7 @@
 
       try {
         // Load from timelyEntries collection
-        var snap = await db.collection('timelyEntries').orderBy('date', 'desc').limit(200).get();
+        var snap = await db.collection('timelyEntries').limit(500).get();
         var entries = [];
         snap.forEach(function(d) { entries.push({id: d.id, ...d.data()}); });
 
@@ -4550,7 +4550,7 @@
           }).join('');
 
       } catch(e) {
-        T.innerHTML = '<div style="color:var(--red);padding:40px;text-align:center;">Error loading Timely entries: ' + esc(e.message) + '</div>';
+        console.error('Timely load error:', e); T.innerHTML = '<div style="color:#E53935;padding:40px;text-align:center;font-size:16px;">Error: ' + esc(e.message) + '<br><br><button class="btn btn-primary" onclick="renderTimelyLoggedView()">Retry</button></div>';
       }
     }
 
