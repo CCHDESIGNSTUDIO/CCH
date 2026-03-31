@@ -1862,6 +1862,14 @@
     .inline-edit-cell { cursor: pointer; }
     .inline-edit-cell:hover { text-decoration: underline dotted; text-underline-offset: 3px; }
 
+  
+    /* DOCUMENT LINE ITEMS - bigger, more readable */
+    .doc-items-table th { font-size: 12px !important; padding: 12px 14px !important; }
+    .doc-items-table td { font-size: 14px !important; padding: 14px 14px !important; }
+    .doc-items-table img { width: 56px; height: 56px; object-fit: cover; border-radius: 0; }
+    .doc-items-table .item-title { font-weight: 600; font-size: 15px; }
+    .doc-items-table .item-desc { font-size: 12px; color: var(--gray-400); margin-top: 2px; }
+
   </style>
 </head>
 <body>
@@ -4335,6 +4343,51 @@
 
       element.onblur = save;
       element.onkeydown = function(e) { if (e.key === 'Enter') { e.preventDefault(); element.blur(); } if (e.key === 'Escape') { element.textContent = oldVal; element.contentEditable = 'false'; } };
+    }
+
+    
+    function showShipToDropdown(projectId, docId, collection, currentShipTo) {
+      var locations = [
+        '— Select Ship To —',
+        'Client Home',
+        'CCH Design Studio — 2481 N. Riverside Dr, Santa Ana, CA',
+        'CBH Office',
+      ];
+      // Add known workrooms and receivers
+      (window._workrooms || []).forEach(function(w) { locations.push('Workroom: ' + (w.name || w)); });
+      (window._receivers || []).forEach(function(r) { locations.push('Receiver: ' + (r.name || r)); });
+      locations.push('+ Add New Location');
+
+      var opts = locations.map(function(loc) {
+        return '<option value="' + escAttr(loc) + '"' + (loc === currentShipTo ? ' selected' : '') + '>' + esc(loc) + '</option>';
+      }).join('');
+
+      return '<select class="form-input" style="font-size:12px;padding:4px 8px;min-width:200px;" onchange="updateDocShipTo(\'' + escAttr(projectId) + '\',\'' + escAttr(docId) + '\',\'' + collection + '\',this.value)">' + opts + '</select>';
+    }
+
+    async function updateDocShipTo(projectId, docId, collection, value) {
+      if (value === '+ Add New Location') {
+        value = prompt('Enter new ship-to address:');
+        if (!value) return;
+      }
+      try {
+        await db.collection('boards').doc(projectId).collection(collection).doc(docId).update({ shipTo: value });
+        showToast('Ship-to updated');
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+
+    
+    async function loadWorkroomsAndReceivers() {
+      if (window._workrooms && window._receivers) return;
+      window._workrooms = []; window._receivers = [];
+      try {
+        var ws = await db.collection('workrooms').get();
+        ws.forEach(function(d) { window._workrooms.push(d.data()); });
+      } catch(e) {}
+      try {
+        var rs = await db.collection('vendors').get();
+        rs.forEach(function(d) { var v = d.data(); if (v.type === 'receiver' || v.isReceiver) window._receivers.push(v); });
+      } catch(e) {}
     }
 
     function closeModal() { document.getElementById('modalContainer').innerHTML = ''; }
