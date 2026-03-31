@@ -1829,6 +1829,17 @@
     .topbar { position: sticky; top: 0; z-index: 100; }
     @media (max-width: 1200px) { .content { padding: 16px; } }
 
+  
+    /* BUTTON CONTRAST FIX */
+    .btn { font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 0; cursor: pointer; transition: all 0.15s; }
+    .btn-primary { background: #C8B99A !important; color: #0E1629 !important; border: 1px solid #C8B99A !important; }
+    .btn-primary:hover { background: #b5a688 !important; }
+    .btn-secondary { background: transparent !important; color: var(--text, #0E1629) !important; border: 1px solid var(--border, #C8B99A) !important; }
+    .btn-secondary:hover { background: rgba(200,185,154,0.1) !important; }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+    /* Topbar buttons */
+    .topbar .btn, .topbar button { color: var(--text, #0E1629) !important; }
+
   </style>
 </head>
 <body>
@@ -4193,6 +4204,80 @@
       await db.collection('boards').doc(id).set(data);
       closeModal();
       navigate('#/project/' + id);
+    }
+
+    
+    async function updateProposalItemField(projectId, docId, itemIdx, field, value) {
+      if (value === '__new__') {
+        value = prompt('Enter new room name:');
+        if (!value) return;
+        // Add to room list for this session
+        if (!window._projRoomList) window._projRoomList = [];
+        if (window._projRoomList.indexOf(value) < 0) window._projRoomList.push(value);
+      }
+      try {
+        var docRef = db.collection('boards').doc(projectId).collection('proposals').doc(docId);
+        var doc = await docRef.get();
+        if (!doc.exists) {
+          docRef = db.collection('boards').doc(projectId).collection('invoices').doc(docId);
+          doc = await docRef.get();
+        }
+        if (!doc.exists) {
+          docRef = db.collection('boards').doc(projectId).collection('purchaseOrders').doc(docId);
+          doc = await docRef.get();
+        }
+        if (!doc.exists) return;
+        var data = doc.data();
+        var items = data.items || [];
+        if (items[itemIdx]) {
+          items[itemIdx][field] = value;
+          await docRef.update({ items: items });
+          showToast('Updated ' + field + ' to "' + value + '"');
+        }
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+
+    
+    async function generateTearSheetsFromDoc(projectId, collection, docId, projectName) {
+      var pricing = confirm('Include pricing on tear sheets?\n\nOK = Show prices\nCancel = No prices (client version)');
+      showToast('Generating tear sheets...');
+      try {
+        var doc = await db.collection('boards').doc(projectId).collection(collection).doc(docId).get();
+        if (!doc.exists) { showToast('Document not found', 'error'); return; }
+        var items = doc.data().items || [];
+        if (items.length === 0) { showToast('No items in this document', 'error'); return; }
+
+        var pages = items.filter(function(item) { return item.title || item.description; }).map(function(item) {
+          var img = item.imageUrl || item.image || '';
+          var cost = parseFloat(item.cost) || 0;
+          var sell = parseFloat(item.amount) || parseFloat(item.clientPrice) || parseFloat(item.total) || 0;
+          var qty = parseInt(item.qty) || 1;
+
+          return '<div style="page-break-after:always;padding:40px;font-family:DM Sans,sans-serif;max-width:800px;margin:0 auto;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;border-bottom:2px solid #C8B99A;padding-bottom:12px;">' +
+              '<div style="font-size:28px;font-weight:300;letter-spacing:4px;color:#0E1629;">CCH</div>' +
+              '<div style="font-size:12px;color:#888;">' + esc(projectName || '') + '</div>' +
+            '</div>' +
+            (img ? '<div style="text-align:center;margin-bottom:24px;"><img src="' + escAttr(img) + '" style="max-width:100%;max-height:400px;object-fit:contain;" referrerpolicy="no-referrer"></div>' : '') +
+            '<div style="font-size:22px;font-weight:600;color:#0E1629;margin-bottom:8px;">' + esc(item.title || item.description || '') + '</div>' +
+            '<table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:16px;">' +
+              (item.vendor ? '<tr><td style="padding:8px 0;color:#888;width:140px;">Vendor</td><td style="padding:8px 0;">' + esc(item.vendor) + '</td></tr>' : '') +
+              (item.room ? '<tr><td style="padding:8px 0;color:#888;">Room</td><td style="padding:8px 0;">' + esc(item.room) + '</td></tr>' : '') +
+              (item.category ? '<tr><td style="padding:8px 0;color:#888;">Category</td><td style="padding:8px 0;">' + esc(item.category) + '</td></tr>' : '') +
+              (item.sku ? '<tr><td style="padding:8px 0;color:#888;">SKU</td><td style="padding:8px 0;font-family:monospace;">' + esc(item.sku) + '</td></tr>' : '') +
+              (item.dimensions ? '<tr><td style="padding:8px 0;color:#888;">Dimensions</td><td style="padding:8px 0;">' + esc(item.dimensions) + '</td></tr>' : '') +
+              '<tr><td style="padding:8px 0;color:#888;">Quantity</td><td style="padding:8px 0;">' + qty + '</td></tr>' +
+              (pricing && sell > 0 ? '<tr><td style="padding:8px 0;color:#888;">Price</td><td style="padding:8px 0;font-weight:600;font-family:monospace;color:#C8B99A;">' + formatMoney(sell) + '</td></tr>' : '') +
+              (pricing && sell > 0 && qty > 1 ? '<tr style="border-top:1px solid #eee;"><td style="padding:8px 0;color:#888;">Total</td><td style="padding:8px 0;font-weight:700;font-family:monospace;color:#C8B99A;">' + formatMoney(sell * qty) + '</td></tr>' : '') +
+            '</table>' +
+          '</div>';
+        }).join('');
+
+        var w = window.open('', '_blank');
+        w.document.write('<!DOCTYPE html><html><head><title>Tear Sheets</title><style>@media print{body{margin:0}}</style></head><body>' + pages + '</body></html>');
+        w.document.close();
+        showToast(items.length + ' tear sheets — Ctrl+P to print/save as PDF');
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
 
     function closeModal() { document.getElementById('modalContainer').innerHTML = ''; }
@@ -11150,6 +11235,7 @@ async function renderBoardsTab(T, proj) {
         <button class="btn btn-secondary btn-sm" onclick="addProposalLineItem('${projectId}','${proposalId}')">+ Add Item</button>
         <button class="btn btn-dark btn-sm" onclick="convertProposalToInvoice('${projectId}','${proposalId}')">🧾 Convert to Invoice</button>
         <button class="btn btn-dark btn-sm" onclick="generatePOsFromDoc('${projectId}','proposals','${proposalId}')">📦 Generate POs by Vendor</button>
+            <button class="btn btn-secondary btn-sm" onclick="generateTearSheetsFromDoc('${escAttr(proj.id)}','proposals','${escAttr(docId)}','${escAttr(proj.name)}')">📄 Tear Sheets</button>
         <button class="btn btn-primary btn-sm" onclick="printProposal('${projectId}','${proposalId}')">🖨️ Print / PDF</button>
         <button class="btn btn-sm" style="color:var(--red);border-color:var(--red);" onclick="deleteProposal('${projectId}','${proposalId}')">🗑️ Delete</button>
       `);
