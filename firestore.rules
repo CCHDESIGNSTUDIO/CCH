@@ -135,5 +135,11 @@ service cloud.firestore {
       allow read: if isAuth();
       allow write: if isAuth();
     }
+
+    // Timely logged entries
+    match /timelyEntries/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth();
+    }
   }
 }

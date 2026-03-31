@@ -1117,12 +1117,7 @@
       box-shadow: 0 3px 12px rgba(0,0,0,0.3); border-bottom: 1px solid rgba(14,22,41,0.08);
       background: rgba(13,13,18,0.95); backdrop-filter: blur(12px);
     }
-    .ib-section-tab {
-      padding: 10px 20px; font-size: 12px; font-weight: 500; color: var(--gray-400);
-      cursor: pointer; border: none; background: none; white-space: nowrap;
-      border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s;
-      position: relative;
-    }
+    .ib-section-tab { padding: 8px 16px; font-size: 13px; font-weight: 600; color: var(--text, #0E1629); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
     .ib-section-tab:hover { color: var(--text-primary); }
     .ib-section-tab.active { color: var(--text-primary); border-bottom-color: var(--cyan); font-weight: 600; }
     .ib-section-tab .ib-tab-count {
@@ -1188,26 +1183,16 @@
     .ib-img-count { font-size: 11px; color: var(--gray-400); margin-right: 4px; }
 
     /* True Masonry Grid using CSS columns (Niice-style varied heights) */
-    .ib-grid {
-      column-count: 4; column-gap: 20px; padding: 0 4px;
-    }
+    .ib-grid { display: grid; grid-template-columns: repeat(var(--ib-cols, 3), 1fr); gap: 4px; width: 100%; }
     .ib-grid.cols-2 { column-count: 2 !important; }
     .ib-grid.cols-3 { column-count: 3 !important; }
     .ib-grid.cols-4 { column-count: 4 !important; }
     .ib-grid.cols-5 { column-count: 5 !important; }
     .ib-grid.cols-6 { column-count: 6 !important; }
 
-    .ib-item {
-      break-inside: avoid; position: relative; border-radius: 8px; overflow: hidden;
-      background: #FFFFFF; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
-      margin-bottom: 20px; display: inline-block; width: 100%;
-      border: 1px solid rgba(14,22,41,0.08);
-      box-shadow: 0 2px 8px rgba(14,22,41,0.06);
-    }
+    .ib-item { position: relative; overflow: hidden; aspect-ratio: 1; cursor: pointer; border-radius: 0; }
     .ib-item:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(14,22,41,0.12); }
-    .ib-item img {
-      width: 100%; display: block; object-fit: cover; border-radius: 8px 8px 0 0;
-    }
+    .ib-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
     /* Info bar below image */
     .ib-item-info {
       padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;
@@ -1870,7 +1855,11 @@
     .doc-items-table .item-title { font-weight: 600; font-size: 15px; }
     .doc-items-table .item-desc { font-size: 12px; color: var(--gray-400); margin-top: 2px; }
 
-  </style>
+  
+    /* FIX PAGE FIT */
+    .ib-section-content { padding: 0 !important; margin: 0; width: 100%; box-sizing: border-box; }
+    .ib-section-tabs { overflow-x: auto; white-space: nowrap; gap: 0; }
+</style>
 </head>
 <body>
 
