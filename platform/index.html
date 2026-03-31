@@ -18674,6 +18674,7 @@ async function renderBoardsTab(T, proj) {
       } else if (smartTimeTab === 'ledger') {
         // ===== TIME LEDGER (Billing View) =====
         var nonBillableCost = filtered.filter(function(t) { return !t.billable; }).reduce(function(s, t) { return s + (parseFloat(t.total) || 0); }, 0);
+      if (smartTimeTab === 'timely') { renderTimelyLoggedView(); return; }
         var leakageVal = Math.max(0, totalBillable - totalInvoiced);
         var efficiencyPct = totalBillable > 0 ? (totalInvoiced / totalBillable * 100) : 0;
         var effColor = efficiencyPct >= 85 ? '#5FA56B' : efficiencyPct >= 70 ? '#C8B99A' : '#E16A5B';
@@ -19016,10 +19017,7 @@ async function renderBoardsTab(T, proj) {
       if (count > 0) {
         info.style.display = 'inline';
         info.textContent = count + ' selected · ' + formatMoney(total);
-       else if (smartTimeTab === 'timely') {
-      renderTimelyLoggedView();
-      return;
-    }} else {
+      } else {
         info.style.display = 'none';
       }
     };
