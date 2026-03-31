@@ -1175,11 +1175,8 @@
     .ib-toolbar-left { display: flex; align-items: center; gap: 8px; flex: 1; }
     .ib-toolbar-right { display: flex; align-items: center; gap: 6px; }
     .ib-toolbar .btn-sm { font-size: 12px; padding: 6px 14px; }
-    .ib-view-btn {
-      padding: 4px 10px; font-size: 11px; border: 1px solid rgba(14,22,41,0.12); background: rgba(255,255,255,0.04);
-      border-radius: 4px; cursor: pointer; color: var(--gray-400); transition: all 0.15s;
-    }
-    .ib-view-btn.active { border-color: var(--cyan); color: var(--cyan); font-weight: 600; }
+    .ib-view-btn { padding: 4px 12px; font-size: 13px; font-weight: 600; border: 1px solid var(--border, #ddd); background: var(--card, white); color: var(--text, #0E1629); cursor: pointer; border-radius: 0; }
+    .ib-view-btn.active { background: var(--gold, #C8B99A); color: white; border-color: var(--gold, #C8B99A); }
     .ib-img-count { font-size: 11px; color: var(--gray-400); margin-right: 4px; }
 
     /* True Masonry Grid using CSS columns (Niice-style varied heights) */
@@ -7069,10 +7066,10 @@ async function renderBoardsTab(T, proj) {
           </div>
           <div class="ib-toolbar-right">
             <span class="ib-img-count">${items.length} images</span>
-            <button class="ib-view-btn ${(window._ibImgSize||'M')==='S'?'active':''}" onclick="window._ibImgSize='S';renderProjectDetail()">S</button>
-            <button class="ib-view-btn ${(window._ibImgSize||'M')==='M'?'active':''}" onclick="window._ibImgSize='M';renderProjectDetail()">M</button>
-            <button class="ib-view-btn ${(window._ibImgSize||'M')==='L'?'active':''}" onclick="window._ibImgSize='L';renderProjectDetail()">L</button>
-            <span style="color:var(--gray-200);margin:0 2px;">|</span>
+            
+            
+            
+            
             <button class="ib-view-btn ${(window._ibGridCols||0)===0?'active':''}" onclick="window._ibGridCols=0;renderProjectDetail()">Auto</button>
             <button class="ib-view-btn ${window._ibGridCols===3?'active':''}" onclick="window._ibGridCols=3;renderProjectDetail()">3</button>
             <button class="ib-view-btn ${window._ibGridCols===4?'active':''}" onclick="window._ibGridCols=4;renderProjectDetail()">4</button>
@@ -33395,8 +33392,8 @@ ${pages}
     // esc() and escAttr() defined at top of script (line ~1127)
 
   </script>
-  <script src="cch-functions.js?v=1772763611"></script>
-  <script src="cch-design-board.js?v=1772763611"></script>
-  <script src="cch-client-board.js?v=1772763611"></script>
+  <script src="cch-functions.js?v=1774994684878"></script>
+  <script src="cch-design-board.js?v=1774994684878"></script>
+  <script src="cch-client-board.js?v=1774994684878"></script>
 </body>
 </html>
