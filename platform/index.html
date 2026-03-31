@@ -1840,6 +1840,28 @@
     /* Topbar buttons */
     .topbar .btn, .topbar button { color: var(--text, #0E1629) !important; }
 
+  
+    /* ROOM BOARD TABLE ALIGNMENT */
+    .data-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .data-table th, .data-table td { padding: 10px 12px; text-align: left; vertical-align: middle; font-size: 13px; border-bottom: 1px solid var(--border, #eee); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .data-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-400, #888); font-weight: 600; position: sticky; top: 0; background: var(--card, white); z-index: 2; }
+    .data-table th:nth-child(1) { width: 48px; } /* img */
+    .data-table th:nth-child(2) { width: 22%; } /* title */
+    .data-table th:nth-child(3) { width: 12%; } /* vendor */
+    .data-table th:nth-child(4) { width: 10%; } /* category */
+    .data-table th:nth-child(5) { width: 10%; } /* room */
+    .data-table th:nth-child(6) { width: 8%; } /* cost */
+    .data-table th:nth-child(7) { width: 8%; } /* sell */
+    .data-table th:nth-child(8) { width: 7%; } /* markup */
+    .data-table th:nth-child(9) { width: 5%; } /* qty */
+    .data-table th:nth-child(10) { width: 8%; } /* total */
+    .data-table th:nth-child(11) { width: 7%; } /* status */
+    /* Inline edit */
+    .data-table td[contenteditable="true"] { background: rgba(200,185,154,0.08); outline: 1px solid var(--gold, #C8B99A); cursor: text; }
+    .data-table tr:hover { background: rgba(200,185,154,0.04); }
+    .inline-edit-cell { cursor: pointer; }
+    .inline-edit-cell:hover { text-decoration: underline dotted; text-underline-offset: 3px; }
+
   </style>
 </head>
 <body>
@@ -4280,6 +4302,41 @@
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
 
+    
+    function inlineEditClip(projectId, clipId, field, element) {
+      var oldVal = element.textContent.trim();
+      if (oldVal === '-') oldVal = '';
+      element.contentEditable = 'true';
+      element.focus();
+
+      // Select all text
+      var range = document.createRange();
+      range.selectNodeContents(element);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      function save() {
+        element.contentEditable = 'false';
+        var newVal = element.textContent.trim();
+        if (newVal === oldVal) return;
+
+        var update = {};
+        if (field === 'cost' || field === 'clientPrice' || field === 'qty') {
+          update[field] = parseFloat(newVal) || 0;
+        } else {
+          update[field] = newVal;
+        }
+
+        db.collection('boards').doc(projectId).collection('clips').doc(clipId).update(update)
+          .then(function() { showToast('Updated ' + field); })
+          .catch(function(e) { showToast('Error: ' + e.message, 'error'); element.textContent = oldVal; });
+      }
+
+      element.onblur = save;
+      element.onkeydown = function(e) { if (e.key === 'Enter') { e.preventDefault(); element.blur(); } if (e.key === 'Escape') { element.textContent = oldVal; element.contentEditable = 'false'; } };
+    }
+
     function closeModal() { document.getElementById('modalContainer').innerHTML = ''; }
 
     // ==================== PROJECT DETAIL ====================
@@ -6569,11 +6626,11 @@ async function renderBoardsTab(T, proj) {
                   return '<tr style="cursor:pointer;">' +
                     (isUnassigned ? '<td onclick="event.stopPropagation()"><input type="checkbox" class="unassigned-check" data-clip-id="' + escAttr(clip.id) + '"></td>' : '') +
                     '<td onclick="showClipDetail(\'' + escAttr(proj.id) + '\',\'' + escAttr(clip.id) + '\')">' + imgTag + '</td>' +
-                    '<td onclick="showClipDetail(\'' + escAttr(proj.id) + '\',\'' + escAttr(clip.id) + '\')"><strong>' + esc(clip.title || 'Untitled') + '</strong>' + (clip.description ? '<br><span style="color:var(--gray-400);font-size:11px;">' + esc(clip.description).substring(0, 60) + '</span>' : '') + '</td>' +
-                    '<td onclick="showClipDetail(\'' + escAttr(proj.id) + '\',\'' + escAttr(clip.id) + '\')" style="font-size:12px;">' + esc(clip.vendor || '-') + (clip.manufacturer ? '<br><span style="color:var(--gray-400)">' + esc(clip.manufacturer) + '</span>' : '') + '</td>' +
+                    '<td class="inline-edit-cell" onclick="inlineEditClip(\'' + escAttr(proj.id) + '\',\'' + escAttr(clip.id) + '\',\'title\',this)"><strong>' + esc(clip.title || 'Untitled') + '</strong>' + (clip.description ? '<br><span style="color:var(--gray-400);font-size:11px;">' + esc(clip.description).substring(0, 60) + '</span>' : '') + '</td>' +
+                    '<td class="inline-edit-cell" style="font-size:12px;" onclick="inlineEditClip(\'' + escAttr(proj.id) + '\',\'' + escAttr(clip.id) + '\',\'vendor\',this)">' + esc(clip.vendor || '-') + (clip.manufacturer ? '<br><span style="color:var(--gray-400)">' + esc(clip.manufacturer) + '</span>' : '') + '</td>' +
                     '<td style="font-size:12px;">' + esc(clip.category || '-') + '</td>' +
-                    '<td style="color:var(--gray-600);">' + (cost > 0 ? formatMoney(cost) : '-') + '</td>' +
-                    '<td style="color:var(--green);font-weight:600;">' + (sell > 0 ? formatMoney(sell) : '-') + '</td>' +
+                    '<td class="inline-edit-cell" style="color:var(--gray-600);cursor:pointer;" onclick="inlineEditClip(\'' + escAttr(proj.id) + '\',\'' + escAttr(clip.id) + '\',\'cost\',this)">' + (cost > 0 ? formatMoney(cost) : '-') + '</td>' +
+                    '<td class="inline-edit-cell" style="color:var(--green);font-weight:600;cursor:pointer;" onclick="inlineEditClip(\'' + escAttr(proj.id) + '\',\'' + escAttr(clip.id) + '\',\'clientPrice\',this)">' + (sell > 0 ? formatMoney(sell) : '-') + '</td>' +
                     '<td>' + (markup > 0 ? markup + '%' : '-') + '</td>' +
                     '<td>' + qty + '</td>' +
                     '<td style="font-weight:600;color:var(--green);">' + (total > 0 ? formatMoney(total) : '-') + '</td>' +
