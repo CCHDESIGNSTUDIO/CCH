@@ -18638,6 +18638,7 @@ async function renderBoardsTab(T, proj) {
           <div style="${tabStyle('activity')}" onclick="smartTimeTab='activity';timeFilter.project='';renderTimeView()">Smart Time</div>
           <div style="${tabStyle('reconciliation')}" onclick="smartTimeTab='reconciliation';timeFilter.project='';renderTimeView()">Time Reconciliation</div>
           <div style="${tabStyle('ledger')}" onclick="smartTimeTab='ledger';renderTimeView()">Time Ledger</div>
+          <div style="${tabStyle('timely')}" onclick="smartTimeTab='timely';renderTimeView()">⏱ Timely Logged</div>
         </div>
 
         <!-- HIDDEN: captures container for autoScanCaptures compatibility -->
@@ -18708,7 +18709,7 @@ async function renderBoardsTab(T, proj) {
           <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
             <div style="display:flex;border:1px solid var(--gray-200);border-radius:0;overflow:hidden;margin-right:8px;">
               <button class="btn btn-sm" style="border:0;border-radius:0;${timeViewMode==='list'?'background:var(--gold);color:white;':''}" onclick="timeViewMode='list';renderTimeView()">List</button>
-          <button class="time-tab ${smartTimeTab==='timely'?'active':''}" onclick="smartTimeTab='timely';renderTimeTracker()">⏱ TIMELY LOGGED</button>
+          
               <button class="btn btn-sm" style="border:0;border-radius:0;border-left:1px solid var(--gray-200);${timeViewMode==='weekly'?'background:var(--gold);color:white;':''}" onclick="timeViewMode='weekly';renderTimeView()">Weekly</button>
               <button class="btn btn-sm" style="border:0;border-radius:0;border-left:1px solid var(--gray-200);${timeViewMode==='monthly'?'background:var(--gold);color:white;':''}" onclick="timeViewMode='monthly';renderTimeView()">Monthly</button>
             </div>
@@ -19018,7 +19019,7 @@ async function renderBoardsTab(T, proj) {
 
     // ---- WEEKLY VIEW ----
     // ---- TIMELINE VIEW ----
-    let _tlDay = null; // currently viewed date string YYYY-MM-DD
+    let _tlDay = new Date().toISOString().slice(0,10); // currently viewed date string YYYY-MM-DD
     var _tlViewMode = 'timeline'; // 'timeline' | 'list' | 'week'
 
     window._tlToggleView = function(mode) {
