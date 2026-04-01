@@ -4467,51 +4467,33 @@
     }
 
     
-    // Safely extract hours from a timelyEntries doc regardless of how it was saved.
-    // Timely API v1.1 returns entry.hours as an OBJECT: {total, total_with_timer, billed, estimated}
-    // where values are in SECONDS. The Cloud Function was saving this object directly → parseFloat fails.
+    // Extract hours from a timelyEntries Firestore doc.
+    // Timely API v1.1 stores actual duration in entry.duration object:
+    //   { total_seconds: 10142, total_hours: 2.8166, total_minutes: 169, hours: 2, minutes: 49, seconds: 2 }
+    // The top-level entry.hours field is always 0 (it's a different field).
     function getTimelyHours(e) {
-      // Case 1: hours is a plain positive decimal (correctly fixed entries or manual entries)
-      var h = (typeof e.hours === 'number') ? e.hours : NaN;
-      if (h > 0) return h;
-
-      // Case 2: hours is the Timely API object {total: seconds, total_with_timer: seconds}
-      if (e.hours && typeof e.hours === 'object') {
-        var hSecs = e.hours.total || e.hours.total_with_timer || 0;
-        if (hSecs > 0) return hSecs / 3600;
+      // Best: raw.duration.total_hours — exact decimal hours from Timely API
+      if (e.raw && e.raw.duration && typeof e.raw.duration === 'object') {
+        var th = parseFloat(e.raw.duration.total_hours);
+        if (th > 0) return th;
+        var ts = parseFloat(e.raw.duration.total_seconds);
+        if (ts > 0) return ts / 3600;
+        var tm = parseFloat(e.raw.duration.total_minutes);
+        if (tm > 0) return tm / 60;
       }
-
-      // Case 3: minutes field saved correctly
-      var m = parseFloat(e.minutes);
-      if (m > 0) return m / 60;
-
-      // Case 4: durationMinutes from webhook
+      // Correctly saved hours (after Cloud Function fix)
+      var h = (typeof e.hours === 'number') ? e.hours : parseFloat(e.hours);
+      if (h > 0) return h;
+      // durationMinutes from webhook
       var dm = parseFloat(e.durationMinutes);
       if (dm > 0) return dm / 60;
-
-      // Case 5: duration as decimal hours (webhook after fix)
+      // minutes field
+      var m = parseFloat(e.minutes);
+      if (m > 0) return m / 60;
+      // duration as decimal hours or seconds
       var d = parseFloat(e.duration);
       if (d > 0 && d < 24) return d;
       if (d >= 24) return d / 3600;
-
-      // Case 6: duration as object
-      if (e.duration && typeof e.duration === 'object') {
-        var dSecs = e.duration.total || e.duration.total_with_timer || 0;
-        if (dSecs > 0) return dSecs / 3600;
-      }
-
-      // Case 7: raw Timely API response — entry.raw.hours.total (seconds)
-      if (e.raw) {
-        if (e.raw.hours && typeof e.raw.hours === 'object') {
-          var rhSecs = e.raw.hours.total || e.raw.hours.total_with_timer || 0;
-          if (rhSecs > 0) return rhSecs / 3600;
-        }
-        if (e.raw.duration && typeof e.raw.duration === 'object') {
-          var rdSecs = e.raw.duration.total || e.raw.duration.total_with_timer || 0;
-          if (rdSecs > 0) return rdSecs / 3600;
-        }
-      }
-
       return 0;
     }
 
