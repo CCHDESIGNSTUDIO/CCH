@@ -4577,6 +4577,7 @@
               '<table style="width:100%;border-collapse:collapse;font-size:13px;background:white;">' +
                 '<thead><tr style="background:var(--gray-50);border-bottom:2px solid var(--gray-200);">' +
                   '<th style="padding:8px 12px;text-align:left;width:32px;"><input type="checkbox" id="chkDay_' + date + '" onchange="toggleDayTimely(\'' + date + '\',this.checked)" title="Select all in this day"></th>' +
+                  '<th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;">Date</th>' +
                   '<th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;">Project</th>' +
                   '<th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;">Member</th>' +
                   '<th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;">Note / Description</th>' +
@@ -4587,12 +4588,17 @@
                   var isLogged = loggedIds.has(String(e.timelyId));
                   var hrs = getTimelyHours(e);
                   var memberDisplay = e.member || e.memberEmail || '—';
+                  var dateLabel = date && date !== 'Unknown' ? (function() {
+                    var d = new Date(date + 'T12:00:00');
+                    return d.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'});
+                  })() : '—';
                   return '<tr style="border-bottom:1px solid var(--gray-100);" class="timely-row" data-date="' + escAttr(date) + '">' +
                     '<td style="padding:8px 12px;">' +
                       (isLogged
                         ? '<input type="checkbox" disabled checked style="opacity:0.4;">'
                         : '<input type="checkbox" class="timely-check" data-id="' + escAttr(e.id) + '" data-timely-id="' + escAttr(String(e.timelyId||'')) + '" onchange="timelyCheckChange()">') +
                     '</td>' +
+                    '<td style="padding:8px 12px;font-size:12px;color:var(--gray-500);white-space:nowrap;">' + dateLabel + '</td>' +
                     '<td style="padding:8px 12px;font-weight:600;color:var(--navy);">' + esc(e.project || 'No Project') + '</td>' +
                     '<td style="padding:8px 12px;color:var(--gray-500);font-size:12px;">' + esc(memberDisplay) + '</td>' +
                     '<td style="padding:8px 12px;color:var(--gray-600);font-size:12px;">' + esc(e.note || '—') + '</td>' +
