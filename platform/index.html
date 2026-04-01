@@ -4467,34 +4467,44 @@
     }
 
     
-    // Extract hours from a timelyEntries Firestore doc.
+    // Extract hours from a timelyEntries Firestore doc, rounded UP to nearest 15 min (billing standard).
     // Timely API v1.1 stores actual duration in entry.duration object:
     //   { total_seconds: 10142, total_hours: 2.8166, total_minutes: 169, hours: 2, minutes: 49, seconds: 2 }
-    // The top-level entry.hours field is always 0 (it's a different field).
+    function roundUpTo15(hrs) {
+      if (!hrs || hrs <= 0) return 0;
+      return Math.ceil(hrs * 4) / 4; // 4 intervals per hour (15 min each)
+    }
     function getTimelyHours(e) {
+      var raw = 0;
       // Best: raw.duration.total_hours — exact decimal hours from Timely API
       if (e.raw && e.raw.duration && typeof e.raw.duration === 'object') {
         var th = parseFloat(e.raw.duration.total_hours);
-        if (th > 0) return th;
-        var ts = parseFloat(e.raw.duration.total_seconds);
-        if (ts > 0) return ts / 3600;
-        var tm = parseFloat(e.raw.duration.total_minutes);
-        if (tm > 0) return tm / 60;
+        if (th > 0) { raw = th; }
+        else {
+          var ts = parseFloat(e.raw.duration.total_seconds);
+          if (ts > 0) raw = ts / 3600;
+          else {
+            var tm = parseFloat(e.raw.duration.total_minutes);
+            if (tm > 0) raw = tm / 60;
+          }
+        }
       }
       // Correctly saved hours (after Cloud Function fix)
-      var h = (typeof e.hours === 'number') ? e.hours : parseFloat(e.hours);
-      if (h > 0) return h;
+      if (!raw) {
+        var h = (typeof e.hours === 'number') ? e.hours : parseFloat(e.hours);
+        if (h > 0) raw = h;
+      }
       // durationMinutes from webhook
-      var dm = parseFloat(e.durationMinutes);
-      if (dm > 0) return dm / 60;
+      if (!raw) { var dm = parseFloat(e.durationMinutes); if (dm > 0) raw = dm / 60; }
       // minutes field
-      var m = parseFloat(e.minutes);
-      if (m > 0) return m / 60;
+      if (!raw) { var m = parseFloat(e.minutes); if (m > 0) raw = m / 60; }
       // duration as decimal hours or seconds
-      var d = parseFloat(e.duration);
-      if (d > 0 && d < 24) return d;
-      if (d >= 24) return d / 3600;
-      return 0;
+      if (!raw) {
+        var d = parseFloat(e.duration);
+        if (d > 0 && d < 24) raw = d;
+        else if (d >= 24) raw = d / 3600;
+      }
+      return roundUpTo15(raw);
     }
 
     async function renderTimelyLoggedView() {
