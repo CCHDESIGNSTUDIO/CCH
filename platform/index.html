@@ -4467,6 +4467,32 @@
     }
 
     
+    // Safely extract hours from a timelyEntries doc regardless of how it was saved
+    // Timely API stores duration as {total: seconds, total_with_timer: seconds}
+    // so old synced entries have hours:0 — fall back to raw.duration.total
+    function getTimelyHours(e) {
+      // Best: hours field is a real decimal number > 0
+      var h = parseFloat(e.hours);
+      if (h > 0) return h;
+      // Webhook saves durationMinutes
+      var dm = parseFloat(e.durationMinutes);
+      if (dm > 0) return dm / 60;
+      // duration field stored as decimal hours (webhook after fix)
+      var d = parseFloat(e.duration);
+      if (d > 0 && d < 24) return d;
+      // duration stored as seconds > 24
+      if (d >= 24) return d / 3600;
+      // Raw Timely API response stored as e.raw.duration.total (seconds)
+      if (e.raw && e.raw.duration) {
+        var rawSecs = (typeof e.raw.duration === 'object') ? (e.raw.duration.total || e.raw.duration.total_with_timer || 0) : parseFloat(e.raw.duration);
+        if (rawSecs > 0) return rawSecs / 3600;
+      }
+      // minutes field
+      var m = parseFloat(e.minutes);
+      if (m > 0) return m / 60;
+      return 0;
+    }
+
     async function renderTimelyLoggedView() {
       var T = document.getElementById('contentArea');
       T.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Loading Timely entries...</div>';
@@ -4485,7 +4511,7 @@
         entries.sort(function(a,b) { return (b.date||'').localeCompare(a.date||''); });
 
         var totalHours = entries.reduce(function(s, e) {
-          return s + (parseFloat(e.hours) || parseFloat(e.totalHours) || parseFloat(e.durationMinutes)/60 || 0);
+          return s + getTimelyHours(e);
         }, 0);
         var pendingCount = entries.filter(function(e) { return !loggedIds.has(String(e.timelyId)); }).length;
 
@@ -4527,7 +4553,7 @@
           dates.map(function(date) {
             var dayEntries = byDate[date];
             var dayHrs = dayEntries.reduce(function(s,e) {
-              return s + (parseFloat(e.hours) || parseFloat(e.totalHours) || parseFloat(e.durationMinutes)/60 || 0);
+              return s + getTimelyHours(e);
             }, 0);
             return '<div style="margin-bottom:24px;">' +
               '<div style="font-size:13px;font-weight:700;margin-bottom:8px;padding:8px 12px;background:var(--navy);color:white;display:flex;justify-content:space-between;">' +
@@ -4545,7 +4571,7 @@
                 '</tr></thead><tbody>' +
                 dayEntries.map(function(e) {
                   var isLogged = loggedIds.has(String(e.timelyId));
-                  var hrs = parseFloat(e.hours) || parseFloat(e.totalHours) || (parseFloat(e.durationMinutes)/60) || 0;
+                  var hrs = getTimelyHours(e);
                   var memberDisplay = e.member || e.memberEmail || '—';
                   return '<tr style="border-bottom:1px solid var(--gray-100);" class="timely-row" data-date="' + escAttr(date) + '">' +
                     '<td style="padding:8px 12px;">' +
@@ -4667,7 +4693,7 @@
           var doc = await db.collection('timelyEntries').doc(docId).get();
           if (!doc.exists) continue;
           var e = doc.data();
-          var hrs = parseFloat(e.hours) || parseFloat(e.totalHours) || (parseFloat(e.durationMinutes)/60) || (parseFloat(e.duration) < 24 ? parseFloat(e.duration) : parseFloat(e.duration)/3600) || 0;
+          var hrs = getTimelyHours(e);
           var memberName = normalizeMemberName(e.member || e.memberEmail || '');
           var nonBillable = isNonBillableProject(e.project);
           var suggestedService = nonBillable ? 'Non-Billable' : guessService(e.service || '');
