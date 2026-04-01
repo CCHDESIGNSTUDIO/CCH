@@ -4502,7 +4502,7 @@
           '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
             '<h2 style="margin:0;font-size:18px;color:var(--navy);">⏱ Timely Logged Entries</h2>' +
             '<div style="display:flex;gap:8px;align-items:center;">' +
-              '<button class="btn btn-primary btn-sm" onclick="logSelectedTimely()" id="logSelectedBtn" style="display:none;">→ Log Selected to Ledger</button>' +
+              '<button class="btn btn-primary btn-sm" onclick="showTimelyLogModal()" id="logSelectedBtn" style="display:none;">→ Review & Log Selected</button>' +
               '<button class="btn btn-secondary btn-sm" onclick="selectAllTimely()">Select All Pending</button>' +
               '<button class="btn btn-secondary btn-sm" onclick="syncTimelyNow()">🔄 Sync from Timely</button>' +
             '</div>' +
@@ -4575,13 +4575,50 @@
       }
     }
 
+    // Billing services for Timely log modal
+    var TIMELY_BILLING_SERVICES = [
+      { label: 'Blended Design Services',    rate: 195, billable: true },
+      { label: 'Design Services',            rate: 250, billable: true },
+      { label: 'Consultation',               rate: 250, billable: true },
+      { label: 'Project Management',         rate: 195, billable: true },
+      { label: 'Sourcing / Procurement',     rate: 195, billable: true },
+      { label: 'Installation / Supervision', rate: 125, billable: true },
+      { label: 'Travel',                     rate: 125, billable: true },
+      { label: 'Non-Billable',               rate: 0,   billable: false }
+    ];
+
+    function isNonBillableProject(projectName) {
+      var p = (projectName || '').toLowerCase().trim();
+      return p.startsWith('cch') || p.startsWith('cbh') ||
+             ['internal','admin','overhead','marketing','business development'].indexOf(p) > -1;
+    }
+
+    function normalizeMemberName(raw) {
+      var r = (raw || '').toLowerCase();
+      if (r.includes('vanessa') || r.includes('holliday') || r.includes('vholliday')) return 'Vanessa Holliday';
+      if (r.includes('cindy') || r.includes('holloway') || r.includes('cynthia')) return 'Cindy Holloway';
+      return 'Cindy Holloway';
+    }
+
+    function guessService(timelyService) {
+      var s = (timelyService || '').toLowerCase();
+      if (s.includes('blended') || s.includes('material') || s.includes('procurement') || s.includes('sourcing') || s.includes('pm') || s.includes('meeting') || s.includes('call') || s.includes('coordination')) return 'Blended Design Services';
+      if (s.includes('install') || s.includes('punch') || s.includes('site') || s.includes('field')) return 'Installation / Supervision';
+      if (s.includes('consult') || s.includes('discovery')) return 'Consultation';
+      if (s.includes('project manage') || s.includes('admin')) return 'Project Management';
+      if (s.includes('sourcing') || s.includes('order')) return 'Sourcing / Procurement';
+      if (s.includes('travel')) return 'Travel';
+      if (s.includes('design') || s.includes('3d') || s.includes('render') || s.includes('sketch') || s.includes('drawing') || s.includes('space')) return 'Design Services';
+      return 'Blended Design Services'; // default
+    }
+
     // Show/hide "Log Selected" button as checkboxes are checked
     function timelyCheckChange() {
       var checked = document.querySelectorAll('.timely-check:checked');
       var btn = document.getElementById('logSelectedBtn');
       if (btn) {
         btn.style.display = checked.length > 0 ? 'inline-flex' : 'none';
-        if (checked.length > 0) btn.textContent = '→ Log ' + checked.length + ' Selected to Ledger';
+        if (checked.length > 0) btn.textContent = '→ Review & Log ' + checked.length + ' Selected';
       }
     }
 
@@ -4595,16 +4632,34 @@
       timelyCheckChange();
     }
 
-    // Log selected entries to Time Ledger
-    async function logSelectedTimely() {
+    // Opens modal to review/edit service & rate before logging
+    async function showTimelyLogModal() {
       var checked = document.querySelectorAll('.timely-check:checked');
       if (!checked.length) { showToast('Select entries first', 'error'); return; }
 
-      var btn = document.getElementById('logSelectedBtn');
-      if (btn) btn.textContent = 'Logging...';
+      var mc = document.getElementById('modalContainer');
+      mc.innerHTML = '<div style="position:fixed;inset:0;background:rgba(14,22,41,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;">' +
+        '<div style="background:white;border-radius:8px;width:100%;max-width:860px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;">' +
+          '<div style="padding:20px 24px;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;align-items:center;background:var(--navy);">' +
+            '<h3 style="margin:0;color:white;font-size:16px;">📋 Review & Log to Time Ledger</h3>' +
+            '<button onclick="closeModal()" style="background:none;border:none;color:white;font-size:20px;cursor:pointer;padding:0;line-height:1;">×</button>' +
+          '</div>' +
+          '<div style="padding:16px 24px;background:#FFF8E1;border-bottom:1px solid #FFE082;font-size:12px;color:#5D4037;">' +
+            '💡 <strong>CCH / CBH projects</strong> are automatically non-billable. Adjust service & rate as needed before logging.' +
+          '</div>' +
+          '<div style="overflow-y:auto;flex:1;" id="timelyModalBody">Loading...</div>' +
+          '<div style="padding:16px 24px;border-top:1px solid var(--gray-200);display:flex;justify-content:space-between;align-items:center;background:var(--gray-50);">' +
+            '<span style="font-size:13px;color:var(--gray-500);" id="timelyModalSummary"></span>' +
+            '<div style="display:flex;gap:8px;">' +
+              '<button onclick="closeModal()" class="btn btn-secondary btn-sm">Cancel</button>' +
+              '<button onclick="confirmTimelyLog()" class="btn btn-primary btn-sm" id="confirmLogBtn">✓ Log to Ledger</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
 
-      var count = 0;
-      var errors = 0;
+      // Load entry data
+      var entries = [];
       for (var cb of checked) {
         var docId = cb.dataset.id;
         if (!docId) continue;
@@ -4612,47 +4667,143 @@
           var doc = await db.collection('timelyEntries').doc(docId).get();
           if (!doc.exists) continue;
           var e = doc.data();
-
-          // Fix: read hours correctly — try all possible field names
           var hrs = parseFloat(e.hours) || parseFloat(e.totalHours) || (parseFloat(e.durationMinutes)/60) || (parseFloat(e.duration) < 24 ? parseFloat(e.duration) : parseFloat(e.duration)/3600) || 0;
+          var memberName = normalizeMemberName(e.member || e.memberEmail || '');
+          var nonBillable = isNonBillableProject(e.project);
+          var suggestedService = nonBillable ? 'Non-Billable' : guessService(e.service || '');
+          var svcObj = TIMELY_BILLING_SERVICES.find(function(s) { return s.label === suggestedService; }) || TIMELY_BILLING_SERVICES[0];
+          entries.push({ docId: docId, timelyId: String(e.timelyId || e.id || docId), date: e.date || '', project: e.project || '', member: memberName, hrs: hrs, note: e.note || '', service: svcObj.label, rate: svcObj.rate, billable: !nonBillable, nonBillableLocked: nonBillable });
+        } catch(err) { console.error(err); }
+      }
 
-          // Normalize member name to match TEAM_CONFIG labels
-          var rawMember = (e.member || e.memberEmail || '').toLowerCase();
-          var memberName = 'Cindy Holloway'; // default
-          if (rawMember.includes('vanessa') || rawMember.includes('holliday') || rawMember.includes('vholliday')) {
-            memberName = 'Vanessa Holliday';
-          } else if (rawMember.includes('cindy') || rawMember.includes('holloway') || rawMember.includes('cynthia')) {
-            memberName = 'Cindy Holloway';
-          }
+      // Store on window for confirmTimelyLog
+      window._timelyPendingEntries = entries;
+      _updateTimelyModal();
+    }
 
-          // Calculate rate and total
-          var rate = memberName === 'Vanessa Holliday' ? TEAM_CONFIG.contractors[0].rate : TEAM_CONFIG.owner.rate;
-          var total = hrs * rate;
+    function _updateTimelyModal() {
+      var entries = window._timelyPendingEntries || [];
+      var svcOptions = TIMELY_BILLING_SERVICES.map(function(s) {
+        return '<option value="' + escAttr(s.label) + '" data-rate="' + s.rate + '" data-billable="' + s.billable + '">' + esc(s.label) + ' ($' + s.rate + '/hr)' + (s.billable ? '' : ' — Non-Billable') + '</option>';
+      }).join('');
 
+      var totalBillable = 0;
+      var html = '<table style="width:100%;border-collapse:collapse;font-size:12px;">' +
+        '<thead><tr style="background:var(--gray-50);border-bottom:2px solid var(--gray-200);">' +
+          '<th style="padding:10px 12px;text-align:left;font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;">Date</th>' +
+          '<th style="padding:10px 12px;text-align:left;font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;">Project</th>' +
+          '<th style="padding:10px 12px;text-align:left;font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;">Member</th>' +
+          '<th style="padding:10px 12px;text-align:right;font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;">Hrs</th>' +
+          '<th style="padding:10px 12px;text-align:left;font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;">Service</th>' +
+          '<th style="padding:10px 12px;text-align:right;font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;">Rate</th>' +
+          '<th style="padding:10px 12px;text-align:right;font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;">Total</th>' +
+          '<th style="padding:10px 12px;text-align:center;font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;">Bill?</th>' +
+        '</tr></thead><tbody>';
+
+      entries.forEach(function(e, i) {
+        var rowTotal = e.billable ? (e.hrs * e.rate) : 0;
+        if (e.billable) totalBillable += rowTotal;
+        var isNB = e.nonBillableLocked;
+        var rowBg = isNB ? 'background:#FFF8E1;' : '';
+        html += '<tr style="border-bottom:1px solid var(--gray-100);' + rowBg + '" id="teRow_' + i + '">' +
+          '<td style="padding:8px 12px;color:var(--gray-500);">' + esc(e.date) + '</td>' +
+          '<td style="padding:8px 12px;font-weight:600;color:var(--navy);">' +
+            esc(e.project) + (isNB ? ' <span style="font-size:10px;color:#E65100;background:#FFF3E0;padding:1px 5px;border-radius:8px;font-weight:400;">internal</span>' : '') +
+          '</td>' +
+          '<td style="padding:8px 12px;color:var(--gray-500);">' + esc(e.member) + '</td>' +
+          '<td style="padding:8px 12px;text-align:right;font-weight:700;font-family:monospace;color:var(--gold);">' + (e.hrs > 0 ? e.hrs.toFixed(2) : '—') + '</td>' +
+          '<td style="padding:8px 12px;">' +
+            '<select class="form-input" style="font-size:11px;padding:4px 6px;" ' +
+              (isNB ? 'disabled style="font-size:11px;padding:4px 6px;background:var(--gray-100);"' : '') +
+              ' onchange="timelyModalSvcChange(' + i + ',this)">' +
+              TIMELY_BILLING_SERVICES.map(function(s) {
+                return '<option value="' + escAttr(s.label) + '" data-rate="' + s.rate + '" data-billable="' + s.billable + '"' +
+                  (e.service === s.label ? ' selected' : '') + '>' +
+                  esc(s.label) + ' ($' + s.rate + '/hr)' + (s.billable ? '' : ' — Non-Billable') + '</option>';
+              }).join('') +
+            '</select>' +
+          '</td>' +
+          '<td style="padding:8px 12px;text-align:right;">' +
+            '<input type="number" class="form-input" style="width:70px;font-size:12px;padding:4px 6px;text-align:right;" ' +
+              'value="' + e.rate + '" min="0" step="5" ' +
+              (isNB ? 'disabled ' : '') +
+              'onchange="timelyModalRateChange(' + i + ',this)">' +
+          '</td>' +
+          '<td style="padding:8px 12px;text-align:right;font-weight:700;font-family:monospace;' + (e.billable ? 'color:var(--navy);' : 'color:var(--gray-400);') + '">' +
+            (e.billable && rowTotal > 0 ? '$' + rowTotal.toFixed(2) : '—') +
+          '</td>' +
+          '<td style="padding:8px 12px;text-align:center;">' +
+            '<input type="checkbox" ' + (e.billable ? 'checked' : '') + (isNB ? ' disabled' : '') +
+            ' onchange="timelyModalBillableChange(' + i + ',this)">' +
+          '</td>' +
+        '</tr>';
+      });
+      html += '</tbody></table>';
+
+      var body = document.getElementById('timelyModalBody');
+      if (body) body.innerHTML = html;
+      var summary = document.getElementById('timelyModalSummary');
+      if (summary) {
+        var billCount = entries.filter(function(e) { return e.billable; }).length;
+        summary.innerHTML = '<strong>' + entries.length + '</strong> entries · <strong>' + billCount + '</strong> billable · Total: <strong style="color:var(--navy);">$' + totalBillable.toFixed(2) + '</strong>';
+      }
+    }
+
+    function timelyModalSvcChange(i, sel) {
+      var entries = window._timelyPendingEntries || [];
+      var opt = sel.options[sel.selectedIndex];
+      entries[i].service = opt.value;
+      entries[i].rate = parseFloat(opt.dataset.rate) || 0;
+      entries[i].billable = opt.dataset.billable === 'true';
+      _updateTimelyModal();
+    }
+
+    function timelyModalRateChange(i, inp) {
+      var entries = window._timelyPendingEntries || [];
+      entries[i].rate = parseFloat(inp.value) || 0;
+      _updateTimelyModal();
+    }
+
+    function timelyModalBillableChange(i, chk) {
+      var entries = window._timelyPendingEntries || [];
+      entries[i].billable = chk.checked;
+      if (!chk.checked) entries[i].rate = 0;
+      _updateTimelyModal();
+    }
+
+    // Final: write selected entries to Firestore timeEntries
+    async function confirmTimelyLog() {
+      var entries = window._timelyPendingEntries || [];
+      if (!entries.length) return;
+      var btn = document.getElementById('confirmLogBtn');
+      if (btn) { btn.disabled = true; btn.textContent = 'Logging...'; }
+
+      var count = 0; var errors = 0;
+      for (var e of entries) {
+        try {
           await db.collection('timeEntries').add({
-            date: e.date || '',
-            project: e.project || '',
-            member: memberName,
-            hours: hrs,
-            total: total,
-            rate: rate,
+            date: e.date,
+            project: e.project,
+            member: e.member,
+            hours: e.hrs,
+            rate: e.billable ? e.rate : 0,
+            total: e.billable ? (e.hrs * e.rate) : 0,
+            service: e.service,
             description: e.note || '',
-            service: 'Design Services',
-            billable: true,
+            billable: e.billable,
             source: 'timely',
-            timelyId: String(e.timelyId || e.id || docId),
-            timelyDocId: docId,
+            timelyId: e.timelyId,
+            timelyDocId: e.docId,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
           });
           count++;
-        } catch(err) {
-          console.error('Log entry error:', err);
-          errors++;
-        }
+        } catch(err) { console.error('Log error:', err); errors++; }
       }
 
+      closeModal();
       if (errors > 0) showToast('Logged ' + count + ' entries (' + errors + ' errors)', 'warning');
       else showToast('✓ ' + count + ' entries logged to Time Ledger');
+      window._timelyPendingEntries = [];
       renderTimelyLoggedView();
     }
 
