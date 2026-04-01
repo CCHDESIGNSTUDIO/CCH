@@ -17034,7 +17034,17 @@ async function renderBoardsTab(T, proj) {
 
       if (!isTimeAdmin()) {
         const myName = currentMemberName();
-        if (myName) timeEntries = timeEntries.filter(t => t.member === myName);
+        if (myName) {
+          const myFirst = myName.split(' ')[0].toLowerCase();
+          timeEntries = timeEntries.filter(t => {
+            const m = (t.member || '').toLowerCase().trim();
+            const email = (t.team || t.email || '').toLowerCase();
+            return m === myName.toLowerCase() ||
+                   m.includes(myFirst) ||
+                   email.includes(myFirst) ||
+                   m === myFirst;
+          });
+        }
       }
 
       // Render page shell with captures placeholder, then auto-scan
@@ -18658,10 +18668,12 @@ async function renderBoardsTab(T, proj) {
         // ===== TIME RECONCILIATION =====
         renderReconciliationView(TC, filtered, admin);
 
+      } else if (smartTimeTab === 'timely') {
+        renderTimelyLoggedView(); return;
+
       } else if (smartTimeTab === 'ledger') {
         // ===== TIME LEDGER (Billing View) =====
         var nonBillableCost = filtered.filter(function(t) { return !t.billable; }).reduce(function(s, t) { return s + (parseFloat(t.total) || 0); }, 0);
-      if (smartTimeTab === 'timely') { renderTimelyLoggedView(); return; }
         var leakageVal = Math.max(0, totalBillable - totalInvoiced);
         var efficiencyPct = totalBillable > 0 ? (totalInvoiced / totalBillable * 100) : 0;
         var effColor = efficiencyPct >= 85 ? '#5FA56B' : efficiencyPct >= 70 ? '#C8B99A' : '#E16A5B';
