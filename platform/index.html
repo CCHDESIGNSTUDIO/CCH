@@ -22164,15 +22164,17 @@ async function renderBoardsTab(T, proj) {
       var dayIsToday = _tlDay === todayStr;
       // Apply source filter
       var _srcFilter = window._tlSourceFilter || '';
-      if (_srcFilter === 'logged') {
-        // Show only logged entries, hide captures
-        dayEntries = dayEntries; // keep as-is
-      }
       var totalHrs = dayEntries.reduce(function(s,t) { return s+(parseFloat(t.hours)||0); }, 0);
       var totalBillable = dayEntries.reduce(function(s,t) { return s+(parseFloat(t.total)||0); }, 0);
       var allCapsToday = (window._pendingCaptures||[]).filter(function(c) { return c.date === _tlDay && !c._dismissed; });
-      var filteredCaps = _srcFilter && _srcFilter !== 'logged' ? allCapsToday.filter(function(c) { return (c.source || 'agent') === _srcFilter; }) : allCapsToday;
+      // Source filter: 'timely' = Timely Memory captures, 'agent' = desktop agent captures, 'logged' = logged entries only, '' = all
+      var filteredCaps = _srcFilter && _srcFilter !== 'logged'
+        ? allCapsToday.filter(function(c) { var src = (c.source||'agent'); return src === _srcFilter || src.startsWith(_srcFilter); })
+        : (_srcFilter === 'logged' ? [] : allCapsToday);
       var capCount = filteredCaps.length;
+      // Total captured hours (from memory blocks, not yet logged)
+      var capturedHrs = allCapsToday.reduce(function(s,c) { return s + (parseFloat(c.minutes)||0)/60; }, 0);
+      var filteredCapHrs = filteredCaps.reduce(function(s,c) { return s + (parseFloat(c.minutes)||0)/60; }, 0);
       var unassignedCount = dayEntries.filter(function(t) { return !t.project || t.project==='Unassigned'; }).length;
 
       // Check for potential duplicates
@@ -22309,14 +22311,15 @@ async function renderBoardsTab(T, proj) {
           '</div>' +
           '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">' +
             '<div style="display:flex;gap:20px;align-items:center;">' +
-              '<div><span style="font-size:22px;font-weight:700;color:var(--gold);font-family:var(--font-mono);">' + totalHrs.toFixed(1) + 'h</span> <span style="font-size:11px;color:var(--gray-400);">logged</span></div>' +
-              '<div><span style="font-size:22px;font-weight:700;color:#5FA56B;font-family:var(--font-mono);">' + (totalBillable > 0 ? '$' + Math.round(totalBillable) : '$0') + '</span> <span style="font-size:11px;color:var(--gray-400);">billable</span></div>' +
-              '<div><span style="font-size:22px;font-weight:700;color:#00BCD4;font-family:var(--font-mono);">' + capCount + '</span> <span style="font-size:11px;color:var(--gray-400);">captures</span></div>' +
+              '<div title="Hours logged to Time Ledger"><span style="font-size:22px;font-weight:700;color:var(--gold);font-family:var(--font-mono);">' + totalHrs.toFixed(1) + 'h</span> <span style="font-size:11px;color:var(--gray-400);">logged</span></div>' +
+              '<div title="Captured activity (not yet logged)"><span style="font-size:22px;font-weight:700;color:#00BCD4;font-family:var(--font-mono);">' + capturedHrs.toFixed(1) + 'h</span> <span style="font-size:11px;color:var(--gray-400);">captured</span></div>' +
+              '<div title="Billable value of logged hours"><span style="font-size:22px;font-weight:700;color:#5FA56B;font-family:var(--font-mono);">' + (totalBillable > 0 ? '$' + Math.round(totalBillable) : '$0') + '</span> <span style="font-size:11px;color:var(--gray-400);">billable</span></div>' +
             '</div>' +
-            '<div style="display:flex;gap:8px;align-items:center;font-size:11px;font-weight:600;">' +
-              '<span onclick="window._tlSourceFilter=window._tlSourceFilter===\'timely\'?\'\':\'timely\';renderTimeView();" style="padding:4px 10px;border-radius:12px;cursor:pointer;transition:all 0.15s;' + (window._tlSourceFilter === 'timely' ? 'background:#4CAF50;color:white;box-shadow:0 0 0 2px white;' : window._tlSourceFilter ? 'background:rgba(76,175,80,0.2);color:#4CAF50;' : 'background:#4CAF50;color:white;') + '">⏱ Timely</span>' +
-              '<span onclick="window._tlSourceFilter=window._tlSourceFilter===\'agent\'?\'\':\'agent\';renderTimeView();" style="padding:4px 10px;border-radius:12px;cursor:pointer;transition:all 0.15s;' + (window._tlSourceFilter === 'agent' ? 'background:#00BCD4;color:white;box-shadow:0 0 0 2px white;' : window._tlSourceFilter ? 'background:rgba(0,184,212,0.2);color:#00BCD4;' : 'background:#00BCD4;color:white;') + '">🖥 Agent</span>' +
-              '<span onclick="window._tlSourceFilter=window._tlSourceFilter===\'logged\'?\'\':\'logged\';renderTimeView();" style="padding:4px 10px;border-radius:12px;cursor:pointer;transition:all 0.15s;' + (window._tlSourceFilter === 'logged' ? 'background:#C8B99A;color:#0E1629;box-shadow:0 0 0 2px white;' : window._tlSourceFilter ? 'background:rgba(200,185,154,0.2);color:#C8B99A;' : 'background:#C8B99A;color:#0E1629;') + '">📋 Logged</span>' +
+            '<div style="display:flex;gap:4px;align-items:center;font-size:11px;font-weight:600;background:rgba(14,22,41,0.06);border-radius:20px;padding:3px;">' +
+              '<span onclick="window._tlSourceFilter=\'\';renderTimeView();" style="padding:4px 12px;border-radius:20px;cursor:pointer;transition:all 0.15s;' + (!_srcFilter ? 'background:var(--navy);color:white;' : 'color:var(--gray-500);') + '">All</span>' +
+              '<span onclick="window._tlSourceFilter=\'timely\';renderTimeView();" style="padding:4px 12px;border-radius:20px;cursor:pointer;transition:all 0.15s;' + (_srcFilter==='timely' ? 'background:#4CAF50;color:white;' : 'color:#4CAF50;') + '">⏱ Timely</span>' +
+              '<span onclick="window._tlSourceFilter=\'agent\';renderTimeView();" style="padding:4px 12px;border-radius:20px;cursor:pointer;transition:all 0.15s;' + (_srcFilter==='agent' ? 'background:#00BCD4;color:white;' : 'color:#00BCD4;') + '">🖥 Agent</span>' +
+              '<span onclick="window._tlSourceFilter=\'logged\';renderTimeView();" style="padding:4px 12px;border-radius:20px;cursor:pointer;transition:all 0.15s;' + (_srcFilter==='logged' ? 'background:#C8B99A;color:#0E1629;' : 'color:#9E8E78;') + '">📋 Logged</span>' +
             '</div>' +
             '<div style="display:flex;gap:6px;align-items:center;">' + aiBtn + '</div>' +
           '</div>' +
