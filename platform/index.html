@@ -13808,13 +13808,18 @@ async function renderBoardsTab(T, proj) {
     function addMyItemToDoc(idx) {
       var p = _myItemsProducts[idx];
       if (!p || !_docEdit) return;
-      var cost = parseFloat(p.costPrice) || parseFloat(p.cost) || parseFloat(p.unitCost) || parseFloat(p.totalCost) || 0;
-      var sell = parseFloat(p.sellPrice) || parseFloat(p.clientPrice) || parseFloat(p.totalSell) || parseFloat(p.amount) || 0;
-      var mkup = cost > 0 ? Math.round(((sell - cost) / cost) * 100) : 0;
+      var qty = parseFloat(p.qty) || 1;
+      var tradeCost = parseFloat(p.unitCost) || parseFloat(p.costPrice) || parseFloat(p.cost) ||
+                      parseFloat(p.tradeCost) || parseFloat(p.totalCost) || 0;
+      var sellPerUnit = parseFloat(p.sellPrice) || parseFloat(p.clientPrice) ||
+                        parseFloat(p.totalSelling) || parseFloat(p.amount) || 0;
+      var cost = tradeCost > 0 ? tradeCost : sellPerUnit;
+      var mkup = (tradeCost > 0 && sellPerUnit > tradeCost) ? Math.round(((sellPerUnit - tradeCost) / tradeCost) * 100) : 0;
       _docEdit.items.push({
         title: p.title || '', vendor: p.vendor || '', category: p.category || '',
         room: p.room || '', qty: 1, cost: cost, markupPct: mkup, shipping: 0,
-        amount: sell, imageUrl: p.imageUrl || p.image || '', description: p.description || '',
+        amount: sellPerUnit, imageUrl: p.imageUrl || p.image || '',
+        description: p.description || '', sku: p.sku || '',
         shipTo: '', expenseType: 'product'
       });
       docEditRenderItems();
@@ -13840,8 +13845,11 @@ async function renderBoardsTab(T, proj) {
             if (filterVendor && (c.vendor || '') !== filterVendor) return '';
             if (filterCat && (c.category || '') !== filterCat) return '';
             if (filterRoom && (c.room || '') !== filterRoom) return '';
-            const cost = parseFloat(c.cost) || (c.totalCost && c.qty ? parseFloat(c.totalCost)/parseFloat(c.qty) : 0) || 0;
-            const sell = parseFloat(c.totalSelling) || parseFloat(c.clientPrice) || 0;
+            const qty = parseFloat(c.qty) || 1;
+            const cost = parseFloat(c.unitCost) || parseFloat(c.cost) || parseFloat(c.tradeCost) ||
+                         (c.totalCost ? parseFloat(c.totalCost)/qty : 0) || 0;
+            const sell = parseFloat(c.clientPrice) || parseFloat(c.sellPrice) ||
+                         (c.totalSelling ? parseFloat(c.totalSelling)/qty : 0) || 0;
             return '<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid rgba(14,22,41,0.06);cursor:pointer;font-size:13px;" data-vendor="' + escAttr(c.vendor||'') + '" data-cat="' + escAttr(c.category||'') + '" data-room="' + escAttr(c.room||'') + '">' +
               '<input type="checkbox" data-idx="' + i + '" style="accent-color:#0E1629;">' +
               (c.imageUrl ? '<img src="' + esc(c.imageUrl) + '" style="width:36px;height:36px;object-fit:cover;border-radius:2px;">' : '<div style="width:36px;height:36px;background:#F5F3EE;display:flex;align-items:center;justify-content:center;font-size:14px;">📦</div>') +
@@ -13874,15 +13882,21 @@ async function renderBoardsTab(T, proj) {
           checked.forEach(function(cb) {
             var c = clips[parseInt(cb.dataset.idx)];
             if (!c) return;
-            var cost = parseFloat(c.cost) || (c.totalCost && c.qty ? parseFloat(c.totalCost)/parseFloat(c.qty) : 0) || 0;
-            var sell = parseFloat(c.totalSelling) || parseFloat(c.clientPrice) || 0;
             var qty = parseFloat(c.qty) || 1;
-            var mkup = cost > 0 ? Math.round(((sell/qty - cost) / cost) * 100) : 0;
+            // Trade cost: use cost field, fall back to totalCost/qty
+            var tradeCost = parseFloat(c.cost) || parseFloat(c.unitCost) || parseFloat(c.tradeCost) ||
+                            (c.totalCost ? parseFloat(c.totalCost)/qty : 0) || 0;
+            // Sell price per unit: prefer clientPrice, fall back to totalSelling/qty
+            var sellPerUnit = parseFloat(c.clientPrice) || parseFloat(c.sellPrice) ||
+                              (c.totalSelling ? parseFloat(c.totalSelling)/qty : 0) || 0;
+            // If no trade cost, use sell price as cost (client pays retail, 0% markup)
+            var cost = tradeCost > 0 ? tradeCost : sellPerUnit;
+            var mkup = (tradeCost > 0 && sellPerUnit > tradeCost) ? Math.round(((sellPerUnit - tradeCost) / tradeCost) * 100) : 0;
             _docEdit.items.push({
               title: c.title || '', description: c.description || '', vendor: c.vendor || '',
               qty: qty, cost: cost, markupPct: mkup, shipping: 0,
-              amount: sell, imageUrl: c.imageUrl || '', room: c.room || '',
-              category: c.category || '', shipTo: '', expenseType: 'product'
+              amount: sellPerUnit * qty, imageUrl: c.imageUrl || c.image || '', room: c.room || '',
+              category: c.category || '', sku: c.sku || '', shipTo: '', expenseType: 'product'
             });
           });
           docEditRenderItems();
