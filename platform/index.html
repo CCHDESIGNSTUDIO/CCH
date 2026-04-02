@@ -844,6 +844,7 @@
       font-size: 15px;
       -webkit-font-smoothing: antialiased;
       letter-spacing: 0.01em;
+      overflow-x: hidden;
     }
 
     /* Custom scrollbars */
@@ -893,7 +894,7 @@
     .auth-error { color: var(--red); font-size: 13px; margin-top: 12px; display: none; }
 
     /* ===== APP LAYOUT ===== */
-    .app { display: flex; height: 100vh; }
+    .app { display: flex; height: 100vh; overflow: hidden; }
 
     /* Sidebar */
     .sidebar {
@@ -943,6 +944,7 @@
       flex: 1; margin-left: var(--sidebar-w);
       display: flex; flex-direction: column; min-height: 100vh;
       background: var(--bg);
+      min-width: 0; overflow-x: hidden;
     }
 
     /* Top header bar */
@@ -950,7 +952,7 @@
       height: var(--header-h); background: #FFFFFF;
       border-bottom: 2px solid rgba(14,22,41,0.08);
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0 32px; flex-shrink: 0;
+      padding: 0 32px; flex-shrink: 0; min-width: 0; overflow: hidden;
     }
     .topbar-breadcrumb { display: flex; align-items: center; gap: 8px; }
     .breadcrumb-link {
@@ -968,7 +970,7 @@
     .topbar-actions .btn-sm { color: #0E1629; font-size: 12px; }
 
     /* Content area */
-    .content { flex: 1; padding: 28px 36px 48px; overflow-y: auto; background: var(--bg); }
+    .content { flex: 1; padding: 28px 36px 48px; overflow-y: auto; overflow-x: hidden; background: var(--bg); min-width: 0; }
 
     /* ===== PAGE HEADER ===== */
     .page-header { margin-bottom: 24px; }
@@ -1612,7 +1614,6 @@
     @media (max-width: 1024px) {
       .overview-grid { grid-template-columns: 1fr; }
     }
-    @media (max-width: 768px) {
     /* Global Search */
     .search-trigger { display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:0;border:1px solid var(--gray-200);background:var(--gray-50);color:var(--gray-400);font-size:13px;cursor:pointer;transition:all 0.2s;min-width:200px; }
     .search-trigger:hover { border-color:var(--gold);color:var(--gray-600); }
@@ -1672,6 +1673,8 @@
     .link-icon { color:var(--gray-300);font-size:16px; }
     .link-icon.active { color:var(--gold); }
 
+    /* Responsive: narrow sidebar at small screens */
+    @media (max-width: 768px) {
       .sidebar { width: 60px; }
       .sidebar .nav-label, .sidebar-logo-sub, .sidebar-user, .sidebar-logout { display: none; }
       .sidebar-logo-text { font-size: 18px; }
@@ -1828,8 +1831,8 @@
     .sidebar .nav-item.active { background: rgba(200,185,154,0.15) !important; color: #C8B99A !important; }
 
     /* PAGE LAYOUT FIX */
-    .main { margin-left: var(--sidebar-w, 220px); min-height: 100vh; }
-    .content { padding: 24px 32px; overflow-y: auto; box-sizing: border-box; }
+    .main { margin-left: var(--sidebar-w, 220px); min-height: 100vh; min-width: 0; overflow-x: hidden; }
+    .content { padding: 24px 32px; overflow-y: auto; overflow-x: hidden; box-sizing: border-box; min-width: 0; }
     .topbar { position: sticky; top: 0; z-index: 100; }
     @media (max-width: 1200px) { .content { padding: 16px; } }
 
@@ -19321,7 +19324,7 @@ async function renderBoardsTab(T, proj) {
     // ---- WEEKLY VIEW ----
     // ---- TIMELINE VIEW ----
     let _tlDay = new Date().toISOString().slice(0,10); // currently viewed date string YYYY-MM-DD
-    var _tlViewMode = 'timeline'; // 'timeline' | 'list' | 'week'
+    var _tlViewMode = 'day'; // 'day' (Timely-style single-col, default) | 'timeline' | 'list' | 'week'
 
     window._tlToggleView = function(mode) {
       _tlViewMode = mode;
@@ -22297,14 +22300,16 @@ async function renderBoardsTab(T, proj) {
         '</div>';
       }
 
-      // View toggle buttons (Timeline / List / Week)
+      // View toggle buttons (Day / Timeline / List / Week)
       var viewToggle = '<div style="display:flex;border-radius:0;overflow:hidden;border:1px solid rgba(255,255,255,0.12);background:#0E1629;">' +
+        '<button onclick="_tlToggleView(\'day\')" style="padding:4px 12px;font-size:11px;font-weight:600;border:none;cursor:pointer;transition:all 0.15s;' +
+          (_tlViewMode === 'day' ? 'background:var(--gold);color:white;' : 'background:transparent;color:#EDE8E0;') + '">⏱ Day</button>' +
         '<button onclick="_tlToggleView(\'timeline\')" style="padding:4px 12px;font-size:11px;font-weight:600;border:none;cursor:pointer;transition:all 0.15s;' +
-          (_tlViewMode === 'timeline' ? 'background:var(--gold);color:white;' : 'background:transparent;color:#0E1629;') + '">📅 Day</button>' +
+          (_tlViewMode === 'timeline' ? 'background:var(--gold);color:white;' : 'background:transparent;color:#EDE8E0;') + '">📅 Grid</button>' +
         '<button onclick="_tlToggleView(\'list\')" style="padding:4px 12px;font-size:11px;font-weight:600;border:none;cursor:pointer;transition:all 0.15s;' +
-          (_tlViewMode === 'list' ? 'background:var(--gold);color:white;' : 'background:transparent;color:#0E1629;') + '">📋 List</button>' +
+          (_tlViewMode === 'list' ? 'background:var(--gold);color:white;' : 'background:transparent;color:#EDE8E0;') + '">📋 List</button>' +
         '<button onclick="_tlToggleView(\'week\')" style="padding:4px 12px;font-size:11px;font-weight:600;border:none;cursor:pointer;transition:all 0.15s;' +
-          (_tlViewMode === 'week' ? 'background:var(--gold);color:white;' : 'background:transparent;color:#0E1629;') + '">📆 Week</button>' +
+          (_tlViewMode === 'week' ? 'background:var(--gold);color:white;' : 'background:transparent;color:#EDE8E0;') + '">📆 Week</button>' +
       '</div>';
 
       // Member selector for admins (lets Cynthia view Vanessa's timeline)
@@ -22458,6 +22463,9 @@ async function renderBoardsTab(T, proj) {
             '<button class="btn btn-secondary btn-sm" onclick="var d=new Date(_tlDay+\'T12:00:00\');d.setDate(d.getDate()+7);_tlDay=dateStr(d);renderTimeView();">Next Week →</button>' +
           '</div>';
         })()
+        : _tlViewMode === 'day' ?
+        // ═══════════ DAY MODE: Single-column Timely-style view ═══════════
+        _tlRenderDayViewHtml(dayEntries, allProjects, capCount, filteredCaps, admin)
         : _tlViewMode === 'list' ?
         // ═══════════ LIST MODE: 2-panel (Buckets LEFT | List RIGHT) ═══════════
         '<div style="display:flex;gap:0;height:calc(100vh - 200px);min-height:560px;border-radius:0;overflow:hidden;box-shadow:var(--shadow-lg);">' +
@@ -22541,6 +22549,8 @@ async function renderBoardsTab(T, proj) {
       // Post-render setup depends on view mode
       if (_tlViewMode === 'week') {
         // Week view — no drag/drop needed
+      } else if (_tlViewMode === 'day') {
+        // Day view — no special drag/drop init needed (handled inline)
       } else if (_tlViewMode === 'list') {
         _tlInitListDragDrop();
       } else {
@@ -22566,6 +22576,115 @@ async function renderBoardsTab(T, proj) {
       if (dayCapsExist && Object.keys(_tlCaptureSuggestions).length === 0 && !_tlAIRunning) {
         // AI auto-categorize disabled on deployed site (needs API key)
       }
+    }
+
+    // ==================== SMART TIME DAY VIEW (Timely-style single-column, B26) ====================
+
+    function _tlRenderDayViewHtml(dayEntries, allProjects, capCount, filteredCaps, admin) {
+      var sorted = dayEntries.slice().sort(function(a, b) {
+        var aTime = a.startTime || ''; var bTime = b.startTime || '';
+        if (aTime && bTime) return aTime < bTime ? -1 : aTime > bTime ? 1 : 0;
+        if (aTime) return -1; if (bTime) return 1;
+        return (parseFloat(b.hours) || 0) - (parseFloat(a.hours) || 0);
+      });
+      function projColor(proj) {
+        var COLS = ['#1976D2','#E53935','#F57C00','#388E3C','#7B1FA2','#00838F','#5D4037','#455A64','#C62828','#2E7D32','#F06292','#81C784','#4DD0E1','#FF8A65','#BA68C8','#0097A7','#8D6E63','#D81B60','#00BFA5','#6D4C41'];
+        var h = 2166136261; var s = proj || 'Unassigned';
+        for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h * 16777619) & 0xFFFFFFFF; }
+        return COLS[Math.abs(h) % COLS.length];
+      }
+      function fmtT(ts) {
+        if (!ts) return ''; ts = String(ts);
+        if (ts.match(/Z$/i) || ts.match(/[+-]\d{2}:\d{2}$/)) {
+          var d = new Date(ts);
+          if (!isNaN(d.getTime())) { var h = d.getHours(), mm = String(d.getMinutes()).padStart(2,'0'), ap = h >= 12 ? 'pm' : 'am'; if (h > 12) h -= 12; if (h === 0) h = 12; return h + ':' + mm + ap; }
+        }
+        var m = ts.match(/T?(\d{1,2}):(\d{2})/); if (!m) return '';
+        var hh = parseInt(m[1]), mm = m[2], ap = hh >= 12 ? 'pm' : 'am'; if (hh > 12) hh -= 12; if (hh === 0) hh = 12; return hh + ':' + mm + ap;
+      }
+      function fmtD(hrs) {
+        var h = Math.floor(hrs), m = Math.round((hrs - h) * 60);
+        if (h > 0 && m > 0) return h + 'h ' + m + 'm'; if (h > 0) return h + 'h'; return m + 'm';
+      }
+      var pendingCaps = (window._pendingCaptures || []).filter(function(c) { return c.date === _tlDay && !c._dismissed; });
+      var totalCapHrs = pendingCaps.reduce(function(s, c) { return s + (parseFloat(c.minutes) || 0); }, 0) / 60;
+      var rowsHtml = '';
+      if (sorted.length === 0) {
+        rowsHtml = '<div style="padding:48px 24px;text-align:center;">' +
+          '<div style="font-size:40px;margin-bottom:12px;opacity:0.25;">&#9201;</div>' +
+          '<div style="font-size:14px;font-weight:600;color:#0E1629;margin-bottom:6px;">No time entries for this day</div>' +
+          '<div style="font-size:12px;color:var(--gray-400);margin-bottom:20px;">Drag memories below to create entries, or add one manually.</div>' +
+          '<button class="btn btn-primary" onclick="showNewTimeEntryModal({date:_tlDay})" style="font-size:12px;">+ Add Time Entry</button>' +
+        '</div>';
+      } else {
+        sorted.forEach(function(t) {
+          var proj = t.project || 'Unassigned';
+          var color = projColor(proj);
+          var hrs = parseFloat(t.hours) || 0;
+          var dur = fmtD(hrs);
+          var tr = t.startTime && t.endTime ? fmtT(t.startTime) + '\u2013' + fmtT(t.endTime) : (t.startTime ? fmtT(t.startTime) : dur);
+          var valStr = (t.billable !== false && t.total && parseFloat(t.total) > 0) ? '<span style="font-size:12px;color:#5FA56B;font-weight:600;font-family:var(--font-mono);">$' + Math.round(parseFloat(t.total)).toLocaleString() + '</span>' : '';
+          var notesHtml = t.description ? '<div style="font-size:11px;color:var(--gray-400);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:600px;">' + esc(t.description) + '</div>' : '';
+          var memberBadge = (admin && t.member) ? '<span style="font-size:10px;color:var(--gray-400);margin-left:6px;">\u00b7 ' + esc(t.member.split(' ')[0]) + '</span>' : '';
+          var invBadge = t.invoiceId ? '<span style="font-size:9px;padding:2px 6px;background:#E8F5E9;color:#2E7D32;border-radius:20px;font-weight:700;margin-left:6px;">INVOICED</span>' : '';
+          var nbBadge = t.billable === false ? '<span style="font-size:9px;color:var(--gray-400);margin-left:4px;">NB</span>' : '';
+          rowsHtml += '<div style="display:flex;align-items:center;gap:0;border-bottom:1px solid rgba(14,22,41,0.05);background:white;transition:background 0.12s;" onmouseenter="this.querySelector(\'.dv-act\').style.opacity=\'1\';this.style.background=\'#FAFAF8\'" onmouseleave="this.querySelector(\'.dv-act\').style.opacity=\'0\';this.style.background=\'white\'">' +
+            '<div style="width:3px;flex-shrink:0;align-self:stretch;background:' + color + ';opacity:0.7;"></div>' +
+            '<div style="width:110px;flex-shrink:0;padding:14px 12px;font-size:11px;color:var(--gray-400);font-family:var(--font-mono);white-space:nowrap;">' + tr + '</div>' +
+            '<div style="flex:1;padding:12px 16px 12px 0;min-width:0;">' +
+              '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">' +
+                '<span style="font-size:13px;font-weight:600;color:#0E1629;">' + esc(proj) + '</span>' +
+                memberBadge +
+                (t.service ? '<span style="font-size:10px;padding:2px 7px;background:rgba(14,22,41,0.06);color:var(--gray-500);border-radius:20px;font-weight:500;">' + esc(t.service) + '</span>' : '') +
+                invBadge + nbBadge +
+              '</div>' + notesHtml +
+            '</div>' +
+            '<div style="padding:0 12px;flex-shrink:0;text-align:right;"><span style="font-size:13px;font-weight:700;color:var(--gold);font-family:var(--font-mono);">' + dur + '</span></div>' +
+            (valStr ? '<div style="padding:0 12px;flex-shrink:0;text-align:right;min-width:68px;">' + valStr + '</div>' : '<div style="width:68px;flex-shrink:0;"></div>') +
+            '<div class="dv-act" style="padding:0 10px;flex-shrink:0;display:flex;gap:4px;opacity:0;transition:opacity 0.12s;">' +
+              '<button onclick="event.stopPropagation();editTimeEntry(\'' + (t.id||'') + '\')" style="padding:4px 9px;background:rgba(14,22,41,0.05);border:none;border-radius:2px;cursor:pointer;font-size:11px;color:#0E1629;">Edit</button>' +
+              '<button onclick="event.stopPropagation();if(confirm(\'Delete this entry?\'))deleteTimeEntry(\'' + (t.id||'') + '\')" style="padding:4px 9px;background:rgba(14,22,41,0.05);border:none;border-radius:2px;cursor:pointer;font-size:11px;color:#E16A5B;">Del</button>' +
+            '</div>' +
+          '</div>';
+        });
+      }
+      var memoriesHtml = _tlRenderMemoriesPanel(_tlDay, allProjects);
+      var mId = 'dvMem' + Math.round(Math.random()*99999);
+      return '<div style="background:white;border:1px solid rgba(14,22,41,0.08);overflow:hidden;">' +
+          '<div style="display:flex;align-items:center;padding:8px 0;background:#F7F6F4;border-bottom:1px solid rgba(14,22,41,0.08);">' +
+            '<div style="width:3px;flex-shrink:0;"></div>' +
+            '<div style="width:110px;flex-shrink:0;padding:0 12px;font-size:9px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.8px;">Time</div>' +
+            '<div style="flex:1;font-size:9px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.8px;">Project / Service</div>' +
+            '<div style="padding:0 12px;min-width:60px;font-size:9px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.8px;text-align:right;">Duration</div>' +
+            '<div style="width:76px;font-size:9px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.8px;text-align:right;padding:0 12px;">Value</div>' +
+            '<div style="width:96px;flex-shrink:0;"></div>' +
+          '</div>' +
+          '<div>' + rowsHtml + '</div>' +
+          (sorted.length > 0 ? '<div style="padding:10px 16px;border-top:1px dashed rgba(14,22,41,0.08);"><button onclick="showNewTimeEntryModal({date:_tlDay})" style="font-size:12px;color:var(--gold);font-weight:600;background:none;border:none;cursor:pointer;padding:0;">+ Add Time Entry</button></div>' : '') +
+        '</div>' +
+        '<div style="margin-top:16px;">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#0E1629;cursor:pointer;" onclick="var s=document.getElementById(\'' + mId + '\');s.style.display=s.style.display===\'none\'?\'block\':\'none\'">' +
+            '<div style="display:flex;align-items:center;gap:10px;">' +
+              '<span style="font-size:12px;font-weight:700;color:#EDE8E0;text-transform:uppercase;letter-spacing:0.8px;">Memories</span>' +
+              (pendingCaps.length > 0 ?
+                '<span style="font-size:11px;font-weight:600;color:var(--gold);">' + pendingCaps.length + ' capture' + (pendingCaps.length !== 1 ? 's' : '') + ' \u00b7 ' + totalCapHrs.toFixed(1) + 'h</span>' :
+                '<span style="font-size:11px;color:rgba(237,232,224,0.35);">No captures for this day</span>') +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:8px;">' +
+              '<a href="#" onclick="event.stopPropagation();event.preventDefault();_tlAISuggestCaptures()" style="font-size:10px;color:#F9A825;text-decoration:none;">&#129302; AI</a>' +
+              '<a href="#" onclick="event.stopPropagation();event.preventDefault();window._tlSelectAllMems()" style="font-size:10px;color:var(--gold);text-decoration:none;padding:2px 8px;border:1px solid rgba(196,160,82,0.3);border-radius:4px;">&#9745; All</a>' +
+              '<span id="tlSelCount" style="font-size:10px;color:var(--gold);"></span>' +
+              '<span style="font-size:11px;color:rgba(237,232,224,0.4);">' + (pendingCaps.length > 0 ? '\u25bc' : '\u25ba') + '</span>' +
+            '</div>' +
+          '</div>' +
+          '<div id="' + mId + '" style="background:#0E1629;padding:8px;border-top:1px solid rgba(255,255,255,0.04);' + (pendingCaps.length === 0 ? 'display:none;' : '') + '">' +
+            '<div id="tlMemoriesList" style="max-height:340px;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;">' + memoriesHtml + '</div>' +
+            '<div id="tlMemFooter" style="padding:8px 4px 4px;">' +
+              '<div id="tlMemFooterHint" style="text-align:center;color:var(--gold);font-size:10px;padding:4px;">&#9745; Click memories to select, then assign to create a time entry</div>' +
+              '<button id="tlMemFooterBtn" onclick="window._tlAssignSelectedToBucket()" style="display:none;width:100%;padding:10px;background:var(--gold);color:white;border:none;cursor:pointer;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(196,160,82,0.3);">+ Assign to Entry</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
     }
 
     // ==================== SMART TIME LIST VIEW ====================
@@ -24528,7 +24647,10 @@ async function renderBoardsTab(T, proj) {
     // Helper: get image from any of the possible field names
     function getProductImg(p) {
       if (!p) return '';
-      return p.imageUrl || p.image || p.img || p.thumbnail || p.photo || p.src || p.productImage || p.imageURL || p.coverImage || p.preview || (p.images && p.images[0]) || '';
+      var url = p.imageUrl || p.image || p.img || p.thumbnail || p.photo || p.src || p.productImage || p.imageURL || p.coverImage || p.preview || (p.images && p.images[0]) || '';
+      // Only return valid URLs — reject bare filenames (no protocol)
+      if (url && !url.startsWith('http') && !url.startsWith('data:') && !url.startsWith('//')) return '';
+      return url;
     }
     let currentViewProduct = null;
 
@@ -24651,24 +24773,40 @@ async function renderBoardsTab(T, proj) {
       const T = document.getElementById('contentArea');
       T.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Loading products...</div>';
 
-      // Load from products collection - paginated load for large libraries
+      // Load from products collection - show first batch immediately, load rest in background
       try {
         libraryProducts = [];
         let lastDoc = null;
-        let batchSize = 500;
-        let keepGoing = true;
-        while (keepGoing) {
-          let q = db.collection('products').limit(batchSize);
-          if (lastDoc) q = q.startAfter(lastDoc);
-          const snap = await q.get();
-          snap.forEach(d => libraryProducts.push({ id: d.id, ...d.data() }));
-          if (snap.docs.length < batchSize) {
-            keepGoing = false;
-          } else {
-            lastDoc = snap.docs[snap.docs.length - 1];
-          }
-        }
+        const batchSize = 500;
+        // Load first batch and render immediately
+        const firstSnap = await db.collection('products').limit(batchSize).get();
+        firstSnap.forEach(d => libraryProducts.push({ id: d.id, ...d.data() }));
+        lastDoc = firstSnap.docs.length === batchSize ? firstSnap.docs[firstSnap.docs.length - 1] : null;
         libraryProducts.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+        // Apply filters and render right away with first batch
+        libraryProducts = libraryProducts.filter(isRealProduct);
+        normalizeLibraryProducts();
+        syncClipsToMasterLibrary();
+        buildLibraryGlobalSets();
+        renderLibraryView();
+        // Load remaining batches in background
+        if (lastDoc) {
+          (async function loadMore() {
+            while (lastDoc) {
+              try {
+                const snap = await db.collection('products').startAfter(lastDoc).limit(batchSize).get();
+                snap.forEach(d => libraryProducts.push({ id: d.id, ...d.data() }));
+                if (snap.docs.length < batchSize) { lastDoc = null; } else { lastDoc = snap.docs[snap.docs.length - 1]; }
+                libraryProducts.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+                libraryProducts = libraryProducts.filter(isRealProduct);
+                normalizeLibraryProducts();
+                buildLibraryGlobalSets();
+                renderLibraryView();
+              } catch(e) { break; }
+            }
+          })();
+        }
+        return; // skip the old code below
       } catch(e) {
         try {
           const snap = await db.collection('products').limit(6000).get();
@@ -24677,10 +24815,15 @@ async function renderBoardsTab(T, proj) {
         } catch(e2) { libraryProducts = []; }
       }
 
-      // Filter out junk
+      // Filter out junk (fallback path — first-batch path returns early above)
       libraryProducts = libraryProducts.filter(isRealProduct);
+      normalizeLibraryProducts();
+      syncClipsToMasterLibrary();
+      buildLibraryGlobalSets();
+      renderLibraryView();
+    }
 
-      // Normalize categories on loaded products
+    function normalizeLibraryProducts() {
       var _catNorm = {
         'Fabric  + Trim':'Fabric & Trim','Fabric + Trim':'Fabric & Trim','Fabric':'Fabric & Trim','Fabri':'Fabric & Trim',
         'Furniture & Upholstery':'Furniture','Mirrors & Accessories':'Accessories','mirror':'Accessories',
@@ -24695,26 +24838,19 @@ async function renderBoardsTab(T, proj) {
           if (!p.category) p.category = _roomToCat[p.room];
           p.room = '';
         }
-        // Remove service categories from display
         if (['Time Track','Expense','Project Management','Designer Fee','Service','Labor','Fee'].indexOf(p.category) >= 0) p._hidden = true;
       });
       libraryProducts = libraryProducts.filter(function(p) { return !p._hidden; });
+    }
 
-      // Auto-sync: check for recently clipped items not yet in master products
-      syncClipsToMasterLibrary();
-
-      // Get vendors/categories from products we already loaded (no extra queries)
-      if (!window._globalVendors || !window._globalCategories) {
-        window._globalVendors = new Set();
-        window._globalCategories = new Set();
-        libraryProducts.forEach(p => {
-          if (p.vendor) window._globalVendors.add(p.vendor);
-          if (p.category) window._globalCategories.add(p.category);
-          if (p.manufacturer) window._globalVendors.add(p.manufacturer);
-        });
-      }
-
-      renderLibraryView();
+    function buildLibraryGlobalSets() {
+      window._globalVendors = new Set();
+      window._globalCategories = new Set();
+      libraryProducts.forEach(p => {
+        if (p.vendor) window._globalVendors.add(p.vendor);
+        if (p.category) window._globalCategories.add(p.category);
+        if (p.manufacturer) window._globalVendors.add(p.manufacturer);
+      });
     }
 
     function librarySearchType(val) {
