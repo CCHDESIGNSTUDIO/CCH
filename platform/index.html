@@ -2954,7 +2954,12 @@
       if (isOwner && window._dashboardView === 'contractor') {
         myTimeEntries = _allTimeEntries.filter(t => _isContractorMember(t.member || t.user || ''));
       } else if (memberName) {
-        myTimeEntries = _allTimeEntries.filter(t => (t.member || '') === memberName);
+        const _mnFirst = memberName.split(' ')[0].toLowerCase();
+        myTimeEntries = _allTimeEntries.filter(t => {
+          const m = (t.member || t.user || '').toLowerCase().trim();
+          const email = (t.team || t.email || '').toLowerCase();
+          return m === memberName.toLowerCase() || m.includes(_mnFirst) || email.includes(_mnFirst);
+        });
       }
 
       // Load room covers for project thumbnails
@@ -11819,10 +11824,10 @@ async function renderBoardsTab(T, proj) {
         <button class="btn btn-secondary btn-sm" onclick="previewDocument('proposal','${projectId}','${proposalId}')">👁️ Preview</button>
         <button class="btn btn-secondary btn-sm" onclick="editProposalMeta('${projectId}','${proposalId}')">✏️ Edit Details</button>
         <button class="btn btn-secondary btn-sm" onclick="addProposalLineItem('${projectId}','${proposalId}')">+ Add Item</button>
-            <button class="btn btn-secondary btn-sm" onclick="showMyItemsPanel(projectId, 'proposals', (prop.id || docId))">🛍️ My Items</button>
+            <button class="btn btn-secondary btn-sm" onclick="showMyItemsPanel('${projectId}','proposals','${proposalId}')">🛍️ My Items</button>
         <button class="btn btn-dark btn-sm" onclick="convertProposalToInvoice('${projectId}','${proposalId}')">🧾 Convert to Invoice</button>
         <button class="btn btn-dark btn-sm" onclick="generatePOsFromDoc('${projectId}','proposals','${proposalId}')">📦 Generate POs by Vendor</button>
-            <button class="btn btn-secondary btn-sm" onclick="generateTearSheetsFromDoc('${escAttr(proj.id)}','proposals','${escAttr(docId)}','${escAttr(proj.name)}')">📄 Tear Sheets</button>
+            <button class="btn btn-secondary btn-sm" onclick="generateTearSheetsFromDoc('${escAttr(projectId)}','proposals','${escAttr(proposalId)}','${escAttr(proj.name || projName)}')">📄 Tear Sheets</button>
         <button class="btn btn-primary btn-sm" onclick="printProposal('${projectId}','${proposalId}')">🖨️ Print / PDF</button>
         <button class="btn btn-sm" style="color:var(--red);border-color:var(--red);" onclick="deleteProposal('${projectId}','${proposalId}')">🗑️ Delete</button>
       `);
@@ -11916,7 +11921,7 @@ async function renderBoardsTab(T, proj) {
                         <td style="padding:12px;">${item.imageUrl ? `<img src="${escAttr(item.imageUrl)}" style="width:80px;height:80px;object-fit:cover;border-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,0.1);" onerror="this.outerHTML='📦'">` : '<div style="width:80px;height:80px;background:var(--gray-50);display:flex;align-items:center;justify-content:center;font-size:28px;">📦</div>'}</td>
                         <td style="padding:12px;"><strong style="font-size:15px;display:block;margin-bottom:4px;">${esc(item.title || 'Untitled')}</strong><span style="font-size:13px;color:var(--gray-400);line-height:1.4;">${esc(item.description || '').substring(0,120)}</span>${item.shipTo ? '<br><span style="font-size:12px;color:var(--teal);margin-top:4px;display:inline-block;">📍 ' + esc(item.shipTo) + '</span>' : ''}</td>
                         <td style="font-size:14px;padding:12px;">${esc(item.vendor || '')}</td>
-                        <td style="font-size:14px;padding:12px;"><select class="form-input" style="font-size:11px;padding:2px 4px;" onchange="updateProposalItemField('${escAttr(proj ? proj.id : projectId)}','${escAttr(prop.id || docId)}',${item._idx !== undefined ? item._idx : idx},'room',this.value)"><option value="">${esc(item.room || '— Room —')}</option>${["Living Room","Kitchen","Primary Bedroom","Primary Bath","Guest Bedroom","Dining Room","Family Room","Office","Outdoor","Hallway"].map(r => '<option value="' + r + '"' + (r === (item.room||'') ? ' selected' : '') + '>' + r + '</option>').join('')}</select></td>
+                        <td style="font-size:14px;padding:12px;"><select class="form-input" style="font-size:11px;padding:2px 4px;" onchange="updateProposalItemField('${escAttr(projectId)}','${escAttr(proposalId)}',${item._idx !== undefined ? item._idx : 0},'room',this.value)"><option value="">${esc(item.room || '— Room —')}</option>${["Living Room","Kitchen","Primary Bedroom","Primary Bath","Guest Bedroom","Dining Room","Family Room","Office","Outdoor","Hallway"].map(r => '<option value="' + r + '"' + (r === (item.room||'') ? ' selected' : '') + '>' + r + '</option>').join('')}</select></td>
                         <td class="amount" style="font-size:14px;padding:12px;">${qty}</td>
                         <td class="amount" style="font-size:14px;padding:12px;">${cost > 0 ? formatMoney(cost) : '—'}</td>
                         <td class="amount" style="font-size:14px;padding:12px;color:${markupPct > 0 ? 'var(--green)' : 'var(--gray-400)'};">${markupPct > 0 ? markupPct + '%' : '—'}</td>
@@ -11945,7 +11950,8 @@ async function renderBoardsTab(T, proj) {
                 let _sub = 0, _ship = 0;
                 items.forEach(i => {
                   const q = parseFloat(i.qty) || 1, c = parseFloat(i.cost) || 0, m = parseFloat(i.markupPct) || 0;
-                  _sub += c * q * (1 + m / 100);
+                  const calcAmt = c > 0 ? c * q * (1 + m / 100) : (parseFloat(i.amount) || 0);
+                  _sub += calcAmt;
                   _ship += parseFloat(i.shipping) || 0;
                 });
                 _ship += parseFloat(prop.docShipping) || 0;
@@ -12052,11 +12058,12 @@ async function renderBoardsTab(T, proj) {
                   </select>
                 </div>
                 <div class="form-group"><label class="form-label">Notes / Terms</label><textarea class="form-input" id="propNotes" rows="3">${esc(p.notes || '')}</textarea></div>
+                <div class="form-group"><label class="form-label">Tax Rate (%)</label><input class="form-input" id="propTaxRate" type="number" step="0.1" min="0" max="100" value="${escAttr(String(p.taxRate || ''))}"></div>
               </div>
               <div class="modal-footer">
                 <button class="btn" style="color:var(--red);margin-right:auto;" onclick="if(confirm('Delete this proposal?')){db.collection('boards').doc('${projectId}').collection('proposals').doc('${proposalId}').delete().then(()=>{closeModal();navigate('#/project/${projectId}/proposals');})}">Delete</button>
                 <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="db.collection('boards').doc('${projectId}').collection('proposals').doc('${proposalId}').update({name:document.getElementById('propName').value.trim(),status:document.getElementById('propStatus').value,notes:document.getElementById('propNotes').value.trim()}).then(()=>{closeModal();renderProposalDetail('${projectId}','${proposalId}');})">Save</button>
+                <button class="btn btn-primary" onclick="db.collection('boards').doc('${projectId}').collection('proposals').doc('${proposalId}').update({name:document.getElementById('propName').value.trim(),status:document.getElementById('propStatus').value,notes:document.getElementById('propNotes').value.trim(),taxRate:parseFloat(document.getElementById('propTaxRate').value)||0}).then(()=>{closeModal();renderProposalDetail('${projectId}','${proposalId}');})">Save</button>
               </div>
             </div>
           </div>
@@ -13080,11 +13087,11 @@ async function renderBoardsTab(T, proj) {
         '.info-label { font-size:10px; text-transform:uppercase; letter-spacing:1.5px; color:#999; margin-bottom:4px; }' +
         '.info-value { font-size:13px; line-height:1.6; }' +
         'table { width:100%; border-collapse:collapse; }' +
-        'th { text-align:left; padding:10px 8px; font-size:10px; text-transform:uppercase; letter-spacing:1px; color:#999; font-weight:600; border-bottom:2px solid #ddd; }' +
+        'th { text-align:left; padding:11px 10px; font-size:10px; text-transform:uppercase; letter-spacing:1px; color:#999; font-weight:600; border-bottom:2px solid #ddd; }' +
         'th.right { text-align:right; }' +
-        'td { padding:12px 8px; border-bottom:1px solid #f0f0f0; font-size:13px; vertical-align:middle; }' +
-        'td.right { text-align:right; font-family:"JetBrains Mono",monospace; font-size:12px; }' +
-        'img { width:48px; height:48px; object-fit:cover; border-radius:4px; }' +
+        'td { padding:14px 10px; border-bottom:1px solid #f0f0f0; font-size:14px; vertical-align:middle; }' +
+        'td.right { text-align:right; font-family:"JetBrains Mono",monospace; font-size:13px; }' +
+        'img { width:64px; height:64px; object-fit:cover; border-radius:4px; }' +
         '.totals { display:flex; justify-content:flex-end; margin-top:20px; }' +
         '.totals table { width:auto; min-width:260px; }' +
         '.totals td { padding:5px 0; }' +
@@ -13123,15 +13130,17 @@ async function renderBoardsTab(T, proj) {
         (function() {
           var _iSub = 0, _iShip = 0;
           items.forEach(function(it) {
+            var sell = parseFloat(it.amount) || 0;
             var q = parseFloat(it.qty) || 1, c = parseFloat(it.cost) || 0, m = parseFloat(it.markupPct) || 0;
-            _iSub += c * q * (1 + m / 100);
+            // Use selling price (amount) when available; fall back to cost+markup
+            _iSub += sell > 0 ? sell : (c * q * (1 + m / 100));
             _iShip += parseFloat(it.shipping) || 0;
           });
+          if (_iSub <= 0) _iSub = parseFloat(invData.total) || total; // fallback for clip-based
           _iShip += parseFloat(invData.docShipping) || 0;
           var _iTaxRate = parseFloat(invData.taxRate) || 0;
           var _iTax = _iSub * (_iTaxRate / 100);
           var _iGrand = _iSub + _iShip + _iTax;
-          if (_iSub <= 0) { _iSub = total; _iGrand = total; } // fallback for clip-based
           var _iPaid = (invData.payments || []).reduce(function(s,p) { return s + (parseFloat(p.amount) || 0); }, 0);
           return '<div class="totals"><table>' +
             '<tr><td>Subtotal</td><td class="right">' + formatMoney(_iSub) + '</td></tr>' +
@@ -13261,7 +13270,8 @@ async function renderBoardsTab(T, proj) {
       var _pvSubtotal = 0, _pvShipping = 0;
       items.forEach(function(it) {
         var q = parseFloat(it.qty) || 1, c = parseFloat(it.cost) || 0, m = parseFloat(it.markupPct) || 0;
-        _pvSubtotal += c * q * (1 + m / 100);
+        var calcAmt = c > 0 ? c * q * (1 + m / 100) : (parseFloat(it.amount) || 0);
+        _pvSubtotal += calcAmt;
         _pvShipping += parseFloat(it.shipping) || 0;
       });
       _pvShipping += parseFloat(docData.docShipping) || 0;
@@ -13702,11 +13712,13 @@ async function renderBoardsTab(T, proj) {
       const items = _docEdit.items;
       let subtotal = 0, totalShipping = 0;
       items.forEach(item => {
+        const sell = parseFloat(item.amount) || 0;
         const qty = parseFloat(item.qty) || 1;
         const cost = parseFloat(item.cost) || 0;
         const mkup = parseFloat(item.markupPct) || 0;
         const ship = parseFloat(item.shipping) || 0;
-        subtotal += cost * qty * (1 + mkup / 100);
+        // Use selling price when no cost is set; otherwise use cost+markup calculation
+        subtotal += (cost === 0 && sell > 0) ? sell : cost * qty * (1 + mkup / 100);
         totalShipping += ship;
       });
       const taxRate = parseFloat(_docEdit.docData.taxRate) || 0;
@@ -18730,8 +18742,8 @@ async function renderBoardsTab(T, proj) {
           rate: rate,
           total: Math.round(totalHrs * rate * 100) / 100,
           billable: billable,
-          member: (currentUser && currentUser.displayName) || TEAM_CONFIG.owner.label,
-          memberName: (currentUser && currentUser.displayName) || TEAM_CONFIG.owner.label,
+          member: currentMemberName() || TEAM_CONFIG.owner.label,
+          memberName: currentMemberName() || TEAM_CONFIG.owner.label,
           source: 'smart-time-bucket',
           sourceCaptures: descriptions.slice(0, 10),
           createdAt: new Date().toISOString()
@@ -18802,7 +18814,7 @@ async function renderBoardsTab(T, proj) {
           rate: rate,
           total: Math.round(hours * rate * 100) / 100,
           billable: true,
-          member: (currentUser && currentUser.displayName) || TEAM_CONFIG.owner.label,
+          member: currentMemberName() || TEAM_CONFIG.owner.label,
           source: 'ai-reconstruction',
           activityCount: s.activityCount,
           createdAt: new Date().toISOString()
@@ -24219,7 +24231,7 @@ async function renderBoardsTab(T, proj) {
           rate: rate,
           total: Math.round(hours * rate * 100) / 100,
           billable: true,
-          member: (currentUser && currentUser.displayName) || TEAM_CONFIG.owner.label,
+          member: currentMemberName() || TEAM_CONFIG.owner.label,
           source: 'ai-reconstruction',
           activityCount: s.activityCount,
           createdAt: new Date().toISOString()
@@ -24395,7 +24407,7 @@ async function renderBoardsTab(T, proj) {
           rate: rate,
           total: Math.round(hours * rate * 100) / 100,
           billable: g.project !== 'Unassigned' && !_isNonBillableProject(g.project),
-          member: (currentUser && currentUser.displayName) || TEAM_CONFIG.owner.label,
+          member: currentMemberName() || TEAM_CONFIG.owner.label,
           source: 'desktop-agent',
           appBreakdown: g.apps,
           createdAt: new Date().toISOString()
