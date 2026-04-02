@@ -11982,18 +11982,18 @@ async function renderBoardsTab(T, proj) {
                 <span style="font-size:14px;color:var(--gray-500);">${formatMoney(grouped[cat].reduce((s, i) => s + (i.amount || 0), 0))}</span>
               </div>
               <div class="table-wrap">
-                <table class="data-table" style="margin-bottom:0;">
+                <table class="data-table" style="margin-bottom:0;table-layout:fixed;width:100%;">
                   <thead><tr>
-                    <th style="width:100px;">Image</th>
+                    <th style="width:96px;">Image</th>
                     <th style="font-size:14px;">Item</th>
-                    <th style="font-size:14px;">Vendor</th>
-                    <th>Room</th>
-                    <th class="amount" style="font-size:14px;">Qty</th>
-                    <th class="amount" style="font-size:14px;">Cost</th>
-                    <th class="amount" style="font-size:14px;">Markup %</th>
-                    <th class="amount" style="font-size:14px;">Shipping</th>
-                    <th class="amount" style="font-size:14px;">Total</th>
-                    <th style="width:70px;"></th>
+                    <th style="font-size:14px;width:130px;">Vendor</th>
+                    <th style="width:130px;">Room</th>
+                    <th class="amount" style="font-size:14px;width:48px;">Qty</th>
+                    <th class="amount" style="font-size:14px;width:90px;">Cost</th>
+                    <th class="amount" style="font-size:14px;width:80px;">Markup %</th>
+                    <th class="amount" style="font-size:14px;width:80px;">Shipping</th>
+                    <th class="amount" style="font-size:14px;width:110px;">Total</th>
+                    <th style="width:64px;"></th>
                   </tr></thead>
                   <tbody>
                     ${grouped[cat].map(item => {
@@ -12012,10 +12012,10 @@ async function renderBoardsTab(T, proj) {
                         <td class="amount" style="font-size:14px;padding:12px;">${cost > 0 ? formatMoney(cost) : '—'}</td>
                         <td class="amount" style="font-size:14px;padding:12px;color:${markupPct > 0 ? 'var(--green)' : 'var(--gray-400)'};">${markupPct > 0 ? markupPct + '%' : '—'}</td>
                         <td class="amount" style="font-size:14px;padding:12px;">${shipping > 0 ? formatMoney(shipping) : '—'}</td>
-                        <td class="amount" style="padding:12px;"><strong style="font-size:15px;">${formatMoney(clientPrice)}</strong></td>
-                        <td style="white-space:nowrap;padding:12px;">
-                          <button class="btn btn-sm" style="padding:4px 8px;font-size:12px;" onclick="editProposalItem('${projectId}','${proposalId}',${item._idx})" title="Edit">✏️</button>
-                          <button class="btn btn-sm" style="padding:4px 8px;font-size:12px;color:var(--red);" onclick="removeProposalItem('${projectId}','${proposalId}',${item._idx})" title="Remove">×</button>
+                        <td class="amount" style="padding:12px;white-space:nowrap;"><strong style="font-size:15px;color:var(--navy);">${formatMoney(clientPrice)}</strong></td>
+                        <td style="white-space:nowrap;padding:8px 6px;text-align:center;">
+                          <button class="btn btn-sm" style="padding:3px 7px;font-size:12px;" onclick="editProposalItem('${projectId}','${proposalId}',${item._idx})" title="Edit">✏️</button>
+                          <button class="btn btn-sm" style="padding:3px 7px;font-size:12px;color:var(--red);" onclick="removeProposalItem('${projectId}','${proposalId}',${item._idx})" title="Remove">×</button>
                         </td>
                       </tr>`;
                     }).join('')}
@@ -12027,7 +12027,7 @@ async function renderBoardsTab(T, proj) {
 
           ${prop.notes ? `<div style="margin-top:20px;padding:16px;background:var(--gray-50);border-radius:0;font-size:13px;"><strong>Notes / Terms:</strong><br>${esc(prop.notes)}</div>` : ''}
 
-          <div style="margin-top:24px;padding-top:16px;border-top:2px solid var(--black);display:flex;justify-content:space-between;align-items:flex-start;">
+          <div style="margin-top:24px;padding-top:16px;border-top:2px solid var(--navy,#0E1629);display:flex;justify-content:space-between;align-items:flex-start;">
             <div style="font-size:13px;color:var(--gray-400);">
               ${Object.keys(grouped).length} room${Object.keys(grouped).length !== 1 ? 's' : ''} · ${items.length} items
             </div>
