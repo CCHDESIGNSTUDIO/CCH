@@ -40,7 +40,7 @@ Always deploy after every fix. Commit and push to GitHub after deploying.
 | ID | Description | Priority | Status |
 |----|-------------|----------|--------|
 | B26 | Smart Time: single-column Timely-style redesign | HIGH | ✅ FIXED — new single-column day view with memories section |
-| B27 | Inspiration Hub: 16 Niice-style issues | HIGH | 🔄 IN PROGRESS (agent working) |
+| B27 | Inspiration Hub: 16 Niice-style issues | HIGH | ✅ FIXED — 20 fixes: tab colors, gold underlines, card backgrounds, lightbox dark panel, loading spinner, empty states, URL paste bar, search/filter, vendor inline edit |
 | B28 | Proposals: 11 bugs (tax, images, links, layout) | HIGH | 🔄 PARTIAL — table layout fixed, tax works, images depend on library |
 | B29 | Invoices: bill-to, tax on preview, line items too small | HIGH | ✅ FIXED — tax uses amount field, 14px font, 64px images in print |
 | B30 | Dark mode text not visible on many pages | MEDIUM | ✅ FIXED — CSS exception for navy backgrounds preserves white text |
