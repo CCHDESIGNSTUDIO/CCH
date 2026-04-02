@@ -4412,65 +4412,128 @@
 
     
     async function showMyItemsPanel(projectId, collection, docId) {
-      // Remove existing panel
+      // Toggle: remove if already open
       var existing = document.getElementById('myItemsSidePanel');
       if (existing) { existing.remove(); return; }
 
       var panel = document.createElement('div');
       panel.id = 'myItemsSidePanel';
-      panel.style.cssText = 'position:fixed;top:0;right:0;width:380px;height:100vh;background:var(--card,white);border-left:2px solid var(--gold,#C8B99A);box-shadow:-4px 0 24px rgba(0,0,0,0.15);z-index:9999;display:flex;flex-direction:column;overflow:hidden;';
+      panel.style.cssText = 'position:fixed;top:0;right:0;width:360px;height:100vh;background:var(--card,#fff);border-left:2px solid var(--gold,#C9A96E);box-shadow:-4px 0 24px rgba(0,0,0,0.15);z-index:9999;display:flex;flex-direction:column;overflow:hidden;';
 
-      panel.innerHTML = '<div style="padding:16px;border-bottom:1px solid var(--border,#eee);display:flex;justify-content:space-between;align-items:center;">' +
-        '<div style="font-size:16px;font-weight:700;color:var(--text);">My Items</div>' +
-        '<button onclick="document.getElementById(\'myItemsSidePanel\').remove()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--gray-400);">×</button>' +
-      '</div>' +
-      '<div style="padding:12px;border-bottom:1px solid var(--border,#eee);">' +
-        '<input id="myItemsSearchInput" placeholder="Search products..." style="width:100%;padding:10px;border:1px solid var(--border,#eee);font-size:13px;" oninput="filterMyItemsPanel(this.value)">' +
-      '</div>' +
-      '<div id="myItemsPanelGrid" style="flex:1;overflow-y:auto;padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>';
+      panel.innerHTML =
+        '<div style="padding:14px 18px;border-bottom:1px solid var(--border,#eee);display:flex;justify-content:space-between;align-items:center;">' +
+          '<div style="font-size:15px;font-weight:700;color:var(--navy,#0E1629);">Add Product</div>' +
+          '<button onclick="document.getElementById(\'myItemsSidePanel\').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--gray-400);">×</button>' +
+        '</div>' +
+        '<div style="padding:10px 14px;border-bottom:1px solid var(--border,#eee);">' +
+          '<input id="myItemsSearchInput" placeholder="Search by name or vendor..." style="width:100%;padding:8px 12px;border:1px solid var(--border,#eee);border-radius:4px;font-size:13px;outline:none;" oninput="filterMyItemsPanel()">' +
+        '</div>' +
+        '<div style="padding:8px 14px;border-bottom:1px solid var(--border,#eee);display:flex;gap:0;">' +
+          '<button id="mipBtnAll" onclick="window._mipSource=\'all\';filterMyItemsPanel()" style="flex:1;padding:7px 0;background:var(--navy,#0E1629);color:white;border:none;font-size:12px;font-weight:600;cursor:pointer;border-radius:4px 0 0 4px;">All</button>' +
+          '<button id="mipBtnProject" onclick="window._mipSource=\'project\';filterMyItemsPanel()" style="flex:1;padding:7px 0;background:var(--card,white);color:var(--gray-600,#6b7280);border:1px solid var(--border,#eee);border-left:none;font-size:12px;font-weight:600;cursor:pointer;">This Project</button>' +
+          '<button id="mipBtnLibrary" onclick="window._mipSource=\'library\';filterMyItemsPanel()" style="flex:1;padding:7px 0;background:var(--card,white);color:var(--gray-600,#6b7280);border:1px solid var(--border,#eee);border-left:none;font-size:12px;font-weight:600;cursor:pointer;border-radius:0 4px 4px 0;">Library</button>' +
+        '</div>' +
+        '<div id="myItemsPanelGrid" style="flex:1;overflow-y:auto;padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start;"></div>';
 
       document.body.appendChild(panel);
 
       // Load products
       showToast('Loading products...');
+      window._mipSource = 'all';
       var items = [];
-      try {
-        var masterSnap = await db.collection('productLibrary').limit(500).get();
-        masterSnap.forEach(function(d) { items.push({id: d.id, source: 'library', ...d.data()}); });
-      } catch(e) {}
+      var seen = new Set();
+      // Project clips first (most relevant)
       try {
         var clipSnap = await db.collection('boards').doc(projectId).collection('clips').get();
-        clipSnap.forEach(function(d) { var c = d.data(); if (c.title) items.push({id: d.id, source: 'clip', ...c}); });
+        clipSnap.forEach(function(d) {
+          var c = d.data();
+          if (c.title) {
+            var k = (c.title + '|' + (c.vendor||'')).toLowerCase();
+            if (!seen.has(k)) { seen.add(k); items.push({id: d.id, _source: 'project', ...c}); }
+          }
+        });
+      } catch(e) {}
+      // Master product library
+      try {
+        var libSnap = await db.collection('productLibrary').limit(500).get();
+        libSnap.forEach(function(d) {
+          var p = d.data();
+          if (p.title) {
+            var k = (p.title + '|' + (p.vendor||'')).toLowerCase();
+            if (!seen.has(k)) { seen.add(k); items.push({id: d.id, _source: 'library', ...p}); }
+          }
+        });
+      } catch(e) {}
+      // products collection
+      try {
+        var prodSnap = await db.collection('products').limit(500).get();
+        prodSnap.forEach(function(d) {
+          var p = d.data();
+          if (p.title) {
+            var k = (p.title + '|' + (p.vendor||'')).toLowerCase();
+            if (!seen.has(k)) { seen.add(k); items.push({id: d.id, _source: 'library', ...p}); }
+          }
+        });
       } catch(e) {}
 
+      // Project items first, then alphabetical
+      items.sort(function(a, b) {
+        if (a._source === 'project' && b._source !== 'project') return -1;
+        if (b._source === 'project' && a._source !== 'project') return 1;
+        return (a.title || '').localeCompare(b.title || '');
+      });
+
       window._myItemsPanelData = items;
-      window._myItemsPanelTarget = { projectId: projectId, collection: collection, docId: docId };
+      window._myItemsPanelTarget = { projectId: projectId, collection: collection || null, docId: docId || null };
       renderMyItemsPanelGrid(items);
     }
 
     function renderMyItemsPanelGrid(items) {
       var grid = document.getElementById('myItemsPanelGrid');
       if (!grid) return;
-      grid.innerHTML = items.slice(0, 100).map(function(item) {
+      grid.innerHTML = items.slice(0, 120).map(function(item) {
         var img = item.imageUrl || item.image || '';
-        var isValid = img && (img.startsWith('http') || img.startsWith('data:'));
+        var isValid = img && (img.startsWith('http') || img.startsWith('data:') || img.startsWith('//'));
         var price = parseFloat(item.sellPrice || item.clientPrice || item.totalSelling || 0);
-        return '<div onclick="addMyItemToDoc(\'' + escAttr(item.id) + '\')" style="background:var(--bg,#f5f5f5);border:1px solid var(--border,#eee);cursor:pointer;overflow:hidden;transition:all 0.15s;" onmouseenter="this.style.borderColor=\'var(--gold)\'" onmouseleave="this.style.borderColor=\'var(--border,#eee)\'">' +
-          (isValid ? '<img src="' + escAttr(img) + '" style="width:100%;aspect-ratio:1;object-fit:cover;" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;color:var(--gray-300);font-size:24px;">📦</div>') +
-          '<div style="padding:8px;">' +
-            '<div style="font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(item.title || 'Untitled') + '</div>' +
+        var srcBadge = item._source === 'project'
+          ? '<span style="position:absolute;top:4px;left:4px;background:rgba(201,169,110,0.92);color:#fff;font-size:9px;font-weight:700;padding:2px 5px;border-radius:2px;line-height:1.2;">PROJECT</span>'
+          : '';
+        return '<div onclick="addMyItemToDoc(\'' + escAttr(item.id) + '\')" style="position:relative;background:var(--bg,#f5f5f5);border:1px solid var(--border,#eee);cursor:pointer;overflow:hidden;transition:border-color 0.15s;border-radius:4px;" onmouseenter="this.style.borderColor=\'var(--gold,#C9A96E)\'" onmouseleave="this.style.borderColor=\'var(--border,#eee)\'">' +
+          (isValid ? '<img src="' + escAttr(img) + '" style="width:100%;aspect-ratio:1;object-fit:cover;" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;color:var(--gray-300);font-size:28px;background:var(--gray-100,#f0f1f3);">📦</div>') +
+          srcBadge +
+          '<div style="padding:6px 8px;">' +
+            '<div style="font-weight:600;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--navy,#0E1629);">' + esc(item.title || 'Untitled') + '</div>' +
             '<div style="font-size:10px;color:var(--gray-400);">' + esc(item.vendor || '') + '</div>' +
-            (price > 0 ? '<div style="font-size:12px;font-weight:600;color:var(--gold);font-family:monospace;margin-top:2px;">' + formatMoney(price) + '</div>' : '') +
+            (price > 0 ? '<div style="font-size:11px;font-weight:600;color:var(--gold,#C9A96E);font-family:monospace;">' + formatMoney(price) + '</div>' : '') +
           '</div></div>';
       }).join('') || '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--gray-400);">No products found</div>';
     }
 
     function filterMyItemsPanel(query) {
-      var q = (query || '').toLowerCase();
+      var q = '';
+      if (typeof query === 'string') {
+        q = query.toLowerCase();
+      } else {
+        var inp = document.getElementById('myItemsSearchInput');
+        q = inp ? inp.value.toLowerCase() : '';
+      }
       var items = window._myItemsPanelData || [];
-      var filtered = q ? items.filter(function(i) {
-        return (i.title || '').toLowerCase().includes(q) || (i.vendor || '').toLowerCase().includes(q);
-      }) : items;
+      var src = window._mipSource || 'all';
+      var filtered = items.filter(function(i) {
+        if (src === 'project' && i._source !== 'project') return false;
+        if (src === 'library' && i._source !== 'library') return false;
+        if (q && !((i.title||'').toLowerCase().includes(q) || (i.vendor||'').toLowerCase().includes(q))) return false;
+        return true;
+      });
+      // Update toggle button styles
+      var btnMap = { all: 'mipBtnAll', project: 'mipBtnProject', library: 'mipBtnLibrary' };
+      Object.keys(btnMap).forEach(function(key) {
+        var btn = document.getElementById(btnMap[key]);
+        if (!btn) return;
+        var active = src === key;
+        btn.style.background = active ? 'var(--navy,#0E1629)' : 'var(--card,white)';
+        btn.style.color = active ? 'white' : 'var(--gray-600,#6b7280)';
+      });
       renderMyItemsPanelGrid(filtered);
     }
 
@@ -4481,6 +4544,28 @@
       if (!item) return;
 
       try {
+        // Selections context (no collection/docId) → save to project clips
+        if (!target.collection) {
+          var clipRef = db.collection('boards').doc(target.projectId).collection('clips').doc();
+          await clipRef.set({
+            title: item.title || '',
+            description: item.description || '',
+            vendor: item.vendor || '',
+            room: item.room || '',
+            category: item.category || '',
+            cost: parseFloat(item.unitCost || item.cost || 0),
+            clientPrice: parseFloat(item.sellPrice || item.clientPrice || item.totalSelling || 0),
+            imageUrl: item.imageUrl || item.image || '',
+            sku: item.sku || '',
+            source: item._source === 'project' ? 'clip' : 'library',
+            addedAt: new Date().toISOString()
+          });
+          showToast('✅ Added to Selections: ' + (item.title || 'Item'));
+          // Refresh selections
+          if (window._currentProject) renderSelectionsTab(document.getElementById('projectTabContent'), window._currentProject);
+          return;
+        }
+        // Document context (proposals/invoices/POs) → add to items array
         var docRef = db.collection('boards').doc(target.projectId).collection(target.collection).doc(target.docId);
         var doc = await docRef.get();
         if (!doc.exists) return;
@@ -4495,7 +4580,6 @@
         });
         await docRef.update({ items: items });
         showToast('✅ Added: ' + (item.title || 'Item'));
-        // Refresh the page
         navigate(window.location.hash);
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
@@ -5350,6 +5434,7 @@
             <span style="color:var(--gray-400);font-size:12px;margin-left:12px;">Cost: ${formatMoney(totalCost)} · Sell: ${formatMoney(totalSell)}</span>
           </div>
           <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary btn-sm" onclick="showMyItemsPanel('${proj.id}', null, null)">🛍️ Add Product</button>
             <button class="btn btn-primary btn-sm" onclick="_selMoveSelectedToBoard()">📦 Move Selected to Room Board</button>
           </div>
         </div>
