@@ -4631,20 +4631,40 @@
 
       try {
         var snap = await db.collection('timelyEntries').limit(500).get();
-        var entries = [];
-        snap.forEach(function(d) { entries.push({id: d.id, ...d.data()}); });
+        var allEntries = [];
+        snap.forEach(function(d) { allEntries.push({id: d.id, ...d.data()}); });
 
         // Check which are already logged to ledger
         var loggedIds = new Set();
         var teSnap = await db.collection('timeEntries').where('source', '==', 'timely').limit(500).get();
         teSnap.forEach(function(d) { var data = d.data(); if (data.timelyId) loggedIds.add(String(data.timelyId)); });
 
+        var admin = isTimeAdmin();
+
+        // Non-admin: only see their own entries — Vanessa cannot see Cindy's logs
+        if (!admin) {
+          var myName = currentMemberName() || '';
+          allEntries = allEntries.filter(function(e) {
+            return (e.member || '').toLowerCase().includes(myName.split(' ')[0].toLowerCase());
+          });
+        }
+
+        // Persist member filter across re-renders (admin only)
+        if (!window._timelyMemberFilter) window._timelyMemberFilter = 'all';
+        var memberFilter = admin ? window._timelyMemberFilter : 'all';
+
+        // Get unique members for the filter dropdown
+        var memberNames = [...new Set(allEntries.map(function(e) { return e.member || ''; }).filter(Boolean))].sort();
+
+        // Apply member filter
+        var entries = memberFilter === 'all' ? allEntries : allEntries.filter(function(e) {
+          return (e.member || '') === memberFilter;
+        });
+
         // Sort by date desc
         entries.sort(function(a,b) { return (b.date||'').localeCompare(a.date||''); });
 
-        var totalHours = entries.reduce(function(s, e) {
-          return s + getTimelyHours(e);
-        }, 0);
+        var totalHours = entries.reduce(function(s, e) { return s + getTimelyHours(e); }, 0);
         var pendingCount = entries.filter(function(e) { return !loggedIds.has(String(e.timelyId)); }).length;
 
         // Group by date
@@ -4656,10 +4676,21 @@
         });
         var dates = Object.keys(byDate).sort().reverse();
 
+        // Member filter dropdown HTML (admin only)
+        var memberFilterHtml = admin
+          ? '<select onchange="window._timelyMemberFilter=this.value;renderTimelyLoggedView()" style="padding:6px 10px;border:1px solid var(--border,#eee);border-radius:4px;font-size:13px;background:var(--card,white);color:var(--navy);cursor:pointer;">' +
+              '<option value="all"' + (memberFilter === 'all' ? ' selected' : '') + '>All Members</option>' +
+              memberNames.map(function(m) {
+                return '<option value="' + escAttr(m) + '"' + (memberFilter === m ? ' selected' : '') + '>' + esc(m) + '</option>';
+              }).join('') +
+            '</select>'
+          : '';
+
         T.innerHTML =
           '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
             '<h2 style="margin:0;font-size:18px;color:var(--navy);">⏱ Timely Logged Entries</h2>' +
             '<div style="display:flex;gap:8px;align-items:center;">' +
+              memberFilterHtml +
               '<button class="btn btn-primary btn-sm" onclick="showTimelyLogModal()" id="logSelectedBtn" style="display:none;">→ Review & Log Selected</button>' +
               '<button class="btn btn-secondary btn-sm" onclick="selectAllTimely()">Select All Pending</button>' +
               '<button class="btn btn-secondary btn-sm" onclick="syncTimelyNow()">🔄 Sync from Timely</button>' +
@@ -4684,9 +4715,7 @@
 
           dates.map(function(date) {
             var dayEntries = byDate[date];
-            var dayHrs = dayEntries.reduce(function(s,e) {
-              return s + getTimelyHours(e);
-            }, 0);
+            var dayHrs = dayEntries.reduce(function(s,e) { return s + getTimelyHours(e); }, 0);
             return '<div style="margin-bottom:24px;">' +
               '<div style="font-size:13px;font-weight:700;margin-bottom:8px;padding:8px 12px;background:var(--navy);color:white;display:flex;justify-content:space-between;">' +
                 '<span>' + date + '</span>' +
@@ -4697,7 +4726,7 @@
                   '<th style="padding:8px 12px;text-align:left;width:32px;"><input type="checkbox" id="chkDay_' + date + '" onchange="toggleDayTimely(\'' + date + '\',this.checked)" title="Select all in this day"></th>' +
                   '<th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;">Date</th>' +
                   '<th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;">Project</th>' +
-                  '<th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;">Member</th>' +
+                  (admin ? '<th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;">Member</th>' : '') +
                   '<th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;">Note / Description</th>' +
                   '<th style="padding:8px 12px;text-align:right;font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;">Hours</th>' +
                   '<th style="padding:8px 12px;text-align:center;font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;">Status</th>' +
@@ -4706,6 +4735,8 @@
                   var isLogged = loggedIds.has(String(e.timelyId));
                   var hrs = getTimelyHours(e);
                   var memberDisplay = e.member || e.memberEmail || '—';
+                  var isVanessa = (e.member || '').toLowerCase().includes('vanessa');
+                  var memberColor = isVanessa ? '#7C3AED' : 'var(--gold,#C9A96E)';
                   var dateLabel = date && date !== 'Unknown' ? (function() {
                     var d = new Date(date + 'T12:00:00');
                     return d.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'});
@@ -4718,7 +4749,7 @@
                     '</td>' +
                     '<td style="padding:8px 12px;font-size:12px;color:var(--gray-500);white-space:nowrap;">' + dateLabel + '</td>' +
                     '<td style="padding:8px 12px;font-weight:600;color:var(--navy);">' + esc(e.project || 'No Project') + '</td>' +
-                    '<td style="padding:8px 12px;color:var(--gray-500);font-size:12px;">' + esc(memberDisplay) + '</td>' +
+                    (admin ? '<td style="padding:8px 12px;font-size:12px;font-weight:600;color:' + memberColor + ';">' + esc(memberDisplay) + '</td>' : '') +
                     '<td style="padding:8px 12px;color:var(--gray-600);font-size:12px;">' + esc(e.note || '—') + '</td>' +
                     '<td style="padding:8px 12px;text-align:right;font-weight:700;font-family:monospace;color:var(--gold);font-size:14px;">' +
                       (hrs > 0 ? hrs.toFixed(2) + 'h' : '<span style="color:#E65100;">?</span>') +
@@ -4731,7 +4762,8 @@
                   '</tr>';
                 }).join('') +
               '</tbody></table></div>';
-          }).join('');
+          }).join('') ||
+          '<div style="text-align:center;padding:60px;color:var(--gray-400);">No entries found for this member.</div>';
 
       } catch(e) {
         console.error('Timely load error:', e);
