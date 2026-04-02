@@ -1141,15 +1141,15 @@
       box-shadow: 0 3px 12px rgba(0,0,0,0.3); border-bottom: 1px solid rgba(14,22,41,0.08);
       background: rgba(13,13,18,0.95); backdrop-filter: blur(12px);
     }
-    .ib-section-tab { padding: 10px 16px; font-size: 14px; font-weight: 700; color: #0E1629 !important; cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
-    .ib-section-tab:hover { color: #C8B99A !important; }
-    .ib-section-tab.active { color: #C8B99A !important; border-bottom-color: #C8B99A; font-weight: 700; }
+    .ib-section-tab { padding: 10px 16px; font-size: 14px; font-weight: 600; color: var(--gray-500, #7A7060) !important; cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; transition: color 0.15s; background: none; border-top: none; border-left: none; border-right: none; }
+    .ib-section-tab:hover { color: var(--text-primary, #0E1629) !important; }
+    .ib-section-tab.active { color: var(--text-primary, #0E1629) !important; border-bottom-color: var(--gold, #C9A96E); font-weight: 700; }
     .ib-section-tab .ib-tab-count {
       font-size: 10px; color: var(--gray-300); margin-left: 4px; font-weight: 400;
     }
     .ib-section-tab.active .ib-tab-count { color: var(--gold); }
-    .ib-section-tab.add-tab { color: var(--gold); font-weight: 600; }
-    .ib-section-tab.add-tab:hover { color: var(--black); }
+    .ib-section-tab.add-tab { color: var(--gold, #C9A96E); font-weight: 600; }
+    .ib-section-tab.add-tab:hover { color: #0E1629; }
 
     /* Section header with inline edit + three-dot menu */
     .ib-section-header {
@@ -1199,8 +1199,9 @@
     .ib-toolbar-left { display: flex; align-items: center; gap: 8px; flex: 1; }
     .ib-toolbar-right { display: flex; align-items: center; gap: 6px; }
     .ib-toolbar .btn-sm { font-size: 12px; padding: 6px 14px; }
-    .ib-view-btn { padding: 4px 12px; font-size: 13px; font-weight: 600; border: 1px solid var(--border, #ddd); background: var(--card, white); color: var(--text, #0E1629); cursor: pointer; border-radius: 0; }
-    .ib-view-btn.active { background: var(--gold, #C8B99A); color: white; border-color: var(--gold, #C8B99A); }
+    .ib-view-btn { padding: 4px 12px; font-size: 13px; font-weight: 600; border: 1px solid var(--gray-200, #ddd); background: var(--card, white); color: var(--text-primary, #0E1629); cursor: pointer; border-radius: 0; transition: all 0.15s; }
+    .ib-view-btn:hover { background: var(--gray-50, #F5F3EE); }
+    .ib-view-btn.active { background: var(--gold, #C9A96E); color: white; border-color: var(--gold, #C9A96E); }
     .ib-img-count { font-size: 11px; color: var(--gray-400); margin-right: 4px; }
 
     /* True Masonry Grid using CSS columns (Niice-style varied heights) */
@@ -1211,12 +1212,13 @@
     .ib-grid.cols-5 { column-count: 5 !important; }
     .ib-grid.cols-6 { column-count: 6 !important; }
 
-    .ib-item { position: relative; overflow: hidden; cursor: pointer; border-radius: 0; break-inside: avoid; margin-bottom: 4px; }
-    .ib-item:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(14,22,41,0.12); }
+    .ib-item { position: relative; overflow: hidden; cursor: pointer; border-radius: 0; break-inside: avoid; margin-bottom: 4px; background: var(--card, white); border: 1px solid var(--gray-100, #E8E4DC); }
+    .ib-item:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(14,22,41,0.12); border-color: var(--gray-200, #ddd); }
     .ib-item img { width: 100%; height: auto; display: block; }
     /* Info bar below image */
     .ib-item-info {
       padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;
+      background: var(--card, white);
     }
     .ib-item-info-top {
       display: flex; justify-content: space-between; align-items: center;
@@ -1254,7 +1256,7 @@
       cursor: pointer; font-weight: 600; backdrop-filter: blur(4px);
       transition: all 0.15s; white-space: nowrap;
     }
-    .ib-hover-btn:hover { background: white; color: var(--black); }
+    .ib-hover-btn:hover { background: white; color: #0E1629; }
     .ib-hover-btn.star-active { background: var(--gold); color: white; }
     .ib-item-remove {
       position: absolute; top: 8px; right: 8px; width: 26px; height: 26px;
@@ -1284,12 +1286,13 @@
 
     /* Upload drop zone */
     .ib-drop-zone {
-      border: 2px dashed rgba(255,255,255,0.15); padding: 48px 32px; text-align: center; border-radius: 12px;
+      border: 2px dashed rgba(14,22,41,0.18); padding: 48px 32px; text-align: center; border-radius: 8px;
       color: var(--gray-400); font-size: 13px; cursor: pointer; margin-top: 20px;
       transition: border-color 0.2s, background 0.2s, transform 0.15s;
       display: flex; flex-direction: column; align-items: center; gap: 8px;
+      background: rgba(14,22,41,0.02);
     }
-    .ib-drop-zone:hover, .ib-drop-zone.dragover { border-color: var(--gold); background: rgba(196,164,100,0.06); transform: scale(1.01); }
+    .ib-drop-zone:hover, .ib-drop-zone.dragover { border-color: var(--gold, #C9A96E); background: rgba(201,169,110,0.06); transform: scale(1.01); color: var(--text-primary, #0E1629); }
     .ib-drop-zone .ib-drop-icon { font-size: 28px; opacity: 0.4; margin-bottom: 4px; }
     .ib-drop-zone .ib-drop-hint { font-size: 11px; color: var(--gray-500); margin-top: 2px; }
 
@@ -1300,6 +1303,7 @@
       animation: ibLbFadeIn 0.2s ease;
     }
     @keyframes ibLbFadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     .ib-lightbox {
       display: flex; width: 92vw; max-width: 1200px; height: 85vh;
       background: #1a1a1a; border-radius:0; overflow: hidden;
@@ -1337,7 +1341,7 @@
       border-left: 1px solid rgba(255,255,255,0.08);
     }
     .ib-lb-panel-section {
-      padding: 16px 20px; border-bottom: 1px solid rgba(14,22,41,0.08);
+      padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.07);
     }
     .ib-lb-panel-section:last-child { border-bottom: none; }
     .ib-lb-label {
@@ -1371,7 +1375,7 @@
     .ib-lb-tag {
       font-size: 11px; padding: 3px 10px; border-radius:0;
       background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7);
-      border: 1px solid rgba(14,22,41,0.12);
+      border: 1px solid rgba(255,255,255,0.12);
     }
     .ib-lb-stars {
       display: flex; gap: 4px; align-items: center;
@@ -1387,7 +1391,7 @@
     }
     .ib-lb-action-btn {
       display: flex; align-items: center; gap: 10px; padding: 10px 14px;
-      border-radius:0; border: 1px solid rgba(14,22,41,0.12);
+      border-radius:0; border: 1px solid rgba(255,255,255,0.1);
       background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.8);
       font-size: 13px; cursor: pointer; transition: all 0.15s; width: 100%;
       text-align: left;
@@ -7217,6 +7221,9 @@ async function renderBoardsTab(T, proj) {
     let ibActiveProjectId = null; // Track active project for paste handler
 
     async function renderIdeabooksTab(T, proj) {
+      // Show loading state
+      T.innerHTML = '<div style="display:flex;align-items:center;gap:12px;padding:32px 0;color:var(--gray-400);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="animation:spin 1s linear infinite;"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>Loading inspiration boards...</div>';
+
       let sections = [];
       try {
         const s = await db.collection('boards').doc(proj.id).collection('ideabooks').orderBy('order','asc').get();
@@ -7337,25 +7344,40 @@ async function renderBoardsTab(T, proj) {
             <button class="btn btn-primary btn-sm" onclick="ibAddFromClips('${projectId}','${section.id}')">+ From Room Board</button>
             <button class="btn btn-secondary btn-sm" onclick="document.getElementById('ibFileUpload-${section.id}').click()">Upload</button>
             <input type="file" id="ibFileUpload-${section.id}" style="display:none" accept="image/*" multiple onchange="ibUploadFiles(event,'${projectId}','${section.id}')">
+            <div style="display:flex;gap:0;border:1px solid var(--gray-200,#ddd);border-radius:4px;overflow:hidden;flex:1;max-width:340px;">
+              <input id="ibUrlInput-${section.id}" type="url" placeholder="Paste image URL..." style="flex:1;padding:6px 10px;font-size:12px;border:none;background:var(--card,white);color:var(--text-primary,#0E1629);min-width:0;"
+                onkeydown="if(event.key==='Enter'){ibAddImageFromInput('${projectId}','${section.id}',this.value);this.value='';}">
+              <button style="padding:6px 12px;font-size:12px;font-weight:600;background:var(--gold,#C9A96E);color:white;border:none;cursor:pointer;white-space:nowrap;"
+                onclick="var el=document.getElementById('ibUrlInput-${section.id}');ibAddImageFromInput('${projectId}','${section.id}',el.value);el.value='';">Add</button>
+            </div>
           </div>
           <div class="ib-toolbar-right">
-            <span class="ib-img-count">${items.length} images</span>
-            
-            
-            
-            
-            <button class="ib-view-btn ${(window._ibGridCols||0)===0?'active':''}" onclick="window._ibGridCols=0;renderProjectDetail()">Auto</button>
-            <button class="ib-view-btn ${window._ibGridCols===3?'active':''}" onclick="window._ibGridCols=3;renderProjectDetail()">3</button>
-            <button class="ib-view-btn ${window._ibGridCols===4?'active':''}" onclick="window._ibGridCols=4;renderProjectDetail()">4</button>
-            <button class="ib-view-btn ${window._ibGridCols===5?'active':''}" onclick="window._ibGridCols=5;renderProjectDetail()">5</button>
+            <span class="ib-img-count">${items.length} image${items.length !== 1 ? 's' : ''}</span>
+            <button class="ib-view-btn ${(window._ibGridCols||0)===0?'active':''}" onclick="window._ibGridCols=0;renderProjectDetail()" title="Auto columns">Auto</button>
+            <button class="ib-view-btn ${window._ibGridCols===2?'active':''}" onclick="window._ibGridCols=2;renderProjectDetail()" title="2 columns">2</button>
+            <button class="ib-view-btn ${window._ibGridCols===3?'active':''}" onclick="window._ibGridCols=3;renderProjectDetail()" title="3 columns">3</button>
+            <button class="ib-view-btn ${window._ibGridCols===4?'active':''}" onclick="window._ibGridCols=4;renderProjectDetail()" title="4 columns">4</button>
+            <button class="ib-view-btn ${window._ibGridCols===5?'active':''}" onclick="window._ibGridCols=5;renderProjectDetail()" title="5 columns">5</button>
           </div>
         </div>
+
+        <!-- Search / filter bar -->
+        ${items.length > 6 ? `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+          <div style="position:relative;flex:1;max-width:280px;">
+            <svg style="position:absolute;left:8px;top:50%;transform:translateY(-50%);opacity:0.4;pointer-events:none;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input type="search" placeholder="Search images, captions, vendors..." oninput="ibFilterGrid(this.value,'ibGrid-${section.id}')"
+              style="width:100%;padding:6px 10px 6px 28px;font-size:12px;border:1px solid var(--gray-200,#ddd);border-radius:4px;background:var(--card,white);color:var(--text-primary,#0E1629);">
+          </div>
+          <span id="ibFilterCount-${section.id}" style="font-size:11px;color:var(--gray-400);"></span>
+        </div>` : ''}
 
         <!-- Masonry Grid -->
         <div class="ib-grid ${window._ibGridCols ? 'cols-'+window._ibGridCols : ''} size-${window._ibImgSize || 'M'}" id="ibGrid-${section.id}"
           ondragover="event.preventDefault();this.style.outline='2px solid var(--gold)'"
           ondragleave="this.style.outline=''"
           ondrop="ibDropImage(event,'${projectId}','${section.id}');this.style.outline=''">
+          ${window._ibShowStarredOnly && items.filter(it => (it.stars||0)>0).length === 0 ? '<div style="padding:32px;text-align:center;color:var(--gray-400);font-size:13px;column-span:all;">No starred images in this section.</div>' : ''}
           ${items.filter((item) => !window._ibShowStarredOnly || (item.stars || 0) > 0).map((item, i) => {
             const origIdx = items.indexOf(item);
             const price = item.price || item.clientPrice || item.cost || '';
@@ -7411,6 +7433,16 @@ async function renderBoardsTab(T, proj) {
           }).join('')}
         </div>
 
+        ${items.length === 0 ? `
+        <div style="text-align:center;padding:40px 20px 20px;color:var(--gray-400);">
+          <div style="font-size:48px;opacity:0.25;margin-bottom:12px;">🖼</div>
+          <div style="font-size:16px;font-weight:600;color:var(--text-primary,#0E1629);margin-bottom:6px;">This section is empty</div>
+          <div style="font-size:13px;margin-bottom:16px;">Upload images, paste a URL above, or drag items from your Room Board.</div>
+          <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" onclick="document.getElementById('ibFileUpload-${section.id}').click()">Upload Images</button>
+            <button class="btn btn-secondary btn-sm" onclick="ibAddFromClips('${projectId}','${section.id}')">From Room Board</button>
+          </div>
+        </div>` : ''}
         <div class="ib-drop-zone" id="ibDropZone-${section.id}"
           onclick="document.getElementById('ibFileUpload-${section.id}').click()"
           ondragover="event.preventDefault();this.classList.add('dragover')"
@@ -7418,7 +7450,7 @@ async function renderBoardsTab(T, proj) {
           ondrop="event.preventDefault();this.classList.remove('dragover');ibDropFiles(event,'${projectId}','${section.id}')">
           <div class="ib-drop-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
           <div>Drop images here, paste from clipboard, or click to upload</div>
-          <div class="ib-drop-hint">Supports JPG, PNG, WebP, GIF · Drag from websites or desktop</div>
+          <div class="ib-drop-hint">Supports JPG, PNG, WebP, GIF · Drag from websites or desktop · Paste with Ctrl+V</div>
         </div>
       `;
     }
@@ -7427,6 +7459,27 @@ async function renderBoardsTab(T, proj) {
       ibActiveSection = sectionId;
       window._ibShowStarredOnly = false;
       renderProjectDetail();
+    }
+
+    function ibFilterGrid(query, gridId) {
+      var q = (query || '').toLowerCase().trim();
+      var grid = document.getElementById(gridId);
+      if (!grid) return;
+      var items = grid.querySelectorAll('.ib-item');
+      var visible = 0;
+      items.forEach(function(el) {
+        // Search caption, vendor badge, price
+        var text = (el.textContent || '').toLowerCase();
+        var show = !q || text.includes(q);
+        el.style.display = show ? '' : 'none';
+        if (show) visible++;
+      });
+      // Update count badge
+      var sectionId = gridId.replace('ibGrid-', '');
+      var countEl = document.getElementById('ibFilterCount-' + sectionId);
+      if (countEl) {
+        countEl.textContent = q ? visible + ' of ' + items.length + ' shown' : '';
+      }
     }
 
     // Sticky section tabs on scroll
@@ -8097,6 +8150,14 @@ async function renderBoardsTab(T, proj) {
         images: firebase.firestore.FieldValue.arrayUnion(newItem)
       });
       renderProjectDetail();
+    }
+
+    async function ibAddImageFromInput(projectId, sectionId, url) {
+      url = (url || '').trim();
+      if (!url) return;
+      if (!url.startsWith('http://') && !url.startsWith('https://')) { showToast('Please enter a valid image URL starting with http:// or https://'); return; }
+      showToast('Adding image...');
+      await ibAddExternalUrl(url, projectId, sectionId);
     }
 
     async function ibAddFromClips(projectId, sectionId) {
@@ -8772,20 +8833,20 @@ async function renderBoardsTab(T, proj) {
             <!-- Image area -->
             <div class="ib-lb-image-area">
               <img src="${escAttr(imgUrl)}" referrerpolicy="no-referrer" id="ibLbMainImg"
-                onerror="this.style.display='none';var p=this.parentElement;p.textContent='Image unavailable';p.style.cssText='color:rgba(14,22,41,0.3);text-align:center;padding:40px;'">
+                onerror="this.style.display='none';var p=this.parentElement;p.innerHTML='<div style=\'display:flex;flex-direction:column;align-items:center;gap:12px;\'><span style=\'font-size:48px;opacity:0.3;\'>🖼</span><span style=\'color:rgba(255,255,255,0.4);font-size:14px;\'>Image unavailable</span></div>';p.style.cssText='color:rgba(255,255,255,0.4);text-align:center;padding:40px;display:flex;align-items:center;justify-content:center;'">
               ${index > 0 ? '<button class="ib-lb-nav prev" onclick="ibLbNav(-1)">‹</button>' : ''}
               ${index < images.length - 1 ? '<button class="ib-lb-nav next" onclick="ibLbNav(1)">›</button>' : ''}
             </div>
 
             <!-- Detail panel (right) -->
-            <div class="ib-lb-panel">
-              <button class="ib-lb-close" onclick="ibCloseLightbox()">&times;</button>
+            <div class="ib-lb-panel" style="position:relative;">
+              <button class="ib-lb-close" onclick="ibCloseLightbox()" title="Close (Esc)">&times;</button>
 
               <!-- Title & vendor -->
               <div class="ib-lb-panel-section">
-                <div class="ib-lb-title" contenteditable="true" onblur="ibLbSaveField('caption',this.textContent)">${caption || 'Untitled'}</div>
-                ${vendor ? '<div class="ib-lb-vendor">' + esc(vendor) + '</div>' : ''}
-                ${price ? '<div class="ib-lb-price" style="margin-top:8px;">' + formatMoney(parseFloat(price) || 0) + '</div>' : ''}
+                <div class="ib-lb-title" contenteditable="true" onblur="ibLbSaveField('caption',this.textContent.trim())" title="Click to edit caption">${caption || '<span style="opacity:0.4;font-style:italic;">Untitled</span>'}</div>
+                <div class="ib-lb-vendor" contenteditable="true" onblur="ibLbSaveField('vendor',this.textContent.trim())" title="Click to edit vendor" style="${vendor ? '' : 'opacity:0.4;font-style:italic;'}">${vendor || 'Add vendor...'}</div>
+                ${price ? '<div class="ib-lb-price" style="margin-top:8px;">' + formatMoney(parseFloat(price) || 0) + '</div>' : '<div style="font-size:11px;color:rgba(255,255,255,0.3);margin-top:6px;">No price set</div>'}
               </div>
 
               <!-- Star rating -->
@@ -8813,10 +8874,10 @@ async function renderBoardsTab(T, proj) {
               <div class="ib-lb-panel-section">
                 <div class="ib-lb-label">Tags</div>
                 <div class="ib-lb-tags" id="ibLbTags">
-                  ${tags.length > 0 ? tags.map(function(t) { return '<span class="ib-lb-tag">#' + esc(t) + '</span>'; }).join('') : '<span style="font-size:11px;color:rgba(14,22,41,0.3);">No tags</span>'}
+                  ${tags.length > 0 ? tags.map(function(t) { return '<span class="ib-lb-tag">#' + esc(t) + '</span>'; }).join('') : '<span style="font-size:11px;color:rgba(255,255,255,0.3);">No tags yet</span>'}
                 </div>
                 <div style="margin-top:8px;">
-                  <input id="ibLbTagInput" placeholder="Add tag..." style="padding:6px 10px;border:1px solid rgba(14,22,41,0.12);border-radius:4px;background:rgba(14,22,41,0.03);color:white;font-size:11px;width:140px;"
+                  <input id="ibLbTagInput" placeholder="Add tag..." style="padding:6px 10px;border:1px solid rgba(255,255,255,0.15);border-radius:4px;background:rgba(255,255,255,0.07);color:white;font-size:11px;width:140px;"
                     onkeydown="if(event.key==='Enter'){ibLbAddTag(this.value);this.value='';}">
                 </div>
               </div>
@@ -8824,7 +8885,7 @@ async function renderBoardsTab(T, proj) {
               <!-- Notes -->
               <div class="ib-lb-panel-section">
                 <div class="ib-lb-label">Notes</div>
-                <textarea style="width:100%;min-height:50px;padding:8px;border:1px solid rgba(14,22,41,0.12);border-radius:0;background:rgba(14,22,41,0.03);color:rgba(255,255,255,0.8);font-size:12px;resize:vertical;"
+                <textarea style="width:100%;min-height:50px;padding:8px;border:1px solid rgba(255,255,255,0.12);border-radius:0;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.85);font-size:12px;resize:vertical;"
                   onblur="ibLbSaveField('notes',this.value)" placeholder="Add notes...">${esc(notes)}</textarea>
               </div>
 
@@ -8838,7 +8899,7 @@ async function renderBoardsTab(T, proj) {
                       (c.date ? '<span class="ib-lb-comment-date">' + new Date(c.date).toLocaleDateString() + '</span>' : '') +
                       '<div class="ib-lb-comment-text">' + esc(c.text) + '</div>' +
                     '</div>';
-                  }).join('') || '<div style="font-size:11px;color:rgba(14,22,41,0.3);padding:4px 0;">No comments yet</div>'}
+                  }).join('') || '<div style="font-size:11px;color:rgba(255,255,255,0.3);padding:4px 0;">No comments yet</div>'}
                 </div>
                 <div class="ib-lb-comment-input">
                   <input id="ibLbCommentInput" placeholder="Add a comment..." onkeydown="if(event.key==='Enter')ibLbPostComment()">
@@ -8859,7 +8920,7 @@ async function renderBoardsTab(T, proj) {
               <div class="ib-lb-panel-section">
                 <div class="ib-lb-label">Copy to Room Board</div>
                 <div class="ib-lb-actions">
-                  ${roomOptions || '<div style="font-size:11px;color:rgba(14,22,41,0.3);padding:4px 0;">No rooms yet</div>'}
+                  ${roomOptions || '<div style="font-size:11px;color:rgba(255,255,255,0.3);padding:4px 0;">No rooms yet</div>'}
                   <button class="ib-lb-action-btn" onclick="ibLbCopyToRoom('')" style="border-style:dashed;color:var(--gold);"><span class="icon">+</span> General (No Room)</button>
                   <button class="ib-lb-action-btn" onclick="ibLbCopyToNewRoom()" style="border-style:dashed;color:var(--gold);"><span class="icon">+</span> New Room...</button>
                 </div>
@@ -8869,7 +8930,7 @@ async function renderBoardsTab(T, proj) {
               <div class="ib-lb-panel-section">
                 <div class="ib-lb-label">Copy to Design Board</div>
                 <div class="ib-lb-actions">
-                  ${designBoardOptions || '<div style="font-size:11px;color:rgba(14,22,41,0.3);padding:4px 0;">No design boards yet</div>'}
+                  ${designBoardOptions || '<div style="font-size:11px;color:rgba(255,255,255,0.3);padding:4px 0;">No design boards yet</div>'}
                   <button class="ib-lb-action-btn" onclick="ibLbCopyToNewDesignBoard()" style="border-style:dashed;color:var(--gold);"><span class="icon">+</span> New Design Board...</button>
                 </div>
               </div>
@@ -15205,9 +15266,14 @@ async function renderBoardsTab(T, proj) {
             <span style="background:var(--gold);color:white;padding:4px 10px;border-radius:0;font-size:12px;font-weight:600;">${boardsList.length}</span>
             <span style="color:var(--gray-400);font-size:12px;">projects · ${allBooks.length} boards · ${boardsList.reduce((s,b) => s + b.totalImages, 0)} images</span>
           </div>
-          <div style="display:flex;align-items:center;gap:12px;">
-            <span style="font-size:12px;color:var(--gray-400);">SORT BY:</span>
-            <select onchange="ideabookSortBy=this.value;renderIdeabooksList()" style="border:1px solid var(--gray-200);border-radius:4px;padding:4px 8px;font-size:12px;">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div style="position:relative;">
+              <svg style="position:absolute;left:8px;top:50%;transform:translateY(-50%);opacity:0.4;pointer-events:none;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input type="search" id="ideabookSearch" placeholder="Search boards..." oninput="filterIdeabooks()"
+                style="padding:6px 10px 6px 28px;font-size:12px;border:1px solid var(--gray-200);border-radius:4px;background:var(--card,white);color:var(--text-primary,#0E1629);width:180px;">
+            </div>
+            <span style="font-size:12px;color:var(--gray-400);">SORT:</span>
+            <select onchange="ideabookSortBy=this.value;renderIdeabooksList()" style="border:1px solid var(--gray-200);border-radius:4px;padding:4px 8px;font-size:12px;background:var(--card,white);color:var(--text-primary,#0E1629);">
               <option value="recent"${ideabookSortBy==='recent'?' selected':''}>Last created</option>
               <option value="name"${ideabookSortBy==='name'?' selected':''}>Name</option>
               <option value="images"${ideabookSortBy==='images'?' selected':''}>Most images</option>
