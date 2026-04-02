@@ -304,6 +304,17 @@
     [data-theme="classic"] #contentArea [style*="color:#C8B99A"] {
       color: #0E1629 !important;
     }
+    /* Exception: white text stays white on dark/navy backgrounds */
+    [data-theme="classic"] #contentArea [style*="background:var(--navy)"],
+    [data-theme="classic"] #contentArea [style*="background: var(--navy)"],
+    [data-theme="classic"] #contentArea [style*="background:#0E1629"],
+    [data-theme="classic"] #contentArea [style*="background:#0e1629"],
+    [data-theme="classic"] #contentArea [style*="background:rgba(14,22,41"],
+    [data-theme="classic"] #contentArea [style*="background: rgba(14,22,41"],
+    [data-theme="classic"] #contentArea [style*="background:#1a2744"],
+    [data-theme="classic"] #contentArea [style*="background:#192340"] {
+      color: white !important;
+    }
     /* Gold accents stay readable */
     [data-theme="classic"] #contentArea [style*="color:#C4A052"],
     [data-theme="classic"] #contentArea [style*="color: #C4A052"],
@@ -781,6 +792,17 @@
     [data-theme="classic"] .modal [style*="color:#fff"],
     [data-theme="classic"] .modal [style*="color:rgba(255,255,255"] {
       color: #0E1629 !important;
+    }
+    /* Exception: white text stays white on dark/navy backgrounds */
+    [data-theme="classic"] #contentArea [style*="background:var(--navy)"],
+    [data-theme="classic"] #contentArea [style*="background: var(--navy)"],
+    [data-theme="classic"] #contentArea [style*="background:#0E1629"],
+    [data-theme="classic"] #contentArea [style*="background:#0e1629"],
+    [data-theme="classic"] #contentArea [style*="background:rgba(14,22,41"],
+    [data-theme="classic"] #contentArea [style*="background: rgba(14,22,41"],
+    [data-theme="classic"] #contentArea [style*="background:#1a2744"],
+    [data-theme="classic"] #contentArea [style*="background:#192340"] {
+      color: white !important;
     }
     /* Classic: muted text that was semi-transparent white → use navy at 50% */
     [data-theme="classic"] #contentArea [style*="color:rgba(255,255,255,0.3"],
