@@ -83,12 +83,18 @@ exports.timelySyncEntries = functions.https.onRequest(async (req, res) => {
     let saved = 0;
     for (const entry of entries) {
       const docId = "timely-" + entry.id;
+      // Timely API v1.1: duration is in entry.duration object
+      // { total_seconds, total_hours, total_minutes, hours, minutes, seconds }
+      // The top-level entry.hours field is always 0 — ignore it
+      const dur = entry.duration || {};
+      const durSecs = parseFloat(dur.total_seconds) || 0;
+      const hoursVal = parseFloat(dur.total_hours) || (durSecs / 3600) || (parseFloat(dur.total_minutes) / 60) || 0;
       await db.collection("timelyEntries").doc(docId).set({
         source: "timely-api",
         timelyId: entry.id,
         date: entry.day || "",
-        hours: entry.hours || 0,
-        minutes: Math.round((entry.hours || 0) * 60),
+        hours: hoursVal,
+        minutes: Math.round(durSecs / 60),
         note: entry.note || "",
         project: entry.project ? entry.project.name : "",
         timelyProjectId: entry.project_id || "",
@@ -135,10 +141,13 @@ exports.timelyWebhook = functions.https.onRequest(async (req, res) => {
     }
 
     const timelyId = String(entry.id);
-    const duration = entry.duration || entry.hours || 0;
-    const durationMin = typeof duration === "number" && duration < 24
-      ? Math.round(duration * 60)  // hours format
-      : Math.round(duration / 60); // seconds format
+    // Timely sends duration as object {total, total_with_timer} in seconds
+    const rawDur = entry.duration;
+    const durSecs = (rawDur && typeof rawDur === "object")
+      ? (rawDur.total || 0)
+      : (typeof rawDur === "number" ? (rawDur > 24 ? rawDur : rawDur * 3600) : 0);
+    const durationMin = Math.round(durSecs / 60);
+    const duration = durSecs / 3600; // store as decimal hours
     const date = entry.day || entry.date || new Date().toISOString().slice(0, 10);
     const note = entry.note || entry.description || "";
     const projectId = entry.project_id || "";
@@ -153,6 +162,7 @@ exports.timelyWebhook = functions.https.onRequest(async (req, res) => {
       source: "timely-webhook",
       timelyId: timelyId,
       date: date,
+      hours: duration,
       duration: duration,
       durationMinutes: durationMin,
       note: note,
