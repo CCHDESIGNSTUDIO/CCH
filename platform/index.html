@@ -7122,6 +7122,32 @@
                 </div>
               </div>
 
+              <!-- PROJECT TEAM -->
+              <div class="dpo-card" style="background:#0E1629;border:1px solid rgba(200,185,154,0.12);border-radius:0;padding:20px;margin-bottom:20px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                  <div style="font-family:'Playfair Display',Georgia,serif;font-size:15px;color:#C8B99A;">Project Team</div>
+                  <button class="dpo-quick-btn" style="font-size:10px;padding:4px 10px;" onclick="addProjectMember('${proj.id}')">+ Add</button>
+                </div>
+                ${(proj.members && proj.members.length > 0)
+                  ? proj.members.map(function(m, idx) {
+                      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(200,185,154,0.06);">' +
+                        '<div>' +
+                          '<div style="font-size:13px;font-weight:600;color:#EDE8E0;">' + esc(m.name || '—') + '</div>' +
+                          (m.role ? '<div style="font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:0.08em;margin-top:2px;">' + esc(m.role) + '</div>' : '') +
+                          (m.email ? '<div style="font-size:10px;color:rgba(200,185,154,0.5);margin-top:2px;">' + esc(m.email) + '</div>' : '') +
+                          (m.phone ? '<div style="font-size:10px;color:rgba(200,185,154,0.5);margin-top:1px;">' + esc(m.phone) + '</div>' : '') +
+                        '</div>' +
+                        '<button onclick="removeProjectMember(\'' + escAttr(proj.id) + '\',' + idx + ')" style="background:none;border:none;color:rgba(200,185,154,0.3);cursor:pointer;font-size:18px;padding:4px 8px;" title="Remove">×</button>' +
+                      '</div>';
+                    }).join('')
+                  : '<div style="text-align:center;padding:16px;border:2px dashed rgba(200,185,154,0.12);cursor:pointer;" onclick="addProjectMember(\'' + escAttr(proj.id) + '\')">' +
+                      '<div style="font-size:20px;margin-bottom:6px;">👥</div>' +
+                      '<div style="font-size:11px;color:var(--gray-400);">No team members yet</div>' +
+                      '<div style="font-size:10px;color:var(--gold);margin-top:4px;">Add contractors, workrooms, subs</div>' +
+                    '</div>'
+                }
+              </div>
+
               <!-- PINTEREST BOARD -->
               <div class="dpo-card" style="background:#0E1629;border:1px solid rgba(200,185,154,0.12);border-radius:0;padding:20px;margin-bottom:20px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
@@ -7188,6 +7214,73 @@
       `;
       // Load files after DOM renders
       setTimeout(function() { loadProjectFiles(proj.id); }, 100);
+    }
+
+    // ----- PROJECT TEAM FUNCTIONS -----
+    function addProjectMember(projectId) {
+      var overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:3000;display:flex;align-items:center;justify-content:center;';
+      overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+      overlay.innerHTML =
+        '<div style="background:#0E1629;width:400px;padding:28px;border:1px solid rgba(200,185,154,0.2);box-shadow:0 24px 48px rgba(0,0,0,0.5);">' +
+          '<div style="font-family:Playfair Display,Georgia,serif;font-size:18px;color:#C8B99A;margin-bottom:20px;">Add Project Member</div>' +
+          '<div style="margin-bottom:12px;">' +
+            '<label style="font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:0.1em;">Name *</label>' +
+            '<input id="pmName" style="width:100%;margin-top:4px;padding:9px 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(200,185,154,0.2);color:#EDE8E0;font-size:13px;box-sizing:border-box;" placeholder="e.g. Vanessa Holliday">' +
+          '</div>' +
+          '<div style="margin-bottom:12px;">' +
+            '<label style="font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:0.1em;">Role</label>' +
+            '<input id="pmRole" style="width:100%;margin-top:4px;padding:9px 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(200,185,154,0.2);color:#EDE8E0;font-size:13px;box-sizing:border-box;" placeholder="e.g. Lead Designer, Workroom, Sub-contractor">' +
+          '</div>' +
+          '<div style="margin-bottom:12px;">' +
+            '<label style="font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:0.1em;">Email</label>' +
+            '<input id="pmEmail" type="email" style="width:100%;margin-top:4px;padding:9px 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(200,185,154,0.2);color:#EDE8E0;font-size:13px;box-sizing:border-box;" placeholder="email@example.com">' +
+          '</div>' +
+          '<div style="margin-bottom:24px;">' +
+            '<label style="font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:0.1em;">Phone</label>' +
+            '<input id="pmPhone" style="width:100%;margin-top:4px;padding:9px 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(200,185,154,0.2);color:#EDE8E0;font-size:13px;box-sizing:border-box;" placeholder="(555) 123-4567">' +
+          '</div>' +
+          '<div style="display:flex;gap:10px;">' +
+            '<button onclick="saveProjectMember(\'' + escAttr(projectId) + '\',this)" style="flex:1;background:var(--gold,#C9A96E);color:#0E1629;border:none;padding:11px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:0.05em;">Add Member</button>' +
+            '<button onclick="this.closest(\'div[style*=fixed]\').remove()" style="background:none;border:1px solid rgba(200,185,154,0.2);color:rgba(200,185,154,0.6);padding:11px 18px;font-size:13px;cursor:pointer;">Cancel</button>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(overlay);
+      setTimeout(function() { var f = document.getElementById('pmName'); if (f) f.focus(); }, 50);
+    }
+
+    async function saveProjectMember(projectId, btn) {
+      var name = (document.getElementById('pmName').value || '').trim();
+      if (!name) { showToast('Name is required', 'error'); return; }
+      var member = {
+        name: name,
+        role: (document.getElementById('pmRole').value || '').trim(),
+        email: (document.getElementById('pmEmail').value || '').trim(),
+        phone: (document.getElementById('pmPhone').value || '').trim()
+      };
+      try {
+        var projRef = db.collection('projects').doc(projectId);
+        var projDoc = await projRef.get();
+        var members = projDoc.exists ? (projDoc.data().members || []) : [];
+        members.push(member);
+        await projRef.update({ members: members });
+        btn.closest('div[style*="fixed"]').remove();
+        showToast('✅ Added ' + name + ' to project');
+        renderProjectDetail();
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+
+    async function removeProjectMember(projectId, idx) {
+      if (!confirm('Remove this member from the project?')) return;
+      try {
+        var projRef = db.collection('projects').doc(projectId);
+        var projDoc = await projRef.get();
+        var members = projDoc.exists ? (projDoc.data().members || []) : [];
+        members.splice(idx, 1);
+        await projRef.update({ members: members });
+        showToast('Member removed');
+        renderProjectDetail();
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
 
     // ----- PINTEREST & FILES FUNCTIONS -----
