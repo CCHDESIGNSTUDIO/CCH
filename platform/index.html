@@ -26242,23 +26242,28 @@ async function renderBoardsTab(T, proj) {
         normalizeLibraryProducts();
         buildLibraryGlobalSets();
         renderLibraryView();
-        // Load remaining batches in background — guard each iteration
+        // Load remaining batches in background — NO re-render until done
         if (lastDoc) {
           (async function loadMore() {
+            var batchNum = 1;
             while (lastDoc) {
-              if (window._libLoadSession !== loadSession) return; // navigated away, stop loading
+              if (window._libLoadSession !== loadSession) return;
               try {
                 const snap = await db.collection('products').startAfter(lastDoc).limit(batchSize).get();
-                if (window._libLoadSession !== loadSession) return; // navigated away
+                if (window._libLoadSession !== loadSession) return;
                 snap.forEach(d => libraryProducts.push({ id: d.id, ...d.data() }));
+                batchNum++;
                 if (snap.docs.length < batchSize) { lastDoc = null; } else { lastDoc = snap.docs[snap.docs.length - 1]; }
-                libraryProducts.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
-                libraryProducts = libraryProducts.filter(isRealProduct);
-                normalizeLibraryProducts();
-                buildLibraryGlobalSets();
-                renderLibraryView();
               } catch(e) { break; }
             }
+            // All batches loaded — one final render
+            if (window._libLoadSession !== loadSession) return;
+            libraryProducts.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+            libraryProducts = libraryProducts.filter(isRealProduct);
+            normalizeLibraryProducts();
+            buildLibraryGlobalSets();
+            renderLibraryView();
+            showToast(libraryProducts.length + ' products loaded');
           })();
         }
         return; // skip the old code below
