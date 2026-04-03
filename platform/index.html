@@ -15911,6 +15911,119 @@ async function renderBoardsTab(T, proj) {
       } catch(e) { console.error('Link save failed:', e); alert('Failed to link documents'); }
     }
 
+    // ── Auto-Link Documents from Houzz Transaction Report ──
+    async function autoLinkAllDocs() {
+      showToast('Auto-linking documents from Houzz data...');
+      try {
+        // 1) Fetch the Houzz link map
+        var resp = await fetch('/houzz_doc_links.json');
+        if (!resp.ok) throw new Error('Could not load houzz_doc_links.json');
+        var linkMap = await resp.json();
+        var linkCodes = Object.keys(linkMap);
+        showToast('Loaded ' + linkCodes.length + ' Houzz link entries');
+
+        // 2) Load all projects
+        var projSnap = await db.collection('projects').get();
+        var projects = [];
+        projSnap.forEach(function(d) { projects.push({ id: d.id, name: (d.data().name || '') }); });
+
+        // 3) Build global code → { projectId, collection, docId } map
+        var codeMap = {};
+        var totalDocs = 0;
+        for (var pi = 0; pi < projects.length; pi++) {
+          var pid = projects[pi].id;
+          try {
+            var invSnap = await db.collection('boards').doc(pid).collection('invoices').get();
+            invSnap.forEach(function(d) {
+              var data = d.data();
+              var code = data.invoiceNum || data.number || '';
+              if (code && /^(IN|PO|PR|RR)-\d+/.test(code)) {
+                codeMap[code] = { projectId: pid, collection: 'invoices', docId: d.id };
+                totalDocs++;
+              }
+            });
+          } catch(e) {}
+          try {
+            var prSnap = await db.collection('boards').doc(pid).collection('proposals').get();
+            prSnap.forEach(function(d) {
+              var data = d.data();
+              var code = data.proposalNum || data.name || data.number || '';
+              if (code && /^(IN|PO|PR|RR)-\d+/.test(code)) {
+                codeMap[code] = { projectId: pid, collection: 'proposals', docId: d.id };
+                totalDocs++;
+              }
+            });
+          } catch(e) {}
+          try {
+            var poSnap = await db.collection('boards').doc(pid).collection('purchaseOrders').get();
+            poSnap.forEach(function(d) {
+              var data = d.data();
+              var code = data.number || data.num || data.poNum || '';
+              if (code && /^(IN|PO|PR|RR)-\d+/.test(code)) {
+                codeMap[code] = { projectId: pid, collection: 'purchaseOrders', docId: d.id };
+                totalDocs++;
+              }
+            });
+          } catch(e) {}
+        }
+        showToast('Scanned ' + projects.length + ' projects, found ' + totalDocs + ' docs with Houzz codes');
+
+        // 4) Apply links
+        var linked = 0, skipped = 0, batch = db.batch();
+        var batchCount = 0;
+
+        for (var ci = 0; ci < linkCodes.length; ci++) {
+          var sourceCode = linkCodes[ci];
+          var sourceInfo = codeMap[sourceCode];
+          if (!sourceInfo) continue; // doc not in Firestore
+
+          var connected = linkMap[sourceCode].connected || [];
+          var sourceRef = db.collection('boards').doc(sourceInfo.projectId).collection(sourceInfo.collection).doc(sourceInfo.docId);
+          var updates = {};
+          var hasUpdate = false;
+
+          for (var li = 0; li < connected.length; li++) {
+            var targetCode = connected[li];
+            var targetInfo = codeMap[targetCode];
+            if (!targetInfo) continue;
+
+            // Determine the field name based on target collection type
+            var targetType = targetInfo.collection === 'proposals' ? 'Proposal'
+                           : targetInfo.collection === 'invoices' ? 'Invoice' : 'PO';
+            var fieldName = 'linked' + targetType + 'Id';
+            updates[fieldName] = targetInfo.docId;
+            hasUpdate = true;
+
+            // Also set the Houzz connected docs list for reference
+            if (!updates._houzzConnected) updates._houzzConnected = connected;
+          }
+
+          if (hasUpdate) {
+            batch.update(sourceRef, updates);
+            batchCount++;
+            linked++;
+
+            // Firestore batch limit is 500
+            if (batchCount >= 400) {
+              await batch.commit();
+              batch = db.batch();
+              batchCount = 0;
+              showToast('Linked ' + linked + ' docs so far...');
+            }
+          } else {
+            skipped++;
+          }
+        }
+
+        if (batchCount > 0) await batch.commit();
+        showToast('✅ Auto-linked ' + linked + ' documents! (' + skipped + ' had no matches in Firestore)');
+        _cacheTime = 0;
+      } catch(e) {
+        console.error('Auto-link error:', e);
+        showToast('Error: ' + e.message, 'error');
+      }
+    }
+
     // Layout preference: 'classic' (full-width cards) or 'studio' (two-column with sidebar)
     var _docEditLayout = localStorage.getItem('cch_docEditLayout') || 'studio';
     window.toggleDocEditLayout = function() {
@@ -29563,7 +29676,7 @@ async function renderBoardsTab(T, proj) {
 
     async function renderAllInvoices() {
       setBreadcrumb([{ label: 'Invoices' }]);
-      setTopbarActions('<button class="btn btn-secondary" style="margin-right:8px;" onclick="importPaymentData()">💰 Import Payments</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="bulkInvoiceCleanup()">🧹 Cleanup</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="bulkMarkQBSynced(\'invoices\')">Sync All QB</button><button class="btn btn-primary" onclick="showNewInvoiceModalGlobal()">+ New Invoice</button>');
+      setTopbarActions('<button class="btn btn-secondary" style="margin-right:8px;" onclick="autoLinkAllDocs()">🔗 Auto-Link Docs</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="importPaymentData()">💰 Import Payments</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="bulkInvoiceCleanup()">🧹 Cleanup</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="bulkMarkQBSynced(\'invoices\')">Sync All QB</button><button class="btn btn-primary" onclick="showNewInvoiceModalGlobal()">+ New Invoice</button>');
       const T = document.getElementById('contentArea');
       T.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Loading invoices...</div>';
       try {
