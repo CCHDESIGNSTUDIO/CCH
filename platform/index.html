@@ -638,11 +638,10 @@
       border-color: rgba(14,22,41,0.1) !important;
     }
 
-    /* ── 4. Project detail sidebar tabs ── */
-    [data-theme="classic"] .project-tabs { background: #FFFFFF !important; border-right: 1px solid rgba(14,22,41,0.08) !important; }
+    /* ── 4. Project detail tabs ── */
     [data-theme="classic"] .project-tab { color: #2C3D5E !important; }
-    [data-theme="classic"] .project-tab:hover { color: #0E1629 !important; background: rgba(14,22,41,0.02) !important; }
-    [data-theme="classic"] .project-tab.active { color: #0E1629 !important; background: rgba(196,164,100,0.08) !important; border-right-color: var(--gold) !important; }
+    [data-theme="classic"] .project-tab:hover { color: #0E1629 !important; }
+    [data-theme="classic"] .project-tab.active { color: #0E1629 !important; border-bottom-color: var(--gold) !important; }
     [data-theme="classic"] .project-tab.active {
       color: #0E1629 !important;
       border-bottom-color: #0E1629 !important;
@@ -1049,24 +1048,22 @@
     .stat-label { font-size: 10px; color: #7A7060; text-transform: uppercase; letter-spacing: 1px; }
 
     /* ===== PROJECT DETAIL ===== */
-    .project-layout { display: grid; grid-template-columns: 200px 1fr; gap: 0; min-height: 500px; }
-    @media (max-width: 900px) { .project-layout { grid-template-columns: 1fr; } .project-tabs { flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 2px solid rgba(14,22,41,0.1); width: auto; } .project-tab { border-right: none !important; border-bottom: 2px solid transparent !important; padding: 10px 14px; } .project-tab.active { border-bottom-color: var(--gold) !important; border-right-color: transparent !important; } }
     .project-tabs {
-      display: flex; flex-direction: column; gap: 2px;
-      background: #FFFFFF; border-right: 1px solid rgba(14,22,41,0.08);
-      padding: 8px 0; width: 200px; position: sticky; top: 0; align-self: start;
+      display: flex; gap: 0; border-bottom: 2px solid rgba(14,22,41,0.1);
+      margin-bottom: 24px; background: #FFFFFF;
+      padding: 0; align-items: center; flex-wrap: wrap;
     }
     .project-tab {
-      padding: 9px 16px; font-size: 12px; font-weight: 500;
+      padding: 10px 14px; font-size: 11px; font-weight: 600;
       color: #7A7060; cursor: pointer; border: none; background: none;
-      border-right: 3px solid transparent; text-align: left;
-      transition: all 0.15s; font-family: var(--font-body); white-space: nowrap;
-      letter-spacing: 0.2px; display: flex; align-items: center; gap: 8px;
+      border-bottom: 2px solid transparent; margin-bottom: -2px;
+      transition: all 0.2s; font-family: var(--font-body); white-space: nowrap;
+      letter-spacing: 0.2px;
     }
-    .project-tab:hover { color: #0E1629; background: rgba(14,22,41,0.02); }
-    .project-tab.active { color: #0E1629; background: var(--gold-light); border-right-color: var(--gold); font-weight: 600; }
-    .project-tab .tab-icon { font-size: 14px; width: 20px; text-align: center; flex-shrink: 0; }
-    .project-tabs .tab-divider { height: 1px; background: rgba(14,22,41,0.06); margin: 6px 16px; }
+    .project-tab:hover { color: #0E1629; }
+    .project-tab.active { color: #0E1629; border-bottom-color: var(--gold); }
+    .project-tab .tab-icon { display: none; }
+    .project-tabs .tab-divider { width: 1px; height: 16px; background: rgba(14,22,41,0.1); margin: 0 2px; flex-shrink: 0; }
     .tab-arrow { display: none; }
 
     .tab-content { display: none; }
@@ -1120,6 +1117,83 @@
     .clip-card-room {
       display: inline-block; padding: 2px 8px; background: rgba(255,255,255,0.06);
       border-radius: 4px; font-size: 10px; color: var(--gray-400); margin-top: 6px;
+    }
+
+    /* ===== PRODUCT LIBRARY — StyleRow premium redesign ===== */
+    .pl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+    .pl-card {
+      position: relative; overflow: hidden; cursor: pointer;
+      background: white; border: 1px solid var(--gray-100);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .pl-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(14,22,41,0.12); border-color: var(--gray-200); }
+    .pl-card-img { width: 100%; height: 300px; object-fit: cover; display: block; background: var(--gray-100); }
+    .pl-card-body { padding: 16px 18px; }
+    .pl-card-title {
+      font-family: var(--font-display); font-weight: 600; font-size: 17px;
+      color: var(--text-primary); margin-bottom: 4px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .pl-card-vendor { font-size: 12px; color: var(--gray-400); margin-bottom: 6px; }
+    .pl-card-desc {
+      font-size: 12px; color: var(--gray-500); line-height: 1.5;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden; margin-bottom: 10px;
+    }
+    .pl-card-price { font-weight: 700; color: var(--gold); font-size: 16px; font-family: var(--font-mono); }
+    .pl-card-price-label { font-size: 10px; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+    .pl-card-overlay {
+      position: absolute; inset: 0; pointer-events: none;
+      background: linear-gradient(180deg, rgba(14,22,41,0.4) 0%, transparent 35%, transparent 60%, rgba(14,22,41,0.5) 100%);
+      opacity: 0; transition: opacity 0.2s;
+    }
+    .pl-card:hover .pl-card-overlay { opacity: 1; }
+    .pl-card-actions {
+      position: absolute; top: 12px; right: 12px;
+      display: flex; gap: 6px; opacity: 0; transition: opacity 0.2s; z-index: 5;
+    }
+    .pl-card:hover .pl-card-actions { opacity: 1; }
+    .pl-action-btn {
+      width: 34px; height: 34px; border: none;
+      background: rgba(255,255,255,0.95); color: var(--navy); font-size: 14px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(8px); box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+      transition: all 0.15s;
+    }
+    .pl-action-btn:hover { background: white; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+
+    /* Product Detail — full-page view */
+    .pd-container { max-width: 1100px; margin: 0 auto; }
+    .pd-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 32px; }
+    .pd-hero-img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: var(--gray-100); border: 1px solid var(--gray-100); }
+    .pd-thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .pd-thumb { width: 64px; height: 64px; object-fit: cover; border: 2px solid transparent; cursor: pointer; transition: border-color 0.15s; }
+    .pd-thumb.active { border-color: var(--gold); }
+    .pd-thumb:hover { border-color: var(--gray-300); }
+    .pd-title { font-family: var(--font-display); font-size: 32px; font-weight: 400; color: var(--text-primary); margin-bottom: 4px; line-height: 1.2; }
+    .pd-vendor-link { font-size: 14px; color: var(--gold); cursor: pointer; text-decoration: none; margin-bottom: 16px; display: inline-block; }
+    .pd-vendor-link:hover { text-decoration: underline; }
+    .pd-description { font-size: 14px; line-height: 1.7; color: var(--gray-500); margin-bottom: 24px; }
+    .pd-section { padding: 16px 0; border-top: 1px solid var(--gray-100); }
+    .pd-section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--gray-400); font-weight: 600; margin-bottom: 8px; }
+    .pd-dimensions { display: flex; gap: 24px; }
+    .pd-dim-item { text-align: center; }
+    .pd-dim-value { font-size: 18px; font-weight: 600; color: var(--text-primary); font-family: var(--font-mono); }
+    .pd-dim-label { font-size: 10px; color: var(--gray-400); text-transform: uppercase; }
+    .pd-field-row { display: flex; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+    .pd-field-label { color: var(--gray-400); min-width: 80px; flex-shrink: 0; }
+    .pd-field-value { color: var(--text-primary); }
+    .pd-price-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    .pd-price-box { text-align: center; padding: 16px; background: var(--gray-50); }
+    .pd-price-amount { font-size: 22px; font-weight: 700; font-family: var(--font-mono); color: var(--text-primary); }
+    .pd-price-amount.gold { color: var(--gold); }
+    .pd-price-label { font-size: 10px; text-transform: uppercase; color: var(--gray-400); letter-spacing: 0.5px; margin-top: 4px; }
+    .pd-notes { background: var(--gray-50); padding: 16px; font-size: 13px; color: var(--gray-500); line-height: 1.6; }
+    .pd-linked-section { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    @media (max-width: 768px) {
+      .pd-layout { grid-template-columns: 1fr; gap: 24px; }
+      .pd-price-grid { grid-template-columns: 1fr; }
+      .pd-linked-section { grid-template-columns: 1fr; }
     }
 
     /* Ideabooks — Niice-style */
@@ -4891,9 +4965,18 @@
                 '<span>' + date + '</span>' +
                 '<span style="font-weight:400;opacity:0.7;">' + dayHrs.toFixed(1) + 'h · ' + dayEntries.length + ' entries</span>' +
               '</div>' +
-              '<table style="width:100%;border-collapse:collapse;font-size:13px;background:white;">' +
+              '<table style="width:100%;border-collapse:collapse;font-size:13px;background:white;table-layout:fixed;">' +
+                '<colgroup>' +
+                  '<col style="width:40px;">' +
+                  '<col style="width:120px;">' +
+                  '<col style="width:160px;">' +
+                  (admin ? '<col style="width:140px;">' : '') +
+                  '<col>' +
+                  '<col style="width:80px;">' +
+                  '<col style="width:90px;">' +
+                '</colgroup>' +
                 '<thead><tr style="background:var(--gray-50);border-bottom:2px solid var(--gray-200);">' +
-                  '<th style="padding:8px 12px;text-align:left;width:32px;"><input type="checkbox" id="chkDay_' + date + '" onchange="toggleDayTimely(\'' + date + '\',this.checked)" title="Select all in this day"></th>' +
+                  '<th style="padding:8px 12px;text-align:left;"><input type="checkbox" id="chkDay_' + date + '" onchange="toggleDayTimely(\'' + date + '\',this.checked)" title="Select all in this day"></th>' +
                   '<th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;">Date</th>' +
                   '<th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;">Project</th>' +
                   (admin ? '<th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;">Member</th>' : '') +
@@ -4920,7 +5003,7 @@
                     '<td style="padding:8px 12px;font-size:12px;color:var(--gray-500);white-space:nowrap;">' + dateLabel + '</td>' +
                     '<td style="padding:8px 12px;font-weight:600;color:var(--navy);">' + esc(e.project || 'No Project') + '</td>' +
                     (admin ? '<td style="padding:8px 12px;font-size:12px;font-weight:600;color:' + memberColor + ';">' + esc(memberDisplay) + '</td>' : '') +
-                    '<td style="padding:8px 12px;color:var(--gray-600);font-size:12px;">' + esc(e.note || '—') + '</td>' +
+                    '<td style="padding:8px 12px;color:var(--gray-600);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(e.note || '—') + '</td>' +
                     '<td style="padding:8px 12px;text-align:right;font-weight:700;font-family:monospace;color:var(--gold);font-size:14px;">' +
                       (hrs > 0 ? hrs.toFixed(2) + 'h' : '<span style="color:#E65100;">?</span>') +
                     '</td>' +
@@ -5427,17 +5510,13 @@
           <div class="page-subtitle">${esc(proj.clientName ? 'For ' + proj.clientName : '')}${proj.projectAddress ? ' · <span style="font-size:12px;opacity:0.7;">📍 ' + esc(proj.projectAddress) + '</span>' : ''}</div>
         </div>
         ${_profitBarHtml}
-        <div class="project-layout">
-          <div class="project-tabs">
-            ${tabs.map(t => {
-              if (t.startsWith('_div')) return '<div class="tab-divider"></div>';
-              return '<button class="project-tab ' + (t === currentProjectTab ? 'active' : '') + '" onclick="switchProjectTab(\'' + t + '\')">' +
-                '<span class="tab-icon">' + (tabIcons[t] || '') + '</span>' + tabLabels[t] +
-              '</button>';
-            }).join('')}
-          </div>
-          <div id="projectTabContent" style="padding:0 0 0 24px;min-width:0;"></div>
+        <div class="project-tabs">
+          ${tabs.map(t => {
+            if (t.startsWith('_div')) return '<div class="tab-divider"></div>';
+            return '<button class="project-tab ' + (t === currentProjectTab ? 'active' : '') + '" onclick="switchProjectTab(\'' + t + '\')">' + tabLabels[t] + '</button>';
+          }).join('')}
         </div>
+        <div id="projectTabContent"></div>
       `;
 
       renderProjectTab(proj);
@@ -7470,6 +7549,23 @@
     let boardSortDir = 'asc';
 
     
+    // Collapsible room sections state
+    if (!window._rbCollapsed) window._rbCollapsed = {};
+    function rbToggleRoom(roomKey) {
+      window._rbCollapsed[roomKey] = !window._rbCollapsed[roomKey];
+      var k = roomKey.replace(/[^a-zA-Z0-9]/g,'');
+      var collapsed = window._rbCollapsed[roomKey];
+      // Toggle both tile and table sections (whichever exists)
+      ['rb-sec-', 'rb-sec-tbl-'].forEach(function(prefix) {
+        var sec = document.getElementById(prefix + k);
+        if (sec) sec.style.display = collapsed ? 'none' : '';
+      });
+      ['rb-arrow-', 'rb-arrow-tbl-'].forEach(function(prefix) {
+        var arrow = document.getElementById(prefix + k);
+        if (arrow) arrow.textContent = collapsed ? '▸' : '▾';
+      });
+    }
+
     function renderBoardTileView(groupedData, projId) {
       return Object.keys(groupedData).map(function(rm) {
         var items = groupedData[rm] || [];
@@ -7478,40 +7574,49 @@
           var p = parseMoney(c.clientPrice) || parseFloat(c.sellPrice) || parseMoney(c.totalSelling) || parseFloat(c.price) || 0;
           return s + (p * q);
         }, 0);
-        return '<div style="margin-bottom:32px;">' +
-          '<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--gold);">' +
-            '<div><span style="font-size:16px;font-weight:600;">' + esc(rm) + '</span> <span style="font-size:12px;color:var(--gray-400);font-weight:400;margin-left:6px;">' + items.length + ' item' + (items.length !== 1 ? 's' : '') + '</span></div>' +
-            (groupTotal > 0 ? '<div style="font-size:14px;font-weight:600;color:var(--gold);font-family:var(--font-mono);">' + formatMoney(groupTotal) + '</div>' : '') +
+        var rmKey = rm.replace(/[^a-zA-Z0-9]/g,'');
+        var isCollapsed = window._rbCollapsed[rm];
+        return '<div style="margin-bottom:8px;">' +
+          '<div onclick="rbToggleRoom(\'' + escAttr(rm) + '\')" style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--gray-200);cursor:pointer;user-select:none;">' +
+            '<div style="display:flex;align-items:center;gap:10px;">' +
+              '<span id="rb-arrow-' + rmKey + '" style="font-size:14px;color:var(--gray-400);width:16px;text-align:center;">' + (isCollapsed ? '▸' : '▾') + '</span>' +
+              '<span style="font-size:16px;font-weight:700;letter-spacing:0.02em;text-transform:uppercase;color:#0E1629;">' + esc(rm) + '</span>' +
+              '<span style="font-size:12px;color:var(--gray-400);font-weight:400;">' + items.length + ' product' + (items.length !== 1 ? 's' : '') + '</span>' +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:12px;">' +
+              (groupTotal > 0 ? '<span style="font-size:13px;font-weight:600;color:var(--gold);font-family:var(--font-mono);">' + formatMoney(groupTotal) + '</span>' : '') +
+              '<div class="action-menu-wrap" style="position:relative;"><button onclick="event.stopPropagation();toggleActionMenu(this)" style="background:none;border:1px solid var(--gray-200);color:var(--gray-400);padding:4px 8px;font-size:14px;cursor:pointer;border-radius:4px;line-height:1;">⋮</button><div class="action-dropdown" style="display:none;right:0;left:auto;min-width:160px;"><a onclick="event.stopPropagation();renameRoom(\'' + escAttr(projId) + '\',\'' + escAttr(rm) + '\');closeAllMenus()">✏️ Rename</a><a onclick="event.stopPropagation();uploadRoomCover(\'' + escAttr(projId) + '\',\'' + escAttr(rm) + '\',this);closeAllMenus()">📷 Set Cover</a><a onclick="event.stopPropagation();deleteRoom(\'' + escAttr(projId) + '\',\'' + escAttr(rm) + '\');closeAllMenus()" style="color:#E53935;">🗑️ Delete</a></div></div>' +
+            '</div>' +
           '</div>' +
-          '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;">' +
+          '<div id="rb-sec-' + rmKey + '" style="' + (isCollapsed ? 'display:none;' : '') + 'padding:16px 0 24px;">' +
+          '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;">' +
           items.map(function(clip) {
             var imgSrc = clip.imageUrl || (clip.images && clip.images[0]) || '';
             var qty = parseFloat(clip.qty || clip.quantity) || 1;
-            var cost = parseMoney(clip.cost) || parseFloat(clip.costPrice) || parseFloat(clip.tradeCost) || parseFloat(clip.unitCost) || 0;
             var sell = parseMoney(clip.clientPrice) || parseFloat(clip.sellPrice) || parseFloat(clip.unitSellingPrice) || (parseMoney(clip.totalSelling) ? parseMoney(clip.totalSelling) / qty : 0) || parseFloat(clip.totalSell) || parseFloat(clip.price) || parseFloat(clip.retailPrice) || 0;
-            var total = parseMoney(clip.totalSelling) || (sell * qty);
-            var status = clip.approvalStatus || clip.status || '';
             var isValid = imgSrc && (imgSrc.startsWith('http') || imgSrc.startsWith('data:'));
-            var statusClass = status === 'Approved' ? 'badge-approved' : status === 'Ordered' ? 'badge-ordered' : status === 'Received' ? 'badge-paid' : status === 'Installed' ? 'badge-paid' : 'badge-draft';
-            return '<div class="rb-tile-card" onclick="showClipDetail(\'' + escAttr(projId) + '\',\'' + escAttr(clip.id) + '\')" style="background:white;border:1px solid var(--gray-200);border-radius:8px;overflow:hidden;cursor:pointer;transition:box-shadow 0.2s,transform 0.15s;position:relative;"' +
-              ' onmouseenter="this.style.boxShadow=\'0 4px 16px rgba(0,0,0,0.12)\';this.style.transform=\'translateY(-2px)\'" onmouseleave="this.style.boxShadow=\'none\';this.style.transform=\'none\'">' +
+            return '<div onclick="showClipDetail(\'' + escAttr(projId) + '\',\'' + escAttr(clip.id) + '\')" style="background:white;border:1px solid var(--gray-200);border-radius:6px;overflow:hidden;cursor:pointer;transition:box-shadow 0.2s,transform 0.15s;"' +
+              ' onmouseenter="this.style.boxShadow=\'0 4px 16px rgba(0,0,0,0.1)\';this.style.transform=\'translateY(-1px)\'" onmouseleave="this.style.boxShadow=\'none\';this.style.transform=\'none\'">' +
               '<div style="position:relative;">' +
-                (isValid ? '<img src="' + escAttr(imgSrc) + '" style="width:100%;aspect-ratio:4/3;object-fit:cover;display:block;" referrerpolicy="no-referrer" onerror="this.outerHTML=\'<div style=\\\'aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;background:#F5F3EE;color:var(--gray-300);font-size:40px;\\\'>\\ud83d\\udcf7</div>\'">' : '<div style="aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;background:#F5F3EE;color:var(--gray-300);font-size:40px;">📷</div>') +
-                (clip.room ? '<div style="position:absolute;top:8px;left:8px;background:rgba(14,22,41,0.85);color:white;font-size:10px;font-weight:600;padding:3px 8px;border-radius:4px;letter-spacing:0.3px;">' + esc(clip.room) + '</div>' : '') +
-                (status ? '<div style="position:absolute;top:8px;right:8px;"><span class="badge ' + statusClass + '" style="font-size:10px;padding:2px 8px;">' + esc(status) + '</span></div>' : '') +
-                (clip.pageUrl ? '<a href="' + escAttr(clip.pageUrl) + '" target="_blank" onclick="event.stopPropagation()" style="position:absolute;bottom:8px;right:8px;background:rgba(255,255,255,0.9);width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:14px;box-shadow:0 1px 3px rgba(0,0,0,0.2);" title="View source">🔗</a>' : '') +
-              '</div>' +
-              '<div style="padding:12px 14px;">' +
-                '<div style="font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#0E1629;">' + esc(clip.title || 'Untitled') + '</div>' +
-                '<div style="font-size:12px;color:var(--gray-500);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(clip.vendor || '') + (clip.category ? ' · ' + esc(clip.category) : '') + '</div>' +
-                '<div style="display:flex;align-items:baseline;justify-content:space-between;margin-top:8px;">' +
-                  (sell > 0 ? '<div style="font-size:16px;font-weight:700;color:var(--gold);font-family:var(--font-mono);">' + formatMoney(sell) + '</div>' : '<div style="font-size:12px;color:var(--gray-300);">No price</div>') +
-                  (qty > 1 ? '<div style="font-size:11px;color:var(--gray-400);">Qty: ' + qty + (total > 0 ? ' · ' + formatMoney(total) : '') + '</div>' : '') +
+                '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:rgba(245,243,238,0.5);border-bottom:1px solid var(--gray-100);">' +
+                  '<div style="display:flex;gap:6px;">' +
+                    (clip.pageUrl ? '<a href="' + escAttr(clip.pageUrl) + '" target="_blank" onclick="event.stopPropagation()" title="View source" style="color:var(--gray-400);font-size:13px;text-decoration:none;padding:2px;">🔗</a>' : '') +
+                  '</div>' +
+                  '<div style="display:flex;gap:6px;">' +
+                    (sell > 0 ? '<span style="font-size:11px;font-weight:600;color:var(--gold);">$</span>' : '') +
+                  '</div>' +
                 '</div>' +
+                (isValid ? '<img src="' + escAttr(imgSrc) + '" style="width:100%;aspect-ratio:1;object-fit:cover;display:block;" referrerpolicy="no-referrer" onerror="this.outerHTML=\'<div style=\\\'aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:#F5F3EE;color:var(--gray-300);font-size:40px;\\\'>📷</div>\'">' : '<div style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:#F5F3EE;color:var(--gray-300);font-size:40px;">📷</div>') +
+              '</div>' +
+              '<div style="padding:10px 12px;">' +
+                '<div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#0E1629;">' + esc(clip.title || 'Untitled') + '</div>' +
+                (clip.vendor ? '<div style="font-size:11px;color:var(--gray-500);margin-top:2px;">By ' + esc(clip.vendor) + '</div>' : '') +
+                (clip.description ? '<div style="font-size:11px;color:var(--gray-400);margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + esc(clip.description).substring(0, 80) + '</div>' : '') +
+                (sell > 0 ? '<div style="font-size:14px;font-weight:700;color:var(--gold);font-family:var(--font-mono);margin-top:6px;">' + formatMoney(sell) + (qty > 1 ? ' <span style="font-size:11px;color:var(--gray-400);font-weight:400;">x' + qty + '</span>' : '') + '</div>' : '') +
               '</div>' +
             '</div>';
           }).join('') +
-          '</div></div>';
+          '</div></div></div>';
       }).join('');
     }
 
@@ -7666,58 +7771,64 @@ async function renderBoardsTab(T, proj) {
       const roomCards = _buildCards(roomNames, roomGrouped);
       const catCards = _buildCards(catNames, catGrouped);
 
+      // Grand totals
+      const grandCost = clips.reduce((s,c) => s + ((parseMoney(c.cost)||0) * (parseFloat(c.qty)||1)), 0);
+      const grandSell = clips.reduce((s,c) => s + (parseMoney(c.totalSelling) || ((parseMoney(c.clientPrice)||0) * (parseFloat(c.qty)||1))), 0);
+
       T.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <div class="section-title" style="margin:0;">${roomNames.length} Rooms · ${catNames.length} Categories · ${clips.length} Items</div>
-          <div style="display: flex; gap: 8px;">
-            <button class="btn ${(window._boardDisplayMode||'tile')==='table'?'btn-primary':'btn-secondary'} btn-sm" onclick="window._boardDisplayMode='table';renderBoardsTab(document.getElementById('tabContent'),{id:'${escAttr(proj.id)}',name:'${escAttr(proj.name)}'})">📊 Table</button>
-            <button class="btn ${(window._boardDisplayMode||'tile')==='tile'?'btn-primary':'btn-secondary'} btn-sm" onclick="window._boardDisplayMode='tile';renderBoardsTab(document.getElementById('tabContent'),{id:'${escAttr(proj.id)}',name:'${escAttr(proj.name)}'})">🖼️ Tiles</button>
-            <button class="btn btn-secondary btn-sm" onclick="showImageManager('${proj.id}','${escAttr(proj.name)}')">🖼️ Image Manager</button>
-            <button class="btn btn-secondary btn-sm" onclick="previewRoomBoard('${proj.id}')">👁️ Preview</button>
-            <button class="btn ${window._boardViewMode==='category'?'btn-secondary':'btn-primary'} btn-sm" onclick="window._boardViewMode='room';renderBoardsTab(document.getElementById('tabContent'),{id:'${escAttr(proj.id)}',name:'${escAttr(proj.name)}'})">🏠 Room Boards</button><button class="btn ${window._boardViewMode==='category'?'btn-primary':'btn-secondary'} btn-sm" onclick="window._boardViewMode='category';renderBoardsTab(document.getElementById('tabContent'),{id:'${escAttr(proj.id)}',name:'${escAttr(proj.name)}'})">🏷️ Category Boards</button>
-            <button class="btn btn-secondary btn-sm" onclick="generateProposalFromClips('${proj.id}')">📋 Generate Proposal</button>
-            <button class="btn btn-secondary btn-sm" onclick="generateTearSheets('${proj.id}','${escAttr(proj.name)}')">📄 Tear Sheets</button>
-            <button class="btn btn-primary btn-sm" onclick="showImportTearSheetModal('${proj.id}','${escAttr(proj.name)}')">📦 Import Tear Sheet</button>
-            <button class="btn btn-secondary btn-sm" onclick="importFFEReport('${proj.id}','${escAttr(proj.name)}')" style="background:rgba(196,164,100,0.1);color:var(--gold);border-color:var(--gold);">📊 Import FFE</button>
-            <button class="btn btn-primary btn-sm" onclick="createNewRoom('${escAttr(proj.id)}')" style="background:var(--cyan);border-color:var(--cyan);color:#0E1629;">+ New Room</button>
+        <!-- TOP BAR: view toggles left, actions right -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--gray-200);">
+          <div style="display:flex;align-items:center;gap:16px;">
+            <!-- View toggle icons (list / grid) like StyleRow -->
+            <div style="display:flex;border:1px solid var(--gray-200);border-radius:6px;overflow:hidden;">
+              <button onclick="window._boardDisplayMode='table';renderBoardsTab(document.getElementById('tabContent'),{id:'${escAttr(proj.id)}',name:'${escAttr(proj.name)}'})" title="List view" style="padding:7px 10px;border:none;cursor:pointer;display:flex;align-items:center;background:${(window._boardDisplayMode||'tile')==='table'?'var(--gold)':'white'};color:${(window._boardDisplayMode||'tile')==='table'?'white':'var(--gray-400)'};">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="14" height="2" rx="0.5"/><rect x="1" y="7" width="14" height="2" rx="0.5"/><rect x="1" y="12" width="14" height="2" rx="0.5"/></svg>
+              </button>
+              <button onclick="window._boardDisplayMode='tile';renderBoardsTab(document.getElementById('tabContent'),{id:'${escAttr(proj.id)}',name:'${escAttr(proj.name)}'})" title="Grid view" style="padding:7px 10px;border:none;border-left:1px solid var(--gray-200);cursor:pointer;display:flex;align-items:center;background:${(window._boardDisplayMode||'tile')==='tile'?'var(--gold)':'white'};color:${(window._boardDisplayMode||'tile')==='tile'?'white':'var(--gray-400)'};">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+              </button>
+            </div>
+
+            <!-- Show Me: Room / Category toggle -->
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:12px;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.05em;font-weight:500;">Show Me</span>
+              <select onchange="window._boardViewMode=this.value;renderBoardsTab(document.getElementById('tabContent'),{id:'${escAttr(proj.id)}',name:'${escAttr(proj.name)}'})" style="font-size:13px;padding:5px 10px;border:1px solid var(--gray-200);border-radius:6px;background:white;color:#0E1629;cursor:pointer;">
+                <option value="room" ${window._boardViewMode!=='category'?'selected':''}>By Room</option>
+                <option value="category" ${window._boardViewMode==='category'?'selected':''}>By Category</option>
+              </select>
+            </div>
+
+            <!-- Product count -->
+            <span style="font-size:13px;color:var(--gray-500);">Displaying <strong>${clips.length}</strong> products</span>
+          </div>
+
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            <button class="btn btn-secondary btn-sm" onclick="previewRoomBoard('${proj.id}')" style="font-size:12px;">👁️ Preview</button>
+            <button class="btn btn-secondary btn-sm" onclick="generateProposalFromClips('${proj.id}')" style="font-size:12px;">📋 Proposal</button>
+            <button class="btn btn-secondary btn-sm" onclick="generateTearSheets('${proj.id}','${escAttr(proj.name)}')" style="font-size:12px;">📄 Tear Sheets</button>
+            <div class="action-menu-wrap" style="position:relative;display:inline-block;">
+              <button class="btn btn-secondary btn-sm" onclick="toggleActionMenu(this)" style="font-size:12px;">+ Add <span style="font-size:10px;">▾</span></button>
+              <div class="action-dropdown" style="display:none;right:0;left:auto;min-width:180px;">
+                <a onclick="createNewRoom('${escAttr(proj.id)}');closeAllMenus()">🏠 New Room</a>
+                <a onclick="showImportTearSheetModal('${proj.id}','${escAttr(proj.name)}');closeAllMenus()">📦 Import Tear Sheet</a>
+                <a onclick="importFFEReport('${proj.id}','${escAttr(proj.name)}');closeAllMenus()">📊 Import FFE</a>
+                <a onclick="showImageManager('${proj.id}','${escAttr(proj.name)}');closeAllMenus()">🖼️ Image Manager</a>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="room-cards-grid" id="roomCardsGrid">
-          ${(window._boardViewMode === "category" ? catCards : roomCards).map(rc => `
-            <div class="room-card" onclick="scrollToRoom('${escAttr(rc.name)}')" style="position:relative;">
-              <div class="room-card-cover">
-                ${rc.coverImg ? '<img src="' + escAttr(rc.coverImg) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' : ''}<div class="room-card-placeholder" style="${rc.coverImg ? 'display:none;' : 'display:flex;'}background:linear-gradient(135deg,#2a2a2a,#3a3a3a);align-items:center;justify-content:center;width:100%;height:100%;color:var(--gold);font-size:28px;flex-direction:column;gap:4px;">🏠<span style="font-size:9px;color:var(--gold);">Upload cover</span></div>
-                <div class="room-card-upload" onclick="event.stopPropagation();uploadRoomCover('${escAttr(proj.id)}','${escAttr(rc.name)}',this)" title="Upload cover image">📷</div>
-                
-                <div style="position:absolute;top:6px;right:6px;z-index:10;" class="action-menu-wrap"><button onclick="event.stopPropagation();toggleActionMenu(this)" style="background:rgba(0,0,0,0.6);color:white;border:none;padding:4px 10px;font-size:16px;cursor:pointer;border-radius:4px;line-height:1;">⋮</button><div class="action-dropdown" style="display:none;right:0;left:auto;min-width:160px;"><a onclick="event.stopPropagation();navigate('#/project/${escAttr(proj.id)}/ideabooks');closeAllMenus()">📂 Open Boards</a><a onclick="event.stopPropagation();renameRoom('${escAttr(proj.id)}','${escAttr(rc.name)}');closeAllMenus()">✏️ Rename</a><a onclick="event.stopPropagation();uploadRoomCover('${escAttr(proj.id)}','${escAttr(rc.name)}',this);closeAllMenus()">📷 Change Cover</a><a onclick="event.stopPropagation();deleteRoom('${escAttr(proj.id)}','${escAttr(rc.name)}');closeAllMenus()" style="color:#E53935;">🗑️ Delete Room</a></div></div>
-              </div>
-              <div class="room-card-info">
-                <div class="room-card-name">${esc(rc.name)}</div>
-                <div class="room-card-meta">${rc.count} items</div>
-                <div class="room-card-budget">${formatMoney(rc.totalCost)} / ${formatMoney(rc.totalSell)}</div>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-        ${catCards.length > 0 ? `
-        <div style="margin-top:32px;margin-bottom:12px;display:flex;align-items:center;gap:12px;">
-          <div class="section-title" style="margin:0;">🏷️ Category Boards</div>
-          <span style="font-size:12px;color:var(--gold);">${catCards.reduce((s,c)=>s+c.count,0)} items across ${catCards.length} categories</span>
-        </div>
-        <div class="room-cards-grid">
-          ${catCards.map(rc => `
-            <div class="room-card" onclick="scrollToRoom('${escAttr(rc.name)}')" style="border-left:3px solid var(--gold);">
-              <div class="room-card-cover">
-                ${rc.coverImg ? '<img src="' + escAttr(rc.coverImg) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' : ''}<div class="room-card-placeholder" style="${rc.coverImg ? 'display:none;' : 'display:flex;'}background:linear-gradient(135deg,#0E1629,#1A2540);align-items:center;justify-content:center;width:100%;height:100%;color:var(--gold);font-size:28px;">🏷️</div>
-              </div>
-              <div class="room-card-info">
-                <div class="room-card-name">${esc(rc.name)}</div>
-                <div class="room-card-meta">${rc.count} items</div>
-                <div class="room-card-budget">${formatMoney(rc.totalCost)} / ${formatMoney(rc.totalSell)}</div>
-              </div>
-            </div>
-          `).join('')}
+
+        <!-- BUDGET summary bar -->
+        ${grandSell > 0 ? `
+        <div style="display:flex;gap:24px;margin-bottom:20px;padding:12px 16px;background:#F9F8F5;border:1px solid var(--gray-200);border-radius:6px;">
+          <div><span style="font-size:11px;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.05em;">Cost</span><div style="font-size:15px;font-weight:600;color:var(--gray-600);font-family:var(--font-mono);">${formatMoney(grandCost)}</div></div>
+          <div><span style="font-size:11px;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.05em;">Sell</span><div style="font-size:15px;font-weight:600;color:var(--gold);font-family:var(--font-mono);">${formatMoney(grandSell)}</div></div>
+          <div><span style="font-size:11px;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.05em;">Margin</span><div style="font-size:15px;font-weight:600;color:var(--green);font-family:var(--font-mono);">${grandCost > 0 ? Math.round((grandSell - grandCost) / grandSell * 100) + '%' : '—'}</div></div>
+          <div><span style="font-size:11px;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.05em;">Rooms</span><div style="font-size:15px;font-weight:600;">${roomNames.length}</div></div>
+          <div><span style="font-size:11px;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.05em;">Categories</span><div style="font-size:15px;font-weight:600;">${catNames.length}</div></div>
         </div>` : ''}
+
+        <!-- CONTENT: collapsible room/category sections -->
         ${(window._boardDisplayMode || 'tile') === 'tile' ? renderBoardTileView(window._boardViewMode === 'category' ? catGrouped : grouped, proj.id) : clips.length === 0 ? `
           <div class="empty-state">
             <div class="empty-icon">🛋️</div>
@@ -7726,20 +7837,34 @@ async function renderBoardsTab(T, proj) {
         ` : Object.keys(window._boardViewMode === "category" ? catGrouped : grouped).map(rm => {
           const isUnassigned = rm === 'Unassigned';
           const availableRooms = roomNames.filter(r => r !== 'Unassigned');
+          const rmKey = rm.replace(/[^a-zA-Z0-9]/g,'');
+          const isCollapsed = window._rbCollapsed && window._rbCollapsed[rm];
+          const sectionItems = (window._boardViewMode === "category" ? catGrouped : grouped)[rm] || [];
+          const sectionTotal = sectionItems.reduce((s,c) => s + (parseMoney(c.totalSelling) || ((parseMoney(c.clientPrice)||0) * (parseFloat(c.qty)||1))), 0);
           return `
-          <div style="margin-bottom: 24px;" id="room-sec-${rm.replace(/[^a-zA-Z0-9]/g,'')}">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid ${isUnassigned ? 'var(--red)' : 'var(--gold)'};">
-              <span style="font-size: 15px; font-weight: 600;">${esc(rm)}${isUnassigned ? ' <span style="font-size:12px;color:var(--red);font-weight:400;">— assign items to rooms below</span>' : ''}</span>
-              ${isUnassigned && availableRooms.length > 0 ? `
-                <div style="display:flex;gap:8px;align-items:center;">
-                  <select id="bulkMoveRoomSelect" class="form-input" style="font-size:12px;padding:4px 8px;min-width:160px;">
-                    <option value="">Move selected to...</option>
-                    ${availableRooms.map(r => '<option value="' + escAttr(r) + '">' + esc(r) + '</option>').join('')}
-                  </select>
-                  <button class="btn btn-primary btn-sm" style="font-size:11px;padding:4px 12px;" onclick="bulkMoveClipsToRoom('${escAttr(proj.id)}', document.getElementById('bulkMoveRoomSelect').value)">Move</button>
-                </div>
-              ` : ''}
+          <div style="margin-bottom:8px;" id="room-sec-${rmKey}">
+            <div onclick="rbToggleRoom('${escAttr(rm)}')" style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid ${isUnassigned ? 'var(--red)' : 'var(--gray-200)'};cursor:pointer;user-select:none;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span id="rb-arrow-tbl-${rmKey}" style="font-size:14px;color:var(--gray-400);width:16px;text-align:center;">${isCollapsed ? '▸' : '▾'}</span>
+                <span style="font-size:16px;font-weight:700;letter-spacing:0.02em;text-transform:uppercase;color:#0E1629;">${esc(rm)}</span>
+                <span style="font-size:12px;color:var(--gray-400);font-weight:400;">${sectionItems.length} product${sectionItems.length !== 1 ? 's' : ''}</span>
+                ${isUnassigned ? '<span style="font-size:11px;color:var(--red);font-weight:400;">— assign rooms below</span>' : ''}
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;">
+                ${sectionTotal > 0 ? '<span style="font-size:13px;font-weight:600;color:var(--gold);font-family:var(--font-mono);">' + formatMoney(sectionTotal) + '</span>' : ''}
+                ${isUnassigned && availableRooms.length > 0 ? `
+                  <div onclick="event.stopPropagation()" style="display:flex;gap:6px;align-items:center;">
+                    <select id="bulkMoveRoomSelect" class="form-input" style="font-size:11px;padding:3px 8px;min-width:140px;">
+                      <option value="">Move selected to...</option>
+                      ${availableRooms.map(r => '<option value="' + escAttr(r) + '">' + esc(r) + '</option>').join('')}
+                    </select>
+                    <button class="btn btn-primary btn-sm" style="font-size:10px;padding:3px 10px;" onclick="bulkMoveClipsToRoom('${escAttr(proj.id)}', document.getElementById('bulkMoveRoomSelect').value)">Move</button>
+                  </div>
+                ` : ''}
+                <div class="action-menu-wrap" style="position:relative;" onclick="event.stopPropagation()"><button onclick="toggleActionMenu(this)" style="background:none;border:1px solid var(--gray-200);color:var(--gray-400);padding:4px 8px;font-size:14px;cursor:pointer;border-radius:4px;line-height:1;">⋮</button><div class="action-dropdown" style="display:none;right:0;left:auto;min-width:160px;"><a onclick="renameRoom('${escAttr(proj.id)}','${escAttr(rm)}');closeAllMenus()">✏️ Rename</a><a onclick="uploadRoomCover('${escAttr(proj.id)}','${escAttr(rm)}',this);closeAllMenus()">📷 Set Cover</a><a onclick="deleteRoom('${escAttr(proj.id)}','${escAttr(rm)}');closeAllMenus()" style="color:#E53935;">🗑️ Delete</a></div></div>
+              </div>
             </div>
+            <div id="rb-sec-tbl-${rmKey}" style="${isCollapsed ? 'display:none;' : ''}">
             <table class="data-table" style="width:100%;font-size:13px;">
               <thead><tr>
                 ${isUnassigned ? '<th style="width:32px;"><input type="checkbox" onchange="document.querySelectorAll(\'.unassigned-check\').forEach(c=>c.checked=this.checked)" title="Select all"></th>' : ''}
@@ -7792,7 +7917,7 @@ async function renderBoardsTab(T, proj) {
                 ${isUnassigned && availableRooms.length > 0 ? '<td></td>' : ''}
               </tr></tfoot>
             </table>
-          </div>
+          </div></div>
         `}).join('')}
       `;
     }
@@ -10746,11 +10871,19 @@ async function renderBoardsTab(T, proj) {
                         '<button class="action-dots" onclick="event.stopPropagation();toggleActionMenu(this)" style="font-size:18px;padding:4px 8px;border:none;background:none;cursor:pointer;color:var(--gray-400);">⋮</button>' +
                         '<div class="action-dropdown" style="display:none">' +
                           '<a onclick="navigate(\'#/project/' + proj.id + '/invoice/' + inv.id + '\');closeAllMenus()">✏️ Edit Invoice</a>' +
-                          '<a onclick="quickRecordPayment(\'' + proj.id + '\',\'invoices\',\'' + inv.id + '\');closeAllMenus()">💳 Record Payment</a>' +
-                          '<a onclick="togglePublished(\'' + proj.id + '\',\'' + inv.id + '\',' + (!inv.published) + ',\'invoices\');closeAllMenus()">' + (inv.published ? '🔒 Unpublish' : '🌐 Publish to Client') + '</a>' +
-                          '<a onclick="markInvoicePaid(\'' + proj.id + '\',\'' + inv.id + '\');closeAllMenus()">✅ Mark as Paid</a>' +
-                          '<a onclick="exportInvoicePDF(\'' + proj.id + '\',\'' + inv.id + '\');closeAllMenus()">📄 PDF</a>' +
+                          '<a onclick="sendInvoiceToClient(\'' + proj.id + '\',\'' + inv.id + '\');closeAllMenus()">📧 Send to Client</a>' +
+                          '<a onclick="togglePublished(\'' + proj.id + '\',\'' + inv.id + '\',' + (!inv.published) + ',\'invoices\');closeAllMenus()">' + (inv.published ? '🔒 Unpublish from Dashboard' : '🌐 Publish to Client Dashboard') + '</a>' +
                           '<div class="divider"></div>' +
+                          '<a onclick="quickRecordPayment(\'' + proj.id + '\',\'invoices\',\'' + inv.id + '\');closeAllMenus()">💳 Record Payment</a>' +
+                          '<a onclick="markInvoicePaid(\'' + proj.id + '\',\'' + inv.id + '\');closeAllMenus()">✅ Mark as Paid</a>' +
+                          '<a onclick="markInvoicePastDue(\'' + proj.id + '\',\'' + inv.id + '\');closeAllMenus()">⚠️ Mark Past Due</a>' +
+                          '<div class="divider"></div>' +
+                          '<a onclick="previewDocument(\'invoice\',\'' + proj.id + '\',\'' + inv.id + '\');closeAllMenus()">📄 Preview / PDF</a>' +
+                          '<a onclick="duplicateInvoice(\'' + proj.id + '\',\'' + inv.id + '\');closeAllMenus()">📋 Duplicate Invoice</a>' +
+                          '<a onclick="generateTearSheetsFromDoc(\'' + proj.id + '\',\'invoices\',\'' + inv.id + '\',\'' + escAttr(proj.name||'') + '\');closeAllMenus()">📑 Tear Sheets</a>' +
+                          '<a onclick="linkDocModal(\'' + proj.id + '\',\'invoices\',\'' + inv.id + '\');closeAllMenus()">🔗 Link Documents</a>' +
+                          '<div class="divider"></div>' +
+                          '<a onclick="archiveInvoice(\'' + proj.id + '\',\'' + inv.id + '\');closeAllMenus()">📥 Archive</a>' +
                           '<a class="danger" onclick="deleteDoc(\'' + proj.id + '\',\'invoices\',\'' + inv.id + '\');closeAllMenus()">🗑️ Delete</a>' +
                         '</div>' +
                       '</div>' +
@@ -12796,7 +12929,7 @@ async function renderBoardsTab(T, proj) {
                 <div class="form-label" style="margin-bottom:8px;">Line Items</div>
                 <div class="po-line" style="display:grid;grid-template-columns:2fr 120px 70px 100px 30px;gap:8px;margin-bottom:8px;">
                   <input class="form-input" placeholder="Item description">
-                  <select class="form-input" style="font-size:11px;"><option value="product">Product</option><option value="sales_tax">Sales Tax</option><option value="shipping">Shipping/Freight</option><option value="handling">Handling</option><option value="other_expense">Other Expense</option></select>
+                  <select class="form-input" style="font-size:11px;"><option value="product">Product</option><option value="service">Service</option><option value="sales_tax">Pre-Paid Tax</option><option value="shipping">Shipping/Freight</option><option value="discount">Discount/Credit</option><option value="expense">Expense</option><option value="handling">Handling</option><option value="other_expense">Other</option></select>
                   <input class="form-input" placeholder="Qty" type="number" value="1">
                   <input class="form-input" placeholder="Cost" type="number" step="0.01">
                   <span></span>
@@ -12819,7 +12952,7 @@ async function renderBoardsTab(T, proj) {
       const line = document.createElement('div');
       line.className = 'po-line';
       line.style.cssText = 'display:grid;grid-template-columns:2fr 120px 70px 100px 30px;gap:8px;margin-bottom:8px;';
-      line.innerHTML = '<input class="form-input" placeholder="Item"><select class="form-input" style="font-size:11px;"><option value="product">Product</option><option value="sales_tax">Sales Tax</option><option value="shipping">Shipping/Freight</option><option value="handling">Handling</option><option value="other_expense">Other Expense</option></select><input class="form-input" placeholder="Qty" type="number" value="1"><input class="form-input" placeholder="Cost" type="number" step="0.01"><button class="btn btn-sm" style="padding:4px 8px;color:var(--red);" onclick="this.parentElement.remove()">×</button>';
+      line.innerHTML = '<input class="form-input" placeholder="Item"><select class="form-input" style="font-size:11px;"><option value="product">Product</option><option value="service">Service</option><option value="sales_tax">Pre-Paid Tax</option><option value="shipping">Shipping/Freight</option><option value="discount">Discount/Credit</option><option value="expense">Expense</option><option value="handling">Handling</option><option value="other_expense">Other</option></select><input class="form-input" placeholder="Qty" type="number" value="1"><input class="form-input" placeholder="Cost" type="number" step="0.01"><button class="btn btn-sm" style="padding:4px 8px;color:var(--red);" onclick="this.parentElement.remove()">×</button>';
       c.appendChild(line);
     }
 
@@ -12831,7 +12964,7 @@ async function renderBoardsTab(T, proj) {
         const inputs = line.querySelectorAll('input');
         const selects = line.querySelectorAll('select');
         const desc = inputs[0].value.trim();
-        const _validExpenseTypes = ['product', 'sales_tax', 'shipping', 'handling', 'other_expense'];
+        const _validExpenseTypes = ['product', 'service', 'sales_tax', 'shipping', 'discount', 'expense', 'handling', 'other_expense'];
         const expenseType = selects.length > 0 && _validExpenseTypes.includes(selects[0].value) ? selects[0].value : 'product';
         const qty = parseFloat(inputs[1].value) || 1;
         const cost = parseFloat(inputs[2].value) || 0;
@@ -14957,13 +15090,16 @@ async function renderBoardsTab(T, proj) {
             '<div class="doc-edit-field"><label>Shipping</label><input type="number" step="0.01" value="' + shipping.toFixed(2) + '" data-idx="' + idx + '" data-field="shipping" onchange="docEditNumChange(this)"></div>' +
             '<div class="doc-edit-field"><label>Markup $</label><input class="calc" value="' + markupDollar.toFixed(2) + '" readonly></div>' +
             '<div class="doc-edit-field"><label>Total</label><input class="calc" value="' + total.toFixed(2) + '" readonly title="Auto-calculated"></div>' +
-            (isPO ? '<div class="doc-edit-field"><label>Expense Type</label><select data-idx="' + idx + '" data-field="expenseType" onchange="docEditFieldChange(this)" style="font-size:11px;">' +
+            '<div class="doc-edit-field"><label>Item Type</label><select data-idx="' + idx + '" data-field="expenseType" onchange="docEditFieldChange(this)" style="font-size:11px;">' +
               '<option value="product"' + ((item.expenseType || 'product') === 'product' ? ' selected' : '') + '>Product</option>' +
-              '<option value="sales_tax"' + (item.expenseType === 'sales_tax' ? ' selected' : '') + '>Sales Tax</option>' +
+              '<option value="service"' + (item.expenseType === 'service' ? ' selected' : '') + '>Service</option>' +
+              '<option value="sales_tax"' + (item.expenseType === 'sales_tax' ? ' selected' : '') + '>Pre-Paid Tax</option>' +
               '<option value="shipping"' + (item.expenseType === 'shipping' ? ' selected' : '') + '>Shipping/Freight</option>' +
+              '<option value="discount"' + (item.expenseType === 'discount' ? ' selected' : '') + '>Discount/Credit</option>' +
+              '<option value="expense"' + (item.expenseType === 'expense' ? ' selected' : '') + '>Expense</option>' +
               '<option value="handling"' + (item.expenseType === 'handling' ? ' selected' : '') + '>Handling</option>' +
-              '<option value="other_expense"' + (item.expenseType === 'other_expense' ? ' selected' : '') + '>Other Expense</option>' +
-            '</select></div>' : '') +
+              '<option value="other_expense"' + (item.expenseType === 'other_expense' ? ' selected' : '') + '>Other</option>' +
+            '</select></div>' +
             '<div class="doc-edit-field doc-edit-room"><label>Room</label><select data-idx="' + idx + '" data-field="room" onchange="docEditFieldChange(this)">' + docEditBuildRoomOptions(_docEdit.rooms, item.room || item.category || '') + '</select></div>' +
             '<div class="doc-edit-field" style="grid-column:span 2;"><label>Ship To</label><select data-idx="' + idx + '" data-field="shipTo" onchange="docEditFieldChange(this)" style="font-size:12px;">' + _piShipToOptions(item.shipTo || '') + '</select></div>' +
           '</div>' +
@@ -15027,33 +15163,32 @@ async function renderBoardsTab(T, proj) {
       const totalPaid = payments.reduce((s,p) => s + (parseFloat(p.amount) || 0), 0);
       const balance = grandTotal - totalPaid;
 
-      // Calculate expense breakdown for POs
+      // Calculate expense breakdown for ALL document types
       var _expBreakdown = {};
-      if (_docEdit.type === 'po') {
-        items.forEach(function(item) {
-          var et = item.expenseType || 'product';
-          var qty = parseFloat(item.qty) || 1;
-          var cost = parseFloat(item.cost) || 0;
-          var ship = parseFloat(item.shipping) || 0;
-          var lt = (cost * qty) + ship;
-          if (!_expBreakdown[et]) _expBreakdown[et] = 0;
-          _expBreakdown[et] += lt;
-        });
-      }
-      var _expLabels = { product: 'Products', sales_tax: 'Pre-Paid Sales Tax', shipping: 'Shipping/Freight', handling: 'Handling Fees', other_expense: 'Other Expenses' };
-      var _expColors = { product: 'var(--cyan)', sales_tax: '#E16A5B', shipping: 'var(--gold)', handling: '#9B59B6', other_expense: 'var(--gray-400)' };
+      items.forEach(function(item) {
+        var et = item.expenseType || 'product';
+        var qty = parseFloat(item.qty) || 1;
+        var cost = parseFloat(item.cost) || 0;
+        var ship = parseFloat(item.shipping) || 0;
+        var amt = parseFloat(item.amount) || 0;
+        var lt = cost > 0 ? (cost * qty) + ship : amt;
+        if (!_expBreakdown[et]) _expBreakdown[et] = 0;
+        _expBreakdown[et] += lt;
+      });
+      var _expLabels = { product: 'Products', service: 'Services', sales_tax: 'Pre-Paid Sales Tax', shipping: 'Shipping/Freight', discount: 'Discounts/Credits', expense: 'Expenses', handling: 'Handling Fees', other_expense: 'Other Expenses' };
+      var _expColors = { product: 'var(--cyan)', service: '#5FA56B', sales_tax: '#E16A5B', shipping: 'var(--gold)', discount: '#9B59B6', expense: '#FF8F00', handling: '#7B1FA2', other_expense: 'var(--gray-400)' };
 
       const el = document.getElementById('docEditTotals');
       if (el) {
         var _expRows = '';
-        if (_docEdit.type === 'po' && Object.keys(_expBreakdown).length > 1) {
-          _expRows = '<tr><td colspan="2" style="padding-top:8px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);border-top:1px solid var(--gray-200);">Expense Breakdown</td></tr>';
+        if (Object.keys(_expBreakdown).length > 1) {
+          _expRows = '<tr><td colspan="2" style="padding-top:8px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);border-top:1px solid var(--gray-200);">Item Type Breakdown</td></tr>';
           Object.keys(_expBreakdown).forEach(function(et) {
             if (_expBreakdown[et] > 0) {
               _expRows += '<tr><td style="color:' + (_expColors[et] || '#fff') + ';font-size:12px;">' + (_expLabels[et] || et) + '</td><td style="color:' + (_expColors[et] || '#fff') + ';">' + formatMoney(_expBreakdown[et]) + '</td></tr>';
             }
           });
-        } else if (_docEdit.type === 'po' && _expBreakdown['sales_tax']) {
+        } else if (_expBreakdown['sales_tax']) {
           _expRows = '<tr><td style="color:#E16A5B;font-size:12px;">Pre-Paid Sales Tax</td><td style="color:#E16A5B;">' + formatMoney(_expBreakdown['sales_tax']) + '</td></tr>';
         }
         el.innerHTML = '<table>' +
@@ -20462,18 +20597,62 @@ async function renderBoardsTab(T, proj) {
 
     // ===== TIME RECONCILIATION VIEW =====
     function renderReconciliationView(container, filtered, admin) {
-      // Get last 14 days
+      // Member filter for reconciliation
+      if (!window._reconMemberFilter) window._reconMemberFilter = 'all';
+      var reconMemberFilter = window._reconMemberFilter;
+
+      // Period filter: 'week', '14days', 'month'
+      if (!window._reconPeriod) window._reconPeriod = '14days';
+      var reconPeriod = window._reconPeriod;
+
+      // Get unique member names from time entries
+      var reconMemberNames = [...new Set(timeEntries.map(t => t.member).filter(Boolean))].sort();
+
+      // Build days array based on period
       const days = [];
       const today = new Date();
-      for (let i = 0; i < 14; i++) {
-        const d = new Date(today);
-        d.setDate(d.getDate() - i);
-        days.push(d.toISOString().split('T')[0]);
+      var periodLabel = 'Last 14 days';
+      if (reconPeriod === 'week') {
+        // This week (Mon–Sun)
+        var dow = today.getDay(); // 0=Sun
+        var mondayOffset = dow === 0 ? -6 : 1 - dow;
+        var monday = new Date(today); monday.setDate(today.getDate() + mondayOffset);
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(monday); d.setDate(monday.getDate() + i);
+          if (d <= today) days.push(d.toISOString().split('T')[0]);
+        }
+        days.sort().reverse();
+        periodLabel = 'This week';
+      } else if (reconPeriod === 'month') {
+        // This calendar month
+        var firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        var d = new Date(today);
+        while (d >= firstOfMonth) {
+          days.push(d.toISOString().split('T')[0]);
+          d.setDate(d.getDate() - 1);
+        }
+        periodLabel = today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      } else {
+        // Default: last 14 days
+        for (let i = 0; i < 14; i++) {
+          const d = new Date(today);
+          d.setDate(d.getDate() - i);
+          days.push(d.toISOString().split('T')[0]);
+        }
+        periodLabel = 'Last 14 days';
       }
 
       // Build per-day data
       const dayData = days.map(dateStr => {
-        const dayEntries = timeEntries.filter(t => t.date === dateStr);
+        let dayEntries = timeEntries.filter(t => t.date === dateStr);
+        // Apply member filter
+        if (reconMemberFilter !== 'all') {
+          var filterFirst = reconMemberFilter.split(' ')[0].toLowerCase();
+          dayEntries = dayEntries.filter(t => {
+            var m = (t.member || '').toLowerCase();
+            return m.includes(filterFirst);
+          });
+        }
         const loggedHours = dayEntries.reduce((s, t) => s + (parseFloat(t.hours) || 0), 0);
         const loggedValue = dayEntries.filter(t => t.billable).reduce((s, t) => s + (parseFloat(t.total) || 0), 0);
         const invoicedValue = dayEntries.filter(t => t.invoiceId).reduce((s, t) => s + (parseFloat(t.invoicedAmount) || parseFloat(t.total) || 0), 0);
@@ -20516,8 +20695,8 @@ async function renderBoardsTab(T, proj) {
         return { dateStr, dayOfWeek, dayLabel, isWeekend, isToday, loggedHours, loggedValue, invoicedValue, entryCount, capturedMinutes, unloggedBuckets, byMember, byProject };
       });
 
-      // Totals for last 7 weekdays
-      const workDays = dayData.filter(d => !d.isWeekend).slice(0, 7);
+      // Totals for weekdays in selected period
+      const workDays = reconPeriod === 'month' ? dayData.filter(d => !d.isWeekend) : dayData.filter(d => !d.isWeekend).slice(0, 7);
       const totalLogged = workDays.reduce((s, d) => s + d.loggedHours, 0);
       const totalValue = workDays.reduce((s, d) => s + d.loggedValue, 0);
       const totalInvoiced = workDays.reduce((s, d) => s + d.invoicedValue, 0);
@@ -20539,16 +20718,29 @@ async function renderBoardsTab(T, proj) {
       const shortName = (m) => (m || 'Unknown').split(/\s+/)[0];
 
       container.innerHTML = `
-        <div style="margin-bottom:24px;">
-          <div style="font-size:22px;font-weight:300;color:#0E1629;font-family:var(--font-display);margin-bottom:4px;">Time Reconciliation</div>
-          <div style="font-size:12px;color:var(--gray-500);">Where did the missing time go? Last 14 days.</div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;">
+          <div>
+            <div style="font-size:22px;font-weight:300;color:#0E1629;font-family:var(--font-display);margin-bottom:4px;">Time Reconciliation</div>
+            <div style="font-size:12px;color:var(--gray-500);">Where did the missing time go? ${esc(periodLabel)}.</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <div style="display:flex;border:1px solid var(--border,#eee);border-radius:4px;overflow:hidden;">
+              <button onclick="window._reconPeriod='week';renderTimeView()" style="padding:6px 12px;font-size:12px;font-weight:600;border:none;cursor:pointer;${reconPeriod==='week'?'background:var(--gold);color:white;':'background:var(--card,white);color:var(--navy);'}">Week</button>
+              <button onclick="window._reconPeriod='14days';renderTimeView()" style="padding:6px 12px;font-size:12px;font-weight:600;border:none;border-left:1px solid var(--border,#eee);cursor:pointer;${reconPeriod==='14days'?'background:var(--gold);color:white;':'background:var(--card,white);color:var(--navy);'}">14 Days</button>
+              <button onclick="window._reconPeriod='month';renderTimeView()" style="padding:6px 12px;font-size:12px;font-weight:600;border:none;border-left:1px solid var(--border,#eee);cursor:pointer;${reconPeriod==='month'?'background:var(--gold);color:white;':'background:var(--card,white);color:var(--navy);'}">Month</button>
+            </div>
+            <select onchange="window._reconMemberFilter=this.value;renderTimeView()" style="padding:6px 10px;border:1px solid var(--border,#eee);border-radius:4px;font-size:13px;background:var(--card,white);color:var(--navy);cursor:pointer;">
+              <option value="all"${reconMemberFilter === 'all' ? ' selected' : ''}>All Members</option>
+              ${reconMemberNames.map(m => '<option value="' + esc(m) + '"' + (reconMemberFilter === m ? ' selected' : '') + '>' + esc(m) + '</option>').join('')}
+            </select>
+          </div>
         </div>
 
         <!-- SUMMARY KPIs -->
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px;">
           <div style="background:#FFFFFF;border-radius:4px;padding:16px;border:1px solid rgba(14,22,41,0.06);border-left:3px solid var(--gold);">
             <div style="font-size:24px;font-weight:700;color:var(--gold);font-family:var(--font-mono);">${totalLogged.toFixed(1)}h</div>
-            <div style="font-size:9px;color:var(--gray-400);text-transform:uppercase;letter-spacing:1px;margin-top:2px;">Week Logged</div>
+            <div style="font-size:9px;color:var(--gray-400);text-transform:uppercase;letter-spacing:1px;margin-top:2px;">${reconPeriod === 'month' ? 'Month' : 'Week'} Logged</div>
           </div>
           <div style="background:#FFFFFF;border-radius:4px;padding:16px;border:1px solid rgba(14,22,41,0.06);border-left:3px solid var(--cyan);">
             <div style="font-size:24px;font-weight:700;color:var(--cyan);font-family:var(--font-mono);">${avgHoursPerDay.toFixed(1)}h</div>
@@ -20578,7 +20770,7 @@ async function renderBoardsTab(T, proj) {
             return `<div style="background:var(--gray-800);border-radius:0;padding:16px;border-left:3px solid ${memberColor};">
               <div style="font-size:14px;font-weight:700;color:${memberColor};margin-bottom:8px;">${esc(shortName(m))}</div>
               <div style="display:flex;gap:20px;">
-                <div><div style="font-size:20px;font-weight:700;color:#0E1629;font-family:var(--font-mono);">${mt.hours.toFixed(1)}h</div><div style="font-size:9px;color:var(--gray-400);text-transform:uppercase;">Week</div></div>
+                <div><div style="font-size:20px;font-weight:700;color:#0E1629;font-family:var(--font-mono);">${mt.hours.toFixed(1)}h</div><div style="font-size:9px;color:var(--gray-400);text-transform:uppercase;">${reconPeriod === 'month' ? 'Month' : 'Week'}</div></div>
                 <div><div style="font-size:20px;font-weight:700;color:#0E1629;font-family:var(--font-mono);">${memberAvg.toFixed(1)}h</div><div style="font-size:9px;color:var(--gray-400);text-transform:uppercase;">Avg/Day</div></div>
                 ${admin ? `<div><div style="font-size:20px;font-weight:700;color:#C8B99A;font-family:var(--font-mono);">${formatMoney(mt.value)}</div><div style="font-size:9px;color:var(--gray-400);text-transform:uppercase;">Value</div></div>` : ''}
               </div>
@@ -24734,7 +24926,7 @@ async function renderBoardsTab(T, proj) {
         function renderTimeWeeklyView(container, filtered, admin) {
       // Determine which week to show
       const today = new Date();
-      const weekStart = getWeekStart(timeFilter.dateFrom ? new Date(timeFilter.dateFrom) : today);
+      const weekStart = getWeekStart(timeFilter.dateFrom ? new Date(timeFilter.dateFrom + 'T12:00:00') : today);
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekEnd.getDate() + 6);
 
@@ -24820,7 +25012,7 @@ async function renderBoardsTab(T, proj) {
       let viewMonth = today.getMonth();
       let viewYear = today.getFullYear();
       if (timeFilter.dateFrom) {
-        const d = new Date(timeFilter.dateFrom);
+        const d = new Date(timeFilter.dateFrom + 'T12:00:00');
         viewMonth = d.getMonth();
         viewYear = d.getFullYear();
       }
@@ -26053,7 +26245,7 @@ async function renderBoardsTab(T, proj) {
     let currentViewProduct = null;
 
     function editCurrentProduct() {
-      if (currentViewProduct) { closeModal(); showNewProductModal(currentViewProduct); }
+      if (currentViewProduct) { showNewProductModal(currentViewProduct); }
     }
 
     // Filter out POs, services, labor, and junk entries
@@ -26220,6 +26412,16 @@ async function renderBoardsTab(T, proj) {
     async function renderProductLibrary() {
       setBreadcrumb([{ label: 'Product Library' }]);
       setTopbarActions('<button class="btn btn-primary" onclick="showNewProductModal()">+ New Product</button>');
+
+      // Clean up detail view escape handler
+      if (window._pdEscHandler) { document.removeEventListener('keydown', window._pdEscHandler); window._pdEscHandler = null; }
+
+      // If returning from detail view and data is cached, skip Firestore reload
+      if (window._libSkipReload && libraryProducts.length > 0) {
+        window._libSkipReload = false;
+        renderLibraryView();
+        return;
+      }
 
       const T = document.getElementById('contentArea');
       T.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Loading products...</div>';
@@ -26613,7 +26815,7 @@ async function renderBoardsTab(T, proj) {
         content = `<div class="card" style="overflow:hidden;">
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
             <thead><tr style="border-bottom:2px solid var(--gray-200);">
-              <th style="padding:10px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;width:72px;">Image</th>
+              <th style="padding:10px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;width:96px;">Image</th>
               <th style="padding:10px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;cursor:pointer;user-select:none;" onclick="librarySortField='title';librarySortDir=librarySortDir==='asc'?'desc':'asc';renderLibraryView()">Product${sortArrow('title')}</th>
               <th style="padding:10px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;cursor:pointer;user-select:none;" onclick="librarySortField='vendor';librarySortDir=librarySortDir==='asc'?'desc':'asc';renderLibraryView()">Vendor${sortArrow('vendor')}</th>
               <th style="padding:10px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;cursor:pointer;user-select:none;" onclick="librarySortField='category';librarySortDir=librarySortDir==='asc'?'desc':'asc';renderLibraryView()">Category${sortArrow('category')}</th>
@@ -26626,9 +26828,9 @@ async function renderBoardsTab(T, proj) {
               const sell = parseFloat(p.clientPrice || p.sellPrice || p.totalSelling) || 0;
               const imgSrc = getProductImg(p);
               const imgHtml = imgSrc
-                ? '<img src="' + escAttr(imgSrc) + '" referrerpolicy="no-referrer" style="width:56px;height:56px;object-fit:cover;border-radius:0;background:var(--gray-100);" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
-                  '<div style="display:none;width:56px;height:56px;border-radius:0;background:var(--gray-100);align-items:center;justify-content:center;color:var(--gray-300);font-size:20px;">📷</div>'
-                : '<div style="width:56px;height:56px;border-radius:0;background:var(--gray-100);display:flex;align-items:center;justify-content:center;color:var(--gray-300);font-size:20px;">📦</div>';
+                ? '<img src="' + escAttr(imgSrc) + '" referrerpolicy="no-referrer" style="width:80px;height:80px;object-fit:cover;border-radius:0;background:var(--gray-100);" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
+                  '<div style="display:none;width:80px;height:80px;border-radius:0;background:var(--gray-100);align-items:center;justify-content:center;color:var(--gray-300);font-size:20px;">📷</div>'
+                : '<div style="width:80px;height:80px;border-radius:0;background:var(--gray-100);display:flex;align-items:center;justify-content:center;color:var(--gray-300);font-size:20px;">📦</div>';
               return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="showProductDetail(\'' + p.id + '\')">' +
                 '<td style="padding:8px 10px;">' + imgHtml + '</td>' +
                 '<td style="padding:8px 10px;"><div style="font-weight:600;font-size:14px;">' + esc(p.title || '') + '</div>' +
@@ -26643,17 +26845,30 @@ async function renderBoardsTab(T, proj) {
           </table>
         </div>`;
       } else {
-        content = `<div class="clips-grid">
-          ${displayItems.map(p => `
-            <div class="card clip-card" style="cursor:pointer;" onclick="showProductDetail('${p.id}')">
-              ${getProductImg(p) ? `<img class="clip-card-img" src="${escAttr(getProductImg(p))}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="clip-card-img" style="display:none;align-items:center;justify-content:center;color:var(--gray-300);font-size:32px;">📷</div>` : '<div class="clip-card-img" style="display:flex;align-items:center;justify-content:center;color:var(--gray-300);font-size:32px;">📦</div>'}
-              <div class="clip-card-body">
-                <div class="clip-card-title">${esc(p.title || 'Untitled')}</div>
-                ${p.vendor ? `<div class="clip-card-vendor">${esc(p.vendor)}</div>` : ''}
-                ${p.category ? `<div style="font-size:11px;color:var(--gray-400);margin-top:2px;">${esc(p.category)}</div>` : ''}
+        content = `<div class="pl-grid">
+          ${displayItems.map(p => {
+            const _cost = parseFloat(p.cost || p.costPrice) || 0;
+            const _sell = parseFloat(p.clientPrice || p.sellPrice || p.totalSelling) || 0;
+            const _dispPrice = _sell || _cost;
+            const _priceLabel = _sell ? 'SELL' : (_cost ? 'DNET' : '');
+            return `
+            <div class="pl-card" onclick="showProductDetail('${p.id}')">
+              ${getProductImg(p)
+                ? `<img class="pl-card-img" src="${escAttr(getProductImg(p))}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="pl-card-img" style="display:none;align-items:center;justify-content:center;color:var(--gray-300);font-size:40px;">📷</div>`
+                : '<div class="pl-card-img" style="display:flex;align-items:center;justify-content:center;color:var(--gray-300);font-size:40px;">📦</div>'}
+              <div class="pl-card-overlay"></div>
+              <div class="pl-card-actions">
+                <button class="pl-action-btn" onclick="event.stopPropagation();showNewProductModal(libraryProducts.find(x=>x.id==='${p.id}'))" title="Edit">&#9998;</button>
+                <button class="pl-action-btn" onclick="event.stopPropagation();deleteProduct('${p.id}')" title="Delete" style="color:var(--red);">&#128465;</button>
               </div>
-            </div>
-          `).join('')}
+              <div class="pl-card-body">
+                <div class="pl-card-title">${esc(p.title || 'Untitled')}</div>
+                ${p.vendor ? `<div class="pl-card-vendor">By ${esc(p.vendor)}</div>` : ''}
+                ${p.description ? `<div class="pl-card-desc">${esc(p.description)}</div>` : ''}
+                ${_dispPrice ? `<div><div class="pl-card-price-label">${_priceLabel}</div><div class="pl-card-price">$${_dispPrice.toLocaleString('en-US', {minimumFractionDigits:2})}</div></div>` : ''}
+              </div>
+            </div>`;
+          }).join('')}
         </div>`;
       }
 
@@ -27061,118 +27276,147 @@ async function renderBoardsTab(T, proj) {
       const p = libraryProducts.find(x => x.id === id);
       if (!p) return;
       currentViewProduct = p;
+      window._libSkipReload = true; // cache guard for back-nav
+
       var cost = parseFloat(p.costPrice) || parseFloat(p.cost) || parseFloat(p.unitCost) || parseFloat(p.totalCost) || parseFloat(p.tradeCost) || 0;
       var sell = parseFloat(p.sellPrice) || parseFloat(p.clientPrice) || parseFloat(p.totalSell) || parseFloat(p.totalSelling) || parseFloat(p.price) || 0;
-      // Normalize: save canonical field names so they always load next time
       if (cost > 0 && !p.costPrice) { try { db.collection('products').doc(p.id).update({ costPrice: cost }); } catch(e){} }
       if (sell > 0 && !p.sellPrice) { try { db.collection('products').doc(p.id).update({ sellPrice: sell }); } catch(e){} }
       var margin = sell > 0 && cost > 0 ? sell - cost : 0;
       var markupPct = cost > 0 ? ((sell - cost) / cost * 100) : 0;
 
-      document.getElementById('modalContainer').innerHTML = `
-        <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
-          <div class="modal" style="width:780px;max-height:90vh;overflow-y:auto;">
-            <div class="modal-header">
-              <div class="modal-title">${esc(p.title)}</div>
-              <button class="modal-close" onclick="closeModal()">&times;</button>
+      // Build images array
+      var imgs = (p.images || []).slice();
+      if (p.imageUrl && imgs.indexOf(p.imageUrl) < 0) imgs.unshift(p.imageUrl);
+      var primaryUrl = getProductImg(p);
+
+      // Parse dimensions
+      var dimW = '', dimD = '', dimH = '';
+      if (p.dimensions) {
+        var dimParts = p.dimensions.match(/([\d.]+)/g);
+        if (dimParts) { dimW = dimParts[0] || ''; dimD = dimParts[1] || ''; dimH = dimParts[2] || ''; }
+      }
+      if (p.width) dimW = p.width;
+      if (p.depth) dimD = p.depth;
+      if (p.height) dimH = p.height;
+
+      setBreadcrumb([
+        { label: 'Product Library', hash: 'library' },
+        { label: p.title || 'Product' }
+      ]);
+      setTopbarActions(`
+        <button class="btn btn-secondary" onclick="editCurrentProduct()">Edit</button>
+        <button class="btn btn-secondary" onclick="deleteProduct('${p.id}')" style="color:var(--red);">Delete</button>
+      `);
+
+      const T = document.getElementById('contentArea');
+      T.innerHTML = `
+        <div class="pd-container">
+          <div class="pd-layout">
+            <!-- LEFT: Image gallery -->
+            <div>
+              <div style="position:relative;overflow:hidden;background:var(--gray-100);">
+                ${primaryUrl
+                  ? '<img id="pdImg" class="pd-hero-img" src="' + escAttr(primaryUrl) + '" referrerpolicy="no-referrer" onerror="this.outerHTML=\'<div class=pd-hero-img style=display:flex;align-items:center;justify-content:center;font-size:64px;color:var(--gray-300);>&#128230;</div>\'">'
+                  : '<div class="pd-hero-img" style="display:flex;align-items:center;justify-content:center;font-size:64px;color:var(--gray-300);">&#128230;</div>'}
+                <div style="position:absolute;bottom:8px;right:8px;display:flex;gap:4px;">
+                  <div onclick="document.getElementById('pdImgFile').click()" style="background:rgba(14,22,41,0.8);color:white;padding:6px 12px;font-size:11px;cursor:pointer;font-weight:600;">Replace</div>
+                </div>
+                <input type="file" id="pdImgFile" accept="image/*" style="display:none;" onchange="window._pdUploadImage(this.files[0],'${p.id}')">
+              </div>
+              ${imgs.length > 1 ? `
+              <div class="pd-thumbs">
+                ${imgs.map(function(u) {
+                  return '<img class="pd-thumb ' + (u === primaryUrl ? 'active' : '') + '" src="' + escAttr(u) + '" referrerpolicy="no-referrer" onclick="window._pdSetPrimaryImage(\'' + p.id + '\',\'' + escAttr(u) + '\')" onerror="this.style.display=\'none\'">';
+                }).join('')}
+                <div onclick="document.getElementById('pdAddImgFile').click()" style="width:64px;height:64px;border:2px dashed var(--gray-300);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:20px;color:var(--gray-400);">+</div>
+              </div>` : `
+              <div class="pd-thumbs">
+                <div onclick="document.getElementById('pdAddImgFile').click()" style="width:64px;height:64px;border:2px dashed var(--gray-300);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:20px;color:var(--gray-400);">+</div>
+              </div>`}
+              <input type="file" id="pdAddImgFile" accept="image/*" multiple style="display:none;" onchange="Array.from(this.files).forEach(function(f){window._pdAddImage(f,'${p.id}')})">
             </div>
-            <div class="modal-body">
-              <div style="display:flex;gap:24px;">
-                <!-- Image gallery with edit -->
-                <div style="flex:0 0 240px;">
-                  <div style="position:relative;border-radius:0;overflow:hidden;background:var(--gray-100);">
-                    ${getProductImg(p) ? `<img id="pdImg" src="${escAttr(getProductImg(p))}" style="width:100%;display:block;border-radius:0;" onerror="this.outerHTML='<div id=\\'pdImg\\' style=\\'width:240px;height:240px;background:var(--gray-100);display:flex;align-items:center;justify-content:center;font-size:48px;color:var(--gray-300);\\'>📦</div>'">` : '<div id="pdImg" style="width:240px;height:240px;display:flex;align-items:center;justify-content:center;font-size:48px;color:var(--gray-300);">📦</div>'}
-                    <div style="position:absolute;bottom:6px;right:6px;display:flex;gap:4px;">
-                      <div onclick="window._pdShowMakeCover('${p.id}')" style="background:rgba(0,0,0,0.7);color:white;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;">🎨 Cover</div>
-                      <div onclick="document.getElementById('pdImgFile').click()" style="background:rgba(0,0,0,0.7);color:white;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;">📷 Replace</div>
-                    </div>
-                    <input type="file" id="pdImgFile" accept="image/*" style="display:none;" onchange="window._pdUploadImage(this.files[0],'${p.id}')">
-                    <div id="pdMakeCoverPanel" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(26,26,46,0.95);border-radius:0;padding:12px;overflow-y:auto;z-index:10;">
-                      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                        <div style="color:white;font-size:12px;font-weight:700;">Set as Room Cover</div>
-                        <div onclick="document.getElementById('pdMakeCoverPanel').style.display='none'" style="color:white;cursor:pointer;font-size:16px;line-height:1;">&times;</div>
-                      </div>
-                      <div id="pdCoverRoomList" style="font-size:11px;color:var(--gray-300);">Loading rooms...</div>
-                    </div>
-                  </div>
-                  <!-- Image gallery thumbnails -->
-                  <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;align-items:center;">
-                    ${(function() {
-                      var imgs = (p.images || []).slice();
-                      if (p.imageUrl && imgs.indexOf(p.imageUrl) < 0) imgs.unshift(p.imageUrl);
-                      var primaryUrl = getProductImg(p);
-                      return imgs.map(function(u) {
-                        var isPrimary = u === primaryUrl;
-                        return '<div style="position:relative;width:44px;height:44px;border-radius:4px;overflow:hidden;border:2px solid ' + (isPrimary ? 'var(--gold)' : 'transparent') + ';cursor:pointer;flex-shrink:0;" onclick="window._pdSetPrimaryImage(\'' + p.id + '\',\'' + escAttr(u) + '\')" onmouseenter="this.querySelector(\'.pd-thumb-x\').style.display=\'flex\'" onmouseleave="this.querySelector(\'.pd-thumb-x\').style.display=\'none\'">' +
-                          '<img src="' + escAttr(u) + '" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.style.display=\'none\'">' +
-                          '<div class="pd-thumb-x" onclick="event.stopPropagation();window._pdRemoveImage(\'' + p.id + '\',\'' + escAttr(u) + '\')" style="position:absolute;top:0;right:0;background:rgba(0,0,0,0.7);color:white;width:16px;height:16px;font-size:10px;display:none;align-items:center;justify-content:center;cursor:pointer;border-radius:0 0 0 4px;">&times;</div>' +
-                        '</div>';
-                      }).join('');
-                    })()}
-                    <div onclick="document.getElementById('pdAddImgFile').click()" style="width:44px;height:44px;border-radius:4px;border:2px dashed var(--gray-300);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;color:var(--gray-400);flex-shrink:0;" title="Add more images">+</div>
-                    <input type="file" id="pdAddImgFile" accept="image/*" multiple style="display:none;" onchange="Array.from(this.files).forEach(function(f){window._pdAddImage(f,'${p.id}')})">
-                  </div>
-                </div>
-                <!-- Info with inline edit -->
-                <div style="flex:1;">
-                  ${p.vendor ? `<div style="font-size:14px;color:var(--gray-500);margin-bottom:2px;cursor:pointer;" onclick="window._pdQuickEdit('${p.id}','vendor','${escAttr(p.vendor)}')" title="Click to edit vendor">${esc(p.vendor)} ✎</div>` : '<div style="font-size:12px;color:var(--gray-300);margin-bottom:2px;cursor:pointer;" onclick="window._pdQuickEdit(\'${p.id}\',\'vendor\',\'\')">+ Add vendor</div>'}
-                  ${p.category ? `<div style="font-size:12px;color:var(--gray-400);margin-bottom:12px;">${esc(p.category)}</div>` : ''}
 
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
-                    <div>
-                      <div style="font-size:10px;color:var(--gray-400);text-transform:uppercase;margin-bottom:2px;">Sell Price</div>
-                      <input type="number" step="0.01" value="${sell || ''}" placeholder="0.00"
-                        onchange="window._pdUpdateField('${p.id}','sellPrice',parseFloat(this.value)||0)"
-                        style="font-size:20px;font-weight:700;color:var(--gold);border:1px solid transparent;border-radius:4px;padding:2px 6px;width:100%;background:transparent;font-family:var(--font-mono);"
-                        onfocus="this.style.borderColor='var(--gold)';this.style.background='white'"
-                        onblur="this.style.borderColor='transparent';this.style.background='transparent'">
-                    </div>
-                    <div>
-                      <div style="font-size:10px;color:var(--gray-400);text-transform:uppercase;margin-bottom:2px;">Cost</div>
-                      <input type="number" step="0.01" value="${cost || ''}" placeholder="0.00"
-                        onchange="window._pdUpdateField('${p.id}','costPrice',parseFloat(this.value)||0)"
-                        style="font-size:20px;font-weight:700;border:1px solid transparent;border-radius:4px;padding:2px 6px;width:100%;background:transparent;font-family:var(--font-mono);"
-                        onfocus="this.style.borderColor='var(--gray-300)';this.style.background='white'"
-                        onblur="this.style.borderColor='transparent';this.style.background='transparent'">
-                    </div>
-                  </div>
-                  ${margin > 0 ? `<div style="font-size:12px;color:var(--green);margin-bottom:12px;">↑ ${markupPct.toFixed(1)}% markup · $${margin.toFixed(2)} margin</div>` : ''}
-                  ${p.sku ? `<div style="font-size:13px;margin-bottom:4px;"><strong>SKU:</strong> ${esc(String(p.sku))}</div>` : ''}
-                  ${p.materials ? `<div style="font-size:13px;margin-bottom:4px;"><strong>Materials:</strong> ${esc(p.materials)}</div>` : ''}
-                  ${p.finish ? `<div style="font-size:13px;margin-bottom:4px;"><strong>Finish:</strong> ${esc(p.finish)}</div>` : ''}
-                  ${p.dimensions ? `<div style="font-size:13px;margin-bottom:4px;"><strong>Dimensions:</strong> ${esc(p.dimensions)}</div>` : ''}
-                  ${p.vendorUrl ? `<div style="font-size:13px;margin-bottom:4px;"><a href="${escAttr(p.vendorUrl)}" target="_blank" style="color:var(--teal);">View on vendor site ↗</a></div>` : ''}
-                </div>
-              </div>
-              ${p.description ? `<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--gray-200);font-size:13px;color:var(--gray-500);">${esc(p.description)}</div>` : ''}
+            <!-- RIGHT: Product info -->
+            <div>
+              <div class="pd-title">${esc(p.title)}</div>
+              ${p.vendor ? '<a class="pd-vendor-link" onclick="libraryFilter.vendor=\'' + escAttr(p.vendor) + '\';navigate(\'library\')">By ' + esc(p.vendor) + '</a>' : ''}
+              ${p.category ? '<div style="font-size:12px;color:var(--gray-400);margin-bottom:16px;">' + esc(p.category) + '</div>' : ''}
+              ${p.description ? '<div class="pd-description">' + esc(p.description) + '</div>' : ''}
 
-              <!-- Purchase Orders & Invoices -->
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px;padding-top:16px;border-top:1px solid var(--gray-200);">
-                <div>
-                  <div style="font-weight:600;margin-bottom:4px;">Purchase Orders</div>
-                  <div id="productPOList" style="min-height:32px;font-size:12px;color:var(--gray-400);">Checking...</div>
+              ${(dimW || dimD || dimH) ? `
+              <div class="pd-section">
+                <div class="pd-section-title">Dimensions</div>
+                <div class="pd-dimensions">
+                  ${dimW ? '<div class="pd-dim-item"><div class="pd-dim-value">' + esc(String(dimW)) + '"</div><div class="pd-dim-label">Width</div></div>' : ''}
+                  ${dimD ? '<div class="pd-dim-item"><div class="pd-dim-value">' + esc(String(dimD)) + '"</div><div class="pd-dim-label">Depth</div></div>' : ''}
+                  ${dimH ? '<div class="pd-dim-item"><div class="pd-dim-value">' + esc(String(dimH)) + '"</div><div class="pd-dim-label">Height</div></div>' : ''}
                 </div>
-                <div>
-                  <div style="font-weight:600;margin-bottom:4px;">Invoices</div>
-                  <div id="productInvoiceList" style="min-height:32px;font-size:12px;color:var(--gray-400);">Checking...</div>
+                ${p.dimensions ? '<div style="font-size:11px;color:var(--gray-400);margin-top:4px;">' + esc(p.dimensions) + '</div>' : ''}
+              </div>` : ''}
+
+              ${(p.materials || p.finish || p.sku) ? `
+              <div class="pd-section">
+                <div class="pd-section-title">Specifications</div>
+                ${p.materials ? '<div class="pd-field-row"><div class="pd-field-label">Materials</div><div class="pd-field-value">' + esc(p.materials) + '</div></div>' : ''}
+                ${p.finish ? '<div class="pd-field-row"><div class="pd-field-label">Finish</div><div class="pd-field-value">' + esc(p.finish) + '</div></div>' : ''}
+                ${p.sku ? '<div class="pd-field-row"><div class="pd-field-label">SKU</div><div class="pd-field-value" style="font-family:var(--font-mono);font-size:12px;">' + esc(String(p.sku)) + '</div></div>' : ''}
+                ${p.vendorUrl ? '<div class="pd-field-row"><div class="pd-field-label">Source</div><div class="pd-field-value"><a href="' + escAttr(p.vendorUrl) + '" target="_blank" style="color:var(--gold);">View on vendor site</a></div></div>' : ''}
+              </div>` : ''}
+
+              <div class="pd-section">
+                <div class="pd-section-title">Pricing</div>
+                <div class="pd-price-grid">
+                  <div class="pd-price-box">
+                    <input type="number" step="0.01" value="${cost || ''}" placeholder="0.00"
+                      onchange="window._pdUpdateField('${p.id}','costPrice',parseFloat(this.value)||0);showProductDetail('${p.id}')"
+                      style="font-size:22px;font-weight:700;border:1px solid transparent;padding:2px 6px;width:100%;background:transparent;font-family:var(--font-mono);text-align:center;color:var(--text-primary);"
+                      onfocus="this.style.borderColor='var(--gold)';this.style.background='white'"
+                      onblur="this.style.borderColor='transparent';this.style.background='transparent'">
+                    <div class="pd-price-label">Cost / DNET</div>
+                  </div>
+                  <div class="pd-price-box">
+                    <input type="number" step="0.01" value="${sell || ''}" placeholder="0.00"
+                      onchange="window._pdUpdateField('${p.id}','sellPrice',parseFloat(this.value)||0);showProductDetail('${p.id}')"
+                      style="font-size:22px;font-weight:700;border:1px solid transparent;padding:2px 6px;width:100%;background:transparent;font-family:var(--font-mono);text-align:center;color:var(--gold);"
+                      onfocus="this.style.borderColor='var(--gold)';this.style.background='white'"
+                      onblur="this.style.borderColor='transparent';this.style.background='transparent'">
+                    <div class="pd-price-label">Sell Price</div>
+                  </div>
+                  <div class="pd-price-box">
+                    <div class="pd-price-amount" style="color:var(--green);">${markupPct > 0 ? markupPct.toFixed(1) + '%' : '—'}</div>
+                    <div class="pd-price-label">Markup</div>
+                    ${margin > 0 ? '<div style="font-size:11px;color:var(--green);margin-top:2px;">$' + margin.toFixed(2) + ' margin</div>' : ''}
+                  </div>
                 </div>
               </div>
 
-              <div style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.06);">
-                <div style="font-weight:600;margin-bottom:8px;font-size:13px;color:var(--text-primary);">Add to Project</div>
-                <div style="display:flex;gap:8px;align-items:center;">
-                  <select class="form-input" id="addToProjectSelect" style="flex:1;max-width:320px;font-size:12px;">
-                    <option value="">Select a project...</option>
-                  </select>
-                  <button class="btn btn-primary btn-sm" onclick="var sel=document.getElementById('addToProjectSelect');if(sel.value)addProductToProject(sel.value,'${p.id}');else alert('Select a project first.');">+ Add</button>
-                </div>
-                <div id="addToProjectBtns" style="display:none;"></div>
+              ${p.notes ? '<div class="pd-section"><div class="pd-section-title">Notes</div><div class="pd-notes">' + esc(p.notes) + '</div></div>' : ''}
+            </div>
+          </div>
+
+          <!-- Linked POs & Invoices -->
+          <div class="pd-section">
+            <div class="pd-linked-section">
+              <div>
+                <div class="pd-section-title">Purchase Orders</div>
+                <div id="productPOList" style="min-height:32px;font-size:12px;color:var(--gray-400);">Checking...</div>
+              </div>
+              <div>
+                <div class="pd-section-title">Invoices</div>
+                <div id="productInvoiceList" style="min-height:32px;font-size:12px;color:var(--gray-400);">Checking...</div>
               </div>
             </div>
-            <div class="modal-footer">
-              <button class="btn btn-secondary" onclick="editCurrentProduct()" style="margin-right:auto;">✎ Edit All Fields</button>
-              <button class="btn btn-secondary" onclick="deleteProduct('${p.id}')" style="color:var(--red);">Delete</button>
-              <button class="btn btn-primary" onclick="closeModal()">Done</button>
+          </div>
+
+          <!-- Add to Project -->
+          <div class="pd-section">
+            <div class="pd-section-title">Add to Project</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <select class="form-input" id="addToProjectSelect" style="flex:1;max-width:320px;font-size:12px;">
+                <option value="">Select a project...</option>
+              </select>
+              <button class="btn btn-primary btn-sm" onclick="var sel=document.getElementById('addToProjectSelect');if(sel.value)addProductToProject(sel.value,'${p.id}');else showToast('Select a project first','warning');">+ Add</button>
             </div>
           </div>
         </div>
@@ -27180,6 +27424,11 @@ async function renderBoardsTab(T, proj) {
       loadProjectsForAddTo(p);
       loadPOsForProduct(p);
       loadInvoicesForProduct(p);
+
+      // Escape key to go back
+      if (window._pdEscHandler) document.removeEventListener('keydown', window._pdEscHandler);
+      window._pdEscHandler = function(e) { if (e.key === 'Escape' && !document.querySelector('.modal-overlay')) navigate('library'); };
+      document.addEventListener('keydown', window._pdEscHandler);
     }
 
     // Inline image upload from product detail — supports multiple images
@@ -27376,7 +27625,7 @@ async function renderBoardsTab(T, proj) {
           el.innerHTML = '<div style="font-style:italic;">No invoices found.</div>';
         } else {
           el.innerHTML = matched.map(function(inv) {
-            return '<div style="padding:6px 10px;background:var(--gray-50);border-radius:0;margin-bottom:4px;cursor:pointer;" onclick="closeModal();navigate(\'#/invoices\')">' +
+            return '<div style="padding:6px 10px;background:var(--gray-50);border-radius:0;margin-bottom:4px;cursor:pointer;" onclick="navigate(\'#/invoices\')">' +
               '<div style="font-size:12px;font-weight:600;">' + esc(inv.number || inv.invoiceNumber || 'Invoice') + '</div>' +
               '<div style="font-size:11px;color:var(--gray-400);">' + esc(inv.client || inv.projectName || '') + (inv.total ? ' · $' + parseFloat(inv.total).toLocaleString('en-US',{minimumFractionDigits:2}) : '') + '</div>' +
             '</div>';
@@ -27418,7 +27667,7 @@ async function renderBoardsTab(T, proj) {
         } else {
           const statusColors = { 'Draft':'var(--gray-400)', 'Sent':'var(--gold)', 'Ordered':'#0097A7', 'Received':'var(--green)', 'On Hold':'#6A1B9A', 'Cancelled':'var(--gray-300)' };
           el.innerHTML = matched.map(po => `
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--gray-50);border-radius:0;margin-bottom:6px;cursor:pointer;" onclick="closeModal();navigate('#/project/${po.projectId}/pos')">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--gray-50);border-radius:0;margin-bottom:6px;cursor:pointer;" onclick="navigate('#/project/${po.projectId}/pos')">
               <div>
                 <div style="font-size:13px;font-weight:600;">${esc(po.number||'PO')}</div>
                 <div style="font-size:11px;color:var(--gray-400);">${esc(po.projectName)} · ${esc(po.vendor||'')}</div>
@@ -29776,12 +30025,19 @@ async function renderBoardsTab(T, proj) {
                         <button class="action-dots" style="font-size:18px;padding:4px 8px;cursor:pointer;background:none;border:1px solid rgba(14,22,41,0.12);color:#0E1629;" onclick="event.stopPropagation();toggleActionMenu(this)">⋮</button>
                         <div class="action-dropdown" style="display:none">
                           <a onclick="event.stopPropagation();navigate('#/project/${inv.projectId}/invoice/${inv.id}');closeAllMenus()">✏️ Edit Invoice</a>
-                          <a onclick="quickRecordPayment('${inv.projectId}','invoices','${inv.id}');closeAllMenus()">💰 Record Payment</a>
+                          <a onclick="sendInvoiceToClient('${inv.projectId}','${inv.id}');closeAllMenus()">📧 Send to Client</a>
+                          <a onclick="togglePublished('${inv.projectId}','${inv.id}',${!inv.published},'invoices');closeAllMenus()">${inv.published ? '🔒 Unpublish from Dashboard' : '🌐 Publish to Client Dashboard'}</a>
+                          <div class="divider"></div>
+                          <a onclick="quickRecordPayment('${inv.projectId}','invoices','${inv.id}');closeAllMenus()">💳 Record Payment</a>
                           <a onclick="markInvoicePaid('${inv.projectId}','${inv.id}');closeAllMenus()">✅ Mark as Paid</a>
-                          <a onclick="togglePublished('${inv.projectId}','${inv.id}',${!inv.published},'invoices');closeAllMenus()">${inv.published ? '○ Unpublish' : '✓ Publish to Client'}</a>
-                          <a onclick="sendInvoiceReminder('${inv.projectId}','${inv.id}');closeAllMenus()">📧 Send Reminder</a>
+                          <a onclick="markInvoicePastDue('${inv.projectId}','${inv.id}');closeAllMenus()">⚠️ Mark Past Due</a>
+                          <div class="divider"></div>
+                          <a onclick="previewDocument('invoice','${inv.projectId}','${inv.id}');closeAllMenus()">📄 Preview / PDF</a>
+                          <a onclick="duplicateInvoice('${inv.projectId}','${inv.id}');closeAllMenus()">📋 Duplicate Invoice</a>
+                          <a onclick="generateTearSheetsFromDoc('${inv.projectId}','invoices','${inv.id}','');closeAllMenus()">📑 Tear Sheets</a>
                           <a onclick="setQBSynced('${inv.projectId}','invoices','${inv.id}');closeAllMenus()">${getQbId(inv) ? '↻ Update QB ID' : '📤 Mark QB Synced'}</a>
                           <div class="divider"></div>
+                          <a onclick="archiveInvoice('${inv.projectId}','${inv.id}');closeAllMenus()">📥 Archive</a>
                           <a class="danger" onclick="deleteDoc('${inv.projectId}','invoices','${inv.id}');closeAllMenus()">🗑️ Delete</a>
                         </div>
                       </div>
@@ -32339,7 +32595,7 @@ async function renderBoardsTab(T, proj) {
           </div>
         </div>
       `;
-      // Add "New Room" handler after DOM injection (cannot use <script> inside template literal)
+      // Add "New Room" handler after DOM injection
       var _cdRoomEl = document.getElementById('cdRoom');
       if (_cdRoomEl) {
         _cdRoomEl.addEventListener('change', function() {
