@@ -17731,7 +17731,7 @@ async function renderBoardsTab(T, proj) {
     // ==================== FINANCIALS ====================
     async function renderFinancials() {
       setBreadcrumb([{ label: 'Financials' }]);
-      var _payrollBtn = isTimeAdmin() ? '<button class="btn btn-secondary" onclick="renderPayrollReport()" style="margin-right:8px;">💰 Payroll</button>' : '';
+      var _payrollBtn = isTimeAdmin() ? '<button class="btn btn-secondary" onclick="renderPayrollReport()" style="margin-right:8px;">💰 Subcontractor Payout</button>' : '';
       setTopbarActions(_payrollBtn + '<button class="btn btn-secondary" onclick="generateQBSyncReport()" style="margin-right:8px;">📊 QB Sync Report</button>');
       const C = document.getElementById('contentArea');
       C.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400)">Loading financials...</div>';
@@ -18824,7 +18824,7 @@ async function renderBoardsTab(T, proj) {
         // Header
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">' +
           '<div>' +
-            '<h2 style="margin:0;font-size:20px;color:var(--navy);">💰 Contractor Payroll — Vanessa Holliday</h2>' +
+            '<h2 style="margin:0;font-size:20px;color:var(--navy);">💰 Subcontractor Payout — Vanessa Holliday</h2>' +
             '<div style="font-size:12px;color:var(--gray-400);margin-top:4px;">Pay Rate: $' + VANESSA_RATE.toFixed(2) + '/hr · Confidential — Admin Only</div>' +
           '</div>' +
           '<div style="display:flex;gap:6px;">' +
