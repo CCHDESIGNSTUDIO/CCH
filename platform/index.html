@@ -18769,9 +18769,6 @@ async function renderBoardsTab(T, proj) {
       var endStr = window._payrollTo;
       var pLabel = new Date(startStr+'T12:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric'}) + ' – ' + new Date(endStr+'T12:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
 
-      var startStr = pStart.toISOString().slice(0, 10);
-      var endStr = pEnd.toISOString().slice(0, 10);
-
       // Load all time entries
       var allEntries = [];
       try {
@@ -18779,11 +18776,20 @@ async function renderBoardsTab(T, proj) {
         snap.forEach(function(d) { allEntries.push({id: d.id, ...d.data()}); });
       } catch(e) {}
 
-      // Filter to Vanessa + date range
-      var VANESSA_RATE = 65.00;
-      var vanessaEntries = allEntries.filter(function(e) {
-        var m = (e.member || e.user || '').toLowerCase();
-        if (m !== 'vanessa holliday' && !m.includes('vanessa')) return false;
+      // Get unique members for selector
+      var allMembers = [...new Set(allEntries.map(function(e) { return e.member || e.user || ''; }).filter(Boolean))].sort();
+      if (!window._payrollMember) window._payrollMember = 'Vanessa Holliday';
+      var selectedMember = window._payrollMember;
+
+      // Rate per member
+      var memberRate = 65.00;
+      if (selectedMember === 'Vanessa Holliday') memberRate = 65.00;
+      // Future: add other contractor rates here
+
+      // Filter to selected member + date range
+      var memberEntries = allEntries.filter(function(e) {
+        var m = (e.member || e.user || '');
+        if (m !== selectedMember) return false;
         var d = (e.date || '').slice(0, 10);
         if (!d) return false;
         return d >= startStr && d <= endStr;
@@ -18791,7 +18797,7 @@ async function renderBoardsTab(T, proj) {
 
       // Categorize entries
       var billable = [], nonBillable = [], personal = [], cch = [];
-      vanessaEntries.forEach(function(e) {
+      memberEntries.forEach(function(e) {
         var proj = (e.project || e.projectName || '').toLowerCase().trim();
         var hrs = parseFloat(e.hours) || 0;
         e._hrs = hrs;
@@ -18812,11 +18818,11 @@ async function renderBoardsTab(T, proj) {
       var nonBillHrs = nonBillable.reduce(function(s, e) { return s + e._hrs; }, 0);
       var personalHrs = personal.reduce(function(s, e) { return s + e._hrs; }, 0);
       var totalHrs = billableHrs + cchHrs + nonBillHrs + personalHrs;
-      var totalPay = totalHrs * VANESSA_RATE;
-      var billablePay = billableHrs * VANESSA_RATE;
-      var cchPay = cchHrs * VANESSA_RATE;
-      var nonBillPay = nonBillHrs * VANESSA_RATE;
-      var personalPay = personalHrs * VANESSA_RATE;
+      var totalPay = totalHrs * memberRate;
+      var billablePay = billableHrs * memberRate;
+      var cchPay = cchHrs * memberRate;
+      var nonBillPay = nonBillHrs * memberRate;
+      var personalPay = personalHrs * memberRate;
 
       // Group billable by project
       var byProject = {};
@@ -18835,13 +18841,20 @@ async function renderBoardsTab(T, proj) {
         // Header
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">' +
           '<div>' +
-            '<h2 style="margin:0;font-size:20px;color:var(--navy);">💰 Subcontractor Payout — Vanessa Holliday</h2>' +
-            '<div style="font-size:12px;color:var(--gray-400);margin-top:4px;">Pay Rate: $' + VANESSA_RATE.toFixed(2) + '/hr · Confidential — Admin Only</div>' +
+            '<h2 style="margin:0;font-size:20px;color:var(--navy);">💰 Subcontractor Payout — ' + esc(selectedMember) + '</h2>' +
+            '<div style="font-size:12px;color:var(--gray-400);margin-top:4px;">Pay Rate: $' + memberRate.toFixed(2) + '/hr · Confidential — Admin Only</div>' +
           '</div>' +
         '</div>' +
 
-        // Date picker + quick period buttons
+        // Member selector + date picker + quick period buttons
         '<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;padding:14px 18px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:4px;flex-wrap:wrap;">' +
+          '<label style="font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.05em;">Member</label>' +
+          '<select onchange="window._payrollMember=this.value;renderPayrollReport()" style="padding:6px 10px;border:1px solid var(--gray-200);border-radius:4px;font-size:13px;">' +
+            allMembers.map(function(m) {
+              return '<option value="' + escAttr(m) + '"' + (m === selectedMember ? ' selected' : '') + '>' + esc(m) + '</option>';
+            }).join('') +
+          '</select>' +
+          '<div style="height:20px;width:1px;background:var(--gray-200);margin:0 4px;"></div>' +
           '<label style="font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.05em;">From</label>' +
           '<input type="date" value="' + escAttr(startStr) + '" onchange="window._payrollFrom=this.value;renderPayrollReport()" style="padding:6px 10px;border:1px solid var(--gray-200);border-radius:4px;font-size:13px;font-family:monospace;">' +
           '<label style="font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.05em;">To</label>' +
@@ -18901,7 +18914,7 @@ async function renderBoardsTab(T, proj) {
                 '<th style="padding:10px 14px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Project</th>' +
                 '<th style="padding:10px 14px;text-align:right;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Entries</th>' +
                 '<th style="padding:10px 14px;text-align:right;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Hours</th>' +
-                '<th style="padding:10px 14px;text-align:right;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Pay @ $' + VANESSA_RATE + '/hr</th>' +
+                '<th style="padding:10px 14px;text-align:right;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Pay @ $' + memberRate + '/hr</th>' +
               '</tr></thead><tbody>' +
               (projectRows.length > 0 ? projectRows.map(function(proj) {
                 var p = byProject[proj];
@@ -18909,7 +18922,7 @@ async function renderBoardsTab(T, proj) {
                   '<td style="padding:10px 14px;font-weight:600;color:var(--navy);">' + esc(proj) + '</td>' +
                   '<td style="padding:10px 14px;text-align:right;color:var(--gray-500);">' + p.entries + '</td>' +
                   '<td style="padding:10px 14px;text-align:right;font-family:monospace;font-weight:600;">' + p.hours.toFixed(1) + 'h</td>' +
-                  '<td style="padding:10px 14px;text-align:right;font-family:monospace;color:var(--gold);">' + formatMoney(p.hours * VANESSA_RATE) + '</td>' +
+                  '<td style="padding:10px 14px;text-align:right;font-family:monospace;color:var(--gold);">' + formatMoney(p.hours * memberRate) + '</td>' +
                 '</tr>';
               }).join('') : '<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--gray-400);">No billable entries this period</td></tr>') +
               '<tr style="border-top:2px solid var(--gold);font-weight:700;">' +
