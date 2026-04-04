@@ -2139,9 +2139,6 @@
         <button class="nav-item" data-page="schedule">
           <span class="nav-icon">◇</span><span class="nav-label">Schedule</span>
         </button>
-        <button class="nav-item" data-page="bizreports">
-          <span class="nav-icon">◇</span><span class="nav-label">Reports</span>
-        </button>
         <button class="nav-item" data-page="financials">
           <span class="nav-icon">◇</span><span class="nav-label">Financials</span>
         </button>
@@ -2712,7 +2709,7 @@
       else if (page === 'reports') renderReportsPage();
       else if (page === 'schedule') renderGlobalSchedule();
       else if (page === 'financials') renderFinancials();
-      else if (page === 'bizreports') renderBizReports();
+      else if (page === 'bizreports') renderFinancials();
       else if (page === 'clientview') { if (USE_NEW_PORTAL) renderClientPortal(parts[1]); else renderClientView(parts[1]); }
       else if (page === 'clientboard') openClientBoard(parts[1], parts[2]);
       else if (page === 'alltasks') renderAllTasks();
