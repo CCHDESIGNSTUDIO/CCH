@@ -17731,93 +17731,124 @@ async function renderBoardsTab(T, proj) {
     // ==================== FINANCIALS ====================
     async function renderFinancials() {
       setBreadcrumb([{ label: 'Financials' }]);
-      var _payrollBtn = isTimeAdmin() ? '<button class="btn btn-secondary" onclick="renderPayrollReport()" style="margin-right:8px;">💰 Subcontractor Payout</button>' : '';
-      setTopbarActions(_payrollBtn + '<button class="btn btn-secondary" onclick="generateQBSyncReport()" style="margin-right:8px;">📊 QB Sync Report</button>');
+      setTopbarActions('');
       const C = document.getElementById('contentArea');
       C.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400)">Loading financials...</div>';
 
+      // Load all data
       const projSnap = await getCachedBoards();
-      let allInvoices = [], allPOs = [];
+      let allInvoices = [], allPOs = [], allProposals = [], allTimeEntries = [];
+      var invIds = new Set(), poIds = new Set();
 
-      // Also check top-level collections
-      try {
-        const topInv = await db.collection('invoices').get();
-        topInv.forEach(d => { var data = d.data(); allInvoices.push({id:d.id, projectId:data.projectId||'', projectName:data.projectName||data.project||'', ...data}); });
-      } catch(e) {}
-      try {
-        const topPO = await db.collection('purchaseOrders').get();
-        topPO.forEach(d => { var data = d.data(); allPOs.push({id:d.id, projectId:data.projectId||'', projectName:data.projectName||data.project||'', ...data}); });
-      } catch(e) {}
-
-      var invIds = new Set(allInvoices.map(i => i.id));
-      var poIds = new Set(allPOs.map(p => p.id));
+      try { var topInv = await db.collection('invoices').get(); topInv.forEach(d => { allInvoices.push({id:d.id, projectId:d.data().projectId||'', projectName:d.data().projectName||d.data().project||'', ...d.data()}); invIds.add(d.id); }); } catch(e) {}
+      try { var topPO = await db.collection('purchaseOrders').get(); topPO.forEach(d => { allPOs.push({id:d.id, projectId:d.data().projectId||'', projectName:d.data().projectName||d.data().project||'', ...d.data()}); poIds.add(d.id); }); } catch(e) {}
 
       for (const pd of projSnap.docs) {
-        try {
-          const invSnap = await db.collection('boards').doc(pd.id).collection('invoices').get();
-          invSnap.forEach(d => { if (!invIds.has(d.id)) { allInvoices.push({id:d.id,projectId:pd.id,projectName:pd.data().name,...d.data()}); invIds.add(d.id); } });
-        } catch(e){}
-        try {
-          const poSnap = await db.collection('boards').doc(pd.id).collection('purchaseOrders').get();
-          poSnap.forEach(d => { if (!poIds.has(d.id)) { allPOs.push({id:d.id,projectId:pd.id,projectName:pd.data().name,...d.data()}); poIds.add(d.id); } });
-        } catch(e){}
+        try { var is = await db.collection('boards').doc(pd.id).collection('invoices').get(); is.forEach(d => { if (!invIds.has(d.id)) { allInvoices.push({id:d.id,projectId:pd.id,projectName:pd.data().name,...d.data()}); invIds.add(d.id); } }); } catch(e){}
+        try { var ps = await db.collection('boards').doc(pd.id).collection('purchaseOrders').get(); ps.forEach(d => { if (!poIds.has(d.id)) { allPOs.push({id:d.id,projectId:pd.id,projectName:pd.data().name,...d.data()}); poIds.add(d.id); } }); } catch(e){}
+        try { var pr = await db.collection('boards').doc(pd.id).collection('proposals').get(); pr.forEach(d => { allProposals.push({id:d.id,projectId:pd.id,projectName:pd.data().name,...d.data()}); }); } catch(e){}
       }
+      try { var teSnap = await db.collection('timeEntries').limit(15000).get(); teSnap.forEach(d => allTimeEntries.push({id:d.id,...d.data()})); } catch(e){}
 
-      // Store for report generation
       window._allInvoices = allInvoices;
       window._allPOs = allPOs;
 
-      allInvoices.sort((a,b) => (b.createdAt||'') > (a.createdAt||'') ? 1 : -1);
-      allPOs.sort((a,b) => (b.createdAt||'') > (a.createdAt||'') ? 1 : -1);
+      // Compute KPIs
+      var totalInvoiced = allInvoices.reduce((s,i) => s + (parseFloat(i.total)||0), 0);
+      var totalPaid = 0;
+      allInvoices.forEach(inv => {
+        var pmts = (inv.payments||[]).reduce((s,p) => s+(parseFloat(p.amount)||0),0);
+        if (pmts > 0) totalPaid += pmts;
+        else if (inv.status === 'Paid') totalPaid += (parseFloat(inv.total)||0);
+      });
+      var totalOutstanding = totalInvoiced - totalPaid;
+      var totalPOCost = allPOs.reduce((s,p) => s + (parseFloat(p.total)||0), 0);
+      var openInvoices = allInvoices.filter(i => i.status !== 'Paid' && i.status !== 'Draft' && i.status !== 'Cancelled');
+      var openPOs = allPOs.filter(p => !['Installed','Received','Cancelled','Closed','Paid'].includes(p.status));
+      var totalTimeHrs = allTimeEntries.reduce((s,e) => s + (parseFloat(e.hours)||0), 0);
+      var totalTimeBillable = allTimeEntries.filter(e => e.billable).reduce((s,e) => s + (parseFloat(e.total)||0), 0);
 
-      const totalInvoiced = allInvoices.reduce((s,i) => s + (i.total||0), 0);
-      const totalPaid = allInvoices.filter(i=>i.status==='Paid').reduce((s,i) => s + (i.total||0), 0);
-      const totalOutstanding = totalInvoiced - totalPaid;
+      // Report card builder
+      function rCard(icon, title, desc, onclick) {
+        return '<div class="card" style="cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;border-left:3px solid var(--gold);" onmouseover="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 8px 24px rgba(0,0,0,0.08)\'" onmouseout="this.style.transform=\'\';this.style.boxShadow=\'\'" onclick="' + onclick + '">' +
+          '<div style="padding:18px 20px;display:flex;align-items:center;gap:16px;">' +
+            '<div style="font-size:24px;width:40px;text-align:center;">' + icon + '</div>' +
+            '<div style="flex:1;">' +
+              '<div style="font-size:14px;font-weight:700;color:var(--navy);">' + title + '</div>' +
+              '<div style="font-size:12px;color:var(--gray-400);margin-top:2px;">' + desc + '</div>' +
+            '</div>' +
+            '<div style="font-size:12px;color:var(--gold);font-weight:600;">View →</div>' +
+          '</div></div>';
+      }
 
-      C.innerHTML = `
-        <div class="page-header"><div class="page-title">Financials</div></div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px;">
-          <div class="card card-body" style="text-align:center;"><div style="font-size:28px;font-weight:700;color:var(--green);">${formatMoney(totalPaid)}</div><div style="font-size:12px;color:var(--gray-400);text-transform:uppercase;">Total Paid</div></div>
-          <div class="card card-body" style="text-align:center;"><div style="font-size:28px;font-weight:700;color:var(--red);">${formatMoney(totalOutstanding)}</div><div style="font-size:12px;color:var(--gray-400);text-transform:uppercase;">Outstanding</div></div>
-          <div class="card card-body" style="text-align:center;"><div style="font-size:28px;font-weight:700;">${formatMoney(totalInvoiced)}</div><div style="font-size:12px;color:var(--gray-400);text-transform:uppercase;">Total Invoiced</div></div>
-        </div>
+      var adminReports = isTimeAdmin() ? (
+        '<div style="margin-top:8px;">' +
+          rCard('💰', 'Subcontractor Payout', 'Calculate Vanessa\'s pay by period — billable, CCH, non-billable breakdown at $65/hr', 'renderPayrollReport()') +
+        '</div>' +
+        '<div style="margin-top:8px;">' +
+          rCard('📊', 'Customer Profitability', 'Revenue, cost, margin, hours, and effective rate per project', "runReport('profitability')") +
+        '</div>'
+      ) : '';
 
-        <div class="section-title">All Invoices</div>
-        <div class="card" style="margin-bottom:32px;"><div class="table-wrap">
-          <table class="data-table">
-            <thead><tr><th>Number</th><th>Project</th><th>Date</th><th>Status</th><th class="amount">Amount</th></tr></thead>
-            <tbody>
-              ${allInvoices.map(inv => `
-                <tr style="cursor:pointer;" onclick="navigate('#/project/${inv.projectId}/invoice/${inv.id}')">
-                  <td><strong>${esc(inv.number||inv.id.slice(0,8))}</strong></td>
-                  <td>${esc(inv.projectName||'')}</td>
-                  <td>${inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : ''}</td>
-                  <td><span class="badge badge-${(inv.status||'draft').toLowerCase()}">${esc(inv.status||'Draft')}</span></td>
-                  <td class="amount">${formatMoney(inv.total||0)}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div></div>
+      C.innerHTML =
+        '<h1 class="page-title" style="margin-bottom:24px;">Financials</h1>' +
 
-        <div class="section-title">All Purchase Orders</div>
-        <div class="card"><div class="table-wrap">
-          <table class="data-table">
-            <thead><tr><th>PO#</th><th>Vendor</th><th>Project</th><th>Status</th><th class="amount">Amount</th></tr></thead>
-            <tbody>
-              ${allPOs.map(po => `
-                <tr style="cursor:pointer;" onclick="navigate('#/project/${po.projectId}/po/${po.id}')">
-                  <td><strong>${esc(po.number||po.id.slice(0,8))}</strong></td>
-                  <td>${esc(po.vendor||'')}</td>
-                  <td>${esc(po.projectName||'')}</td>
-                  <td><span class="badge badge-${(po.status||'draft').toLowerCase()}">${esc(po.status||'Draft')}</span></td>
-                  <td class="amount">${formatMoney(po.total||0)}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div></div>
-      `;
+        // KPI row
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:32px;">' +
+          '<div class="card" style="text-align:center;padding:20px;"><div style="font-size:26px;font-weight:700;color:var(--green);font-family:monospace;">' + formatMoney(totalPaid) + '</div><div style="font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.1em;margin-top:6px;">Collected</div></div>' +
+          '<div class="card" style="text-align:center;padding:20px;"><div style="font-size:26px;font-weight:700;color:#E16A5B;font-family:monospace;">' + formatMoney(totalOutstanding) + '</div><div style="font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.1em;margin-top:6px;">Outstanding</div></div>' +
+          '<div class="card" style="text-align:center;padding:20px;"><div style="font-size:26px;font-weight:700;color:var(--navy);font-family:monospace;">' + formatMoney(totalInvoiced) + '</div><div style="font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.1em;margin-top:6px;">Total Invoiced</div></div>' +
+          '<div class="card" style="text-align:center;padding:20px;"><div style="font-size:26px;font-weight:700;color:var(--gold);font-family:monospace;">' + formatMoney(totalPOCost) + '</div><div style="font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.1em;margin-top:6px;">Total PO Cost</div></div>' +
+        '</div>' +
+
+        // ── Payments ──
+        '<div style="font-size:16px;font-weight:700;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">💳</span> Payments</div>' +
+        '<div style="display:grid;gap:8px;margin-bottom:28px;">' +
+          rCard('💰', 'Payment Summary', 'Incoming payments, amounts invoiced and remaining balance by project — ' + formatMoney(totalPaid) + ' collected, ' + formatMoney(totalOutstanding) + ' outstanding', "navigate('#/allinvoices')") +
+        '</div>' +
+
+        // ── Open Transactions ──
+        '<div style="font-size:16px;font-weight:700;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">📋</span> Open Transactions</div>' +
+        '<div style="display:grid;gap:8px;margin-bottom:28px;">' +
+          rCard('🧾', 'Open Invoices (' + openInvoices.length + ')', 'Unpaid and partially paid invoices with aging — ' + formatMoney(openInvoices.reduce((s,i)=>s+(parseFloat(i.total)||0),0)) + ' outstanding', "runReport('arAging')") +
+          '<div style="margin-top:8px;">' +
+            rCard('📦', 'Open Purchase Orders (' + openPOs.length + ')', 'POs not yet received or installed — ' + formatMoney(openPOs.reduce((s,p)=>s+(parseFloat(p.total)||0),0)) + ' pending', "navigate('#/allpos')") +
+          '</div>' +
+        '</div>' +
+
+        // ── Transactions ──
+        '<div style="font-size:16px;font-weight:700;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">✦</span> Transactions</div>' +
+        '<div style="display:grid;gap:8px;margin-bottom:28px;">' +
+          rCard('🧾', 'All Invoices (' + allInvoices.length + ')', 'Complete invoice list — filter by status, project, date', "navigate('#/allinvoices')") +
+          '<div style="margin-top:8px;">' +
+            rCard('📦', 'All Purchase Orders (' + allPOs.length + ')', 'Complete PO list — filter by vendor, status, project', "navigate('#/allpos')") +
+          '</div>' +
+          '<div style="margin-top:8px;">' +
+            rCard('📋', 'All Proposals (' + allProposals.length + ')', 'Complete proposal list — filter by status, project', "navigate('#/allproposals')") +
+          '</div>' +
+        '</div>' +
+
+        // ── Time Billing ──
+        '<div style="font-size:16px;font-weight:700;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">⏱</span> Time Billing</div>' +
+        '<div style="display:grid;gap:8px;margin-bottom:28px;">' +
+          rCard('👥', 'Time by Team Member', totalTimeHrs.toFixed(0) + ' total hours tracked, ' + formatMoney(totalTimeBillable) + ' billable value', "runReport('timeByProject')") +
+          '<div style="margin-top:8px;">' +
+            rCard('📊', 'Time by Project', 'Hours and billing value broken down by project', "navigate('#/timeledger')") +
+          '</div>' +
+        '</div>' +
+
+        // ── Reports ──
+        '<div style="font-size:16px;font-weight:700;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">📈</span> Reports</div>' +
+        '<div style="display:grid;gap:8px;margin-bottom:28px;">' +
+          rCard('🔗', 'QB Sync Status', 'Invoices and POs missing QuickBooks IDs — what needs to be pushed', 'generateQBSyncReport()') +
+          '<div style="margin-top:8px;">' +
+            rCard('🏭', 'Vendor Spend', 'Total spend per vendor across all POs — markup, item count, project breakdown', "runReport('vendorSpend')") +
+          '</div>' +
+          '<div style="margin-top:8px;">' +
+            rCard('⏳', 'A/R Aging', 'Outstanding balances by age bucket — current, 30, 60, 90+ days', "runReport('arAging')") +
+          '</div>' +
+          adminReports +
+        '</div>';
     }
 
 
@@ -18713,51 +18744,33 @@ async function renderBoardsTab(T, proj) {
       input.click();
     }
 
-    // ==================== VANESSA PAYROLL REPORT ====================
+    // ==================== SUBCONTRACTOR PAYOUT REPORT ====================
     async function renderPayrollReport() {
       if (!isTimeAdmin()) return;
       var C = document.getElementById('contentArea');
-      C.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Generating payroll report...</div>';
+      C.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Generating payout report...</div>';
 
       // Determine pay period: 1st-15th or 16th-end of month
       var now = new Date();
       var day = now.getDate();
       var year = now.getFullYear();
-      var month = now.getMonth(); // 0-indexed
-      var periodStart, periodEnd, periodLabel;
+      var month = now.getMonth();
 
-      if (day <= 15) {
-        // Current period is 1st-15th
-        periodStart = new Date(year, month, 1);
-        periodEnd = new Date(year, month, 15, 23, 59, 59);
-        periodLabel = periodStart.toLocaleDateString('en-US', {month:'long'}) + ' 1–15, ' + year;
-      } else {
-        // Current period is 16th-end
-        periodStart = new Date(year, month, 16);
-        periodEnd = new Date(year, month + 1, 0, 23, 59, 59); // last day of month
-        periodLabel = periodStart.toLocaleDateString('en-US', {month:'long'}) + ' 16–' + periodEnd.getDate() + ', ' + year;
+      // Default date range: current semi-monthly period
+      if (!window._payrollFrom || !window._payrollTo) {
+        if (day <= 15) {
+          window._payrollFrom = year + '-' + String(month+1).padStart(2,'0') + '-01';
+          window._payrollTo = year + '-' + String(month+1).padStart(2,'0') + '-15';
+        } else {
+          var lastDay = new Date(year, month+1, 0).getDate();
+          window._payrollFrom = year + '-' + String(month+1).padStart(2,'0') + '-16';
+          window._payrollTo = year + '-' + String(month+1).padStart(2,'0') + '-' + lastDay;
+        }
       }
 
-      // Also calculate previous period for quick toggle
-      var prevStart, prevEnd, prevLabel;
-      if (day <= 15) {
-        // Previous = last month 16th-end
-        var pm = new Date(year, month - 1, 16);
-        var pmEnd = new Date(year, month, 0, 23, 59, 59);
-        prevStart = pm; prevEnd = pmEnd;
-        prevLabel = pm.toLocaleDateString('en-US', {month:'long'}) + ' 16–' + pmEnd.getDate() + ', ' + pm.getFullYear();
-      } else {
-        // Previous = this month 1st-15th
-        prevStart = new Date(year, month, 1);
-        prevEnd = new Date(year, month, 15, 23, 59, 59);
-        prevLabel = prevStart.toLocaleDateString('en-US', {month:'long'}) + ' 1–15, ' + year;
-      }
-
-      // Use selected period or default to current
-      var usePeriod = window._payrollPeriod || 'current';
-      var pStart = usePeriod === 'prev' ? prevStart : periodStart;
-      var pEnd = usePeriod === 'prev' ? prevEnd : periodEnd;
-      var pLabel = usePeriod === 'prev' ? prevLabel : periodLabel;
+      var startStr = window._payrollFrom;
+      var endStr = window._payrollTo;
+      var pLabel = new Date(startStr+'T12:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric'}) + ' – ' + new Date(endStr+'T12:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
 
       var startStr = pStart.toISOString().slice(0, 10);
       var endStr = pEnd.toISOString().slice(0, 10);
@@ -18769,12 +18782,13 @@ async function renderBoardsTab(T, proj) {
         snap.forEach(function(d) { allEntries.push({id: d.id, ...d.data()}); });
       } catch(e) {}
 
-      // Filter to Vanessa + this pay period
+      // Filter to Vanessa + date range
       var VANESSA_RATE = 65.00;
       var vanessaEntries = allEntries.filter(function(e) {
         var m = (e.member || e.user || '').toLowerCase();
-        if (!m.includes('vanessa')) return false;
+        if (m !== 'vanessa holliday' && !m.includes('vanessa')) return false;
         var d = (e.date || '').slice(0, 10);
+        if (!d) return false;
         return d >= startStr && d <= endStr;
       });
 
@@ -18822,15 +18836,24 @@ async function renderBoardsTab(T, proj) {
         '<div style="max-width:800px;margin:0 auto;">' +
 
         // Header
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">' +
           '<div>' +
             '<h2 style="margin:0;font-size:20px;color:var(--navy);">💰 Subcontractor Payout — Vanessa Holliday</h2>' +
             '<div style="font-size:12px;color:var(--gray-400);margin-top:4px;">Pay Rate: $' + VANESSA_RATE.toFixed(2) + '/hr · Confidential — Admin Only</div>' +
           '</div>' +
-          '<div style="display:flex;gap:6px;">' +
-            '<button class="btn btn-sm ' + (usePeriod === 'prev' ? '' : 'btn-primary') + '" onclick="window._payrollPeriod=\'current\';renderPayrollReport()">' + periodLabel + '</button>' +
-            '<button class="btn btn-sm ' + (usePeriod === 'prev' ? 'btn-primary' : '') + '" onclick="window._payrollPeriod=\'prev\';renderPayrollReport()">' + prevLabel + '</button>' +
-          '</div>' +
+        '</div>' +
+
+        // Date picker + quick period buttons
+        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;padding:14px 18px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:4px;flex-wrap:wrap;">' +
+          '<label style="font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.05em;">From</label>' +
+          '<input type="date" value="' + escAttr(startStr) + '" onchange="window._payrollFrom=this.value;renderPayrollReport()" style="padding:6px 10px;border:1px solid var(--gray-200);border-radius:4px;font-size:13px;font-family:monospace;">' +
+          '<label style="font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.05em;">To</label>' +
+          '<input type="date" value="' + escAttr(endStr) + '" onchange="window._payrollTo=this.value;renderPayrollReport()" style="padding:6px 10px;border:1px solid var(--gray-200);border-radius:4px;font-size:13px;font-family:monospace;">' +
+          '<div style="height:20px;width:1px;background:var(--gray-200);margin:0 4px;"></div>' +
+          '<button class="btn btn-sm" onclick="(function(){var n=new Date(),y=n.getFullYear(),m=n.getMonth();window._payrollFrom=y+\'-\'+String(m+1).padStart(2,\'0\')+\'-01\';window._payrollTo=y+\'-\'+String(m+1).padStart(2,\'0\')+\'-15\';renderPayrollReport()})()">1st–15th</button>' +
+          '<button class="btn btn-sm" onclick="(function(){var n=new Date(),y=n.getFullYear(),m=n.getMonth(),ld=new Date(y,m+1,0).getDate();window._payrollFrom=y+\'-\'+String(m+1).padStart(2,\'0\')+\'-16\';window._payrollTo=y+\'-\'+String(m+1).padStart(2,\'0\')+\'-\'+ld;renderPayrollReport()})()">16th–End</button>' +
+          '<button class="btn btn-sm" onclick="(function(){var n=new Date(),y=n.getFullYear(),m=n.getMonth()-1;if(m<0){m=11;y--;}window._payrollFrom=y+\'-\'+String(m+1).padStart(2,\'0\')+\'-16\';var ld=new Date(y,m+1,0).getDate();window._payrollTo=y+\'-\'+String(m+1).padStart(2,\'0\')+\'-\'+ld;renderPayrollReport()})()">Prev 16–End</button>' +
+          '<button class="btn btn-sm" onclick="(function(){var n=new Date(),y=n.getFullYear(),m=n.getMonth()-1;if(m<0){m=11;y--;}window._payrollFrom=y+\'-\'+String(m+1).padStart(2,\'0\')+\'-01\';window._payrollTo=y+\'-\'+String(m+1).padStart(2,\'0\')+\'-15\';renderPayrollReport()})()">Prev 1–15</button>' +
         '</div>' +
 
         // Period heading
