@@ -17730,22 +17730,11 @@ async function renderBoardsTab(T, proj) {
       setBreadcrumb([{ label: 'Financials' }]);
       setTopbarActions('');
       const C = document.getElementById('contentArea');
-      C.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400)">Loading financials...</div>';
 
-      // Load all data
-      const projSnap = await getCachedBoards();
-      let allInvoices = [], allPOs = [], allProposals = [], allTimeEntries = [];
-      var invIds = new Set(), poIds = new Set();
-
-      try { var topInv = await db.collection('invoices').get(); topInv.forEach(d => { allInvoices.push({id:d.id, projectId:d.data().projectId||'', projectName:d.data().projectName||d.data().project||'', ...d.data()}); invIds.add(d.id); }); } catch(e) {}
-      try { var topPO = await db.collection('purchaseOrders').get(); topPO.forEach(d => { allPOs.push({id:d.id, projectId:d.data().projectId||'', projectName:d.data().projectName||d.data().project||'', ...d.data()}); poIds.add(d.id); }); } catch(e) {}
-
-      for (const pd of projSnap.docs) {
-        try { var is = await db.collection('boards').doc(pd.id).collection('invoices').get(); is.forEach(d => { if (!invIds.has(d.id)) { allInvoices.push({id:d.id,projectId:pd.id,projectName:pd.data().name,...d.data()}); invIds.add(d.id); } }); } catch(e){}
-        try { var ps = await db.collection('boards').doc(pd.id).collection('purchaseOrders').get(); ps.forEach(d => { if (!poIds.has(d.id)) { allPOs.push({id:d.id,projectId:pd.id,projectName:pd.data().name,...d.data()}); poIds.add(d.id); } }); } catch(e){}
-        try { var pr = await db.collection('boards').doc(pd.id).collection('proposals').get(); pr.forEach(d => { allProposals.push({id:d.id,projectId:pd.id,projectName:pd.data().name,...d.data()}); }); } catch(e){}
-      }
-      try { var teSnap = await db.collection('timeEntries').limit(15000).get(); teSnap.forEach(d => allTimeEntries.push({id:d.id,...d.data()})); } catch(e){}
+      // Use cached financial data if available, load in background
+      await loadFinancialData();
+      var allInvoices = _cachedInvoices || [];
+      var allPOs = _cachedPOs || [];
 
       window._allInvoices = allInvoices;
       window._allPOs = allPOs;
@@ -17762,8 +17751,7 @@ async function renderBoardsTab(T, proj) {
       var totalPOCost = allPOs.reduce((s,p) => s + (parseFloat(p.total)||0), 0);
       var openInvoices = allInvoices.filter(i => i.status !== 'Paid' && i.status !== 'Draft' && i.status !== 'Cancelled');
       var openPOs = allPOs.filter(p => !['Installed','Received','Cancelled','Closed','Paid'].includes(p.status));
-      var totalTimeHrs = allTimeEntries.reduce((s,e) => s + (parseFloat(e.hours)||0), 0);
-      var totalTimeBillable = allTimeEntries.filter(e => e.billable).reduce((s,e) => s + (parseFloat(e.total)||0), 0);
+      var totalTimeHrs = 0, totalTimeBillable = 0;
 
       // Report card builder
       function rCard(icon, title, desc, onclick) {
