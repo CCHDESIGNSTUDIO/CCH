@@ -1051,19 +1051,20 @@
     .project-tabs {
       display: flex; gap: 0; border-bottom: 2px solid rgba(14,22,41,0.1);
       margin-bottom: 24px; background: #FFFFFF;
-      padding: 0; align-items: center; flex-wrap: wrap;
+      padding: 0 8px; align-items: center; overflow-x: auto;
+      -webkit-overflow-scrolling: touch; scrollbar-width: thin;
     }
     .project-tab {
-      padding: 10px 14px; font-size: 11px; font-weight: 600;
+      padding: 11px 12px; font-size: 11px; font-weight: 600;
       color: #7A7060; cursor: pointer; border: none; background: none;
       border-bottom: 2px solid transparent; margin-bottom: -2px;
       transition: all 0.2s; font-family: var(--font-body); white-space: nowrap;
-      letter-spacing: 0.2px;
+      letter-spacing: 0.2px; flex-shrink: 0;
     }
     .project-tab:hover { color: #0E1629; }
     .project-tab.active { color: #0E1629; border-bottom-color: var(--gold); }
     .project-tab .tab-icon { display: none; }
-    .project-tabs .tab-divider { width: 1px; height: 16px; background: rgba(14,22,41,0.1); margin: 0 2px; flex-shrink: 0; }
+    .project-tabs .tab-divider { width: 1px; height: 16px; background: rgba(14,22,41,0.1); margin: 0 4px; flex-shrink: 0; }
     .tab-arrow { display: none; }
 
     .tab-content { display: none; }
@@ -2090,6 +2091,9 @@
         <button class="nav-item" data-page="projects">
           <span class="nav-icon">◻</span><span class="nav-label">Projects</span>
         </button>
+        <button class="nav-item" data-page="alltasks">
+          <span class="nav-icon">✓</span><span class="nav-label">Tasks</span>
+        </button>
         <button class="nav-item" data-page="library">
           <span class="nav-icon">◇</span><span class="nav-label">Selections</span>
         </button>
@@ -2711,6 +2715,7 @@
       else if (page === 'bizreports') renderBizReports();
       else if (page === 'clientview') { if (USE_NEW_PORTAL) renderClientPortal(parts[1]); else renderClientView(parts[1]); }
       else if (page === 'clientboard') openClientBoard(parts[1], parts[2]);
+      else if (page === 'alltasks') renderAllTasks();
       else if (page === 'allproposals') renderAllProposals();
       else if (page === 'allinvoices') renderAllInvoices();
       else if (page === 'allpos') renderAllPOs();
@@ -4536,41 +4541,85 @@
       var pricing = confirm('Include pricing on tear sheets?\n\nOK = Show prices\nCancel = No prices (client version)');
       showToast('Generating tear sheets...');
       try {
-        var doc = await db.collection('boards').doc(projectId).collection(collection).doc(docId).get();
-        if (!doc.exists) { showToast('Document not found', 'error'); return; }
-        var items = doc.data().items || [];
+        var docSnap = await db.collection('boards').doc(projectId).collection(collection).doc(docId).get();
+        if (!docSnap.exists) { showToast('Document not found', 'error'); return; }
+        var items = docSnap.data().items || [];
         if (items.length === 0) { showToast('No items in this document', 'error'); return; }
 
+        // Get project name if not provided
+        if (!projectName) {
+          try {
+            var boardDoc = await db.collection('boards').doc(projectId).get();
+            if (boardDoc.exists && boardDoc.data().name) projectName = boardDoc.data().name;
+          } catch(e){}
+        }
+
+        var today = new Date().toLocaleDateString('en-US', {month: 'long', day: 'numeric', year: 'numeric'});
+        var fmt = function(v) { var n = parseFloat(v); return n > 0 ? '$' + n.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0}) : ''; };
+
         var pages = items.filter(function(item) { return item.title || item.description; }).map(function(item) {
-          var img = item.imageUrl || item.image || '';
-          var cost = parseFloat(item.cost) || 0;
+          var imgSrc = item.imageUrl || item.image || '';
           var sell = parseFloat(item.amount) || parseFloat(item.clientPrice) || parseFloat(item.total) || 0;
           var qty = parseInt(item.qty) || 1;
+          var total = sell * qty;
 
-          return '<div style="page-break-after:always;padding:40px;font-family:DM Sans,sans-serif;max-width:800px;margin:0 auto;">' +
-            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;border-bottom:2px solid #C8B99A;padding-bottom:12px;">' +
-              '<div style="font-size:28px;font-weight:300;letter-spacing:4px;color:#0E1629;">CCH</div>' +
-              '<div style="font-size:12px;color:#888;">' + esc(projectName || '') + '</div>' +
+          var fields = [
+            ['Room', item.room || ''],
+            ['Category', item.category || ''],
+            ['Item Code / SKU', item.sku || ''],
+            ['Vendor / Brand', item.vendor || ''],
+            ['Dimensions', item.dimensions || ''],
+            ['Qty', qty > 1 ? qty : ''],
+          ];
+          if (pricing && sell > 0) fields.push(['Unit Price', fmt(sell)]);
+          if (pricing && total > 0 && qty > 1) fields.push(['Total', fmt(total)]);
+          fields = fields.filter(function(f) { return f[1] !== '' && f[1] !== null; });
+
+          return '<div class="page">' +
+            '<div class="page-header">' +
+              '<div class="logo-block"><div class="logo-cch">CCH</div><div class="logo-sub">Design Inc.</div></div>' +
+              '<div class="project-info"><div class="proj-name">' + esc(projectName || '') + '</div><div class="proj-meta">Product Specification &middot; ' + today + '</div></div>' +
             '</div>' +
-            (img ? '<div style="text-align:center;margin-bottom:24px;"><img src="' + escAttr(img) + '" style="max-width:100%;max-height:400px;object-fit:contain;" referrerpolicy="no-referrer"></div>' : '') +
-            '<div style="font-size:22px;font-weight:600;color:#0E1629;margin-bottom:8px;">' + esc(item.title || item.description || '') + '</div>' +
-            '<table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:16px;">' +
-              (item.vendor ? '<tr><td style="padding:8px 0;color:#888;width:140px;">Vendor</td><td style="padding:8px 0;">' + esc(item.vendor) + '</td></tr>' : '') +
-              (item.room ? '<tr><td style="padding:8px 0;color:#888;">Room</td><td style="padding:8px 0;">' + esc(item.room) + '</td></tr>' : '') +
-              (item.category ? '<tr><td style="padding:8px 0;color:#888;">Category</td><td style="padding:8px 0;">' + esc(item.category) + '</td></tr>' : '') +
-              (item.sku ? '<tr><td style="padding:8px 0;color:#888;">SKU</td><td style="padding:8px 0;font-family:monospace;">' + esc(item.sku) + '</td></tr>' : '') +
-              (item.dimensions ? '<tr><td style="padding:8px 0;color:#888;">Dimensions</td><td style="padding:8px 0;">' + esc(item.dimensions) + '</td></tr>' : '') +
-              '<tr><td style="padding:8px 0;color:#888;">Quantity</td><td style="padding:8px 0;">' + qty + '</td></tr>' +
-              (pricing && sell > 0 ? '<tr><td style="padding:8px 0;color:#888;">Price</td><td style="padding:8px 0;font-weight:600;font-family:monospace;color:#C8B99A;">' + formatMoney(sell) + '</td></tr>' : '') +
-              (pricing && sell > 0 && qty > 1 ? '<tr style="border-top:1px solid #eee;"><td style="padding:8px 0;color:#888;">Total</td><td style="padding:8px 0;font-weight:700;font-family:monospace;color:#C8B99A;">' + formatMoney(sell * qty) + '</td></tr>' : '') +
-            '</table>' +
+            '<div class="page-body">' +
+              '<div class="img-col">' +
+                (imgSrc ? '<img src="' + escAttr(imgSrc) + '" alt="" referrerpolicy="no-referrer" onerror="this.style.display=\'none\';var p=this.parentElement;p.textContent=\'No image on file\';p.style.cssText=\'text-align:center;color:#9E9A8F;padding:10px;\'">'
+                  : '<div class="no-img">No image on file</div>') +
+              '</div>' +
+              '<div class="detail-col">' +
+                '<div class="product-title">' + esc(item.title || item.description || 'Untitled Product') + '</div>' +
+                '<div class="product-room">' + esc(item.room || item.category || '') + '</div>' +
+                '<div class="spec-table">' +
+                  fields.map(function(f) { return '<div class="spec-row"><div class="spec-label">' + esc(f[0]) + '</div><div class="spec-val">' + esc(String(f[1])) + '</div></div>'; }).join('') +
+                '</div>' +
+                (item.description && item.title ? '<div class="desc-block"><div class="desc-label">Description</div><div class="desc-text">' + esc(item.description) + '</div></div>' : '') +
+                (pricing && total > 0 ? '<div class="price-callout">' + fmt(total) + (qty > 1 ? '<span class="price-note"> (' + qty + ' x ' + fmt(sell) + ')</span>' : '') + '</div>' : '') +
+              '</div>' +
+            '</div>' +
+            '<div class="page-footer"><div>CCH Design Inc. &nbsp;&middot;&nbsp; Confidential — For Client Review Only</div><div>' + esc(item.room || '') + '</div></div>' +
           '</div>';
         }).join('');
 
+        var tearSheetCSS = _getTearSheetCSS();
+        var docLabel = collection === 'invoices' ? 'Invoice' : 'Proposal';
+        var itemCount = items.filter(function(i){return i.title||i.description;}).length;
+
         var w = window.open('', '_blank');
-        w.document.write('<!DOCTYPE html><html><head><title>Tear Sheets</title><style>@media print{body{margin:0}}</style></head><body>' + pages + '</body></html>');
+        if (!w) { showToast('Pop-up blocked — allow pop-ups for this site', 'error'); return; }
+        w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+          '<title>' + esc(projectName || docLabel) + ' — Tear Sheets</title>' +
+          '<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">' +
+          '<style>' + tearSheetCSS + '</style></head><body>' +
+          '<div class="toolbar" id="tsToolbar">' +
+            '<div class="toolbar-title">' + esc(projectName || '') + ' — ' + docLabel + ' Tear Sheets (' + itemCount + ' products)</div>' +
+            '<div class="toolbar-actions">' +
+              '<button class="tb-btn" onclick="window.print()">🖨️ Print / PDF</button>' +
+              '<button class="tb-btn" onclick="document.getElementById(\'tsToolbar\').style.display=\'none\';window.print();setTimeout(function(){document.getElementById(\'tsToolbar\').style.display=\'\'},500)">⬇️ Download</button>' +
+              '<button class="tb-btn" onclick="var s=encodeURIComponent(\'CCH Design — ' + esc((projectName||'').replace(/'/g,'')) + ' Tear Sheets\');var b=encodeURIComponent(\'Hi,\\n\\nPlease find the attached tear sheets for ' + esc((projectName||'').replace(/'/g,'')) + '.\\n\\n' + itemCount + ' products included.\\n\\nBest,\\nCCH Design Inc.\');window.open(\'mailto:?subject=\'+s+\'&body=\'+b,\'_self\');alert(\'Tip: Print this page to PDF first (Ctrl+P → Save as PDF), then attach it to the email.\')">✉️ Email</button>' +
+            '</div>' +
+          '</div>' +
+          pages + '</body></html>');
         w.document.close();
-        showToast(items.length + ' tear sheets — Ctrl+P to print/save as PDF');
+        showToast(itemCount + ' tear sheets ready');
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
 
@@ -6719,19 +6768,6 @@
       var _timeVal = _timeEntries.reduce(function(s,e){ return s+(e.total||0); },0);
       var _timeBillHrs = _timeEntries.filter(function(e){ return e.billable; }).reduce(function(s,e){ return s+(e.hours||0); },0);
 
-      // Load hero cover image
-      var _heroCover = '';
-      try {
-        var _rmSnap = await db.collection('boards').doc(proj.id).collection('roomMeta').limit(1).get();
-        _rmSnap.forEach(function(d) { var rm = d.data(); if (rm.coverImage) _heroCover = rm.coverImage; });
-      } catch(e) {}
-      if (!_heroCover) {
-        try {
-          var _clSnap = await db.collection('boards').doc(proj.id).collection('clips').limit(5).get();
-          _clSnap.forEach(function(d) { if (!_heroCover) { var c = d.data(); if (c.imageUrl && !c.imageUrl.startsWith('data:')) _heroCover = c.imageUrl; } });
-        } catch(e) {}
-      }
-
       // Load all docs
       let invoices = [], proposals = [], pos = [], clips = [], activities = [];
       try {
@@ -6900,28 +6936,12 @@
           .dpo-quick-btn:hover { background:var(--gold-light); border-color:var(--gold); }
           .dpo-po-alert { background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.2); border-radius:0; padding:14px 18px; margin-bottom:16px; }
           .dpo-margin-ring { width:64px; height:64px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:700; font-family:'JetBrains Mono',monospace; }
-          .dpo-hero { position:relative; height:200px; overflow:hidden; margin:-28px -28px 28px -28px; background:linear-gradient(135deg,#0E1629,#1A2540); }
-          .dpo-hero img { width:100%; height:100%; object-fit:cover; opacity:0.55; }
-          .dpo-hero-overlay { position:absolute; bottom:0; left:0; right:0; padding:24px 28px; background:linear-gradient(transparent, rgba(14,22,41,0.85)); }
-          .dpo-hero-name { font-family:'Playfair Display',Georgia,serif; font-size:32px; color:#FFFFFF; letter-spacing:0.5px; }
-          .dpo-hero-sub { font-size:12px; color:rgba(200,185,154,0.8); margin-top:4px; }
-          .dpo-hero-initials { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:64px; font-weight:300; color:rgba(200,185,154,0.15); font-family:'Playfair Display',Georgia,serif; letter-spacing:8px; }
-          @media (max-width:900px) { .dpo-layout { grid-template-columns:1fr; } .dpo-hero { height:140px; } }
+          @media (max-width:900px) { .dpo-layout { grid-template-columns:1fr; } }
         </style>
 
         <div class="dpo-wrap">
-          <!-- HERO IMAGE -->
-          <div class="dpo-hero">
-            ${_heroCover ? '<img src="' + escAttr(_heroCover) + '" onerror="this.style.display=\'none\'">' : '<div class="dpo-hero-initials">' + esc((proj.name || 'P').split(' ').map(function(w){return w.charAt(0);}).join('').slice(0,3)) + '</div>'}
-            <div class="dpo-hero-overlay">
-              <div class="dpo-hero-name">${esc(proj.name || 'Project')}</div>
-              <div class="dpo-hero-sub">${esc(proj.clientName ? 'Client: ' + proj.clientName : '')} ${proj.status ? '· ' + esc(proj.status) : ''} ${proj.projectAddress ? '· ' + esc(proj.projectAddress) : ''}</div>
-            </div>
-          </div>
-
           <!-- HEADER -->
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;">
-            <div>
+          <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:28px;">
             <div style="display:flex;gap:8px;align-items:center;">
               <div style="display:flex;gap:1px;background:rgba(14,22,41,0.03);border:1px solid rgba(14,22,41,0.08);border-radius:0;overflow:hidden;margin-right:8px;">
                 ${['week','month','year','all'].map(function(p) {
@@ -29727,6 +29747,102 @@ async function renderBoardsTab(T, proj) {
       '</div>';
     }
 
+    // ==================== ALL TASKS (cross-project) ====================
+    async function renderAllTasks() {
+      setBreadcrumb([{ label: 'Tasks' }]);
+      setTopbarActions('');
+      const C = document.getElementById('contentArea');
+      C.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Loading tasks across all projects...</div>';
+
+      const snap = await getCachedBoards();
+      const allProjects = [];
+      snap.forEach(d => allProjects.push({ id: d.id, ...d.data() }));
+      const active = allProjects.filter(p => p.status !== 'Completed');
+
+      let allTasks = [];
+      await Promise.all(active.map(async p => {
+        try {
+          const tSnap = await db.collection('boards').doc(p.id).collection('tasks').get();
+          tSnap.forEach(d => allTasks.push({ id: d.id, projectId: p.id, projectName: p.name || p.id, ...d.data() }));
+        } catch(e) {}
+      }));
+
+      const memberName = typeof currentMemberName === 'function' ? currentMemberName() : '';
+      window._allTaskFilter = window._allTaskFilter || 'active';
+      var filtered = allTasks;
+      if (window._allTaskFilter === 'active') filtered = allTasks.filter(t => t.status !== 'Done');
+      else if (window._allTaskFilter === 'mine') filtered = allTasks.filter(t => t.status !== 'Done' && (t.assignee || '').toLowerCase().includes((memberName || '').split(' ')[0].toLowerCase()));
+      else if (window._allTaskFilter === 'done') filtered = allTasks.filter(t => t.status === 'Done');
+
+      var priOrder = { 'Urgent': 0, 'High': 1, 'Medium': 2, 'Low': 3 };
+      var statusOrder = { 'To Do': 0, 'In Progress': 1, 'Waiting': 2, 'Done': 3 };
+      filtered.sort(function(a,b) {
+        var sa = statusOrder[a.status] || 0, sb = statusOrder[b.status] || 0;
+        if (sa !== sb) return sa - sb;
+        var pa = priOrder[a.priority] || 2, pb = priOrder[b.priority] || 2;
+        if (pa !== pb) return pa - pb;
+        return (b.createdAt || '').localeCompare(a.createdAt || '');
+      });
+
+      var todoCount = allTasks.filter(t => t.status === 'To Do').length;
+      var inProgressCount = allTasks.filter(t => t.status === 'In Progress').length;
+      var waitingCount = allTasks.filter(t => t.status === 'Waiting').length;
+      var doneCount = allTasks.filter(t => t.status === 'Done').length;
+      var priColors = { 'Urgent': '#E16A5B', 'High': '#F9A825', 'Medium': 'var(--cyan)', 'Low': 'var(--gray-400)' };
+      var statusColors = { 'To Do': 'var(--gray-400)', 'In Progress': 'var(--cyan)', 'Waiting': '#F9A825', 'Done': '#5FA56B' };
+      var statusIcons = { 'To Do': '○', 'In Progress': '◐', 'Waiting': '◷', 'Done': '●' };
+
+      C.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+          <div>
+            <h2 style="font-size:22px;font-weight:700;margin:0;color:var(--text-primary);font-family:var(--font-display);">All Tasks</h2>
+            <div style="font-size:12px;color:var(--gray-400);margin-top:4px;">
+              ${todoCount} to do · ${inProgressCount} in progress · ${waitingCount} waiting · ${doneCount} done · across ${active.length} projects
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <button class="btn btn-sm" style="${window._allTaskFilter==='active'?'background:var(--gold);color:white;':''}border:1px solid rgba(14,22,41,0.12);" onclick="window._allTaskFilter='active';renderAllTasks()">📋 Active</button>
+          <button class="btn btn-sm" style="${window._allTaskFilter==='mine'?'background:var(--gold);color:white;':''}border:1px solid rgba(14,22,41,0.12);" onclick="window._allTaskFilter='mine';renderAllTasks()">👤 My Tasks</button>
+          <button class="btn btn-sm" style="${window._allTaskFilter==='done'?'background:var(--gold);color:white;':''}border:1px solid rgba(14,22,41,0.12);" onclick="window._allTaskFilter='done';renderAllTasks()">✅ Completed</button>
+          <button class="btn btn-sm" style="${window._allTaskFilter==='all'?'background:var(--gold);color:white;':''}border:1px solid rgba(14,22,41,0.12);" onclick="window._allTaskFilter='all';renderAllTasks()">All</button>
+        </div>
+
+        ${filtered.length > 0 ? `
+        <div style="background:#FFFFFF;border:1px solid rgba(14,22,41,0.08);border-radius:0;overflow:hidden;">
+          <table style="width:100%;border-collapse:collapse;">
+            <thead><tr>
+              <th style="text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(14,22,41,0.08);width:30px;"></th>
+              <th style="text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(14,22,41,0.08);">Task</th>
+              <th style="text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(14,22,41,0.08);">Project</th>
+              <th style="text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(14,22,41,0.08);">Assignee</th>
+              <th style="text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(14,22,41,0.08);">Priority</th>
+              <th style="text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(14,22,41,0.08);">Due</th>
+            </tr></thead>
+            <tbody>
+              ${filtered.map(t => {
+                var sc = statusColors[t.status] || 'var(--gray-400)';
+                var si = statusIcons[t.status] || '○';
+                var pc = priColors[t.priority] || 'var(--gray-400)';
+                var dueStr = t.dueDate ? new Date(t.dueDate + 'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
+                var overdue = t.dueDate && t.dueDate < new Date().toISOString().slice(0,10) && t.status !== 'Done';
+                return '<tr style="cursor:pointer;border-bottom:1px solid rgba(14,22,41,0.04);" onclick="currentProjectId=\'' + t.projectId + '\';currentProjectTab=\'tasks\';navigate(\'#/project/' + t.projectId + '/tasks\')">' +
+                  '<td style="padding:10px 14px;font-size:16px;color:' + sc + ';" title="' + esc(t.status || 'To Do') + '">' + si + '</td>' +
+                  '<td style="padding:10px 14px;"><div style="font-size:13px;font-weight:600;color:#0E1629;">' + esc(t.title || t.name || 'Untitled') + '</div>' + (t.category ? '<div style="font-size:10px;color:var(--gold);margin-top:2px;">' + esc(t.category) + '</div>' : '') + '</td>' +
+                  '<td style="padding:10px 14px;font-size:12px;color:var(--cyan);cursor:pointer;" onclick="event.stopPropagation();navigate(\'#/project/' + t.projectId + '\')">' + esc(t.projectName) + '</td>' +
+                  '<td style="padding:10px 14px;font-size:12px;color:#0E1629;">' + esc(t.assignee || '—') + '</td>' +
+                  '<td style="padding:10px 14px;"><span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:0;background:' + pc + '20;color:' + pc + ';">' + esc(t.priority || 'Medium') + '</span></td>' +
+                  '<td style="padding:10px 14px;font-size:12px;color:' + (overdue ? '#E16A5B;font-weight:600' : '#0E1629') + ';">' + (dueStr || '—') + (overdue ? ' ⚠' : '') + '</td>' +
+                '</tr>';
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+        ` : '<div style="text-align:center;padding:60px 20px;color:var(--gray-400);"><div style="font-size:40px;margin-bottom:12px;">✅</div><div style="font-size:14px;">' + (window._allTaskFilter === 'done' ? 'No completed tasks' : 'No active tasks across projects') + '</div></div>'}
+      `;
+    }
+
     async function renderAllProposals() {
       setBreadcrumb([{ label: 'Proposals' }]);
       setTopbarActions('');
@@ -32588,6 +32704,7 @@ async function renderBoardsTab(T, proj) {
             <div class="modal-footer" style="justify-content:space-between;">
               <button class="btn btn-secondary btn-sm" style="color:var(--red);border-color:var(--red);" onclick="deleteClip('${escAttr(projectId)}','${escAttr(clipId)}')">🗑 Delete</button>
               <div style="display:flex;gap:8px;">
+                <button class="btn btn-secondary btn-sm" onclick="generateSingleTearSheet('${escAttr(projectId)}','${escAttr(clipId)}')" title="Generate Tear Sheet">📄 Tear Sheet</button>
                 <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="saveClipDetail('${escAttr(projectId)}','${escAttr(clipId)}')">Save Changes</button>
               </div>
@@ -35274,7 +35391,151 @@ async function renderBoardsTab(T, proj) {
     }
 
 
-    // ==================== TEAR SHEET GENERATOR ====================
+    // ==================== SINGLE PRODUCT TEAR SHEET ====================
+    async function generateSingleTearSheet(projectId, clipId) {
+      const doc = await db.collection('boards').doc(projectId).collection('clips').doc(clipId).get();
+      if (!doc.exists) { showToast('Product not found', 'error'); return; }
+      const c = { id: doc.id, ...doc.data() };
+
+      // Get project name
+      let projectName = projectId;
+      try {
+        const boardDoc = await db.collection('boards').doc(projectId).get();
+        if (boardDoc.exists && boardDoc.data().name) projectName = boardDoc.data().name;
+      } catch(e){}
+
+      const today = new Date().toLocaleDateString('en-US', {month: 'long', day: 'numeric', year: 'numeric'});
+      const fmt = v => { const n = parseFloat(v); return n > 0 ? '$' + n.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0}) : ''; };
+
+      const imgSrc = c.imageUrl || (c.images && c.images[0]) || '';
+      const sell = parseMoney(c.clientPrice) || parseMoney(c.sellPrice) || parseMoney(c.price) || 0;
+      const qty = parseFloat(c.qty) || 1;
+      const total = parseMoney(c.totalSelling) || (sell * qty);
+
+      const fields = [
+        ['Room', c.room || ''],
+        ['Category', c.category || ''],
+        ['Item Code / SKU', c.sku || c.itemCode || ''],
+        ['Vendor / Brand', c.vendor || c.manufacturer || ''],
+        ['Finish / Color', c.finish || c.finishColor || ''],
+        ['Materials', c.materials || ''],
+        ['Dimensions', c.dimensions || ''],
+        ['Lead Time', c.leadTime || ''],
+        ['Qty', qty > 1 ? qty : ''],
+        ['Unit Price', fmt(sell)],
+        ['Total', total > 0 && qty > 1 ? fmt(total) : ''],
+      ].filter(([,v]) => v !== '' && v !== null);
+
+      const pageHTML = `
+        <div class="page">
+          <div class="page-header">
+            <div class="logo-block">
+              <div class="logo-cch">CCH</div>
+              <div class="logo-sub">Design Inc.</div>
+            </div>
+            <div class="project-info">
+              <div class="proj-name">${esc(projectName)}</div>
+              <div class="proj-meta">Product Specification &middot; ${today}</div>
+            </div>
+          </div>
+          <div class="page-body">
+            <div class="img-col">
+              ${imgSrc
+                ? '<img src="' + escAttr(imgSrc) + '" alt="" referrerpolicy="no-referrer" onerror="this.style.display=\'none\';var p=this.parentElement;p.textContent=\'No image on file\';p.style.cssText=\'text-align:center;color:#9E9A8F;padding:10px;\'">'
+                : '<div class="no-img">No image on file</div>'}
+            </div>
+            <div class="detail-col">
+              <div class="product-title">${esc(c.title || 'Untitled Product')}</div>
+              <div class="product-room">${esc(c.room || c.category || '')}</div>
+              <div class="spec-table">
+                ${fields.map(([label, val]) => '<div class="spec-row"><div class="spec-label">' + esc(label) + '</div><div class="spec-val">' + esc(String(val)) + '</div></div>').join('')}
+              </div>
+              ${c.description ? '<div class="desc-block"><div class="desc-label">Description</div><div class="desc-text">' + esc(c.description) + '</div></div>' : ''}
+              ${c.vendorDescription ? '<div class="desc-block"><div class="desc-label">Vendor Notes</div><div class="desc-text">' + esc(c.vendorDescription) + '</div></div>' : ''}
+              ${total > 0 ? '<div class="price-callout">' + fmt(total) + (qty > 1 ? '<span class="price-note"> (' + qty + ' x ' + fmt(sell) + ')</span>' : '') + '</div>' : ''}
+            </div>
+          </div>
+          <div class="page-footer">
+            <div>CCH Design Inc. &nbsp;&middot;&nbsp; Confidential — For Client Review Only</div>
+            <div>${esc(c.room || '')}</div>
+          </div>
+        </div>`;
+
+      const tearSheetCSS = _getTearSheetCSS();
+
+      const fullHTML = '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+        '<title>' + esc(c.title || 'Product') + ' — Tear Sheet</title>' +
+        '<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">' +
+        '<style>' + tearSheetCSS + '</style></head><body>' +
+        '<div class="toolbar" id="tsToolbar">' +
+          '<div class="toolbar-title">Tear Sheet: ' + esc(c.title || 'Product') + '</div>' +
+          '<div class="toolbar-actions">' +
+            '<button class="tb-btn" onclick="window.print()" title="Print or Save as PDF">🖨️ Print / PDF</button>' +
+            '<button class="tb-btn" onclick="tsDownloadPDF()" title="Download as PDF">⬇️ Download</button>' +
+            '<button class="tb-btn" onclick="tsEmailTearSheet()" title="Email tear sheet">✉️ Email</button>' +
+          '</div>' +
+        '</div>' +
+        pageHTML +
+        '<script>' +
+        'function tsDownloadPDF(){' +
+          'document.getElementById("tsToolbar").style.display="none";' +
+          'window.print();' +
+          'setTimeout(function(){document.getElementById("tsToolbar").style.display="";},500);' +
+        '}' +
+        'function tsEmailTearSheet(){' +
+          'var subj=encodeURIComponent("CCH Design — ' + esc(c.title || 'Product').replace(/'/g, "\\'") + ' Tear Sheet");' +
+          'var body=encodeURIComponent("Hi,\\n\\nPlease find the attached tear sheet for ' + esc(c.title || 'this product').replace(/'/g, "\\'") + '.\\n\\nProject: ' + esc(projectName).replace(/'/g, "\\'") + '\\n\\nBest,\\nCCH Design Inc.");' +
+          'window.open("mailto:?subject="+subj+"&body="+body,"_self");' +
+          'alert("Tip: Print this page to PDF first (Ctrl+P → Save as PDF), then attach it to the email that just opened.");' +
+        '}' +
+        '</script>' +
+        '</body></html>';
+
+      const win = window.open('', '_blank');
+      if (!win) { showToast('Pop-up blocked — allow pop-ups for this site', 'error'); return; }
+      win.document.write(fullHTML);
+      win.document.close();
+    }
+
+    // Shared CSS for tear sheet pages
+    function _getTearSheetCSS() {
+      return '*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }' +
+        'body { font-family: "DM Sans", sans-serif; background: #f5f4f0; color: #0E1629; }' +
+        '.toolbar { position:fixed;top:0;left:0;right:0;z-index:999;background:#0E1629;display:flex;align-items:center;justify-content:space-between;padding:12px 24px;box-shadow:0 2px 12px rgba(0,0,0,0.3); }' +
+        '.toolbar-title { color:#fff;font-size:14px;font-weight:600;letter-spacing:0.5px;max-width:50%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }' +
+        '.toolbar-actions { display:flex;gap:10px; }' +
+        '.tb-btn { background:transparent;color:#C8B99A;border:1px solid #C8B99A;padding:8px 16px;font-size:12px;font-weight:600;letter-spacing:0.5px;cursor:pointer;font-family:"DM Sans",sans-serif;transition:all 0.15s; }' +
+        '.tb-btn:hover { background:#C8B99A;color:#0E1629; }' +
+        '.page { width:11in;min-height:8.5in;background:#fff;margin:72px auto 24px;display:grid;grid-template-rows:auto 1fr auto;box-shadow:0 2px 16px rgba(0,0,0,0.10);page-break-after:always; }' +
+        '.page-header { display:flex;align-items:center;justify-content:space-between;padding:24px 40px;border-bottom:3px solid #0E1629;background:#0E1629; }' +
+        '.logo-block { display:flex;flex-direction:column; }' +
+        '.logo-cch { font-family:"Cormorant Garamond",Georgia,serif;font-size:32px;font-weight:700;color:#C8B99A;letter-spacing:4px;line-height:1; }' +
+        '.logo-sub { font-size:9px;letter-spacing:4px;color:rgba(255,255,255,0.5);text-transform:uppercase;margin-top:2px; }' +
+        '.project-info { text-align:right; }' +
+        '.proj-name { font-size:18px;font-weight:600;color:#fff;letter-spacing:0.5px; }' +
+        '.proj-meta { font-size:11px;color:rgba(255,255,255,0.5);margin-top:3px;letter-spacing:0.5px; }' +
+        '.page-body { display:grid;grid-template-columns:1fr 1fr;min-height:0; }' +
+        '.img-col { background:#f0eeea;display:flex;align-items:center;justify-content:center;padding:32px;border-right:1px solid #e8e6e0;overflow:hidden; }' +
+        '.img-col img { max-width:100%;max-height:580px;object-fit:contain; }' +
+        '.no-img { color:#9E9A8F;text-align:center;font-size:16px;line-height:1.6; }' +
+        '.detail-col { padding:40px 44px;display:flex;flex-direction:column;justify-content:flex-start; }' +
+        '.product-title { font-family:"Cormorant Garamond",Georgia,serif;font-size:30px;font-weight:600;color:#0E1629;line-height:1.2;margin-bottom:4px; }' +
+        '.product-room { font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#C8B99A;margin-bottom:28px;font-weight:600; }' +
+        '.spec-table { margin-bottom:24px; }' +
+        '.spec-row { display:flex;align-items:baseline;padding:7px 0;border-bottom:1px solid #f0efeb; }' +
+        '.spec-label { font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:#9E9A8F;width:160px;flex-shrink:0; }' +
+        '.spec-val { font-size:14px;color:#0E1629;font-weight:500; }' +
+        '.desc-block { margin-top:4px;margin-bottom:20px; }' +
+        '.desc-label { font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:#9E9A8F;margin-bottom:8px; }' +
+        '.desc-text { font-size:13px;color:#6B6760;line-height:1.65; }' +
+        '.price-callout { margin-top:auto;padding-top:20px;border-top:2px solid #0E1629;font-family:"Cormorant Garamond",Georgia,serif;font-size:36px;font-weight:700;color:#0E1629; }' +
+        '.price-note { font-size:14px;font-family:"DM Sans",sans-serif;font-weight:400;color:#9E9A8F;margin-left:8px; }' +
+        '.page-footer { display:flex;justify-content:space-between;align-items:center;padding:12px 40px;border-top:1px solid #e8e6e0;font-size:10px;color:#9E9A8F;letter-spacing:0.5px;background:#FAFAF8; }' +
+        '@page { size:11in 8.5in landscape;margin:0; }' +
+        '@media print { .toolbar{display:none!important;} body{background:white;} .page{margin:0;box-shadow:none;width:100%;min-height:100vh;} }';
+    }
+
+    // ==================== TEAR SHEET GENERATOR (BULK) ====================
     async function generateTearSheets(projectId, projectName) {
       let clips = [];
       try {
@@ -35351,12 +35612,11 @@ async function renderBoardsTab(T, proj) {
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'DM Sans', sans-serif; background: #f5f4f0; color: #0E1629; }
-  .print-btn {
-    position: fixed; top: 16px; right: 16px; z-index: 999;
-    background: #0E1629; color: #00B8D4; border: 2px solid #C8B99A;
-    padding: 10px 20px; border-radius:0; cursor: pointer;
-    font-size: 13px; font-weight: 700; letter-spacing: 0.5px;
-  }
+  .toolbar { position:fixed;top:0;left:0;right:0;z-index:999;background:#0E1629;display:flex;align-items:center;justify-content:space-between;padding:12px 24px;box-shadow:0 2px 12px rgba(0,0,0,0.3); }
+  .toolbar-title { color:#fff;font-size:14px;font-weight:600;letter-spacing:0.5px;max-width:50%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+  .toolbar-actions { display:flex;gap:10px; }
+  .tb-btn { background:transparent;color:#C8B99A;border:1px solid #C8B99A;padding:8px 16px;font-size:12px;font-weight:600;letter-spacing:0.5px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s; }
+  .tb-btn:hover { background:#C8B99A;color:#0E1629; }
   .page {
     width: 11in; min-height: 8.5in;
     background: #fff;
@@ -35366,16 +35626,19 @@ async function renderBoardsTab(T, proj) {
     box-shadow: 0 2px 16px rgba(0,0,0,0.10);
     page-break-after: always;
   }
+  .page:first-of-type {
+    margin-top: 72px;
+  }
   .page-header {
     display: flex; align-items: center; justify-content: space-between;
     padding: 24px 40px; border-bottom: 3px solid #0E1629;
     background: #0E1629;
   }
   .logo-block { display: flex; flex-direction: column; }
-  .logo-cch { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 32px; font-weight: 700; color: #00B8D4; letter-spacing: 4px; line-height: 1; }
+  .logo-cch { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 32px; font-weight: 700; color: #C8B99A; letter-spacing: 4px; line-height: 1; }
   .logo-sub { font-size: 9px; letter-spacing: 4px; color: rgba(255,255,255,0.5); text-transform: uppercase; margin-top: 2px; }
   .project-info { text-align: right; }
-  .proj-name { font-size: 18px; font-weight: 600; color: #0E1629; letter-spacing: 0.5px; }
+  .proj-name { font-size: 18px; font-weight: 600; color: #fff; letter-spacing: 0.5px; }
   .proj-meta { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 3px; letter-spacing: 0.5px; }
   .page-body { display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
   .img-col {
@@ -35388,7 +35651,7 @@ async function renderBoardsTab(T, proj) {
   .no-img { color: #0E1629; text-align: center; font-size: 28px; line-height: 1.6; }
   .detail-col { padding: 40px 44px; display: flex; flex-direction: column; justify-content: flex-start; }
   .product-title { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 30px; font-weight: 600; color: #0E1629; line-height: 1.2; margin-bottom: 4px; }
-  .product-room { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #00B8D4; margin-bottom: 28px; font-weight: 600; }
+  .product-room { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #C8B99A; margin-bottom: 28px; font-weight: 600; }
   .spec-table { margin-bottom: 24px; }
   .spec-row { display: flex; align-items: baseline; padding: 7px 0; border-bottom: 1px solid #f0efeb; }
   .spec-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: #9E9A8F; width: 140px; flex-shrink: 0; }
@@ -35406,13 +35669,20 @@ async function renderBoardsTab(T, proj) {
   }
   @page { size: 11in 8.5in landscape; margin: 0; }
   @media print {
-    .print-btn { display: none !important; }
+    .toolbar { display: none !important; }
     body { background: white; }
     .page { margin: 0; box-shadow: none; width: 100%; min-height: 100vh; }
   }
 </style>
 </head><body>
-<button class="print-btn" onclick="window.print()">🖨️ Print / Save PDF</button>
+<div class="toolbar" id="tsToolbar">
+  <div class="toolbar-title">${esc(projectName || 'Room Board')} — Tear Sheets (${clips.length} products)</div>
+  <div class="toolbar-actions">
+    <button class="tb-btn" onclick="window.print()">🖨️ Print / PDF</button>
+    <button class="tb-btn" onclick="document.getElementById('tsToolbar').style.display='none';window.print();setTimeout(function(){document.getElementById('tsToolbar').style.display=''},500)">⬇️ Download</button>
+    <button class="tb-btn" onclick="var s=encodeURIComponent('CCH Design — ${esc((projectName||'').replace(/'/g,""))} Tear Sheets');var b=encodeURIComponent('Hi,\\n\\nPlease find the attached tear sheets for ${esc((projectName||'').replace(/'/g,""))}.\\n\\n${clips.length} products included.\\n\\nBest,\\nCCH Design Inc.');window.open('mailto:?subject='+s+'&body='+b,'_self');alert('Tip: Print this page to PDF first (Ctrl+P → Save as PDF), then attach it to the email.')">✉️ Email</button>
+  </div>
+</div>
 ${pages}
 </body></html>`);
       win.document.close();
