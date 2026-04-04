@@ -3169,6 +3169,30 @@
         });
       }
 
+      // Load tasks from all active projects
+      let _allTasks = [];
+      await Promise.all(active.map(async p => {
+        try {
+          const taskSnap = await db.collection('boards').doc(p.id).collection('tasks').get();
+          taskSnap.forEach(d => _allTasks.push({ id: d.id, projectId: p.id, projectName: p.name || p.id, ...d.data() }));
+        } catch(e) {}
+      }));
+      // Filter tasks for dashboard view
+      let dashTasks = _allTasks.filter(t => t.status !== 'Done');
+      if (isOwner && window._dashboardView === 'contractor') {
+        dashTasks = dashTasks.filter(t => (t.assignee || '').toLowerCase().includes('vanessa'));
+      } else if (!isOwner) {
+        const _mn = memberName ? memberName.toLowerCase() : '';
+        dashTasks = dashTasks.filter(t => (t.assignee || '').toLowerCase().includes(_mn));
+      }
+      // Sort: urgent first, then by due date
+      const priOrder = { Urgent: 0, High: 1, Medium: 2, Low: 3 };
+      dashTasks.sort((a, b) => {
+        const pa = priOrder[a.priority] ?? 3, pb = priOrder[b.priority] ?? 3;
+        if (pa !== pb) return pa - pb;
+        return (a.dueDate || '9999') < (b.dueDate || '9999') ? -1 : 1;
+      });
+
       // Load room covers for project thumbnails
       let roomCovers = {};
       for (const p of active.slice(0, 12)) {
@@ -3614,6 +3638,33 @@
                 </table>
               </div>
 
+              <!-- Tasks -->
+              ${dashTasks.length > 0 ? `
+              <div style="margin-bottom:28px;">
+                <div class="db-sh">Tasks <span class="db-sh-count">${dashTasks.length}</span></div>
+                <div style="background:#FFFFFF;border:1px solid rgba(14,22,41,0.08);border-radius:4px;overflow:hidden;">
+                  ${dashTasks.slice(0, 15).map(t => {
+                    const priColors = { Urgent: '#E16A5B', High: '#F9A825', Medium: 'var(--cyan)', Low: 'var(--gray-400)' };
+                    const statusIcons = { 'To Do': '○', 'In Progress': '◐', 'Waiting': '◷', 'Done': '●' };
+                    const pc = priColors[t.priority] || 'var(--gray-400)';
+                    const si = statusIcons[t.status] || '○';
+                    const overdue = t.dueDate && t.dueDate < new Date().toISOString().slice(0,10);
+                    return '<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid rgba(14,22,41,0.06);cursor:pointer;" onclick="navigate(\'#/project/' + t.projectId + '/tasks\')">' +
+                      '<span style="font-size:16px;color:' + pc + ';" title="' + esc(t.status || 'To Do') + '">' + si + '</span>' +
+                      '<div style="flex:1;min-width:0;">' +
+                        '<div style="font-size:13px;font-weight:500;color:#0E1629;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(t.title || 'Untitled') + '</div>' +
+                        '<div style="font-size:10px;color:var(--gold);margin-top:1px;">' + esc(t.projectName) + (t.category ? ' · ' + esc(t.category) : '') + '</div>' +
+                      '</div>' +
+                      (t.assignee ? '<span style="font-size:10px;color:var(--gray-400);white-space:nowrap;">' + esc(t.assignee.split(' ')[0]) + '</span>' : '') +
+                      (t.dueDate ? '<span style="font-size:10px;font-family:var(--font-mono);color:' + (overdue ? '#E16A5B' : 'var(--gray-400)') + ';white-space:nowrap;">' + t.dueDate.slice(5) + '</span>' : '') +
+                      (t.priority === 'Urgent' || t.priority === 'High' ? '<span style="font-size:9px;padding:2px 6px;background:' + pc + '22;color:' + pc + ';font-weight:600;border-radius:0;">' + esc(t.priority) + '</span>' : '') +
+                    '</div>';
+                  }).join('')}
+                  ${dashTasks.length > 15 ? '<div style="padding:10px 16px;text-align:center;font-size:11px;color:var(--gold);cursor:pointer;" onclick="navigate(\'#/projects\')">+ ' + (dashTasks.length - 15) + ' more tasks</div>' : ''}
+                </div>
+              </div>
+              ` : ''}
+
               ${olderProjects.length > 0 ? '<div style="margin-bottom:28px;">' +
                 '<div class="db-sh" style="cursor:pointer;" onclick="var el=document.getElementById(\'dbOlderProjects\');el.style.display=el.style.display===\'none\'?\'grid\':\'none\';">Other Active Projects <span class="db-sh-count">' + olderProjects.length + '</span> <span style="font-size:10px;color:var(--gold);font-weight:400;letter-spacing:0;margin-left:4px;">▸ expand</span></div>' +
                 '<div id="dbOlderProjects" class="db-pcards" style="display:none;">' +
@@ -4007,6 +4058,29 @@
                   </div>
                 </div>
               </div>
+
+              <!-- Tasks -->
+              ${dashTasks.length > 0 ? `
+              <div class="vd-panel">
+                <div class="vd-panel-t">Tasks <span style="font-size:10px;font-weight:600;padding:2px 8px;background:var(--gold);color:white;border-radius:0;margin-left:8px;">${dashTasks.length}</span></div>
+                ${dashTasks.slice(0, 12).map(t => {
+                  const priColors = { Urgent: '#E16A5B', High: '#F9A825', Medium: 'var(--cyan)', Low: 'var(--gray-400)' };
+                  const statusIcons = { 'To Do': '○', 'In Progress': '◐', 'Waiting': '◷', 'Done': '●' };
+                  const pc = priColors[t.priority] || 'var(--gray-400)';
+                  const si = statusIcons[t.status] || '○';
+                  const overdue = t.dueDate && t.dueDate < new Date().toISOString().slice(0,10);
+                  return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(14,22,41,0.06);cursor:pointer;" onclick="navigate(\'#/project/' + t.projectId + '/tasks\')">' +
+                    '<span style="font-size:14px;color:' + pc + ';">' + si + '</span>' +
+                    '<div style="flex:1;min-width:0;">' +
+                      '<div style="font-size:12px;font-weight:500;color:#0E1629;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(t.title || 'Untitled') + '</div>' +
+                      '<div style="font-size:10px;color:var(--gold);">' + esc(t.projectName) + '</div>' +
+                    '</div>' +
+                    (t.dueDate ? '<span style="font-size:10px;font-family:var(--font-mono);color:' + (overdue ? '#E16A5B' : 'var(--gray-400)') + ';">' + t.dueDate.slice(5) + '</span>' : '') +
+                    (t.priority === 'Urgent' || t.priority === 'High' ? '<span style="font-size:9px;padding:2px 6px;background:' + pc + '22;color:' + pc + ';font-weight:600;">' + esc(t.priority) + '</span>' : '') +
+                  '</div>';
+                }).join('')}
+              </div>
+              ` : ''}
 
               <!-- Recent Time Entries -->
               <div class="vd-panel">
@@ -5368,9 +5442,9 @@
       `);
 
       const _isAdminUser = currentUser && ADMIN_EMAILS.includes((currentUser.email || '').toLowerCase());
-      const tabs = ['overview', 'tasks', 'selections', 'ideabooks', 'boards', 'designboards', 'ffe', '_div1', 'proposals', 'invoices', 'pos', ...(_isAdminUser ? ['financials'] : []), '_div2', 'files', 'time', 'comms', 'notes'];
-      const tabLabels = { overview: 'Overview', tasks: 'Tasks', selections: 'Selections', ideabooks: 'Inspiration', boards: 'Room Boards', designboards: 'Design Boards', ffe: 'FFE Tracker', proposals: 'Proposals', invoices: 'Invoices', pos: 'Purchase Orders', financials: 'Financials', files: 'Files & Docs', time: 'Time', comms: 'Communications', notes: 'Notes' };
-      const tabIcons = { overview: '◈', tasks: '✅', selections: '🛍️', ideabooks: '💡', boards: '🏠', designboards: '🎨', ffe: '🛋️', proposals: '📋', invoices: '💰', pos: '📦', financials: '📊', files: '📁', time: '⏱️', comms: '💬', notes: '📝' };
+      const tabs = ['overview', 'tasks', 'selections', 'ideabooks', 'designboards', 'ffe', 'specbook', ...(_isAdminUser ? ['_div1', 'financials'] : []), '_div2', 'files', 'time', 'comms', 'notes'];
+      const tabLabels = { overview: 'Overview', tasks: 'Tasks', selections: 'Selections', ideabooks: 'Inspiration', boards: 'Room Boards', designboards: 'Design Boards', ffe: 'FFE Tracker', specbook: 'Spec Book', financials: 'Financials', files: 'Files & Docs', time: 'Time', comms: 'Communications', notes: 'Notes' };
+      const tabIcons = { overview: '◈', tasks: '✅', selections: '🛍️', ideabooks: '💡', boards: '🏠', designboards: '🎨', ffe: '🛋️', specbook: '📖', financials: '📊', files: '📁', time: '⏱️', comms: '💬', notes: '📝' };
 
       // Load profit data for summary bar
       let _projInvoices = [], _projPOs = [], _projTime = [];
@@ -5596,6 +5670,7 @@
       else if (currentProjectTab === 'invoices') await renderInvoicesTab(T, proj);
       else if (currentProjectTab === 'pos') await renderPOsTab(T, proj);
       else if (currentProjectTab === 'ffe') await renderFFETab(T, proj);
+      else if (currentProjectTab === 'specbook') await renderSpecBookTab(T, proj);
       else if (currentProjectTab === 'financials') await renderFinancialsTab(T, proj);
       else if (currentProjectTab === 'time') await renderTimeTab(T, proj);
       else if (currentProjectTab === 'files') await renderFilesTab(T, proj);
@@ -6807,11 +6882,15 @@
       invoices.forEach(inv => { if (inv.status === 'Estimated') inv.status = 'Invoiced'; });
       proposals.forEach(pr => { if (pr.status === 'Estimated') pr.status = 'Approved'; });
 
-      // Load tasks count
+      // Load tasks
       window._projTaskCount = 0;
+      window._projTasks = [];
       try {
         var taskSnap = await db.collection('boards').doc(proj.id).collection('tasks').get();
-        taskSnap.forEach(function(d) { var t = d.data(); if (t.status !== 'Done') window._projTaskCount++; });
+        taskSnap.forEach(function(d) { var t = { id: d.id, ...d.data() }; window._projTasks.push(t); if (t.status !== 'Done') window._projTaskCount++; });
+        // Sort: urgent first, then due date
+        var _priOrd = { Urgent: 0, High: 1, Medium: 2, Low: 3 };
+        window._projTasks.sort(function(a, b) { var pa = _priOrd[a.priority] ?? 3, pb = _priOrd[b.priority] ?? 3; return pa !== pb ? pa - pb : (a.dueDate || '9999') < (b.dueDate || '9999') ? -1 : 1; });
       } catch(e) {}
 
       // Load recent activity
@@ -6904,88 +6983,85 @@
         ...pos.map(p => ({ type: 'po', icon: '📦', label: p.number || p.num || p.id.slice(0,8), id: p.id, collection: 'purchaseOrders', total: p.total, status: p.status, linked: { proposal: p.linkedProposalId, invoice: p.linkedInvoiceId } }))
       ];
 
+      // Computed values for compact overview
+      const _selectionsCount = clips.filter(c => isRealProduct(c)).length;
+      const _selectionsTotal = clips.reduce((s,c) => s + (parseMoney(c.clientPrice) || parseMoney(c.totalSelling) || 0), 0);
+      const _pipelineProposals = proposals.filter(p => !['Invoiced','Converted','Cancelled'].includes(p.status));
+      const _pipelineTotal = _pipelineProposals.reduce((s,p) => s + (parseFloat(p.total)||0), 0);
+      const _openInvoices = invoices.filter(i => { var pd = (i.payments||[]).reduce((s,p) => s + (parseFloat(p.amount)||0), 0); return i.status !== 'Paid' && i.status !== 'Draft' && ((parseFloat(i.total)||0) - pd) > 0; });
+      const _activePOs = pos.filter(p => !['Installed','Received','Cancelled','Closed'].includes(p.status));
+      const _poTotal = _activePOs.reduce((s,p) => s + (parseFloat(p.total)||0), 0);
+      const _contractorHrs = _timeEntries.filter(t => !_isOwnerMember(t.member||t.user||'')).reduce((s,t) => s + (parseFloat(t.hours)||0), 0);
+      const _contractorCost = _contractorHrs * (TEAM_CONFIG.contractors[0] ? TEAM_CONFIG.contractors[0].rate : DEFAULT_CONTRACTOR_RATE);
+
       T.innerHTML = `
         <style>
-          .dpo-card { background:#FFFFFF; border:1px solid rgba(14,22,41,0.08); border-radius:0; padding:0; overflow:hidden; transition:all 0.3s ease; }
-          .dpo-card:hover { border-color:rgba(14,22,41,0.15); box-shadow:0 8px 32px rgba(14,22,41,0.08); transform:translateY(-2px); }
-          .dpo-wrap { background:#FFFFFF; border-radius:0; padding:28px; margin:-8px -8px 0 -8px; }
-          .dpo-section { margin-bottom:28px; }
-          .dpo-section-title { font-family:'Playfair Display',Georgia,serif; font-size:18px; color:#0E1629; margin-bottom:16px; letter-spacing:0.5px; }
-          .dpo-fin-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; }
-          .dpo-fin-card { background:#FFFFFF; border:1px solid rgba(14,22,41,0.1); border-radius:0; padding:20px; text-align:center; transition:all 0.25s ease; }
-          .dpo-fin-card:hover { border-color:rgba(196,164,100,0.4); }
-          .dpo-fin-value { font-size:26px; font-weight:700; font-family:'JetBrains Mono',monospace; margin-bottom:4px; color:#0E1629; }
-          .dpo-fin-label { font-size:11px; text-transform:uppercase; letter-spacing:0.12em; color:#C4A464; font-family:'DM Sans','Montserrat',sans-serif; }
-          .dpo-room-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; }
-          .dpo-room-card { background:#FFFFFF; border-radius:0; overflow:hidden; cursor:pointer; transition:all 0.3s ease; border:1px solid rgba(14,22,41,0.08); }
-          .dpo-room-card:hover { border-color:#C4A464; transform:translateY(-3px); box-shadow:0 8px 24px rgba(14,22,41,0.1); }
-          .dpo-room-img { width:100%; height:140px; object-fit:cover; background:#F5F3EE; }
-          .dpo-room-body { padding:14px; }
-          .dpo-room-name { font-family:'Playfair Display',Georgia,serif; font-size:15px; color:#0E1629; margin-bottom:4px; }
-          .dpo-room-count { font-size:11px; color:#C4A464; }
-          .dpo-activity { max-height:400px; overflow-y:auto; }
-          .dpo-act-item { display:flex; gap:12px; padding:12px 0; border-bottom:1px solid rgba(14,22,41,0.06); }
-          .dpo-act-dot { width:8px; height:8px; border-radius:50%; margin-top:6px; flex-shrink:0; }
-          .dpo-act-text { font-size:13px; color:#0E1629; line-height:1.4; }
-          .dpo-act-time { font-size:10px; color:#C4A464; margin-top:2px; }
-          .dpo-docs-table { width:100%; border-collapse:collapse; }
-          .dpo-docs-table th { text-align:left; padding:10px 12px; font-size:10px; text-transform:uppercase; letter-spacing:0.1em; color:var(--gold); border-bottom:1px solid rgba(14,22,41,0.08); font-family:'DM Sans','Montserrat',sans-serif; }
-          .dpo-docs-table td { padding:10px 12px; font-size:13px; color:#0E1629; border-bottom:1px solid rgba(14,22,41,0.06); }
-          .dpo-docs-table tr:hover { background:var(--gold-light); }
-          .dpo-badge { display:inline-block; padding:3px 10px; border-radius:0; font-size:10px; font-weight:600; letter-spacing:0.05em; }
-          .dpo-layout { display:grid; grid-template-columns:1fr 320px; gap:28px; }
-          .dpo-quick-btn { background:var(--gray-100); border:1px solid var(--border); color:var(--gold); padding:10px 18px; border-radius:0; cursor:pointer; font-size:12px; font-weight:600; font-family:var(--font-body); letter-spacing:0.05em; transition:all 0.25s; }
+          .dpo-card { background:#FFFFFF; border:1px solid rgba(14,22,41,0.08); border-radius:0; padding:0; overflow:hidden; }
+          .dpo-wrap { background:#FFFFFF; border-radius:0; padding:20px; margin:-8px -8px 0 -8px; }
+          .dpo-section { margin-bottom:20px; }
+          .dpo-section-title { font-size:11px; font-weight:700; color:#0E1629; text-transform:uppercase; letter-spacing:1.5px; margin-bottom:10px; }
+          .dpo-fin-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; }
+          .dpo-fin-card { background:#FFFFFF; border:1px solid rgba(14,22,41,0.08); border-radius:0; padding:14px 16px; text-align:center; }
+          .dpo-fin-value { font-size:20px; font-weight:700; font-family:var(--font-mono); margin-bottom:2px; color:#0E1629; }
+          .dpo-fin-label { font-size:9px; text-transform:uppercase; letter-spacing:1px; color:var(--gold); }
+          .dpo-layout { display:grid; grid-template-columns:1fr 300px; gap:20px; }
+          .dpo-quick-btn { background:var(--gray-50); border:1px solid rgba(14,22,41,0.1); color:var(--gold); padding:6px 14px; border-radius:0; cursor:pointer; font-size:11px; font-weight:600; font-family:var(--font-body); letter-spacing:0.03em; transition:all 0.2s; }
           .dpo-quick-btn:hover { background:var(--gold-light); border-color:var(--gold); }
-          .dpo-po-alert { background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.2); border-radius:0; padding:14px 18px; margin-bottom:16px; }
-          .dpo-margin-ring { width:64px; height:64px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:700; font-family:'JetBrains Mono',monospace; }
+          .dpo-list-row { display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid rgba(14,22,41,0.06); cursor:pointer; font-size:12px; }
+          .dpo-list-row:hover { background:var(--gold-light); }
+          .dpo-list-row:last-child { border:none; }
+          .dpo-sidebar-card { background:#FFFFFF; border:1px solid rgba(14,22,41,0.08); border-radius:0; padding:14px 16px; margin-bottom:12px; }
+          .dpo-sidebar-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1.5px; color:var(--gold); margin-bottom:10px; }
+          .dpo-sidebar-row { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid rgba(14,22,41,0.05); font-size:12px; }
+          .dpo-sidebar-row:last-child { border:none; }
           @media (max-width:900px) { .dpo-layout { grid-template-columns:1fr; } }
         </style>
 
         <div class="dpo-wrap">
-          <!-- HEADER -->
-          <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:28px;">
-            <div style="display:flex;gap:8px;align-items:center;">
-              <div style="display:flex;gap:1px;background:rgba(14,22,41,0.03);border:1px solid rgba(14,22,41,0.08);border-radius:0;overflow:hidden;margin-right:8px;">
-                ${['week','month','year','all'].map(function(p) {
-                  var active = window._projPeriod === p;
-                  return '<button onclick="window._projPeriod=\'' + p + '\';renderProjectDetail()" style="padding:5px 12px;font-size:10px;font-weight:600;border:none;cursor:pointer;letter-spacing:0.3px;' + (active ? 'background:var(--gold);color:white;' : 'background:transparent;color:var(--gray-400);') + '">' + _pLabels[p] + '</button>';
-                }).join('')}
-              </div>
-              <button class="dpo-quick-btn" onclick="switchProjectTab('proposals')">📋 Proposal</button>
-              <button class="dpo-quick-btn" onclick="showNewInvoiceModal('${proj.id}')">🧾 Invoice</button>
-              <button class="dpo-quick-btn" onclick="showNewPOModal('${proj.id}')">📦 PO</button>
-              <button class="dpo-quick-btn" onclick="navigate('#/clientview/${proj.id}')">👁️ Client View</button>
+          <!-- FINANCIAL HEALTH — top bar -->
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px;">
+            <div class="dpo-fin-card" style="border-left:3px solid var(--gold);">
+              <div class="dpo-fin-value" style="color:var(--gold);">${formatMoney(_timeVal)}</div>
+              <div class="dpo-fin-label">Logged Value</div>
+            </div>
+            <div class="dpo-fin-card" style="border-left:3px solid var(--cyan);">
+              <div class="dpo-fin-value">${formatMoney(totalInvoiced)}</div>
+              <div class="dpo-fin-label">Invoiced</div>
+            </div>
+            <div class="dpo-fin-card" style="border-left:3px solid var(--green);">
+              <div class="dpo-fin-value" style="color:var(--green);">${formatMoney(totalPaid)}</div>
+              <div class="dpo-fin-label">Paid</div>
+            </div>
+            <div class="dpo-fin-card" style="border-left:3px solid ${balance > 0 ? '#E16A5B' : 'var(--green)'};">
+              <div class="dpo-fin-value" style="color:${balance > 0 ? '#E16A5B' : 'var(--green)'};">${formatMoney(balance)}</div>
+              <div class="dpo-fin-label">Outstanding</div>
+            </div>
+            <div class="dpo-fin-card" style="border-left:3px solid #CE93D8;">
+              <div class="dpo-fin-value">${formatMoney(_pipelineTotal)}</div>
+              <div class="dpo-fin-label">Pipeline</div>
             </div>
           </div>
 
-          <!-- STATUS CHIPS ROW -->
-          ${(function() {
-            var taskCount = 0, pendingApprovals = proposals.filter(function(p){ return p.status==='Sent'||p.status==='Pending'; }).length;
-            var openOrders = pos.filter(function(p){ return p.status==='Ordered'||p.status==='Waiting'||p.status==='Waiting for Confirmation'; }).length;
-            var invoicesDue = invoices.filter(function(i){ var paid = (i.payments||[]).reduce(function(s,p){return s+(parseFloat(p.amount)||0);},0); return i.status!=='Paid'&&i.status!=='Draft'&&(parseFloat(i.total)||0)-paid>0; }).length;
-            // Try to get task count
-            try { taskCount = window._projTaskCount || 0; } catch(e){}
-            var chips = [];
-            chips.push({ label: 'Selections', count: clips.length, color: 'var(--cyan)', icon: '🛋️' });
-            if (pendingApprovals > 0) chips.push({ label: 'Pending Approvals', count: pendingApprovals, color: '#F9A825', icon: '⏳' });
-            if (openOrders > 0) chips.push({ label: 'Open Orders', count: openOrders, color: '#3B82F6', icon: '📦' });
-            if (invoicesDue > 0) chips.push({ label: 'Invoices Due', count: invoicesDue, color: '#E16A5B', icon: '🧾' });
-            if (taskCount > 0) chips.push({ label: 'Active Tasks', count: taskCount, color: '#5FA56B', icon: '✅' });
-            return '<div style="display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap;">' +
-              chips.map(function(c) {
-                return '<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;background:rgba(14,22,41,0.02);border:1px solid rgba(14,22,41,0.08);border-left:3px solid ' + c.color + ';border-radius:0;cursor:default;">' +
-                  '<span style="font-size:14px;">' + c.icon + '</span>' +
-                  '<span style="font-size:12px;color:rgba(14,22,41,0.6);">' + c.label + '</span>' +
-                  '<span style="font-size:14px;font-weight:700;color:' + c.color + ';font-family:var(--font-mono);">' + c.count + '</span>' +
-                '</div>';
-              }).join('') +
-            '</div>';
-          })()}
+          <!-- COSTS ROW -->
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">
+            <div style="background:rgba(14,22,41,0.02);border:1px solid rgba(14,22,41,0.06);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;">PO Costs</span>
+              <span style="font-size:14px;font-weight:600;font-family:var(--font-mono);color:#0E1629;">${formatMoney(_poTotal)}</span>
+            </div>
+            <div style="background:rgba(14,22,41,0.02);border:1px solid rgba(14,22,41,0.06);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;">Contractors</span>
+              <span style="font-size:14px;font-weight:600;font-family:var(--font-mono);color:#0E1629;">${formatMoney(_contractorCost)}</span>
+            </div>
+            <div style="background:rgba(14,22,41,0.02);border:1px solid rgba(14,22,41,0.06);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;">Efficiency</span>
+              <span style="font-size:14px;font-weight:600;font-family:var(--font-mono);color:#0E1629;">${_timeHrs > 0 ? Math.round(_timeBillHrs / _timeHrs * 100) : 0}%</span>
+            </div>
+          </div>
 
-          <!-- BURN RATE -->
+          <!-- BURN RATE (hidden - moved to financials tab) -->
           ${(function() {
             var fee = parseFloat(proj.designFee || proj.fee || proj.budget || 0);
-            if (fee <= 0) return '';
+            if (true || fee <= 0) return ''; // hidden for now
             var internalCost = pTimeHrs * getMemberRate(currentUser ? currentUser.email : '');
             var profitRemaining = fee - internalCost;
             var feeUsedPct = Math.round(internalCost / fee * 100);
@@ -7047,213 +7123,161 @@
 
           <div class="dpo-layout">
             <div>
-              <!-- FINANCIAL OVERVIEW -->
-              <div class="dpo-section">
-                <div class="dpo-section-title">Financial Overview — ${_pLabel}</div>
-                <div class="dpo-fin-grid">
-                  <div class="dpo-fin-card">
-                    <div class="dpo-fin-value" style="color:#C8B99A;">${formatMoney(totalInvoiced)}</div>
-                    <div class="dpo-fin-label">Total Invoiced</div>
-                    <div style="font-size:10px;color:rgba(200,185,154,0.5);margin-top:4px;">${pInvoices.length} invoices</div>
+              <!-- HOURS WORKED + SELECTIONS — side by side -->
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+                <div class="dpo-sidebar-card" style="margin:0;" onclick="switchProjectTab('time')">
+                  <div class="dpo-sidebar-title">Hours Worked</div>
+                  <div style="display:flex;align-items:baseline;gap:12px;">
+                    <span style="font-size:24px;font-weight:700;font-family:var(--font-mono);color:var(--cyan);">${_timeHrs.toFixed(1)}</span>
+                    <span style="font-size:10px;color:var(--gold);">total</span>
+                    <span style="font-size:16px;font-weight:600;font-family:var(--font-mono);color:#0E1629;">${_timeBillHrs.toFixed(1)}</span>
+                    <span style="font-size:10px;color:var(--gold);">billable</span>
                   </div>
-                  <div class="dpo-fin-card">
-                    <div class="dpo-fin-value" style="color:#EDE8E0;">${formatMoney(_pDesignFees)}</div>
-                    <div class="dpo-fin-label">Design Fees</div>
-                    <div style="font-size:10px;color:rgba(200,185,154,0.5);margin-top:4px;">${pTimeBillHrs.toFixed(1)}h logged</div>
-                  </div>
-                  <div class="dpo-fin-card">
-                    <div class="dpo-fin-value" style="color:#CE93D8;">${formatMoney(_pSubCost)}</div>
-                    <div class="dpo-fin-label">Subcontractors</div>
-                  </div>
-                  <div class="dpo-fin-card">
-                    <div class="dpo-fin-value" style="color:#EDE8E0;">${formatMoney(totalPOCost)}</div>
-                    <div class="dpo-fin-label">Cost of Goods</div>
-                    <div style="font-size:10px;color:rgba(200,185,154,0.5);margin-top:4px;">POs & expenses</div>
-                  </div>
-                  <div class="dpo-fin-card">
-                    <div class="dpo-fin-value" style="color:${_pProfit >= 0 ? '#81C784' : '#E57373'};">${formatMoney(_pProfit)}</div>
-                    <div class="dpo-fin-label">Total Profit</div>
-                    <div style="font-size:10px;color:rgba(200,185,154,0.5);margin-top:4px;">${margin}% margin</div>
-                  </div>
-                  <div class="dpo-fin-card">
-                    <div class="dpo-fin-value" style="color:#EDE8E0;">${formatMoney(totalPaid)}</div>
-                    <div class="dpo-fin-label">Collected</div>
-                    <div style="font-size:10px;color:rgba(200,185,154,0.5);margin-top:4px;">${balance > 0 ? formatMoney(balance) + ' outstanding' : 'fully collected'}</div>
-                  </div>
+                </div>
+                <div class="dpo-sidebar-card" style="margin:0;cursor:pointer;" onclick="switchProjectTab('ffe')">
+                  <div class="dpo-sidebar-title">Selections <span style="color:#0E1629;font-size:12px;font-family:var(--font-mono);margin-left:4px;">${_selectionsCount}</span></div>
+                  <div style="font-size:16px;font-weight:700;font-family:var(--font-mono);color:var(--gold);">${formatMoney(_selectionsTotal)}</div>
+                  <div style="font-size:10px;color:var(--gray-400);margin-top:2px;">total value</div>
                 </div>
               </div>
 
-              ${pTimeHrs > 0 || _timeHrs > 0 ? `
-              <div class="dpo-section">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-                  <div class="dpo-section-title">Time Summary — ${_pLabel}</div>
-                  <a href="#" onclick="switchProjectTab('time');return false;" style="color:#C8B99A;font-size:12px;text-decoration:none;font-family:DM Sans,Montserrat,sans-serif;">View All &rarr;</a>
+              <!-- FINANCIALS (Invoice-only) -->
+              <div class="dpo-sidebar-card" style="margin-bottom:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                  <div class="dpo-sidebar-title" style="margin:0;">Financials</div>
+                  <span style="font-size:10px;color:var(--gray-400);">${invoices.length} invoice${invoices.length !== 1 ? 's' : ''}</span>
                 </div>
-                <div class="dpo-fin-grid">
-                  <div class="dpo-fin-card">
-                    <div class="dpo-fin-value" style="color:#C8B99A;">${pTimeHrs.toFixed(1)}</div>
-                    <div class="dpo-fin-label">Total Hours</div>
-                  </div>
-                  <div class="dpo-fin-card">
-                    <div class="dpo-fin-value" style="color:#EDE8E0;">${pTimeBillHrs.toFixed(1)}</div>
-                    <div class="dpo-fin-label">Billable Hours</div>
-                  </div>
-                  <div class="dpo-fin-card">
-                    <div class="dpo-fin-value" style="color:#C8B99A;">${formatMoney(pTimeVal)}</div>
-                    <div class="dpo-fin-label">Logged Value</div>
-                  </div>
-                  <div class="dpo-fin-card">
-                    <div class="dpo-fin-value" style="color:#EDE8E0;">${pTimeEntries.length}</div>
-                    <div class="dpo-fin-label">Entries</div>
-                  </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+                  <div style="text-align:center;"><div style="font-size:18px;font-weight:700;font-family:var(--font-mono);color:var(--gold);">${formatMoney(totalInvoiced)}</div><div style="font-size:9px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-top:2px;">Invoiced</div></div>
+                  <div style="text-align:center;"><div style="font-size:18px;font-weight:700;font-family:var(--font-mono);color:var(--green);">${formatMoney(totalPaid)}</div><div style="font-size:9px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-top:2px;">Paid</div></div>
+                  <div style="text-align:center;"><div style="font-size:18px;font-weight:700;font-family:var(--font-mono);color:${balance > 0 ? '#E16A5B' : 'var(--green)'};">${formatMoney(balance)}</div><div style="font-size:9px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-top:2px;">Outstanding</div></div>
                 </div>
-              </div>` : ''}
+              </div>
 
+              <!-- TASKS -->
+              <div class="dpo-sidebar-card" style="margin-bottom:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                  <div class="dpo-sidebar-title" style="margin:0;">Tasks</div>
+                  <button class="dpo-quick-btn" style="padding:4px 10px;" onclick="switchProjectTab('tasks')">+ New Task</button>
+                </div>
+                ${(function() {
+                  var tasks = (window._projTasks || []).filter(function(t){ return t.status !== 'Done'; });
+                  if (tasks.length === 0) return '<div style="font-size:12px;color:var(--gray-400);text-align:center;padding:12px;">No active tasks</div>';
+                  var priColors = { Urgent: '#E16A5B', High: '#F9A825', Medium: 'var(--cyan)', Low: 'var(--gray-400)' };
+                  var statusIcons = { 'To Do': '○', 'In Progress': '◐', 'Waiting': '◷', 'Done': '●' };
+                  return tasks.slice(0, 8).map(function(t) {
+                    var pc = priColors[t.priority] || 'var(--gray-400)';
+                    var si = statusIcons[t.status] || '○';
+                    var overdue = t.dueDate && t.dueDate < new Date().toISOString().slice(0,10);
+                    return '<div class="dpo-list-row" onclick="switchProjectTab(\'tasks\')">' +
+                      '<span style="color:' + pc + ';">' + si + '</span>' +
+                      '<div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#0E1629;">' + esc(t.title || 'Untitled') + '</div>' +
+                      (t.assignee ? '<span style="font-size:10px;color:var(--gray-400);">' + esc(t.assignee.split(' ')[0]) + '</span>' : '') +
+                      (t.dueDate ? '<span style="font-size:10px;font-family:var(--font-mono);color:' + (overdue ? '#E16A5B' : 'var(--gray-400)') + ';">' + t.dueDate.slice(5) + '</span>' : '') +
+                    '</div>';
+                  }).join('') +
+                  (tasks.length > 8 ? '<div style="text-align:center;font-size:10px;color:var(--gold);padding:6px;cursor:pointer;" onclick="switchProjectTab(\'tasks\')">+ ' + (tasks.length - 8) + ' more</div>' : '');
+                })()}
+              </div>
+
+              <!-- OPEN PROPOSALS (Revenue Opportunity) -->
               ${(function() {
-                if (pTimeEntries.length === 0) return '';
-                var ownerEntries = pTimeEntries.filter(function(t) { return _isOwnerMember(t.member || t.user || ''); });
-                var contractorEntries = pTimeEntries.filter(function(t) { return !_isOwnerMember(t.member || t.user || ''); });
-                var ownerHrs = ownerEntries.reduce(function(s,t) { return s + (parseFloat(t.hours) || 0); }, 0);
-                var contractorHrs = contractorEntries.reduce(function(s,t) { return s + (parseFloat(t.hours) || 0); }, 0);
-                var ownerRate = TEAM_CONFIG.owner.rate;
-                var contractorRate = TEAM_CONFIG.contractors[0] ? TEAM_CONFIG.contractors[0].rate : DEFAULT_CONTRACTOR_RATE;
-                var ownerCost = ownerEntries.reduce(function(s,t) { return s + ((parseFloat(t.hours) || 0) * (parseFloat(t.rate || t.hourlyRate || t.billableRate) || ownerRate)); }, 0);
-                var contractorCost = contractorEntries.reduce(function(s,t) { return s + ((parseFloat(t.hours) || 0) * (parseFloat(t.internalCostRate) || contractorRate)); }, 0);
-                var totalInternal = ownerCost + contractorCost;
-                var fee = parseFloat(proj.designFee || proj.fee || proj.budget || 0);
-                var remaining = fee > 0 ? fee - totalInternal : 0;
-                return '<div class="dpo-section">' +
-                  '<div class="dpo-section-title">Team Cost Breakdown — ' + _pLabel + '</div>' +
-                  '<div style="background:#FFFFFF;border:1px solid rgba(14,22,41,0.08);border-radius:0;overflow:hidden;">' +
-                    '<table style="width:100%;border-collapse:collapse;">' +
-                      '<thead><tr>' +
-                        '<th style="text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(14,22,41,0.08);">Phase</th>' +
-                        '<th style="text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(14,22,41,0.08);">Member</th>' +
-                        '<th style="text-align:right;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(14,22,41,0.08);">Hours</th>' +
-                        '<th style="text-align:right;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(14,22,41,0.08);">Rate</th>' +
-                        '<th style="text-align:right;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(14,22,41,0.08);">Total Cost</th>' +
-                      '</tr></thead>' +
-                      '<tbody>' +
-                        (ownerHrs > 0 ? '<tr style="border-bottom:1px solid rgba(14,22,41,0.06);"><td style="padding:12px 14px;font-size:13px;color:#0E1629;">Design Phase</td><td style="padding:12px 14px;font-size:13px;color:#0E1629;">Cindy</td><td style="padding:12px 14px;font-size:13px;text-align:right;font-family:var(--font-mono);font-weight:600;color:#0E1629;">' + ownerHrs.toFixed(1) + 'h</td><td style="padding:12px 14px;font-size:13px;text-align:right;font-family:var(--font-mono);color:var(--gold);">' + formatMoney(ownerRate) + '/hr</td><td style="padding:12px 14px;font-size:13px;text-align:right;font-family:var(--font-mono);font-weight:600;color:#0E1629;">' + formatMoney(ownerCost) + '</td></tr>' : '') +
-                        (contractorHrs > 0 ? '<tr style="border-bottom:1px solid rgba(14,22,41,0.06);"><td style="padding:12px 14px;font-size:13px;color:#0E1629;">Contractor</td><td style="padding:12px 14px;font-size:13px;color:#0E1629;">Vanessa</td><td style="padding:12px 14px;font-size:13px;text-align:right;font-family:var(--font-mono);font-weight:600;color:#0E1629;">' + contractorHrs.toFixed(1) + 'h</td><td style="padding:12px 14px;font-size:13px;text-align:right;font-family:var(--font-mono);color:var(--gold);">' + formatMoney(contractorRate) + '/hr</td><td style="padding:12px 14px;font-size:13px;text-align:right;font-family:var(--font-mono);font-weight:600;color:#0E1629;">' + formatMoney(contractorCost) + '</td></tr>' : '') +
-                        '<tr style="background:rgba(14,22,41,0.02);"><td colspan="2" style="padding:12px 14px;font-size:12px;font-weight:700;color:#0E1629;text-transform:uppercase;letter-spacing:0.05em;">Total Internal Cost</td><td style="padding:12px 14px;font-size:13px;text-align:right;font-family:var(--font-mono);font-weight:700;color:#0E1629;">' + (ownerHrs + contractorHrs).toFixed(1) + 'h</td><td></td><td style="padding:12px 14px;font-size:13px;text-align:right;font-family:var(--font-mono);font-weight:700;color:#0E1629;">' + formatMoney(totalInternal) + '</td></tr>' +
-                        (fee > 0 ? '<tr><td colspan="4" style="padding:12px 14px;font-size:12px;font-weight:700;color:' + (remaining >= 0 ? 'var(--green)' : 'var(--red)') + ';text-transform:uppercase;letter-spacing:0.05em;">Fee Profit Remaining</td><td style="padding:12px 14px;font-size:13px;text-align:right;font-family:var(--font-mono);font-weight:700;color:' + (remaining >= 0 ? 'var(--green)' : 'var(--red)') + ';">' + formatMoney(remaining) + '</td></tr>' : '') +
-                      '</tbody>' +
-                    '</table>' +
-                  '</div>' +
+                if (_pipelineProposals.length === 0) return '';
+                return '<div class="dpo-sidebar-card" style="margin-bottom:16px;">' +
+                  '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><div class="dpo-sidebar-title" style="margin:0;">Revenue Opportunity</div><span style="font-size:14px;font-weight:700;font-family:var(--font-mono);color:var(--gold);">' + formatMoney(_pipelineTotal) + '</span></div>' +
+                  _pipelineProposals.map(function(p) {
+                    return '<div class="dpo-list-row" onclick="navigate(\'#/project/' + proj.id + '/proposal/' + p.id + '\')">' +
+                      '<span>📋</span>' +
+                      '<div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#0E1629;">' + esc(p.proposalNum || p.name || 'Proposal') + '</div>' +
+                      '<span class="badge badge-' + (p.status||'draft').toLowerCase() + '" style="font-size:9px;">' + esc(p.status || 'Draft') + '</span>' +
+                      '<span style="font-family:var(--font-mono);font-weight:600;color:#0E1629;">' + formatMoney(parseFloat(p.total)||0) + '</span>' +
+                    '</div>';
+                  }).join('') +
                 '</div>';
               })()}
 
-              ${overduePOs.length > 0 ? `
-              <div class="dpo-po-alert">
-                <div style="font-size:12px;font-weight:600;color:#EF4444;margin-bottom:6px;">⚠️ ${overduePOs.length} Overdue PO${overduePOs.length > 1 ? 's' : ''}</div>
-                ${overduePOs.map(p => '<div style="font-size:12px;color:#0E1629;margin-top:4px;">📦 ' + esc(p.vendor || '') + ' — ' + esc(p.number || p.id.slice(0,8)) + ' (ETA: ' + esc(p.eta || 'not set') + ')</div>').join('')}
-              </div>` : ''}
-
-              <!-- SELECTION BOARDS -->
-              ${rooms.length > 0 ? `
-              <div class="dpo-section">
-                <div class="dpo-section-title">Selection Boards</div>
-                <div class="dpo-room-grid">
-                  ${rooms.map(room => {
-                    const roomClips = byRoom[room];
-                    const coverImg = roomClips.find(c => c.imageUrl || c.image);
-                    const imgUrl = coverImg ? (coverImg.imageUrl || coverImg.image) : '';
-                    const productCount = roomClips.filter(c => isRealProduct(c)).length;
-                    const roomTotal = roomClips.reduce((s,c) => s + (parseFloat(c.clientPrice || c.totalSelling) || 0), 0);
-                    return '<div class="dpo-room-card" onclick="switchProjectTab(\'boards\')">' +
-                      (imgUrl ? '<img class="dpo-room-img" src="' + escAttr(imgUrl) + '" onerror="this.style.display=\'none\'">' : '<div class="dpo-room-img" style="display:flex;align-items:center;justify-content:center;font-size:40px;color:var(--gold);">🏠</div>') +
-                      '<div class="dpo-room-body">' +
-                        '<div class="dpo-room-name">' + esc(room) + '</div>' +
-                        '<div class="dpo-room-count">' + productCount + ' product' + (productCount !== 1 ? 's' : '') + (roomTotal > 0 ? ' · ' + formatMoney(roomTotal) : '') + '</div>' +
-                      '</div>' +
+              <!-- OPEN INVOICES -->
+              ${(function() {
+                if (_openInvoices.length === 0) return '';
+                return '<div class="dpo-sidebar-card" style="margin-bottom:16px;">' +
+                  '<div class="dpo-sidebar-title">Open Invoices</div>' +
+                  _openInvoices.map(function(inv) {
+                    var total = parseFloat(inv.total) || 0;
+                    var paid = (inv.payments||[]).reduce(function(s,p){return s+(parseFloat(p.amount)||0);},0);
+                    var bal = total - paid;
+                    var num = inv.invoiceNum || inv.number || inv.id.slice(0,8);
+                    var overdue = inv.dueDate && inv.dueDate < new Date().toISOString().slice(0,10);
+                    return '<div class="dpo-list-row" onclick="navigate(\'#/project/' + proj.id + '/invoice/' + inv.id + '\')">' +
+                      '<span>🧾</span>' +
+                      '<div style="flex:1;color:#0E1629;font-weight:500;">#' + esc(num) + '</div>' +
+                      (overdue ? '<span style="font-size:9px;color:#E16A5B;font-weight:600;">OVERDUE</span>' : '') +
+                      '<span style="font-family:var(--font-mono);font-weight:600;color:' + (overdue ? '#E16A5B' : '#0E1629') + ';">' + formatMoney(bal) + '</span>' +
                     '</div>';
-                  }).join('')}
-                </div>
-              </div>` : ''}
+                  }).join('') +
+                '</div>';
+              })()}
 
-              <!-- ALL DOCUMENTS TABLE -->
-              ${allDocs.length > 0 ? `
-              <div class="dpo-section">
-                <div class="dpo-section-title">Documents</div>
-                <div class="dpo-card" style="background:#0E1629;border:1px solid rgba(0,184,212,0.08);border-radius:0;overflow:hidden;">
-                  <table class="dpo-docs-table">
-                    <thead><tr>
-                      <th>Doc</th><th>Type</th><th>Status</th><th style="text-align:right;">Amount</th><th style="text-align:right;">Balance</th><th>Linked</th>
-                    </tr></thead>
-                    <tbody>
-                    ${allDocs.map(d => {
-                      const linkParts = [];
-                      if (d.linked.proposal) { const lp = proposals.find(p => p.id === d.linked.proposal); linkParts.push('📋 ' + (lp ? (lp.proposalNum || lp.name || lp.id.slice(0,8)) : 'PR')); }
-                      if (d.linked.invoice) { const li = invoices.find(i => i.id === d.linked.invoice); linkParts.push('🧾 ' + (li ? (li.invoiceNum || li.number || li.id.slice(0,8)) : 'INV')); }
-                      if (d.linked.po) { const lpo = pos.find(p => p.id === d.linked.po); linkParts.push('📦 ' + (lpo ? (lpo.number || lpo.id.slice(0,8)) : 'PO')); }
-                      const paidAmt = (d.payments || []).reduce((s,p) => s + (parseFloat(p.amount)||0), 0);
-                      const docTotal = parseFloat(d.total) || 0;
-                      const docBalance = d.type === 'invoice' ? (docTotal - paidAmt) : 0;
-                      const typeColors = { proposal: '#C8B99A', invoice: '#C8B99A', po: '#C8B99A' };
-                      const tc = typeColors[d.type] || '#666';
-                      return '<tr style="cursor:pointer;" onclick="navigate(\'#/project/' + proj.id + '/' + (d.type === 'proposal' ? 'proposal' : d.type === 'invoice' ? 'invoice' : 'po') + '/' + d.id + '\')">' +
-                        '<td style="font-weight:600;color:#0E1629;">' + d.icon + ' ' + esc(d.label) + '</td>' +
-                        '<td><span class="dpo-badge" style="background:' + tc + '20;color:' + tc + ';">' + d.type.charAt(0).toUpperCase() + d.type.slice(1) + '</span></td>' +
-                        '<td>' + statusBadge(d.status) + '</td>' +
-                        '<td style="text-align:right;font-family:monospace;color:#C8B99A;">' + formatMoney(docTotal) + '</td>' +
-                        '<td style="text-align:right;font-family:monospace;">' + (d.type === 'invoice' ? (docBalance > 0 ? '<span style="color:#EF4444;">' + formatMoney(docBalance) + '</span>' : '<span style="color:#2E7D32;">Paid</span>') : '<span style="color:var(--gold);">—</span>') + '</td>' +
-                        '<td style="font-size:11px;color:#C8B99A;">' + (linkParts.length > 0 ? linkParts.join(' → ') : '<span style="color:var(--gold);">—</span>') + '</td>' +
-                      '</tr>';
-                    }).join('')}
-                    </tbody>
-                  </table>
-                </div>
-              </div>` : ''}
+              <!-- OPEN POs -->
+              ${(function() {
+                if (_activePOs.length === 0) return '';
+                return '<div class="dpo-sidebar-card" style="margin-bottom:16px;">' +
+                  '<div class="dpo-sidebar-title">Open Purchase Orders</div>' +
+                  _activePOs.slice(0, 8).map(function(po) {
+                    return '<div class="dpo-list-row" onclick="navigate(\'#/project/' + proj.id + '/po/' + po.id + '\')">' +
+                      '<span>📦</span>' +
+                      '<div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#0E1629;">' + esc(po.number || po.num || po.id.slice(0,8)) + '</div>' +
+                      '<span style="font-size:10px;color:var(--gray-400);">' + esc(po.vendor || '') + '</span>' +
+                      '<span class="badge badge-' + (po.status||'draft').toLowerCase() + '" style="font-size:9px;">' + esc(po.status || 'Draft') + '</span>' +
+                      '<span style="font-family:var(--font-mono);font-weight:600;color:#0E1629;">' + formatMoney(parseFloat(po.total)||0) + '</span>' +
+                    '</div>';
+                  }).join('') +
+                  (_activePOs.length > 8 ? '<div style="text-align:center;font-size:10px;color:var(--gold);padding:6px;">+ ' + (_activePOs.length - 8) + ' more</div>' : '') +
+                '</div>';
+              })()}
             </div>
 
             <!-- SIDEBAR -->
             <div>
               <!-- PROJECT DETAILS -->
-              <div class="dpo-card" style="background:#0E1629;border:1px solid rgba(200,185,154,0.12);border-radius:0;padding:20px;margin-bottom:20px;">
-                <div style="font-family:'Playfair Display',Georgia,serif;font-size:15px;color:#C8B99A;margin-bottom:14px;">Project Details</div>
-                ${proj.clientName ? '<div style="margin-bottom:10px;"><div style="font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:0.1em;">Client</div><div style="font-size:14px;color:#0E1629;margin-top:2px;">' + esc(proj.clientName) + '</div></div>' : ''}
-                ${proj.clientPhone ? '<div style="margin-bottom:10px;"><div style="font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:0.1em;">Phone</div><div style="font-size:14px;color:#0E1629;margin-top:2px;">' + esc(proj.clientPhone) + '</div></div>' : ''}
-                ${proj.clientEmail ? '<div style="margin-bottom:10px;"><div style="font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:0.1em;">Email</div><div style="font-size:14px;color:#0E1629;margin-top:2px;">' + esc(proj.clientEmail) + '</div></div>' : ''}
-                ${proj.projectAddress ? '<div style="margin-bottom:10px;"><div style="font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:0.1em;">Project Location</div><div style="font-size:14px;color:#0E1629;margin-top:2px;">📍 ' + esc(proj.projectAddress) + '</div></div>' : ''}
-                ${proj.clientAddress ? '<div style="margin-bottom:10px;"><div style="font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:0.1em;">Billing Address</div><div style="font-size:14px;color:#0E1629;margin-top:2px;">' + esc(proj.clientAddress) + '</div></div>' : ''}
-                <div style="margin-top:14px;display:flex;gap:8px;">
-                  <button class="dpo-quick-btn" style="font-size:11px;padding:8px 14px;" onclick="showEditProjectModal('${proj.id}')">✏️ Edit</button>
-                  <button class="dpo-quick-btn" style="font-size:11px;padding:8px 14px;" onclick="sendTextFromApp('${proj.id}')">📱 Text</button>
+              <div class="dpo-sidebar-card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                  <div class="dpo-sidebar-title" style="margin:0;">Project Details</div>
+                  <div style="display:flex;gap:4px;">
+                    <button class="dpo-quick-btn" style="padding:3px 10px;" onclick="showEditProjectModal('${proj.id}')">Edit</button>
+                    <button class="dpo-quick-btn" style="padding:3px 10px;" onclick="sendTextFromApp('${proj.id}')">Text</button>
+                  </div>
                 </div>
+                ${proj.clientName ? '<div style="font-size:14px;font-weight:600;color:#0E1629;margin-bottom:6px;">' + esc(proj.clientName) + '</div>' : ''}
+                ${proj.clientEmail ? '<div style="font-size:11px;color:var(--gold);margin-bottom:3px;">' + esc(proj.clientEmail) + '</div>' : ''}
+                ${proj.clientPhone ? '<div style="font-size:11px;color:var(--gray-400);margin-bottom:3px;">' + esc(proj.clientPhone) + '</div>' : ''}
+                ${proj.projectAddress ? '<div style="font-size:11px;color:var(--gray-400);margin-top:6px;">📍 ' + esc(proj.projectAddress) + '</div>' : ''}
               </div>
 
               <!-- PROJECT TEAM -->
-              <div class="dpo-card" style="background:#0E1629;border:1px solid rgba(200,185,154,0.12);border-radius:0;padding:20px;margin-bottom:20px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-                  <div style="font-family:'Playfair Display',Georgia,serif;font-size:15px;color:#C8B99A;">Project Team</div>
-                  <button class="dpo-quick-btn" style="font-size:10px;padding:4px 10px;" onclick="addProjectMember('${proj.id}')">+ Add</button>
+              <div class="dpo-sidebar-card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                  <div class="dpo-sidebar-title" style="margin:0;">Project Team</div>
+                  <button class="dpo-quick-btn" style="padding:3px 10px;" onclick="addProjectMember('${proj.id}')">+ Add</button>
                 </div>
                 ${(proj.members && proj.members.length > 0)
                   ? proj.members.map(function(m, idx) {
-                      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(200,185,154,0.06);">' +
-                        '<div>' +
-                          '<div style="font-size:13px;font-weight:600;color:#EDE8E0;">' + esc(m.name || '—') + '</div>' +
-                          (m.role ? '<div style="font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:0.08em;margin-top:2px;">' + esc(m.role) + '</div>' : '') +
-                          (m.email ? '<div style="font-size:10px;color:rgba(200,185,154,0.5);margin-top:2px;">' + esc(m.email) + '</div>' : '') +
-                          (m.phone ? '<div style="font-size:10px;color:rgba(200,185,154,0.5);margin-top:1px;">' + esc(m.phone) + '</div>' : '') +
+                      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(14,22,41,0.05);">' +
+                        '<div style="flex:1;min-width:0;">' +
+                          '<span style="font-size:12px;font-weight:600;color:#0E1629;">' + esc(m.name || '—') + '</span>' +
+                          (m.role ? ' <span style="font-size:10px;color:var(--gold);">· ' + esc(m.role) + '</span>' : '') +
                         '</div>' +
-                        '<button onclick="removeProjectMember(\'' + escAttr(proj.id) + '\',' + idx + ')" style="background:none;border:none;color:rgba(200,185,154,0.3);cursor:pointer;font-size:18px;padding:4px 8px;" title="Remove">×</button>' +
+                        '<button onclick="removeProjectMember(\'' + escAttr(proj.id) + '\',' + idx + ')" style="background:none;border:none;color:var(--gray-300);cursor:pointer;font-size:14px;padding:2px 4px;">×</button>' +
                       '</div>';
                     }).join('')
-                  : '<div style="text-align:center;padding:16px;border:2px dashed rgba(200,185,154,0.12);cursor:pointer;" onclick="addProjectMember(\'' + escAttr(proj.id) + '\')">' +
-                      '<div style="font-size:20px;margin-bottom:6px;">👥</div>' +
-                      '<div style="font-size:11px;color:var(--gray-400);">No team members yet</div>' +
-                      '<div style="font-size:10px;color:var(--gold);margin-top:4px;">Add contractors, workrooms, subs</div>' +
-                    '</div>'
+                  : '<div style="text-align:center;padding:12px;font-size:11px;color:var(--gray-400);cursor:pointer;" onclick="addProjectMember(\'' + escAttr(proj.id) + '\')">+ Add team members</div>'
                 }
               </div>
 
               <!-- PINTEREST BOARD -->
-              <div class="dpo-card" style="background:#0E1629;border:1px solid rgba(200,185,154,0.12);border-radius:0;padding:20px;margin-bottom:20px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-                  <div style="font-family:'Playfair Display',Georgia,serif;font-size:15px;color:#C8B99A;">Pinterest Board</div>
-                  <button class="dpo-quick-btn" style="font-size:10px;padding:4px 10px;" onclick="editPinterestBoard('${proj.id}')">✏️ Edit</button>
+              <div class="dpo-sidebar-card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                  <div class="dpo-sidebar-title" style="margin:0;">Pinterest Board</div>
+                  <button class="dpo-quick-btn" style="padding:3px 10px;" onclick="editPinterestBoard('${proj.id}')">Edit</button>
                 </div>
                 ${(function(){
                   if (!proj.pinterestUrl) return '<div style="text-align:center;padding:20px;border:2px dashed rgba(200,185,154,0.15);cursor:pointer;" onclick="editPinterestBoard(\'' + proj.id + '\')"><div style="font-size:24px;margin-bottom:6px;">📌</div><div style="font-size:12px;color:var(--gray-400);">Link a Pinterest board</div><div style="font-size:10px;color:var(--gold);margin-top:4px;">Paste any Pinterest board URL</div></div>';
@@ -7265,12 +7289,12 @@
               </div>
 
               <!-- FILES & ATTACHMENTS -->
-              <div class="dpo-card" style="background:#0E1629;border:1px solid rgba(200,185,154,0.12);border-radius:0;padding:20px;margin-bottom:20px;" id="projFilesCard${proj.id}">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-                  <div style="font-family:'Playfair Display',Georgia,serif;font-size:15px;color:#C8B99A;">Files & Deliverables</div>
+              <div class="dpo-sidebar-card" id="projFilesCard${proj.id}">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                  <div class="dpo-sidebar-title" style="margin:0;">Files & Deliverables</div>
                   <div style="display:flex;gap:4px;">
-                    <button class="dpo-quick-btn" style="font-size:10px;padding:4px 8px;" onclick="addProjectFileLink('${proj.id}')">🔗 Link</button>
-                    <label class="dpo-quick-btn" style="font-size:10px;padding:4px 8px;cursor:pointer;margin:0;">📁 Upload
+                    <button class="dpo-quick-btn" style="padding:3px 8px;" onclick="addProjectFileLink('${proj.id}')">Link</button>
+                    <label class="dpo-quick-btn" style="padding:3px 8px;cursor:pointer;margin:0;">Upload
                       <input type="file" multiple style="display:none;" onchange="uploadProjectFiles('${proj.id}', this.files)">
                     </label>
                   </div>
@@ -7282,8 +7306,8 @@
 
               <!-- PO STATUS SUMMARY -->
               ${pos.length > 0 ? `
-              <div class="dpo-card" style="background:#0E1629;border:1px solid rgba(0,184,212,0.08);border-radius:0;padding:20px;margin-bottom:20px;">
-                <div style="font-family:'Playfair Display',Georgia,serif;font-size:15px;color:#C8B99A;margin-bottom:14px;">PO Status</div>
+              <div class="dpo-sidebar-card">
+                <div class="dpo-sidebar-title">PO Status</div>
                 ${['Waiting for Confirmation','Ordered','At Receiver','At Workroom','Installed','Received'].map(status => {
                   const count = pos.filter(p => p.status === status).length;
                   if (count === 0) return '';
@@ -7293,8 +7317,8 @@
               </div>` : ''}
 
               <!-- RECENT ACTIVITY -->
-              <div class="dpo-card" style="background:#0E1629;border:1px solid rgba(0,184,212,0.08);border-radius:0;padding:20px;">
-                <div style="font-family:'Playfair Display',Georgia,serif;font-size:15px;color:#C8B99A;margin-bottom:14px;">Recent Activity</div>
+              <div class="dpo-sidebar-card">
+                <div class="dpo-sidebar-title">Recent Activity</div>
                 <div class="dpo-activity">
                   ${activities.length === 0 ? '<div style="text-align:center;padding:20px;color:var(--gold);font-size:13px;">No recent activity</div>' :
                     activities.map(a => {
@@ -17707,7 +17731,8 @@ async function renderBoardsTab(T, proj) {
     // ==================== FINANCIALS ====================
     async function renderFinancials() {
       setBreadcrumb([{ label: 'Financials' }]);
-      setTopbarActions('<button class="btn btn-secondary" onclick="generateQBSyncReport()" style="margin-right:8px;">📊 QB Sync Report</button>');
+      var _payrollBtn = isTimeAdmin() ? '<button class="btn btn-secondary" onclick="renderPayrollReport()" style="margin-right:8px;">💰 Payroll</button>' : '';
+      setTopbarActions(_payrollBtn + '<button class="btn btn-secondary" onclick="generateQBSyncReport()" style="margin-right:8px;">📊 QB Sync Report</button>');
       const C = document.getElementById('contentArea');
       C.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400)">Loading financials...</div>';
 
@@ -18686,6 +18711,232 @@ async function renderBoardsTab(T, proj) {
         }
       };
       input.click();
+    }
+
+    // ==================== VANESSA PAYROLL REPORT ====================
+    async function renderPayrollReport() {
+      if (!isTimeAdmin()) return;
+      var C = document.getElementById('contentArea');
+      C.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Generating payroll report...</div>';
+
+      // Determine pay period: 1st-15th or 16th-end of month
+      var now = new Date();
+      var day = now.getDate();
+      var year = now.getFullYear();
+      var month = now.getMonth(); // 0-indexed
+      var periodStart, periodEnd, periodLabel;
+
+      if (day <= 15) {
+        // Current period is 1st-15th
+        periodStart = new Date(year, month, 1);
+        periodEnd = new Date(year, month, 15, 23, 59, 59);
+        periodLabel = periodStart.toLocaleDateString('en-US', {month:'long'}) + ' 1–15, ' + year;
+      } else {
+        // Current period is 16th-end
+        periodStart = new Date(year, month, 16);
+        periodEnd = new Date(year, month + 1, 0, 23, 59, 59); // last day of month
+        periodLabel = periodStart.toLocaleDateString('en-US', {month:'long'}) + ' 16–' + periodEnd.getDate() + ', ' + year;
+      }
+
+      // Also calculate previous period for quick toggle
+      var prevStart, prevEnd, prevLabel;
+      if (day <= 15) {
+        // Previous = last month 16th-end
+        var pm = new Date(year, month - 1, 16);
+        var pmEnd = new Date(year, month, 0, 23, 59, 59);
+        prevStart = pm; prevEnd = pmEnd;
+        prevLabel = pm.toLocaleDateString('en-US', {month:'long'}) + ' 16–' + pmEnd.getDate() + ', ' + pm.getFullYear();
+      } else {
+        // Previous = this month 1st-15th
+        prevStart = new Date(year, month, 1);
+        prevEnd = new Date(year, month, 15, 23, 59, 59);
+        prevLabel = prevStart.toLocaleDateString('en-US', {month:'long'}) + ' 1–15, ' + year;
+      }
+
+      // Use selected period or default to current
+      var usePeriod = window._payrollPeriod || 'current';
+      var pStart = usePeriod === 'prev' ? prevStart : periodStart;
+      var pEnd = usePeriod === 'prev' ? prevEnd : periodEnd;
+      var pLabel = usePeriod === 'prev' ? prevLabel : periodLabel;
+
+      var startStr = pStart.toISOString().slice(0, 10);
+      var endStr = pEnd.toISOString().slice(0, 10);
+
+      // Load all time entries
+      var allEntries = [];
+      try {
+        var snap = await db.collection('timeEntries').limit(15000).get();
+        snap.forEach(function(d) { allEntries.push({id: d.id, ...d.data()}); });
+      } catch(e) {}
+
+      // Filter to Vanessa + this pay period
+      var VANESSA_RATE = 65.00;
+      var vanessaEntries = allEntries.filter(function(e) {
+        var m = (e.member || e.user || '').toLowerCase();
+        if (!m.includes('vanessa')) return false;
+        var d = (e.date || '').slice(0, 10);
+        return d >= startStr && d <= endStr;
+      });
+
+      // Categorize entries
+      var billable = [], nonBillable = [], personal = [], cch = [];
+      vanessaEntries.forEach(function(e) {
+        var proj = (e.project || e.projectName || '').toLowerCase().trim();
+        var hrs = parseFloat(e.hours) || 0;
+        e._hrs = hrs;
+
+        if (proj.includes('personal') || proj.includes('pto') || proj.includes('vacation') || proj.includes('sick') || proj.includes('holiday')) {
+          personal.push(e);
+        } else if (proj.startsWith('cch') || proj.startsWith('cbh') || proj === 'internal' || proj === 'admin' || proj === 'overhead' || proj === 'marketing' || proj === 'business development') {
+          cch.push(e);
+        } else if (e.billable === false || _isNonBillableProject(proj)) {
+          nonBillable.push(e);
+        } else {
+          billable.push(e);
+        }
+      });
+
+      var billableHrs = billable.reduce(function(s, e) { return s + e._hrs; }, 0);
+      var cchHrs = cch.reduce(function(s, e) { return s + e._hrs; }, 0);
+      var nonBillHrs = nonBillable.reduce(function(s, e) { return s + e._hrs; }, 0);
+      var personalHrs = personal.reduce(function(s, e) { return s + e._hrs; }, 0);
+      var totalHrs = billableHrs + cchHrs + nonBillHrs + personalHrs;
+      var totalPay = totalHrs * VANESSA_RATE;
+      var billablePay = billableHrs * VANESSA_RATE;
+      var cchPay = cchHrs * VANESSA_RATE;
+      var nonBillPay = nonBillHrs * VANESSA_RATE;
+      var personalPay = personalHrs * VANESSA_RATE;
+
+      // Group billable by project
+      var byProject = {};
+      billable.forEach(function(e) {
+        var proj = e.project || e.projectName || 'Unassigned';
+        if (!byProject[proj]) byProject[proj] = { hours: 0, entries: 0 };
+        byProject[proj].hours += e._hrs;
+        byProject[proj].entries++;
+      });
+      var projectRows = Object.keys(byProject).sort(function(a, b) { return byProject[b].hours - byProject[a].hours; });
+
+      // Render
+      C.innerHTML =
+        '<div style="max-width:800px;margin:0 auto;">' +
+
+        // Header
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">' +
+          '<div>' +
+            '<h2 style="margin:0;font-size:20px;color:var(--navy);">💰 Contractor Payroll — Vanessa Holliday</h2>' +
+            '<div style="font-size:12px;color:var(--gray-400);margin-top:4px;">Pay Rate: $' + VANESSA_RATE.toFixed(2) + '/hr · Confidential — Admin Only</div>' +
+          '</div>' +
+          '<div style="display:flex;gap:6px;">' +
+            '<button class="btn btn-sm ' + (usePeriod === 'prev' ? '' : 'btn-primary') + '" onclick="window._payrollPeriod=\'current\';renderPayrollReport()">' + periodLabel + '</button>' +
+            '<button class="btn btn-sm ' + (usePeriod === 'prev' ? 'btn-primary' : '') + '" onclick="window._payrollPeriod=\'prev\';renderPayrollReport()">' + prevLabel + '</button>' +
+          '</div>' +
+        '</div>' +
+
+        // Period heading
+        '<div style="font-size:16px;font-weight:700;color:var(--navy);margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid var(--gold);">Pay Period: ' + esc(pLabel) + '</div>' +
+
+        // Summary cards
+        '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:28px;">' +
+          '<div style="background:var(--navy);padding:18px;text-align:center;border:1px solid rgba(200,185,154,0.15);">' +
+            '<div style="font-size:24px;font-weight:700;color:var(--gold);font-family:monospace;">' + totalHrs.toFixed(1) + 'h</div>' +
+            '<div style="font-size:10px;color:rgba(200,185,154,0.7);text-transform:uppercase;letter-spacing:0.1em;margin-top:4px;">Total Hours</div>' +
+          '</div>' +
+          '<div style="background:var(--navy);padding:18px;text-align:center;border:1px solid rgba(200,185,154,0.15);">' +
+            '<div style="font-size:24px;font-weight:700;color:#81C784;font-family:monospace;">' + billableHrs.toFixed(1) + 'h</div>' +
+            '<div style="font-size:10px;color:rgba(200,185,154,0.7);text-transform:uppercase;letter-spacing:0.1em;margin-top:4px;">Client Billable</div>' +
+          '</div>' +
+          '<div style="background:var(--navy);padding:18px;text-align:center;border:1px solid rgba(200,185,154,0.15);">' +
+            '<div style="font-size:24px;font-weight:700;color:#CE93D8;font-family:monospace;">' + cchHrs.toFixed(1) + 'h</div>' +
+            '<div style="font-size:10px;color:rgba(200,185,154,0.7);text-transform:uppercase;letter-spacing:0.1em;margin-top:4px;">CCH Internal</div>' +
+          '</div>' +
+          '<div style="background:var(--navy);padding:18px;text-align:center;border:1px solid rgba(200,185,154,0.15);">' +
+            '<div style="font-size:24px;font-weight:700;color:#90CAF9;font-family:monospace;">' + nonBillHrs.toFixed(1) + 'h</div>' +
+            '<div style="font-size:10px;color:rgba(200,185,154,0.7);text-transform:uppercase;letter-spacing:0.1em;margin-top:4px;">Non-Billable</div>' +
+          '</div>' +
+          '<div style="background:var(--navy);padding:18px;text-align:center;border:1px solid rgba(200,185,154,0.15);">' +
+            '<div style="font-size:24px;font-weight:700;color:#FFB74D;font-family:monospace;">' + personalHrs.toFixed(1) + 'h</div>' +
+            '<div style="font-size:10px;color:rgba(200,185,154,0.7);text-transform:uppercase;letter-spacing:0.1em;margin-top:4px;">Personal/PTO</div>' +
+          '</div>' +
+        '</div>' +
+
+        // TOTAL PAY — big card
+        '<div style="background:linear-gradient(135deg,#0E1629,#1a2744);border:2px solid var(--gold);padding:28px;text-align:center;margin-bottom:28px;">' +
+          '<div style="font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:0.2em;margin-bottom:8px;">Total Pay This Period</div>' +
+          '<div style="font-size:42px;font-weight:700;color:#FFFFFF;font-family:monospace;">' + formatMoney(totalPay) + '</div>' +
+          '<div style="display:flex;justify-content:center;gap:24px;margin-top:16px;font-size:12px;">' +
+            '<span style="color:#81C784;">Billable: ' + formatMoney(billablePay) + '</span>' +
+            '<span style="color:#CE93D8;">CCH: ' + formatMoney(cchPay) + '</span>' +
+            '<span style="color:#90CAF9;">Non-Bill: ' + formatMoney(nonBillPay) + '</span>' +
+            '<span style="color:#FFB74D;">Personal: ' + formatMoney(personalPay) + '</span>' +
+          '</div>' +
+        '</div>' +
+
+        // Billable breakdown by project
+        '<div style="margin-bottom:28px;">' +
+          '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:12px;">Billable Hours by Project</div>' +
+          '<div class="card" style="overflow:hidden;">' +
+            '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+              '<thead><tr style="border-bottom:2px solid var(--gray-200);">' +
+                '<th style="padding:10px 14px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Project</th>' +
+                '<th style="padding:10px 14px;text-align:right;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Entries</th>' +
+                '<th style="padding:10px 14px;text-align:right;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Hours</th>' +
+                '<th style="padding:10px 14px;text-align:right;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Pay @ $' + VANESSA_RATE + '/hr</th>' +
+              '</tr></thead><tbody>' +
+              (projectRows.length > 0 ? projectRows.map(function(proj) {
+                var p = byProject[proj];
+                return '<tr style="border-bottom:1px solid var(--gray-100);">' +
+                  '<td style="padding:10px 14px;font-weight:600;color:var(--navy);">' + esc(proj) + '</td>' +
+                  '<td style="padding:10px 14px;text-align:right;color:var(--gray-500);">' + p.entries + '</td>' +
+                  '<td style="padding:10px 14px;text-align:right;font-family:monospace;font-weight:600;">' + p.hours.toFixed(1) + 'h</td>' +
+                  '<td style="padding:10px 14px;text-align:right;font-family:monospace;color:var(--gold);">' + formatMoney(p.hours * VANESSA_RATE) + '</td>' +
+                '</tr>';
+              }).join('') : '<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--gray-400);">No billable entries this period</td></tr>') +
+              '<tr style="border-top:2px solid var(--gold);font-weight:700;">' +
+                '<td style="padding:12px 14px;color:var(--navy);">TOTAL BILLABLE</td>' +
+                '<td style="padding:12px 14px;text-align:right;">' + billable.length + '</td>' +
+                '<td style="padding:12px 14px;text-align:right;font-family:monospace;">' + billableHrs.toFixed(1) + 'h</td>' +
+                '<td style="padding:12px 14px;text-align:right;font-family:monospace;color:var(--gold);">' + formatMoney(billablePay) + '</td>' +
+              '</tr>' +
+            '</tbody></table>' +
+          '</div>' +
+        '</div>' +
+
+        // CCH / Non-Billable / Personal detail
+        (cch.length > 0 ? '<div style="margin-bottom:20px;">' +
+          '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:12px;">CCH Internal (' + cchHrs.toFixed(1) + 'h — ' + formatMoney(cchPay) + ')</div>' +
+          '<div class="card" style="overflow:hidden;"><table style="width:100%;border-collapse:collapse;font-size:12px;">' +
+            '<thead><tr style="border-bottom:1px solid var(--gray-200);"><th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--gray-400);">Date</th><th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--gray-400);">Project</th><th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--gray-400);">Service</th><th style="padding:8px 12px;text-align:right;font-size:10px;color:var(--gray-400);">Hours</th></tr></thead><tbody>' +
+            cch.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); }).map(function(e) {
+              return '<tr style="border-bottom:1px solid var(--gray-100);"><td style="padding:6px 12px;color:var(--gray-500);">' + esc(e.date || '') + '</td><td style="padding:6px 12px;">' + esc(e.project || '') + '</td><td style="padding:6px 12px;color:var(--gray-500);">' + esc(e.service || e.description || '') + '</td><td style="padding:6px 12px;text-align:right;font-family:monospace;">' + e._hrs.toFixed(1) + 'h</td></tr>';
+            }).join('') +
+          '</tbody></table></div></div>' : '') +
+
+        (nonBillable.length > 0 ? '<div style="margin-bottom:20px;">' +
+          '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:12px;">Non-Billable (' + nonBillHrs.toFixed(1) + 'h — ' + formatMoney(nonBillPay) + ')</div>' +
+          '<div class="card" style="overflow:hidden;"><table style="width:100%;border-collapse:collapse;font-size:12px;">' +
+            '<thead><tr style="border-bottom:1px solid var(--gray-200);"><th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--gray-400);">Date</th><th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--gray-400);">Project</th><th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--gray-400);">Service</th><th style="padding:8px 12px;text-align:right;font-size:10px;color:var(--gray-400);">Hours</th></tr></thead><tbody>' +
+            nonBillable.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); }).map(function(e) {
+              return '<tr style="border-bottom:1px solid var(--gray-100);"><td style="padding:6px 12px;color:var(--gray-500);">' + esc(e.date || '') + '</td><td style="padding:6px 12px;">' + esc(e.project || '') + '</td><td style="padding:6px 12px;color:var(--gray-500);">' + esc(e.service || e.description || '') + '</td><td style="padding:6px 12px;text-align:right;font-family:monospace;">' + e._hrs.toFixed(1) + 'h</td></tr>';
+            }).join('') +
+          '</tbody></table></div></div>' : '') +
+
+        (personal.length > 0 ? '<div style="margin-bottom:20px;">' +
+          '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:12px;">Personal / PTO (' + personalHrs.toFixed(1) + 'h — ' + formatMoney(personalPay) + ')</div>' +
+          '<div class="card" style="overflow:hidden;"><table style="width:100%;border-collapse:collapse;font-size:12px;">' +
+            '<thead><tr style="border-bottom:1px solid var(--gray-200);"><th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--gray-400);">Date</th><th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--gray-400);">Project</th><th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--gray-400);">Description</th><th style="padding:8px 12px;text-align:right;font-size:10px;color:var(--gray-400);">Hours</th></tr></thead><tbody>' +
+            personal.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); }).map(function(e) {
+              return '<tr style="border-bottom:1px solid var(--gray-100);"><td style="padding:6px 12px;color:var(--gray-500);">' + esc(e.date || '') + '</td><td style="padding:6px 12px;">' + esc(e.project || '') + '</td><td style="padding:6px 12px;color:var(--gray-500);">' + esc(e.service || e.description || '') + '</td><td style="padding:6px 12px;text-align:right;font-family:monospace;">' + e._hrs.toFixed(1) + 'h</td></tr>';
+            }).join('') +
+          '</tbody></table></div></div>' : '') +
+
+        // Print button
+        '<div style="text-align:center;margin-top:24px;padding-top:20px;border-top:1px solid var(--gray-200);">' +
+          '<button class="btn btn-primary" onclick="window.print()">🖨️ Print Report</button>' +
+          '<button class="btn btn-secondary" style="margin-left:8px;" onclick="renderFinancials()">← Back to Financials</button>' +
+        '</div>' +
+
+        '</div>';
     }
 
     // ==================== QB SYNC REPORT ====================
@@ -20646,14 +20897,16 @@ async function renderBoardsTab(T, proj) {
         days.sort().reverse();
         periodLabel = 'This week';
       } else if (reconPeriod === 'month') {
-        // This calendar month
-        var firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        var d = new Date(today);
-        while (d >= firstOfMonth) {
-          days.push(d.toISOString().split('T')[0]);
-          d.setDate(d.getDate() - 1);
+        // Full calendar month (use _reconCalMonth if navigating)
+        var calY = window._reconCalYear !== undefined ? window._reconCalYear : today.getFullYear();
+        var calM = window._reconCalMonth !== undefined ? window._reconCalMonth : today.getMonth();
+        var firstOfMonth = new Date(calY, calM, 1);
+        var lastOfMonth = new Date(calY, calM + 1, 0);
+        for (var di = lastOfMonth.getDate(); di >= 1; di--) {
+          var dd = new Date(calY, calM, di);
+          days.push(dd.toISOString().split('T')[0]);
         }
-        periodLabel = today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        periodLabel = firstOfMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
       } else {
         // Default: last 14 days
         for (let i = 0; i < 14; i++) {
@@ -20801,7 +21054,9 @@ async function renderBoardsTab(T, proj) {
         </div>` : ''}
 
 
-        <!-- DAY BY DAY TABLE -->
+        <div id="reconCalendarSlot"></div>
+        ${reconPeriod !== 'month' ? `
+        <!-- DAY BY DAY TABLE (week / 14-day view) -->
         <div style="background:var(--gray-800);border-radius:0;overflow:hidden;">
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
             <thead>
@@ -20843,6 +21098,7 @@ async function renderBoardsTab(T, proj) {
             </tbody>
           </table>
         </div>
+        ` : ''}
 
         <!-- MISSING TIME ALERTS -->
         ${(zeroDays.length > 0 || lowDays.length > 0) ? `
@@ -20854,6 +21110,102 @@ async function renderBoardsTab(T, proj) {
           </div>
         </div>` : ''}
       `;
+
+      // Render month calendar into slot (after innerHTML is set)
+      if (reconPeriod === 'month') {
+        var calSlot = document.getElementById('reconCalendarSlot');
+        if (calSlot) calSlot.innerHTML = _buildReconCalendar(today, dayData, admin);
+      }
+    }
+
+    function _buildReconCalendar(today, dayData, admin) {
+      var calYear = today.getFullYear();
+      var calMonth = today.getMonth();
+      if (window._reconCalMonth !== undefined) { calMonth = window._reconCalMonth; calYear = window._reconCalYear; }
+      else { window._reconCalMonth = calMonth; window._reconCalYear = calYear; }
+      var firstDay = new Date(calYear, calMonth, 1);
+      var lastDay = new Date(calYear, calMonth + 1, 0);
+      var daysInMonth = lastDay.getDate();
+      var startDow = firstDay.getDay();
+      var mondayStart = startDow === 0 ? 6 : startDow - 1;
+      var monthName = firstDay.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      var todayStr = today.toISOString().split('T')[0];
+
+      var dayLookup = {};
+      dayData.forEach(function(d) { dayLookup[d.dateStr] = d; });
+
+      var h = '<div style="margin-bottom:24px;">';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
+      var prevM = calMonth - 1 < 0 ? 11 : calMonth - 1;
+      var prevY = calMonth - 1 < 0 ? calYear - 1 : calYear;
+      var nextM = calMonth + 1 > 11 ? 0 : calMonth + 1;
+      var nextY = calMonth + 1 > 11 ? calYear + 1 : calYear;
+      h += '<button class="btn btn-sm" style="background:rgba(200,185,154,0.1);color:#C8B99A;border:1px solid rgba(200,185,154,0.2);" onclick="window._reconCalMonth=' + prevM + ';window._reconCalYear=' + prevY + ';renderTimeView();">&larr; Prev</button>';
+      h += '<div style="font-size:16px;font-weight:600;color:var(--navy);">' + monthName + '</div>';
+      h += '<button class="btn btn-sm" style="background:rgba(200,185,154,0.1);color:#C8B99A;border:1px solid rgba(200,185,154,0.2);" onclick="window._reconCalMonth=' + nextM + ';window._reconCalYear=' + nextY + ';renderTimeView();">Next &rarr;</button>';
+      h += '</div>';
+
+      h += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:rgba(14,22,41,0.06);">';
+      var dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+      for (var di = 0; di < 7; di++) {
+        var wknd = di >= 5;
+        h += '<div style="padding:8px 4px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:' + (wknd ? 'var(--gray-500)' : 'var(--gray-400)') + ';background:white;">' + dayNames[di] + '</div>';
+      }
+
+      for (var e = 0; e < mondayStart; e++) {
+        h += '<div style="padding:8px;min-height:80px;background:var(--gray-50);"></div>';
+      }
+
+      for (var day = 1; day <= daysInMonth; day++) {
+        var ds = calYear + '-' + String(calMonth + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+        var dd = dayLookup[ds];
+        var cellDow = (mondayStart + day - 1) % 7;
+        var isWknd = cellDow >= 5;
+        var isTodayCell = ds === todayStr;
+        var hrs = dd ? dd.loggedHours : 0;
+        var val = dd ? dd.loggedValue : 0;
+        var isFuture = new Date(ds + 'T12:00:00') > today;
+
+        var bgColor = 'white';
+        var borderColor = 'transparent';
+        if (isTodayCell) { bgColor = 'rgba(0,184,212,0.05)'; borderColor = 'var(--cyan)'; }
+        else if (isWknd) { bgColor = 'var(--gray-50)'; }
+
+        var statusDot = '';
+        if (!isWknd && !isFuture) {
+          if (hrs >= 6) statusDot = '<div style="width:6px;height:6px;border-radius:50%;background:#5FA56B;margin:2px auto 0;"></div>';
+          else if (hrs >= 3) statusDot = '<div style="width:6px;height:6px;border-radius:50%;background:#C8B99A;margin:2px auto 0;"></div>';
+          else if (hrs > 0) statusDot = '<div style="width:6px;height:6px;border-radius:50%;background:#F57C00;margin:2px auto 0;"></div>';
+          else statusDot = '<div style="width:6px;height:6px;border-radius:50%;background:#E16A5B;margin:2px auto 0;"></div>';
+        }
+
+        var projChips = '';
+        if (dd && dd.byProject) {
+          var pp = Object.entries(dd.byProject).slice(0, 2);
+          for (var pi = 0; pi < pp.length; pi++) {
+            projChips += '<div style="font-size:8px;color:var(--cyan);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(pp[pi][0]) + '</div>';
+          }
+        }
+
+        h += '<div style="padding:6px;min-height:80px;background:' + bgColor + ';border:2px solid ' + borderColor + ';cursor:pointer;" onclick="_tlDay=\'' + ds + '\';smartTimeTab=\'activity\';renderTimeView();">';
+        h += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+        h += '<span style="font-size:13px;font-weight:' + (isTodayCell ? '700' : '500') + ';color:' + (isTodayCell ? 'var(--cyan)' : isWknd ? 'var(--gray-500)' : '#0E1629') + ';">' + day + '</span>';
+        h += statusDot;
+        h += '</div>';
+        if (hrs > 0) {
+          h += '<div style="font-size:16px;font-weight:700;color:var(--gold);font-family:var(--font-mono);margin-top:4px;">' + hrs.toFixed(1) + 'h</div>';
+          if (admin && val > 0) h += '<div style="font-size:10px;color:#C8B99A;font-family:var(--font-mono);">' + formatMoney(val) + '</div>';
+          h += projChips;
+        } else if (!isWknd && !isFuture) {
+          h += '<div style="font-size:10px;color:#E16A5B;margin-top:6px;font-weight:600;">No time</div>';
+        }
+        h += '</div>';
+      }
+
+      var endDow = (mondayStart + daysInMonth) % 7;
+      if (endDow > 0) { for (var e2 = endDow; e2 < 7; e2++) { h += '<div style="padding:8px;min-height:80px;background:var(--gray-50);"></div>'; } }
+      h += '</div></div>';
+      return h;
     }
 
     // ---- LIST VIEW ----
@@ -26522,7 +26874,8 @@ async function renderBoardsTab(T, proj) {
           if (!p.category) p.category = _roomToCat[p.room];
           p.room = '';
         }
-        if (['Time Track','Expense','Project Management','Designer Fee','Service','Labor','Fee'].indexOf(p.category) >= 0) p._hidden = true;
+        if (['Time Track','Expense','Project Management','Designer Fee','Service','Labor','Fee',
+             'Etails','Details','Retail','Etail','Uncategorized','Time Billing','Expenses','Shipping'].indexOf(p.category) >= 0) p._hidden = true;
       });
       libraryProducts = libraryProducts.filter(function(p) { return !p._hidden; });
     }
@@ -32131,6 +32484,13 @@ async function renderBoardsTab(T, proj) {
         const imageUrl = imageUrlsByRow[rowNum] || '';
         if (imageUrl) imageCount++;
 
+        // Normalize bad Houzz category values at import time
+        var _rawCat = (row['Category'] || '').trim();
+        var _catLower = _rawCat.toLowerCase();
+        var _houzzCatFix = {'etails':'','details':'','etail':'','retail':'','uncategorized':'',
+          'time billing':'','expenses':'','designer fee':'','time track':''};
+        var _fixedCat = _houzzCatFix.hasOwnProperty(_catLower) ? _houzzCatFix[_catLower] : _rawCat;
+
         const item = {
           title: row['Title'] || '',
           room: row['Room'] || '',
@@ -32163,7 +32523,7 @@ async function renderBoardsTab(T, proj) {
           purchaseQuantity: parseFloat(row['Purchase Quantity']) || 0,
           notes: row['Notes'] || '',
           assignee: row['Assignee'] || '',
-          category: row['Category'] || ''
+          category: _fixedCat
         };
 
         if (item.room) rooms.add(item.room);
@@ -35582,6 +35942,774 @@ async function renderBoardsTab(T, proj) {
         w.document.close();
         showToast(products.length + ' tear sheets ready');
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+
+    // ==================== E-SPEC BOOK BUILDER ====================
+    // State
+    window._specBook = { step: 1, sourceType: 'room', selectedSources: [], items: [], selectedItems: [], viewMode: 'grid', pricingMode: 'client', bookName: '', search: '',
+      exportOptions: { cover: true, toc: true, cutSheets: true, supportingDocs: true, pricing: false, roomDividers: true }
+    };
+
+    async function _gatherSpecBookData(projId) {
+      let clips = [], ideabooks = [];
+      try {
+        const cs = await db.collection('boards').doc(projId).collection('clips').get();
+        cs.forEach(d => clips.push({ id: d.id, ...d.data() }));
+      } catch(e) {}
+      try {
+        const is = await db.collection('boards').doc(projId).collection('ideabooks').orderBy('order','asc').get();
+        is.forEach(d => ideabooks.push({ id: d.id, ...d.data() }));
+      } catch(e) {}
+      // Also pull from productLibrary
+      let libItems = [];
+      try {
+        const ls = await db.collection('productLibrary').where('projectId','==',projId).get();
+        ls.forEach(d => libItems.push({ id: d.id, ...d.data(), _source: 'library' }));
+      } catch(e) {}
+      // Merge clips + library items, deduplicate by title+vendor
+      const seen = new Set();
+      const items = [];
+      for (const c of clips) {
+        const key = ((c.title||'')+(c.vendor||c.manufacturer||'')).toLowerCase().replace(/\s/g,'');
+        if (seen.has(key) && key) continue;
+        if (key) seen.add(key);
+        items.push({
+          id: c.id, title: c.title || c.caption || '', vendor: c.vendor || c.manufacturer || '', sku: c.sku || c.itemCode || '',
+          modelNum: c.modelNum || c.model || c.sku || '', upc: c.upc || '', category: c.category || '',
+          room: c.room || '', materials: c.materials || '', finish: c.finish || c.finishColor || '',
+          color: c.color || c.finishColor || '', dimensions: c.dimensions || '',
+          description: c.description || '', vendorNotes: c.vendorDescription || '',
+          imageUrl: c.imageUrl || c.image || '', images: c.images || [],
+          cost: parseFloat(c.cost || c.costPrice || 0) || 0,
+          sell: parseFloat(c.clientPrice || c.sellPrice || c.price || 0) || 0,
+          qty: parseInt(c.qty) || 1, leadTime: c.leadTime || '',
+          docs: [], _source: 'clips'
+        });
+      }
+      for (const p of libItems) {
+        const key = ((p.title||'')+(p.vendor||'')).toLowerCase().replace(/\s/g,'');
+        if (seen.has(key) && key) continue;
+        if (key) seen.add(key);
+        items.push({
+          id: p.id, title: p.title || '', vendor: p.vendor || '', sku: p.sku || '',
+          modelNum: p.modelNum || p.sku || '', upc: p.upc || '', category: p.category || '',
+          room: p.room || '', materials: p.materials || '', finish: p.finish || '',
+          color: p.color || '', dimensions: p.dimensions || '',
+          description: p.description || '', vendorNotes: '',
+          imageUrl: p.imageUrl || p.image || '', images: p.images || [],
+          cost: parseFloat(p.costPrice || p.cost || 0) || 0,
+          sell: parseFloat(p.sellPrice || p.sell || 0) || 0,
+          qty: parseInt(p.qty) || 1, leadTime: p.leadTime || '',
+          docs: [], _source: 'library'
+        });
+      }
+      // Attach existing file docs per item
+      try {
+        const fs = await db.collection('boards').doc(projId).collection('files').get();
+        fs.forEach(d => {
+          const f = d.data();
+          // Try matching by room or item reference
+          items.forEach(it => {
+            if (f.itemId === it.id || (f.room && f.room === it.room && f.category === 'Specifications')) {
+              it.docs.push({ id: d.id, name: f.name || f.fileName || 'Document', url: f.url || f.downloadUrl || '', type: f.type || 'file' });
+            }
+          });
+        });
+      } catch(e) {}
+      // Extract available rooms and categories
+      const rooms = [...new Set(items.map(i => i.room).filter(Boolean))].sort();
+      const categories = [...new Set(items.map(i => i.category).filter(Boolean))].sort();
+      return { items, rooms, categories, ideabooks };
+    }
+
+    async function renderSpecBookTab(T, proj) {
+      const sb = window._specBook;
+      // Gather data on first load or refresh
+      if (!window._specBookData || window._specBookDataProjId !== proj.id) {
+        window._specBookData = await _gatherSpecBookData(proj.id);
+        window._specBookDataProjId = proj.id;
+        sb.items = window._specBookData.items;
+        sb.step = 1;
+        sb.selectedSources = [];
+        sb.selectedItems = [];
+        sb.bookName = (proj.name || proj.title || 'Project') + ' — Spec Book';
+      }
+      const data = window._specBookData;
+
+      // Wizard step indicator
+      const steps = ['Source', 'Items', 'Review', 'Export'];
+      let html = '<div style="padding:24px 32px 0;">';
+      // Step indicator bar
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:28px;">';
+      steps.forEach((s, i) => {
+        const stepNum = i + 1;
+        const isActive = sb.step === stepNum;
+        const isDone = sb.step > stepNum;
+        const circleColor = isActive ? '#C9A96E' : isDone ? '#0E1629' : '#d4d2cd';
+        const textColor = isActive ? '#0E1629' : isDone ? '#0E1629' : '#9E9A8F';
+        html += '<div style="display:flex;align-items:center;gap:6px;">' +
+          '<div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;background:' + circleColor + ';">' + (isDone ? '✓' : stepNum) + '</div>' +
+          '<span style="font-size:13px;font-weight:' + (isActive ? '700' : '500') + ';color:' + textColor + ';letter-spacing:0.3px;">' + s + '</span>' +
+          '</div>';
+        if (i < 3) html += '<div style="flex:1;height:2px;background:' + (isDone ? '#0E1629' : '#e8e6e0') + ';margin:0 4px;"></div>';
+      });
+      html += '</div>';
+
+      // Render current step
+      if (sb.step === 1) html += _specBookStep1(data, sb);
+      else if (sb.step === 2) html += _specBookStep2(data, sb);
+      else if (sb.step === 3) html += _specBookStep3(data, sb);
+      else if (sb.step === 4) html += _specBookStep4(data, sb, proj);
+
+      html += '</div>';
+      T.innerHTML = html;
+    }
+
+    // STEP 1 — Source Selection
+    function _specBookStep1(data, sb) {
+      let html = '<div style="max-width:640px;">';
+      html += '<h2 style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:28px;font-weight:600;color:#0E1629;margin-bottom:6px;">Select Source</h2>';
+      html += '<p style="font-size:14px;color:#6B6760;margin-bottom:24px;">Choose how to organize your spec book, then select which groups to include.</p>';
+
+      // Room / Category toggle
+      html += '<div style="display:flex;gap:0;margin-bottom:20px;border:1px solid #d4d2cd;border-radius:6px;overflow:hidden;width:fit-content;">';
+      ['room', 'category'].forEach(t => {
+        const active = sb.sourceType === t;
+        html += '<button onclick="window._specBook.sourceType=\'' + t + '\';window._specBook.selectedSources=[];renderSpecBookTab(document.getElementById(\'projectTabContent\'),window._currentProject);" ' +
+          'style="padding:10px 28px;font-size:13px;font-weight:600;letter-spacing:0.3px;cursor:pointer;border:none;background:' + (active ? '#0E1629' : '#fff') + ';color:' + (active ? '#fff' : '#0E1629') + ';transition:all 0.15s;">' +
+          (t === 'room' ? 'By Room' : 'By Category') + '</button>';
+      });
+      html += '</div>';
+
+      const list = sb.sourceType === 'room' ? data.rooms : data.categories;
+      const allSelected = list.length > 0 && list.every(s => sb.selectedSources.includes(s));
+
+      // Select All
+      html += '<label style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #e8e6e0;margin-bottom:4px;cursor:pointer;font-size:13px;font-weight:600;color:#0E1629;">' +
+        '<input type="checkbox" ' + (allSelected ? 'checked' : '') + ' onchange="if(this.checked){window._specBook.selectedSources=[' + list.map(s => '\'' + esc(s).replace(/'/g,"\\'") + '\'').join(',') + '];}else{window._specBook.selectedSources=[];}renderSpecBookTab(document.getElementById(\'projectTabContent\'),window._currentProject);"> Select All (' + list.length + ')</label>';
+
+      // Individual checkboxes
+      if (list.length === 0) {
+        html += '<div style="padding:32px;text-align:center;color:#9E9A8F;font-size:14px;">No ' + sb.sourceType + 's found. Add products to your Room Boards first.</div>';
+      } else {
+        list.forEach(name => {
+          const checked = sb.selectedSources.includes(name);
+          const count = data.items.filter(i => sb.sourceType === 'room' ? i.room === name : i.category === name).length;
+          html += '<label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0efeb;cursor:pointer;">' +
+            '<input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="_specBookToggleSource(\'' + esc(name).replace(/'/g,"\\'") + '\')"> ' +
+            '<span style="font-size:14px;color:#0E1629;font-weight:500;">' + esc(name) + '</span>' +
+            '<span style="font-size:12px;color:#9E9A8F;margin-left:auto;">' + count + ' items</span></label>';
+        });
+      }
+
+      // Next button
+      html += '<div style="margin-top:28px;display:flex;justify-content:flex-end;">' +
+        '<button onclick="_specBookGoStep(2)" ' + (sb.selectedSources.length === 0 ? 'disabled' : '') + ' style="padding:12px 36px;background:' + (sb.selectedSources.length > 0 ? '#0E1629' : '#d4d2cd') + ';color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;letter-spacing:0.3px;">Next →</button></div>';
+      html += '</div>';
+      return html;
+    }
+
+    function _specBookToggleSource(name) {
+      const sb = window._specBook;
+      const idx = sb.selectedSources.indexOf(name);
+      if (idx >= 0) sb.selectedSources.splice(idx, 1);
+      else sb.selectedSources.push(name);
+      renderSpecBookTab(document.getElementById('projectTabContent'), window._currentProject);
+    }
+
+    function _specBookGoStep(step) {
+      const sb = window._specBook;
+      const data = window._specBookData;
+      if (step === 2 && sb.selectedSources.length === 0) return;
+      // When entering step 2, populate filtered items and pre-select all
+      if (step === 2 && sb.step === 1) {
+        const filtered = data.items.filter(i => {
+          const val = sb.sourceType === 'room' ? i.room : i.category;
+          return sb.selectedSources.includes(val);
+        });
+        sb.selectedItems = filtered.map(i => i.id);
+      }
+      sb.step = step;
+      renderSpecBookTab(document.getElementById('projectTabContent'), window._currentProject);
+    }
+
+    // STEP 2 — Item Selection
+    function _specBookStep2(data, sb) {
+      const filtered = data.items.filter(i => {
+        const val = sb.sourceType === 'room' ? i.room : i.category;
+        return sb.selectedSources.includes(val);
+      });
+      const search = (sb.search || '').toLowerCase();
+      const visible = search ? filtered.filter(i => (i.title+i.vendor+i.sku+i.room+i.category).toLowerCase().includes(search)) : filtered;
+      const allSelected = visible.length > 0 && visible.every(i => sb.selectedItems.includes(i.id));
+      const selectedCount = visible.filter(i => sb.selectedItems.includes(i.id)).length;
+
+      let html = '<div>';
+      // Header bar
+      html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">';
+      html += '<h2 style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:28px;font-weight:600;color:#0E1629;margin-right:auto;">Select Items</h2>';
+      // Search
+      html += '<input type="text" placeholder="Search items..." value="' + esc(sb.search || '') + '" oninput="window._specBook.search=this.value;renderSpecBookTab(document.getElementById(\'projectTabContent\'),window._currentProject);" style="padding:8px 14px;border:1px solid #d4d2cd;font-size:13px;width:220px;outline:none;font-family:inherit;">';
+      // Grid/List toggle
+      html += '<div style="display:flex;border:1px solid #d4d2cd;overflow:hidden;">';
+      html += '<button onclick="window._specBook.viewMode=\'list\';renderSpecBookTab(document.getElementById(\'projectTabContent\'),window._currentProject);" style="padding:6px 10px;border:none;cursor:pointer;background:' + (sb.viewMode === 'list' ? '#0E1629' : '#fff') + ';color:' + (sb.viewMode === 'list' ? '#fff' : '#0E1629') + ';" title="List view">☰</button>';
+      html += '<button onclick="window._specBook.viewMode=\'grid\';renderSpecBookTab(document.getElementById(\'projectTabContent\'),window._currentProject);" style="padding:6px 10px;border:none;border-left:1px solid #d4d2cd;cursor:pointer;background:' + (sb.viewMode === 'grid' ? '#0E1629' : '#fff') + ';color:' + (sb.viewMode === 'grid' ? '#fff' : '#0E1629') + ';" title="Grid view">⊞</button>';
+      html += '</div></div>';
+
+      // Select all + count
+      html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">';
+      html += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:#0E1629;">' +
+        '<input type="checkbox" ' + (allSelected ? 'checked' : '') + ' onchange="_specBookSelectAll(this.checked)"> Select All</label>';
+      html += '<span style="font-size:12px;color:#9E9A8F;">' + selectedCount + ' of ' + visible.length + ' selected</span>';
+      html += '</div>';
+
+      if (visible.length === 0) {
+        html += '<div style="padding:48px;text-align:center;color:#9E9A8F;font-size:14px;">No items match your criteria.</div>';
+      } else if (sb.viewMode === 'grid') {
+        // Grid view — 3 columns
+        html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">';
+        visible.forEach(item => {
+          const checked = sb.selectedItems.includes(item.id);
+          const fmt = v => { const n = parseFloat(v); return n > 0 ? '$' + n.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0}) : ''; };
+          html += '<div style="background:#fff;border:1px solid ' + (checked ? '#C9A96E' : '#e8e6e0') + ';overflow:hidden;position:relative;transition:border-color 0.15s;">';
+          // Status bar
+          html += '<div style="background:#0E1629;color:#fff;text-align:center;font-size:10px;font-weight:600;letter-spacing:1px;padding:4px 8px;text-transform:uppercase;">' + (item.room || item.category || 'Unassigned') + '</div>';
+          // Checkbox overlay
+          html += '<div style="position:absolute;top:28px;left:8px;z-index:2;"><input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="_specBookToggleItem(\'' + item.id + '\')" style="width:18px;height:18px;cursor:pointer;accent-color:#C9A96E;"></div>';
+          // Image
+          html += '<div style="height:180px;display:flex;align-items:center;justify-content:center;background:#f8f7f5;padding:12px;">';
+          if (item.imageUrl) html += '<img src="' + esc(item.imageUrl) + '" style="max-width:100%;max-height:160px;object-fit:contain;" onerror="this.style.display=\'none\'">';
+          else html += '<div style="color:#ccc;font-size:40px;">📦</div>';
+          html += '</div>';
+          // Details
+          html += '<div style="padding:12px 14px;">';
+          html += '<div style="font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#0E1629;margin-bottom:2px;">' + esc(item.vendor || 'Unknown Vendor') + '</div>';
+          html += '<div style="font-size:13px;color:#0E1629;font-weight:500;margin-bottom:4px;line-height:1.3;">' + esc(item.title || 'Untitled') + '</div>';
+          if (item.modelNum || item.sku) html += '<div style="font-size:11px;color:#9E9A8F;">MODEL #: <span style="font-weight:600;color:#6B6760;">' + esc(item.modelNum || item.sku) + '</span></div>';
+          if (item.upc) html += '<div style="font-size:11px;color:#9E9A8F;">UPC #: <span style="font-weight:600;color:#6B6760;">' + esc(item.upc) + '</span></div>';
+          // Qty
+          html += '<div style="margin-top:8px;padding-top:6px;border-top:1px solid #f0efeb;font-size:12px;color:#C9A96E;font-weight:600;">QTY: ' + (item.qty || 1) + '</div>';
+          // Doc count
+          html += '<div style="margin-top:6px;font-size:11px;color:#9E9A8F;cursor:pointer;" onclick="_specBookExpandItem(\'' + item.id + '\')">TECHNICAL DOCUMENTS ▾ <span style="font-weight:600;">' + (item.docs.length || 0) + '</span></div>';
+          html += '</div></div>';
+        });
+        html += '</div>';
+      } else {
+        // List view — single column rows
+        visible.forEach(item => {
+          const checked = sb.selectedItems.includes(item.id);
+          html += '<div style="display:flex;align-items:center;background:#fff;border:1px solid ' + (checked ? '#C9A96E' : '#e8e6e0') + ';margin-bottom:8px;overflow:hidden;transition:border-color 0.15s;">';
+          // Status strip
+          html += '<div style="background:#0E1629;color:#fff;writing-mode:vertical-lr;text-orientation:mixed;font-size:9px;font-weight:600;letter-spacing:1px;padding:8px 4px;text-transform:uppercase;text-align:center;min-height:100%;">' + (item.room || item.category || '—') + '</div>';
+          // Checkbox
+          html += '<div style="padding:0 12px;"><input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="_specBookToggleItem(\'' + item.id + '\')" style="width:18px;height:18px;cursor:pointer;accent-color:#C9A96E;"></div>';
+          // Image
+          html += '<div style="width:120px;height:100px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#f8f7f5;margin:8px 0;">';
+          if (item.imageUrl) html += '<img src="' + esc(item.imageUrl) + '" style="max-width:110px;max-height:90px;object-fit:contain;" onerror="this.style.display=\'none\'">';
+          else html += '<div style="color:#ccc;font-size:32px;">📦</div>';
+          html += '</div>';
+          // Details
+          html += '<div style="flex:1;padding:10px 16px;">';
+          html += '<div style="font-size:13px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#0E1629;">' + esc(item.vendor || 'Unknown Vendor') + '</div>';
+          html += '<div style="font-size:14px;color:#0E1629;font-weight:500;margin:2px 0;">' + esc(item.title || 'Untitled') + '</div>';
+          let meta = [];
+          if (item.modelNum || item.sku) meta.push('MODEL #: ' + esc(item.modelNum || item.sku));
+          if (item.upc) meta.push('UPC #: ' + esc(item.upc));
+          if (meta.length) html += '<div style="font-size:11px;color:#9E9A8F;margin-top:2px;">' + meta.join(' &nbsp;·&nbsp; ') + '</div>';
+          html += '<div style="margin-top:6px;font-size:12px;color:#C9A96E;font-weight:600;">QTY: ' + (item.qty || 1) + '</div>';
+          html += '</div>';
+          // Docs + expand
+          html += '<div style="padding:10px 16px;text-align:right;flex-shrink:0;">';
+          html += '<div style="font-size:11px;color:#9E9A8F;cursor:pointer;" onclick="_specBookExpandItem(\'' + item.id + '\')">TECHNICAL DOCUMENTS ▾</div>';
+          html += '<div style="font-size:11px;color:#6B6760;margin-top:4px;">' + (item.docs.length || 0) + ' docs</div>';
+          html += '</div></div>';
+        });
+      }
+
+      // Nav buttons
+      html += '<div style="margin-top:28px;display:flex;justify-content:space-between;">';
+      html += '<button onclick="_specBookGoStep(1)" style="padding:12px 36px;background:#fff;color:#0E1629;border:1px solid #d4d2cd;font-size:14px;font-weight:600;cursor:pointer;">← Back</button>';
+      html += '<button onclick="_specBookGoStep(3)" ' + (selectedCount === 0 ? 'disabled' : '') + ' style="padding:12px 36px;background:' + (selectedCount > 0 ? '#0E1629' : '#d4d2cd') + ';color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;">Next →</button>';
+      html += '</div></div>';
+      return html;
+    }
+
+    function _specBookSelectAll(checked) {
+      const sb = window._specBook;
+      const data = window._specBookData;
+      const filtered = data.items.filter(i => {
+        const val = sb.sourceType === 'room' ? i.room : i.category;
+        return sb.selectedSources.includes(val);
+      });
+      const search = (sb.search || '').toLowerCase();
+      const visible = search ? filtered.filter(i => (i.title+i.vendor+i.sku+i.room+i.category).toLowerCase().includes(search)) : filtered;
+      if (checked) {
+        visible.forEach(i => { if (!sb.selectedItems.includes(i.id)) sb.selectedItems.push(i.id); });
+      } else {
+        const visIds = new Set(visible.map(i => i.id));
+        sb.selectedItems = sb.selectedItems.filter(id => !visIds.has(id));
+      }
+      renderSpecBookTab(document.getElementById('projectTabContent'), window._currentProject);
+    }
+
+    function _specBookToggleItem(id) {
+      const sb = window._specBook;
+      const idx = sb.selectedItems.indexOf(id);
+      if (idx >= 0) sb.selectedItems.splice(idx, 1);
+      else sb.selectedItems.push(id);
+      renderSpecBookTab(document.getElementById('projectTabContent'), window._currentProject);
+    }
+
+    function _specBookExpandItem(id) {
+      // Toggle expand for document management
+      const existing = document.getElementById('specbook-expand-' + id);
+      if (existing) { existing.remove(); return; }
+      const item = (window._specBookData.items || []).find(i => i.id === id);
+      if (!item) return;
+      // Find the card/row element and append expand panel
+      const el = event.target.closest('[style*="background:#fff"]');
+      if (!el) return;
+      const panel = document.createElement('div');
+      panel.id = 'specbook-expand-' + id;
+      panel.style.cssText = 'padding:12px 16px;border-top:1px solid #e8e6e0;background:#FAFAF8;';
+      let ph = '<div style="font-size:12px;font-weight:600;color:#0E1629;margin-bottom:8px;">Attached Documents</div>';
+      if (item.docs.length === 0) {
+        ph += '<div style="font-size:12px;color:#9E9A8F;padding:12px;text-align:center;border:2px dashed #d4d2cd;margin-bottom:8px;">No documents attached. Upload or drag files here.</div>';
+      } else {
+        item.docs.forEach((doc, di) => {
+          ph += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0efeb;">' +
+            '<span style="font-size:13px;">📄</span>' +
+            '<a href="' + esc(doc.url) + '" target="_blank" style="font-size:12px;color:#0E1629;text-decoration:none;flex:1;">' + esc(doc.name) + '</a>' +
+            '<button onclick="_specBookRemoveDoc(\'' + id + '\',' + di + ')" style="background:none;border:none;color:#c44;cursor:pointer;font-size:14px;" title="Remove">×</button>' +
+            '</div>';
+        });
+      }
+      // Upload button
+      ph += '<div style="margin-top:8px;"><label style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:#0E1629;color:#fff;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.3px;"><input type="file" multiple style="display:none;" onchange="_specBookUploadDocs(\'' + id + '\',this.files)">+ Add Documents</label></div>';
+      panel.innerHTML = ph;
+      el.appendChild(panel);
+    }
+
+    async function _specBookUploadDocs(itemId, files) {
+      if (!files || !files.length) return;
+      const item = (window._specBookData.items || []).find(i => i.id === itemId);
+      if (!item) return;
+      const projId = window._specBookDataProjId;
+      for (const file of files) {
+        try {
+          const storageRef = firebase.storage().ref('specbook/' + projId + '/' + itemId + '/' + file.name);
+          const snap = await storageRef.put(file);
+          const url = await snap.ref.getDownloadURL();
+          item.docs.push({ name: file.name, url: url, type: file.type || 'file' });
+          // Save doc reference to Firestore
+          await db.collection('boards').doc(projId).collection('files').add({
+            name: file.name, url: url, type: file.type, category: 'Specifications',
+            itemId: itemId, room: item.room, uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        } catch(e) { showToast('Upload failed: ' + e.message, 'error'); }
+      }
+      showToast(files.length + ' document(s) attached');
+      renderSpecBookTab(document.getElementById('projectTabContent'), window._currentProject);
+    }
+
+    function _specBookRemoveDoc(itemId, docIdx) {
+      const item = (window._specBookData.items || []).find(i => i.id === itemId);
+      if (!item) return;
+      item.docs.splice(docIdx, 1);
+      renderSpecBookTab(document.getElementById('projectTabContent'), window._currentProject);
+    }
+
+    // STEP 3 — Review
+    function _specBookStep3(data, sb) {
+      const selected = data.items.filter(i => sb.selectedItems.includes(i.id));
+      const totalDocs = selected.reduce((s, i) => s + (i.docs ? i.docs.length : 0), 0);
+      const missingDocs = selected.filter(i => !i.docs || i.docs.length === 0);
+
+      let html = '<div style="max-width:800px;">';
+      html += '<h2 style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:28px;font-weight:600;color:#0E1629;margin-bottom:6px;">Review</h2>';
+      html += '<p style="font-size:14px;color:#6B6760;margin-bottom:24px;">Review your spec book contents before exporting.</p>';
+
+      // Summary cards
+      html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px;">';
+      // Items card
+      html += '<div style="background:#fff;border:1px solid #e8e6e0;padding:24px;text-align:center;">' +
+        '<div style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:42px;font-weight:700;color:#0E1629;">' + selected.length + '</div>' +
+        '<div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#9E9A8F;">Items Included</div></div>';
+      // Docs card
+      html += '<div style="background:#fff;border:1px solid #e8e6e0;padding:24px;text-align:center;">' +
+        '<div style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:42px;font-weight:700;color:#0E1629;">' + totalDocs + '</div>' +
+        '<div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#9E9A8F;">Documents Attached</div></div>';
+      // Missing docs card
+      html += '<div style="background:#fff;border:1px solid ' + (missingDocs.length > 0 ? '#C9A96E' : '#e8e6e0') + ';padding:24px;text-align:center;">' +
+        '<div style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:42px;font-weight:700;color:' + (missingDocs.length > 0 ? '#C9A96E' : '#0E1629') + ';">' + missingDocs.length + '</div>' +
+        '<div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#9E9A8F;">Missing Documents</div></div>';
+      html += '</div>';
+
+      // Admin/Client toggle
+      html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">';
+      html += '<span style="font-size:13px;font-weight:600;color:#0E1629;">Pricing Mode:</span>';
+      html += '<div style="display:flex;border:1px solid #d4d2cd;overflow:hidden;">';
+      ['admin', 'client', 'none'].forEach(m => {
+        const active = sb.pricingMode === m;
+        const label = m === 'admin' ? 'Admin (Cost+Sell)' : m === 'client' ? 'Client (Sell Only)' : 'No Pricing';
+        html += '<button onclick="window._specBook.pricingMode=\'' + m + '\';renderSpecBookTab(document.getElementById(\'projectTabContent\'),window._currentProject);" style="padding:8px 16px;font-size:12px;font-weight:600;border:none;cursor:pointer;background:' + (active ? '#0E1629' : '#fff') + ';color:' + (active ? '#fff' : '#0E1629') + ';letter-spacing:0.3px;">' + label + '</button>';
+      });
+      html += '</div></div>';
+
+      // Items list grouped by source
+      const groups = {};
+      selected.forEach(i => {
+        const g = sb.sourceType === 'room' ? (i.room || 'Unassigned') : (i.category || 'Uncategorized');
+        if (!groups[g]) groups[g] = [];
+        groups[g].push(i);
+      });
+
+      Object.keys(groups).sort().forEach(gName => {
+        html += '<div style="margin-bottom:20px;">';
+        html += '<div style="font-size:14px;font-weight:700;color:#0E1629;padding:8px 0;border-bottom:2px solid #0E1629;margin-bottom:8px;">' + esc(gName) + ' (' + groups[gName].length + ')</div>';
+        groups[gName].forEach(item => {
+          const hasDocs = item.docs && item.docs.length > 0;
+          html += '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #f0efeb;">';
+          html += '<div style="width:48px;height:48px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#f8f7f5;">';
+          if (item.imageUrl) html += '<img src="' + esc(item.imageUrl) + '" style="max-width:44px;max-height:44px;object-fit:contain;" onerror="this.parentElement.innerHTML=\'📦\'">';
+          else html += '📦';
+          html += '</div>';
+          html += '<div style="flex:1;"><div style="font-size:13px;font-weight:600;color:#0E1629;">' + esc(item.title || 'Untitled') + '</div>';
+          html += '<div style="font-size:11px;color:#9E9A8F;">' + esc(item.vendor) + (item.sku ? ' · ' + esc(item.sku) : '') + '</div></div>';
+          html += '<div style="font-size:12px;color:' + (hasDocs ? '#0E1629' : '#C9A96E') + ';font-weight:600;">' + (hasDocs ? item.docs.length + ' docs' : '⚠ No docs') + '</div>';
+          html += '</div>';
+        });
+        html += '</div>';
+      });
+
+      // Nav buttons
+      html += '<div style="margin-top:28px;display:flex;justify-content:space-between;">';
+      html += '<button onclick="_specBookGoStep(2)" style="padding:12px 36px;background:#fff;color:#0E1629;border:1px solid #d4d2cd;font-size:14px;font-weight:600;cursor:pointer;">← Back</button>';
+      html += '<button onclick="_specBookGoStep(4)" style="padding:12px 36px;background:#0E1629;color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;">Next →</button>';
+      html += '</div></div>';
+      return html;
+    }
+
+    // STEP 4 — Export
+    function _specBookStep4(data, sb, proj) {
+      let html = '<div style="max-width:640px;">';
+      html += '<h2 style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:28px;font-weight:600;color:#0E1629;margin-bottom:6px;">Export Spec Book</h2>';
+      html += '<p style="font-size:14px;color:#6B6760;margin-bottom:24px;">Name your spec book and choose what to include.</p>';
+
+      // Book name
+      html += '<div style="margin-bottom:24px;">';
+      html += '<label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:#9E9A8F;display:block;margin-bottom:6px;">Book Name</label>';
+      html += '<input type="text" value="' + esc(sb.bookName) + '" onchange="window._specBook.bookName=this.value;" style="width:100%;padding:12px 14px;border:1px solid #d4d2cd;font-size:14px;font-family:inherit;color:#0E1629;outline:none;">';
+      html += '</div>';
+
+      // Export options
+      html += '<div style="margin-bottom:28px;">';
+      html += '<label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:#9E9A8F;display:block;margin-bottom:12px;">Include in Export</label>';
+      const opts = [
+        { key: 'cover', label: 'Cover Page' },
+        { key: 'toc', label: 'Table of Contents' },
+        { key: 'cutSheets', label: 'Cut Sheets (Product Pages)' },
+        { key: 'supportingDocs', label: 'Supporting Documents' },
+        { key: 'pricing', label: 'Pricing Summary' },
+        { key: 'roomDividers', label: 'Room Dividers' }
+      ];
+      opts.forEach(o => {
+        html += '<label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0efeb;cursor:pointer;">';
+        html += '<div style="position:relative;width:44px;height:24px;background:' + (sb.exportOptions[o.key] ? '#0E1629' : '#d4d2cd') + ';border-radius:12px;cursor:pointer;transition:background 0.2s;" onclick="window._specBook.exportOptions.' + o.key + '=!window._specBook.exportOptions.' + o.key + ';renderSpecBookTab(document.getElementById(\'projectTabContent\'),window._currentProject);event.preventDefault();">' +
+          '<div style="position:absolute;top:2px;' + (sb.exportOptions[o.key] ? 'left:22px' : 'left:2px') + ';width:20px;height:20px;background:#fff;border-radius:50%;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div></div>';
+        html += '<span style="font-size:14px;color:#0E1629;font-weight:500;">' + o.label + '</span>';
+        html += '</label>';
+      });
+      html += '</div>';
+
+      // Pricing mode reminder
+      html += '<div style="padding:14px 16px;background:#f8f7f5;border:1px solid #e8e6e0;margin-bottom:28px;font-size:13px;color:#6B6760;">';
+      html += 'Pricing mode: <strong style="color:#0E1629;">' + (sb.pricingMode === 'admin' ? 'Admin (cost + sell)' : sb.pricingMode === 'client' ? 'Client (sell only)' : 'No pricing') + '</strong>';
+      html += ' — <a href="#" onclick="_specBookGoStep(3);return false;" style="color:#C9A96E;">Change</a></div>';
+
+      // Export actions
+      html += '<div style="display:flex;gap:12px;margin-bottom:16px;">';
+      html += '<button onclick="_specBookExport(\'pdf\')" style="flex:1;padding:14px;background:#0E1629;color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;letter-spacing:0.3px;">⬇ Download PDF</button>';
+      html += '<button onclick="_specBookExport(\'print\')" style="flex:1;padding:14px;background:#fff;color:#0E1629;border:2px solid #0E1629;font-size:14px;font-weight:600;cursor:pointer;letter-spacing:0.3px;">🖨 Print</button>';
+      html += '</div>';
+
+      // Nav
+      html += '<div style="margin-top:20px;"><button onclick="_specBookGoStep(3)" style="padding:12px 36px;background:#fff;color:#0E1629;border:1px solid #d4d2cd;font-size:14px;font-weight:600;cursor:pointer;">← Back</button></div>';
+      html += '</div>';
+      return html;
+    }
+
+    // EXPORT — Generate print-ready spec book
+    function _specBookExport(mode) {
+      const sb = window._specBook;
+      const data = window._specBookData;
+      const proj = window._currentProject;
+      const selected = data.items.filter(i => sb.selectedItems.includes(i.id));
+      if (selected.length === 0) { showToast('No items selected', 'error'); return; }
+
+      const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      const projName = proj.name || proj.title || 'Project';
+      const clientName = proj.clientName || proj.client || '';
+      const fmt = v => { const n = parseFloat(v); return n > 0 ? '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''; };
+      const eo = sb.exportOptions;
+
+      // Group items
+      const groups = {};
+      selected.forEach(i => {
+        const g = sb.sourceType === 'room' ? (i.room || 'Unassigned') : (i.category || 'Uncategorized');
+        if (!groups[g]) groups[g] = [];
+        groups[g].push(i);
+      });
+      const groupNames = Object.keys(groups).sort();
+
+      // Build HTML
+      let pages = '';
+      let pageNum = 1;
+      let tocEntries = [];
+
+      // Cover page
+      if (eo.cover) {
+        pages += '<div class="page" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">' +
+          '<div class="page-header" style="width:100%;"><div class="logo-block"><div class="logo-cch">CCH</div><div class="logo-sub">Design Inc.</div></div>' +
+          '<div class="project-info"><div class="proj-name">' + esc(projName) + '</div><div class="proj-meta">' + today + '</div></div></div>' +
+          '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px;">' +
+          '<div style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:56px;font-weight:700;color:#0E1629;line-height:1.1;margin-bottom:16px;">' + esc(sb.bookName || 'Specification Book') + '</div>' +
+          (clientName ? '<div style="font-size:18px;color:#9E9A8F;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">Prepared for ' + esc(clientName) + '</div>' : '') +
+          '<div style="font-size:14px;color:#C8B99A;letter-spacing:1px;">' + today + '</div>' +
+          '<div style="width:80px;height:3px;background:#C8B99A;margin-top:32px;"></div>' +
+          '</div>' +
+          '<div class="page-footer"><span>CCH Design Inc. · www.cchdesign.com · (949) 497-7979</span><span>CONFIDENTIAL</span></div></div>';
+        pageNum++;
+      }
+
+      // TOC placeholder — we'll fill after building all pages
+      const tocPageNum = eo.toc ? pageNum : -1;
+      if (eo.toc) pageNum++;
+
+      // Product pages
+      groupNames.forEach(gName => {
+        // Room divider
+        if (eo.roomDividers) {
+          pages += '<div class="page" style="display:flex;flex-direction:column;">' +
+            '<div class="page-header"><div class="logo-block"><div class="logo-cch">CCH</div><div class="logo-sub">Design Inc.</div></div>' +
+            '<div class="project-info"><div class="proj-name">' + esc(projName) + '</div><div class="proj-meta">' + today + '</div></div></div>' +
+            '<div style="flex:1;display:flex;align-items:center;justify-content:center;">' +
+            '<div style="text-align:center;"><div style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:48px;font-weight:700;color:#0E1629;">' + esc(gName) + '</div>' +
+            '<div style="font-size:14px;color:#9E9A8F;letter-spacing:2px;text-transform:uppercase;margin-top:8px;">' + groups[gName].length + ' Items</div></div></div>' +
+            '<div class="page-footer"><span>CCH Design Inc.</span><span>Page ' + pageNum + '</span></div></div>';
+          tocEntries.push({ name: gName, page: pageNum, isGroup: true });
+          pageNum++;
+        }
+
+        if (eo.cutSheets) {
+          groups[gName].forEach(item => {
+            tocEntries.push({ name: item.title || 'Untitled', page: pageNum, vendor: item.vendor, isGroup: false });
+
+            pages += '<div class="page"><div class="page-header"><div class="logo-block"><div class="logo-cch">CCH</div><div class="logo-sub">Design Inc.</div></div>' +
+              '<div class="project-info"><div class="proj-name">' + esc(projName) + '</div><div class="proj-meta">' + esc(gName) + ' · ' + today + '</div></div></div>';
+
+            // Body — image grid left, details right
+            pages += '<div class="page-body">';
+
+            // Image column — hero + supporting images
+            pages += '<div class="img-col" style="flex-direction:column;gap:8px;">';
+            if (item.imageUrl) {
+              pages += '<img src="' + esc(item.imageUrl) + '" style="max-width:100%;max-height:420px;object-fit:contain;" onerror="this.outerHTML=\'<div class=no-img>No Image Available</div>\'">';
+            } else {
+              pages += '<div class="no-img">No Image<br>Available</div>';
+            }
+            // Supporting images (up to 4)
+            const extraImages = (item.images || []).filter(img => img && img !== item.imageUrl).slice(0, 4);
+            if (extraImages.length > 0) {
+              pages += '<div style="display:grid;grid-template-columns:repeat(' + Math.min(extraImages.length, 4) + ',1fr);gap:6px;margin-top:8px;">';
+              extraImages.forEach(img => {
+                pages += '<img src="' + esc(img) + '" style="width:100%;height:100px;object-fit:contain;background:#fff;border:1px solid #e8e6e0;" onerror="this.style.display=\'none\'">';
+              });
+              pages += '</div>';
+            }
+            pages += '</div>';
+
+            // Detail column
+            pages += '<div class="detail-col">';
+            pages += '<div class="product-title">' + esc(item.title || 'Untitled') + '</div>';
+            pages += '<div class="product-room">' + esc(item.vendor || '') + (item.finish ? ' · ' + esc(item.finish) : '') + '</div>';
+
+            // Description
+            if (item.description) {
+              pages += '<div class="desc-block"><div class="desc-text">' + esc(item.description) + '</div></div>';
+            }
+
+            // Dimensions
+            pages += '<div class="spec-table">';
+            pages += '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:#0E1629;margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid #C8B99A;">D I M E N S I O N S</div>';
+            if (item.dimensions) {
+              // Parse dimensions string
+              const dims = item.dimensions;
+              pages += '<div style="display:flex;gap:24px;margin-bottom:12px;">';
+              pages += '<div><div style="font-size:11px;color:#9E9A8F;text-transform:uppercase;letter-spacing:0.5px;">Dimensions</div><div style="font-size:14px;font-weight:500;color:#0E1629;">' + esc(dims) + '</div></div>';
+              pages += '</div>';
+            } else {
+              pages += '<div style="font-size:12px;color:#9E9A8F;">—</div>';
+            }
+
+            // Material / Finish / Color / Model / Vendor
+            pages += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;margin-top:16px;">';
+            pages += '<div><div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:#0E1629;margin-bottom:4px;padding-bottom:4px;border-bottom:2px solid #C8B99A;">M A T E R I A L / F I N I S H</div><div style="font-size:13px;color:#0E1629;">' + esc(item.materials || item.finish || '—') + '</div></div>';
+            pages += '<div><div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:#0E1629;margin-bottom:4px;padding-bottom:4px;border-bottom:2px solid #C8B99A;">C O L O R</div><div style="font-size:13px;color:#0E1629;">' + esc(item.color || '—') + '</div></div>';
+            pages += '<div><div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:#0E1629;margin-bottom:4px;padding-bottom:4px;border-bottom:2px solid #C8B99A;">M O D E L / S K U</div><div style="font-size:13px;color:#0E1629;font-family:monospace;">' + esc(item.modelNum || item.sku || '—') + '</div></div>';
+            pages += '<div><div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:#0E1629;margin-bottom:4px;padding-bottom:4px;border-bottom:2px solid #C8B99A;">V E N D O R</div><div style="font-size:13px;color:#0E1629;">' + esc(item.vendor || '—') + '</div></div>';
+            pages += '</div>';
+            pages += '</div>';
+
+            // Pricing
+            const sell = item.sell || 0;
+            const cost = item.cost || 0;
+            const qty = item.qty || 1;
+            const total = sell * qty;
+            if (sb.pricingMode !== 'none' && (sell > 0 || cost > 0)) {
+              pages += '<div style="margin-top:auto;padding-top:16px;border-top:2px solid #0E1629;">';
+              pages += '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:#0E1629;margin-bottom:8px;">P R I C I N G</div>';
+              pages += '<div style="display:flex;align-items:baseline;gap:32px;">';
+              if (sb.pricingMode === 'admin' && cost > 0) {
+                pages += '<div><div style="font-size:13px;color:#9E9A8F;">Cost</div><div style="font-size:18px;font-weight:600;color:#0E1629;">' + fmt(cost) + '</div></div>';
+              }
+              if (sell > 0) pages += '<div><div style="font-size:13px;color:#9E9A8F;">Unit Price</div><div style="font-size:18px;font-weight:600;color:#0E1629;">' + fmt(sell) + '</div></div>';
+              pages += '<div><div style="font-size:13px;color:#9E9A8F;">Qty</div><div style="font-size:18px;font-weight:600;color:#0E1629;">' + qty + '</div></div>';
+              if (total > 0 && qty > 1) pages += '<div><div style="font-size:13px;color:#9E9A8F;">Total</div><div style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:28px;font-weight:700;color:#0E1629;">' + fmt(total) + '</div></div>';
+              if (sb.pricingMode === 'admin' && cost > 0 && sell > 0) {
+                const markup = ((sell - cost) / cost * 100).toFixed(0);
+                pages += '<div><div style="font-size:13px;color:#9E9A8F;">Markup</div><div style="font-size:18px;font-weight:600;color:#28a745;">' + markup + '%</div></div>';
+              }
+              pages += '</div></div>';
+            }
+
+            // Notes / Lead Time
+            if (item.leadTime || item.vendorNotes) {
+              pages += '<div class="desc-block" style="margin-top:12px;"><div class="desc-label">Notes</div>';
+              if (item.leadTime) pages += '<div class="desc-text">Lead Time: ' + esc(item.leadTime) + '</div>';
+              if (item.vendorNotes) pages += '<div class="desc-text">' + esc(item.vendorNotes) + '</div>';
+              pages += '</div>';
+            }
+
+            pages += '</div>'; // detail-col
+            pages += '</div>'; // page-body
+
+            pages += '<div class="page-footer"><span>CCH Design Inc. · www.cchdesign.com · (949) 497-7979</span><span>Page ' + pageNum + '</span></div></div>';
+            pageNum++;
+          });
+        }
+      });
+
+      // Pricing summary page
+      if (eo.pricing && sb.pricingMode !== 'none') {
+        pages += '<div class="page" style="display:flex;flex-direction:column;">' +
+          '<div class="page-header"><div class="logo-block"><div class="logo-cch">CCH</div><div class="logo-sub">Design Inc.</div></div>' +
+          '<div class="project-info"><div class="proj-name">' + esc(projName) + '</div><div class="proj-meta">' + today + '</div></div></div>' +
+          '<div style="flex:1;padding:40px;">' +
+          '<div style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:32px;font-weight:700;color:#0E1629;margin-bottom:24px;">Pricing Summary</div>' +
+          '<table style="width:100%;border-collapse:collapse;font-size:12px;">' +
+          '<thead><tr style="border-bottom:2px solid #0E1629;">' +
+          '<th style="text-align:left;padding:8px 6px;font-size:10px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#9E9A8F;">Item</th>' +
+          '<th style="text-align:left;padding:8px 6px;font-size:10px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#9E9A8F;">Vendor</th>' +
+          '<th style="text-align:left;padding:8px 6px;font-size:10px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#9E9A8F;">Room</th>' +
+          '<th style="text-align:center;padding:8px 6px;font-size:10px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#9E9A8F;">Qty</th>' +
+          (sb.pricingMode === 'admin' ? '<th style="text-align:right;padding:8px 6px;font-size:10px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#9E9A8F;">Cost</th>' : '') +
+          '<th style="text-align:right;padding:8px 6px;font-size:10px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#9E9A8F;">Price</th>' +
+          '<th style="text-align:right;padding:8px 6px;font-size:10px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#9E9A8F;">Total</th>' +
+          '</tr></thead><tbody>';
+        let grandCost = 0, grandSell = 0;
+        selected.forEach(item => {
+          const sell = item.sell || 0;
+          const cost = item.cost || 0;
+          const qty = item.qty || 1;
+          grandCost += cost * qty;
+          grandSell += sell * qty;
+          pages += '<tr style="border-bottom:1px solid #f0efeb;">' +
+            '<td style="padding:6px;font-weight:500;">' + esc(item.title || 'Untitled') + '</td>' +
+            '<td style="padding:6px;color:#6B6760;">' + esc(item.vendor || '') + '</td>' +
+            '<td style="padding:6px;color:#6B6760;">' + esc(item.room || '') + '</td>' +
+            '<td style="padding:6px;text-align:center;">' + qty + '</td>' +
+            (sb.pricingMode === 'admin' ? '<td style="padding:6px;text-align:right;">' + (cost > 0 ? fmt(cost) : '—') + '</td>' : '') +
+            '<td style="padding:6px;text-align:right;">' + (sell > 0 ? fmt(sell) : '—') + '</td>' +
+            '<td style="padding:6px;text-align:right;font-weight:600;">' + (sell > 0 ? fmt(sell * qty) : '—') + '</td></tr>';
+        });
+        pages += '</tbody><tfoot><tr style="border-top:2px solid #0E1629;font-weight:700;">' +
+          '<td colspan="3" style="padding:8px 6px;">TOTAL (' + selected.length + ' items)</td>' +
+          '<td style="padding:8px 6px;text-align:center;">' + selected.reduce((s,i) => s + (i.qty||1), 0) + '</td>' +
+          (sb.pricingMode === 'admin' ? '<td style="padding:8px 6px;text-align:right;">' + fmt(grandCost) + '</td>' : '') +
+          '<td style="padding:8px 6px;text-align:right;"></td>' +
+          '<td style="padding:8px 6px;text-align:right;font-size:16px;">' + fmt(grandSell) + '</td></tr>';
+        if (sb.pricingMode === 'admin' && grandCost > 0) {
+          const profit = grandSell - grandCost;
+          pages += '<tr><td colspan="' + (sb.pricingMode === 'admin' ? 6 : 5) + '" style="padding:6px;text-align:right;font-size:11px;color:#9E9A8F;">Profit:</td>' +
+            '<td style="padding:6px;text-align:right;color:#28a745;font-weight:600;">' + fmt(profit) + ' (' + ((profit/grandCost)*100).toFixed(0) + '%)</td></tr>';
+        }
+        pages += '</tfoot></table></div>' +
+          '<div class="page-footer"><span>CCH Design Inc.</span><span>Page ' + pageNum + '</span></div></div>';
+        pageNum++;
+      }
+
+      // Build TOC page
+      let tocPage = '';
+      if (eo.toc) {
+        tocPage = '<div class="page" style="display:flex;flex-direction:column;">' +
+          '<div class="page-header"><div class="logo-block"><div class="logo-cch">CCH</div><div class="logo-sub">Design Inc.</div></div>' +
+          '<div class="project-info"><div class="proj-name">' + esc(projName) + '</div><div class="proj-meta">' + today + '</div></div></div>' +
+          '<div style="flex:1;padding:40px;overflow:auto;">' +
+          '<div style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:32px;font-weight:700;color:#0E1629;margin-bottom:24px;">Table of Contents</div>';
+        tocEntries.forEach(e => {
+          if (e.isGroup) {
+            tocPage += '<div style="display:flex;align-items:baseline;padding:10px 0;border-bottom:1px solid #e8e6e0;">' +
+              '<span style="font-size:16px;font-weight:700;color:#0E1629;flex:1;">' + esc(e.name) + '</span>' +
+              '<span style="font-size:13px;color:#9E9A8F;">' + e.page + '</span></div>';
+          } else {
+            tocPage += '<div style="display:flex;align-items:baseline;padding:6px 0 6px 24px;border-bottom:1px solid #f0efeb;">' +
+              '<span style="font-size:13px;color:#0E1629;flex:1;">' + esc(e.name) + '<span style="color:#9E9A8F;margin-left:8px;font-size:11px;">' + esc(e.vendor || '') + '</span></span>' +
+              '<span style="font-size:12px;color:#9E9A8F;">' + e.page + '</span></div>';
+          }
+        });
+        tocPage += '</div><div class="page-footer"><span>CCH Design Inc.</span><span>Page ' + tocPageNum + '</span></div></div>';
+      }
+
+      // Assemble final HTML
+      const w = window.open('', '_blank');
+      if (!w) { showToast('Popup blocked — please allow popups', 'error'); return; }
+      w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(sb.bookName || 'Spec Book') + '</title>' +
+        '<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">' +
+        '<style>' + _getTearSheetCSS() + '</style></head><body>');
+      // Toolbar
+      w.document.write('<div class="toolbar"><div class="toolbar-title">' + esc(sb.bookName || 'Spec Book') + ' — ' + esc(projName) + '</div>' +
+        '<div class="toolbar-actions">' +
+        '<button class="tb-btn" onclick="window.print()">🖨 Print / PDF</button>' +
+        '<button class="tb-btn" onclick="document.querySelector(\'.toolbar\').style.display=\'none\';window.print();document.querySelector(\'.toolbar\').style.display=\'flex\';">⬇ Download</button>' +
+        '</div></div>');
+
+      // Cover
+      if (eo.cover) w.document.write(pages.substring(0, pages.indexOf('</div></div>') + 12));
+
+      // TOC
+      if (eo.toc) w.document.write(tocPage);
+
+      // All pages
+      w.document.write(pages);
+
+      w.document.write('</body></html>');
+      w.document.close();
+
+      // Save spec book config to Firestore
+      const projId = proj.id;
+      db.collection('boards').doc(projId).collection('specBooks').add({
+        name: sb.bookName,
+        sourceType: sb.sourceType,
+        selectedSources: sb.selectedSources,
+        selectedItemIds: sb.selectedItems,
+        exportOptions: sb.exportOptions,
+        pricingMode: sb.pricingMode,
+        itemCount: selected.length,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).catch(e => console.warn('Could not save spec book config:', e));
+
+      showToast(selected.length + ' items — Spec Book ready');
     }
 
     // Shared CSS for tear sheet pages
