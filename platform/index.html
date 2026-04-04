@@ -35491,7 +35491,7 @@ async function renderBoardsTab(T, proj) {
           'window.open("mailto:?subject="+subj+"&body="+body,"_self");' +
           'alert("Tip: Print this page to PDF first (Ctrl+P → Save as PDF), then attach it to the email that just opened.");' +
         '}' +
-        '</script>' +
+        '<\/scr' + 'ipt>' +
         '</body></html>';
 
       const win = window.open('', '_blank');
@@ -35691,10 +35691,11 @@ async function renderBoardsTab(T, proj) {
       }).join('');
 
       const win = window.open('', '_blank');
+      if (!win) { showToast('Pop-up blocked — allow pop-ups for this site', 'error'); return; }
       win.document.write(`<!DOCTYPE html>
 <html><head>
 <meta charset="UTF-8">
-<title>${projectName || 'Room Board'} — Tear Sheets</title>
+<title>${esc(projectName || 'Room Board')} — Tear Sheets</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
