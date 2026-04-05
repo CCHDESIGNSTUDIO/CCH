@@ -15468,16 +15468,16 @@ async function renderBoardsTab(T, proj) {
           '<button onclick="toggleMyItemsPanel()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#7A7060;">&times;</button>' +
         '</div>' +
         '<div style="padding:10px 16px;border-bottom:1px solid #E5E2DA;">' +
-          '<input type="text" id="myItemsSearch" placeholder="Search..." oninput="filterMyItemsPanel()" style="width:100%;padding:8px 12px;border:1px solid #E5E2DA;font-size:13px;outline:none;background:#F9F8F5;">' +
+          '<input type="text" id="myItemsSearch" placeholder="Search..." oninput="filterDocMyItemsPanel()" style="width:100%;padding:8px 12px;border:1px solid #E5E2DA;font-size:13px;outline:none;background:#F9F8F5;">' +
         '</div>' +
         '<div style="padding:8px 16px;border-bottom:1px solid #E5E2DA;display:flex;gap:6px;flex-wrap:wrap;">' +
-          '<button class="mip-tab" data-filter="all" onclick="filterMyItemsPanel(\'all\')" style="padding:4px 10px;font-size:11px;border:1px solid #0E1629;background:#0E1629;color:#EDE8E0;cursor:pointer;font-weight:600;">All</button>' +
-          '<button class="mip-tab" data-filter="product" onclick="filterMyItemsPanel(\'product\')" style="padding:4px 10px;font-size:11px;border:1px solid #E5E2DA;background:#fff;color:#0E1629;cursor:pointer;">Product</button>' +
-          '<button class="mip-tab" data-filter="service" onclick="filterMyItemsPanel(\'service\')" style="padding:4px 10px;font-size:11px;border:1px solid #E5E2DA;background:#fff;color:#0E1629;cursor:pointer;">Service</button>' +
+          '<button class="mip-tab" data-filter="all" onclick="filterDocMyItemsPanel(\'all\')" style="padding:4px 10px;font-size:11px;border:1px solid #0E1629;background:#0E1629;color:#EDE8E0;cursor:pointer;font-weight:600;">All</button>' +
+          '<button class="mip-tab" data-filter="product" onclick="filterDocMyItemsPanel(\'product\')" style="padding:4px 10px;font-size:11px;border:1px solid #E5E2DA;background:#fff;color:#0E1629;cursor:pointer;">Product</button>' +
+          '<button class="mip-tab" data-filter="service" onclick="filterDocMyItemsPanel(\'service\')" style="padding:4px 10px;font-size:11px;border:1px solid #E5E2DA;background:#fff;color:#0E1629;cursor:pointer;">Service</button>' +
         '</div>' +
         '<div style="padding:6px 16px;border-bottom:1px solid #F0EDE6;display:flex;gap:4px;">' +
-          '<div onclick="filterMyItemsPanel(\'project\')" style="cursor:pointer;padding:6px 12px;font-size:11px;font-weight:600;color:#0E1629;border-bottom:2px solid var(--gold);">In this Project</div>' +
-          '<div onclick="filterMyItemsPanel(\'library\')" style="cursor:pointer;padding:6px 12px;font-size:11px;font-weight:600;color:#7A7060;">In My Library</div>' +
+          '<div onclick="filterDocMyItemsPanel(\'project\')" style="cursor:pointer;padding:6px 12px;font-size:11px;font-weight:600;color:#0E1629;border-bottom:2px solid var(--gold);">In this Project</div>' +
+          '<div onclick="filterDocMyItemsPanel(\'library\')" style="cursor:pointer;padding:6px 12px;font-size:11px;font-weight:600;color:#7A7060;">In My Library</div>' +
         '</div>' +
         '<div id="myItemsList" style="flex:1;overflow-y:auto;"></div>';
       document.body.appendChild(panel);
@@ -15487,7 +15487,7 @@ async function renderBoardsTab(T, proj) {
     var _myItemsFilter = 'all';
     var _myItemsSourceFilter = '';
 
-    function filterMyItemsPanel(filter) {
+    function filterDocMyItemsPanel(filter) {
       if (filter === 'project' || filter === 'library') {
         _myItemsSourceFilter = filter;
       } else if (filter) {
@@ -15525,7 +15525,7 @@ async function renderBoardsTab(T, proj) {
         var imgUrl = p.imageUrl || p.image || p.thumbnail || '';
         var realIdx = _myItemsProducts.indexOf(p);
         return '<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #F0EDE6;cursor:pointer;transition:background 0.1s;" onmouseover="this.style.background=\'#F9F8F5\'" onmouseout="this.style.background=\'#fff\'">' +
-          '<button onclick="event.stopPropagation();addMyItemToDoc(' + realIdx + ')" style="width:28px;height:28px;border-radius:50%;border:2px solid var(--gold);background:none;color:var(--gold);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Add to document">+</button>' +
+          '<button onclick="event.stopPropagation();addDocMyItem(' + realIdx + ')" style="width:28px;height:28px;border-radius:50%;border:2px solid var(--gold);background:none;color:var(--gold);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Add to document">+</button>' +
           (imgUrl ? '<img src="' + escAttr(imgUrl) + '" style="width:56px;height:56px;object-fit:cover;flex-shrink:0;" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div style="width:56px;height:56px;background:#F5F3EE;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">📦</div>') +
           '<div style="flex:1;min-width:0;">' +
             '<div style="font-size:13px;font-weight:600;color:#0E1629;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(p.title || '') + '</div>' +
@@ -15536,7 +15536,7 @@ async function renderBoardsTab(T, proj) {
       }).join('');
     }
 
-    function addMyItemToDoc(idx) {
+    function addDocMyItem(idx) {
       var p = _myItemsProducts[idx];
       if (!p || !_docEdit) return;
       var qty = parseFloat(p.qty) || 1;
@@ -16087,6 +16087,51 @@ async function renderBoardsTab(T, proj) {
         _cacheTime = 0;
         renderProjectDetail();
       } catch(e) { console.error('Link save failed:', e); alert('Failed to link documents'); }
+    }
+
+    // ── Stub functions for menu actions (prevent console errors) ──
+    async function sendInvoiceToClient(projectId, docId) {
+      showToast('Email sending not yet configured — publish to Client Dashboard instead', 'warning');
+    }
+    async function markInvoicePastDue(projectId, docId) {
+      try {
+        await db.collection('boards').doc(projectId).collection('invoices').doc(docId).update({ status: 'Overdue', updatedAt: new Date().toISOString() });
+        showToast('Invoice marked as Past Due');
+        _cacheTime = 0; renderProjectDetail();
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+    async function duplicateInvoice(projectId, docId) {
+      try {
+        var doc = await db.collection('boards').doc(projectId).collection('invoices').doc(docId).get();
+        if (!doc.exists) return;
+        var data = doc.data();
+        delete data.payments; data.status = 'Draft'; data.paidAmount = 0;
+        data.createdAt = new Date().toISOString(); data.updatedAt = new Date().toISOString();
+        data.invoiceNum = ''; data.number = '';
+        var newRef = await db.collection('boards').doc(projectId).collection('invoices').add(data);
+        showToast('Invoice duplicated as Draft');
+        _cacheTime = 0; navigate('#/project/' + projectId + '/invoice/' + newRef.id);
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+    async function archiveInvoice(projectId, docId) {
+      if (!confirm('Archive this invoice? It will be marked as Cancelled.')) return;
+      try {
+        await db.collection('boards').doc(projectId).collection('invoices').doc(docId).update({ status: 'Cancelled', updatedAt: new Date().toISOString() });
+        showToast('Invoice archived');
+        _cacheTime = 0; renderProjectDetail();
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+    function previewPO(projectId, docId) {
+      previewDocument('po', projectId, docId);
+    }
+    function togglePOVendor(projectId, field) {
+      // Toggle vendor visibility on PO list — no-op for now
+    }
+    function filterSelPicker(query) {
+      // Stub for selection picker filter
+      var items = window._selPickerClips || [];
+      var q = (query || '').toLowerCase();
+      // Re-render selection picker items if the picker is open
     }
 
     // ── Auto-Link Documents from Houzz Transaction Report ──
