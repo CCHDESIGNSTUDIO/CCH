@@ -2749,203 +2749,155 @@
     }
 
     // ==================== GLOBAL SEARCH ====================
-    let searchCache = null;
     let searchOpen = false;
 
     // Cmd+K / Ctrl+K shortcut
     document.addEventListener('keydown', (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); openGlobalSearch(); }
-      if (e.key === 'Escape' && searchOpen) closeGlobalSearch();
     });
 
-    async function buildSearchCache() {
-      if (searchCache) return searchCache;
-      const projSnap = await getCachedBoards();
-      const cache = { projects: [], invoices: [], proposals: [], pos: [], clips: [], loaded: false };
-      const projNames = {};
-      projSnap.forEach(d => {
-        const data = d.data();
-        const name = data.name || d.id;
-        projNames[d.id] = name;
-        cache.projects.push({ id: d.id, name, status: data.status || 'In Progress', clipCount: data.clipCount || 0, clientName: data.clientName || '' });
-      });
-      searchCache = cache;
-      // Load subcollections in background (limit to projects with data)
-      const projIds = Object.keys(projNames);
-      const loadBatch = async (pids) => {
-        await Promise.all(pids.map(async pid => {
-          try {
-            const invs = await db.collection('boards').doc(pid).collection('invoices').get();
-            invs.forEach(d => { const data = d.data(); cache.invoices.push({ id: d.id, projectId: pid, projectName: projNames[pid], num: data.invoiceNum || data.number || d.id, status: data.status || 'Draft', total: parseFloat(data.total) || 0, date: data.date || data.createdAt || '' }); });
-          } catch(e) {}
-          try {
-            const props = await db.collection('boards').doc(pid).collection('proposals').get();
-            props.forEach(d => { const data = d.data(); cache.proposals.push({ id: d.id, projectId: pid, projectName: projNames[pid], name: data.name || data.proposalNum || data.number || d.id, status: data.status || 'Draft', total: parseFloat(data.total) || 0, date: data.date || data.createdAt || '', items: data.items || [] }); });
-          } catch(e) {}
-          try {
-            const clps = await db.collection('boards').doc(pid).collection('clips').limit(50).get();
-            clps.forEach(d => { const data = d.data(); cache.clips.push({ id: d.id, projectId: pid, projectName: projNames[pid], title: data.title || '', vendor: data.vendor || '', manufacturer: data.manufacturer || '', category: data.category || '', room: data.room || '', sku: data.sku || '', description: data.description || '', cost: parseFloat(data.cost) || 0, clientPrice: parseFloat(data.clientPrice) || 0, imageUrl: data.imageUrl || '' }); });
-          } catch(e) {}
-        }));
-      };
-      // Load in batches of 8 projects at a time to avoid rate limits
-      for (let i = 0; i < projIds.length; i += 8) {
-        await loadBatch(projIds.slice(i, i + 8));
-      }
-      cache.loaded = true;
-      return cache;
-    }
-
-    function invalidateSearchCache() { searchCache = null; }
-
     function openGlobalSearch() {
+      // Show a quick input overlay — on Enter or after typing, navigate to full results page
       searchOpen = true;
-      const overlay = document.createElement('div');
-      overlay.className = 'search-overlay';
+      var overlay = document.createElement('div');
       overlay.id = 'globalSearchOverlay';
-      overlay.onclick = (e) => { if (e.target === overlay) closeGlobalSearch(); };
-      overlay.innerHTML = `
-        <div class="search-modal">
-          <div class="search-input-wrap">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-            <input class="search-input" id="globalSearchInput" placeholder="Search projects, invoices, POs, items, vendors, amounts..." autofocus>
-            <button class="search-close" onclick="closeGlobalSearch()">&times;</button>
-          </div>
-          <div class="search-results" id="globalSearchResults">
-            <div class="search-empty">Start typing to search across all projects...</div>
-          </div>
-          <div class="search-hint">
-            <span><kbd>↑↓</kbd> Navigate</span>
-            <span><kbd>Enter</kbd> Open</span>
-            <span><kbd>Esc</kbd> Close</span>
-          </div>
-        </div>
-      `;
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:5000;display:flex;align-items:flex-start;justify-content:center;padding-top:120px;';
+      overlay.onclick = function(e) { if (e.target === overlay) { overlay.remove(); searchOpen = false; } };
+      overlay.innerHTML =
+        '<div style="background:#fff;width:560px;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,0.3);overflow:hidden;">' +
+          '<div style="display:flex;align-items:center;padding:16px 20px;gap:12px;border-bottom:1px solid var(--gray-200);">' +
+            '<span style="font-size:20px;color:var(--gray-400);">🔍</span>' +
+            '<input id="globalSearchInput" style="flex:1;border:none;outline:none;font-size:16px;color:var(--navy);" placeholder="Search projects, vendors, invoices, POs, products, amounts..." autofocus>' +
+            '<kbd style="font-size:10px;color:var(--gray-400);background:var(--gray-100);padding:2px 6px;border-radius:3px;">Enter</kbd>' +
+          '</div>' +
+          '<div style="padding:12px 20px;font-size:12px;color:var(--gray-400);">Press Enter to search · Esc to close</div>' +
+        '</div>';
       document.body.appendChild(overlay);
-      const input = document.getElementById('globalSearchInput');
+      var input = document.getElementById('globalSearchInput');
       input.focus();
-      let debounce = null;
-      input.addEventListener('input', () => {
-        clearTimeout(debounce);
-        debounce = setTimeout(() => runGlobalSearch(input.value.trim()), 200);
-      });
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-          e.preventDefault();
-          const items = document.querySelectorAll('.search-item');
-          const active = document.querySelector('.search-item.active');
-          let idx = active ? [...items].indexOf(active) : -1;
-          if (active) active.classList.remove('active');
-          idx = e.key === 'ArrowDown' ? Math.min(idx + 1, items.length - 1) : Math.max(idx - 1, 0);
-          if (items[idx]) { items[idx].classList.add('active'); items[idx].scrollIntoView({ block: 'nearest' }); }
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && input.value.trim()) {
+          overlay.remove();
+          searchOpen = false;
+          runGlobalSearch(input.value.trim());
         }
-        if (e.key === 'Enter') {
-          const active = document.querySelector('.search-item.active') || document.querySelector('.search-item');
-          if (active) active.click();
-        }
+        if (e.key === 'Escape') { overlay.remove(); searchOpen = false; }
       });
-      // Pre-build cache in background
-      buildSearchCache();
-    }
-
-    function closeGlobalSearch() {
-      searchOpen = false;
-      const el = document.getElementById('globalSearchOverlay');
-      if (el) el.remove();
     }
 
     async function runGlobalSearch(query) {
-      const R = document.getElementById('globalSearchResults');
-      if (!query || query.length < 1) { R.innerHTML = '<div class="search-empty">Start typing to search across all projects...</div>'; return; }
-      R.innerHTML = '<div class="search-empty" style="color:var(--gold);">Searching...</div>';
-      const cache = await buildSearchCache();
-      const q = query.toLowerCase();
-      const qNum = parseFloat(query.replace(/[$,]/g, ''));
-      let html = '';
+      if (!query) return;
+      var C = document.getElementById('contentArea');
+      setBreadcrumb([{ label: 'Search Results' }]);
+      setTopbarActions('');
+      C.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Searching for "' + esc(query) + '"...</div>';
 
-      // Search projects
-      const projMatches = cache.projects.filter(p => p.name.toLowerCase().includes(q) || p.id.includes(q));
-      if (projMatches.length > 0) {
-        html += '<div class="search-section"><div class="search-section-title">Projects (' + projMatches.length + ')</div>';
-        projMatches.slice(0, 5).forEach(p => {
-          html += '<div class="search-item" onclick="closeGlobalSearch();navigate(\'#/project/' + p.id + '\')">' +
-            '<div class="search-item-icon clip">📁</div>' +
-            '<div class="search-item-body"><div class="search-item-title">' + esc(p.name) + '</div><div class="search-item-sub">' + p.clipCount + ' items • ' + p.status + '</div></div></div>';
+      var q = query.toLowerCase();
+      var qNum = parseFloat(query.replace(/[$,]/g, ''));
+      var isNum = !isNaN(qNum) && qNum > 0;
+      var thStyle = 'padding:10px 14px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--gray-400);font-weight:600;white-space:nowrap;';
+      var tdStyle = 'padding:10px 14px;font-size:13px;border-bottom:1px solid var(--gray-100);';
+
+      // Load data from cached financial data + projects + products
+      await loadFinancialData();
+      var allInvoices = _cachedInvoices || [];
+      var allPOs = _cachedPOs || [];
+      var allProposals = _cachedProposals || [];
+
+      // Load projects
+      var projSnap = await getCachedBoards();
+      var projects = [];
+      projSnap.forEach(function(d) { var data = d.data(); projects.push({ id: d.id, name: data.name || d.id, status: data.status || '', clientName: data.clientName || '' }); });
+
+      // Load products
+      var products = [];
+      try {
+        var pSnap = await db.collection('products').limit(3000).get();
+        pSnap.forEach(function(d) { var p = d.data(); if (p.title) products.push({id: d.id, ...p}); });
+      } catch(e) {}
+
+      // ── Match function: does item match query? ──
+      function matchStr() {
+        var args = Array.prototype.slice.call(arguments);
+        return args.some(function(v) { return v && String(v).toLowerCase().includes(q); });
+      }
+      function matchAmt(amt) { return isNum && Math.abs((parseFloat(amt)||0) - qNum) < 1; }
+
+      // ── Search each category ──
+      var projResults = projects.filter(function(p) { return matchStr(p.name, p.clientName, p.id); });
+      var invResults = allInvoices.filter(function(i) { return matchStr(i.invoiceNum, i.number, i.projectName, i.status, i.vendor, i.clientName) || matchAmt(i.total); });
+      var poResults = allPOs.filter(function(p) { return matchStr(p.number, p.num, p.vendor, p.projectName, p.status) || matchAmt(p.total); });
+      var prResults = (allProposals||[]).filter(function(p) { return matchStr(p.proposalNum, p.name, p.number, p.projectName, p.status) || matchAmt(p.total) || (p.items||[]).some(function(it) { return matchStr(it.title, it.vendor); }); });
+      var prodResults = products.filter(function(p) { return matchStr(p.title, p.vendor, p.manufacturer, p.category, p.sku, p.description, p.room) || matchAmt(p.clientPrice) || matchAmt(p.cost) || matchAmt(p.sellPrice); });
+
+      var totalResults = projResults.length + invResults.length + poResults.length + prResults.length + prodResults.length;
+
+      // ── Build results page ──
+      var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">' +
+        '<div><h1 class="page-title" style="margin:0;">Search Results</h1>' +
+        '<div style="font-size:13px;color:var(--gray-400);margin-top:4px;">' + totalResults + ' results for "<strong>' + esc(query) + '</strong>"</div></div>' +
+        '<div style="display:flex;gap:8px;align-items:center;">' +
+          '<input id="searchAgainInput" value="' + escAttr(query) + '" style="padding:8px 14px;border:1px solid var(--gray-200);border-radius:4px;font-size:14px;width:280px;" onkeydown="if(event.key===\'Enter\')runGlobalSearch(this.value)">' +
+          '<button class="btn btn-primary btn-sm" onclick="runGlobalSearch(document.getElementById(\'searchAgainInput\').value)">Search</button>' +
+        '</div></div>';
+
+      // Projects
+      if (projResults.length > 0) {
+        html += '<div style="font-size:15px;font-weight:700;color:var(--navy);margin:24px 0 10px;border-bottom:2px solid var(--gold);padding-bottom:6px;">📁 Projects (' + projResults.length + ')</div>';
+        html += '<div class="card" style="overflow:hidden;margin-bottom:16px;"><table style="width:100%;border-collapse:collapse;"><thead><tr><th style="' + thStyle + '">Project</th><th style="' + thStyle + '">Client</th><th style="' + thStyle + '">Status</th></tr></thead><tbody>';
+        projResults.slice(0,20).forEach(function(p) {
+          html += '<tr style="cursor:pointer;" onclick="navigate(\'#/project/' + p.id + '\')"><td style="' + tdStyle + 'font-weight:600;color:var(--navy);">' + esc(p.name) + '</td><td style="' + tdStyle + '">' + esc(p.clientName) + '</td><td style="' + tdStyle + '">' + esc(p.status) + '</td></tr>';
         });
-        html += '</div>';
+        html += '</tbody></table></div>';
       }
 
-      // Search invoices
-      const invMatches = cache.invoices.filter(i =>
-        i.num.toLowerCase().includes(q) || i.projectName.toLowerCase().includes(q) || i.status.toLowerCase().includes(q) ||
-        (!isNaN(qNum) && Math.abs(i.total - qNum) < 1)
-      );
-      if (invMatches.length > 0) {
-        html += '<div class="search-section"><div class="search-section-title">Invoices (' + invMatches.length + ')</div>';
-        invMatches.slice(0, 8).forEach(i => {
-          const sColor = i.status === 'Paid' ? 'var(--green)' : i.status === 'Sent' ? 'var(--gold)' : 'var(--gray-400)';
-          html += '<div class="search-item" onclick="closeGlobalSearch();navigate(\'#/project/' + i.projectId + '/invoices\')">' +
-            '<div class="search-item-icon inv">💰</div>' +
-            '<div class="search-item-body"><div class="search-item-title">' + esc(i.num) + '</div><div class="search-item-sub">' + esc(i.projectName) + ' • ' + esc(i.date) + '</div></div>' +
-            '<div class="search-item-right"><div class="search-item-amount">$' + i.total.toLocaleString('en-US',{minimumFractionDigits:2}) + '</div><div class="search-item-badge" style="color:' + sColor + '">' + esc(i.status) + '</div></div></div>';
+      // Invoices
+      if (invResults.length > 0) {
+        html += '<div style="font-size:15px;font-weight:700;color:var(--navy);margin:24px 0 10px;border-bottom:2px solid var(--gold);padding-bottom:6px;">🧾 Invoices (' + invResults.length + ')</div>';
+        html += '<div class="card" style="overflow:hidden;margin-bottom:16px;"><table style="width:100%;border-collapse:collapse;"><thead><tr><th style="' + thStyle + '">Number</th><th style="' + thStyle + '">Project</th><th style="' + thStyle + '">Status</th><th style="' + thStyle + 'text-align:right;">Amount</th></tr></thead><tbody>';
+        invResults.slice(0,30).forEach(function(i) {
+          html += '<tr style="cursor:pointer;" onclick="navigate(\'#/project/' + (i.projectId||'') + '/invoice/' + i.id + '\')"><td style="' + tdStyle + 'font-weight:600;">' + esc(i.invoiceNum || i.number || i.id.slice(0,8)) + '</td><td style="' + tdStyle + '">' + esc(i.projectName||'') + '</td><td style="' + tdStyle + '"><span class="badge badge-' + (i.status||'draft').toLowerCase() + '">' + esc(i.status||'Draft') + '</span></td><td style="' + tdStyle + 'text-align:right;font-family:monospace;font-weight:600;">' + formatMoney(i.total||0) + '</td></tr>';
         });
-        html += '</div>';
+        html += '</tbody></table></div>';
       }
 
-      // Search proposals
-      const propMatches = cache.proposals.filter(p =>
-        p.name.toLowerCase().includes(q) || p.projectName.toLowerCase().includes(q) || p.status.toLowerCase().includes(q) ||
-        (!isNaN(qNum) && Math.abs(p.total - qNum) < 1) ||
-        p.items.some(it => (it.title||'').toLowerCase().includes(q) || (it.vendor||'').toLowerCase().includes(q))
-      );
-      if (propMatches.length > 0) {
-        html += '<div class="search-section"><div class="search-section-title">Proposals (' + propMatches.length + ')</div>';
-        propMatches.slice(0, 8).forEach(p => {
-          html += '<div class="search-item" onclick="closeGlobalSearch();navigate(\'#/project/' + p.projectId + '/proposal/' + p.id + '\')">' +
-            '<div class="search-item-icon prop">📋</div>' +
-            '<div class="search-item-body"><div class="search-item-title">' + esc(p.name) + '</div><div class="search-item-sub">' + esc(p.projectName) + ' • ' + (p.items||[]).length + ' items</div></div>' +
-            '<div class="search-item-right"><div class="search-item-amount">$' + p.total.toLocaleString('en-US',{minimumFractionDigits:2}) + '</div><div class="search-item-badge">' + esc(p.status) + '</div></div></div>';
+      // Purchase Orders
+      if (poResults.length > 0) {
+        html += '<div style="font-size:15px;font-weight:700;color:var(--navy);margin:24px 0 10px;border-bottom:2px solid var(--gold);padding-bottom:6px;">📦 Purchase Orders (' + poResults.length + ')</div>';
+        html += '<div class="card" style="overflow:hidden;margin-bottom:16px;"><table style="width:100%;border-collapse:collapse;"><thead><tr><th style="' + thStyle + '">PO #</th><th style="' + thStyle + '">Vendor</th><th style="' + thStyle + '">Project</th><th style="' + thStyle + '">Status</th><th style="' + thStyle + 'text-align:right;">Amount</th></tr></thead><tbody>';
+        poResults.slice(0,30).forEach(function(p) {
+          html += '<tr style="cursor:pointer;" onclick="navigate(\'#/project/' + (p.projectId||'') + '/po/' + p.id + '\')"><td style="' + tdStyle + 'font-weight:600;">' + esc(p.number || p.num || p.id.slice(0,8)) + '</td><td style="' + tdStyle + '">' + esc(p.vendor||'') + '</td><td style="' + tdStyle + '">' + esc(p.projectName||'') + '</td><td style="' + tdStyle + '"><span class="badge badge-' + (p.status||'draft').toLowerCase() + '">' + esc(p.status||'Draft') + '</span></td><td style="' + tdStyle + 'text-align:right;font-family:monospace;font-weight:600;">' + formatMoney(p.total||0) + '</td></tr>';
         });
-        html += '</div>';
+        html += '</tbody></table></div>';
       }
 
-      // Search POs
-      const poMatches = cache.pos.filter(p =>
-        p.num.toLowerCase().includes(q) || p.vendor.toLowerCase().includes(q) || p.projectName.toLowerCase().includes(q) ||
-        p.status.toLowerCase().includes(q) || (!isNaN(qNum) && Math.abs(p.total - qNum) < 1)
-      );
-      if (poMatches.length > 0) {
-        html += '<div class="search-section"><div class="search-section-title">Purchase Orders (' + poMatches.length + ')</div>';
-        poMatches.slice(0, 8).forEach(p => {
-          html += '<div class="search-item" onclick="closeGlobalSearch();navigate(\'#/project/' + p.projectId + '/pos\')">' +
-            '<div class="search-item-icon po">📦</div>' +
-            '<div class="search-item-body"><div class="search-item-title">' + esc(p.num) + '</div><div class="search-item-sub">' + esc(p.vendor || p.projectName) + ' • ' + esc(p.projectName) + '</div></div>' +
-            '<div class="search-item-right"><div class="search-item-amount">$' + p.total.toLocaleString('en-US',{minimumFractionDigits:2}) + '</div><div class="search-item-badge">' + esc(p.status) + '</div></div></div>';
+      // Proposals
+      if (prResults.length > 0) {
+        html += '<div style="font-size:15px;font-weight:700;color:var(--navy);margin:24px 0 10px;border-bottom:2px solid var(--gold);padding-bottom:6px;">📋 Proposals (' + prResults.length + ')</div>';
+        html += '<div class="card" style="overflow:hidden;margin-bottom:16px;"><table style="width:100%;border-collapse:collapse;"><thead><tr><th style="' + thStyle + '">Name</th><th style="' + thStyle + '">Project</th><th style="' + thStyle + '">Status</th><th style="' + thStyle + 'text-align:right;">Amount</th></tr></thead><tbody>';
+        prResults.slice(0,30).forEach(function(p) {
+          html += '<tr style="cursor:pointer;" onclick="navigate(\'#/project/' + (p.projectId||'') + '/proposal/' + p.id + '\')"><td style="' + tdStyle + 'font-weight:600;">' + esc(p.proposalNum || p.name || p.number || p.id.slice(0,8)) + '</td><td style="' + tdStyle + '">' + esc(p.projectName||'') + '</td><td style="' + tdStyle + '"><span class="badge badge-' + (p.status||'draft').toLowerCase() + '">' + esc(p.status||'Draft') + '</span></td><td style="' + tdStyle + 'text-align:right;font-family:monospace;font-weight:600;">' + formatMoney(p.total||0) + '</td></tr>';
         });
-        html += '</div>';
+        html += '</tbody></table></div>';
       }
 
-      // Search products/clips
-      const clipMatches = cache.clips.filter(c =>
-        c.title.toLowerCase().includes(q) || c.vendor.toLowerCase().includes(q) || c.manufacturer.toLowerCase().includes(q) ||
-        c.category.toLowerCase().includes(q) || c.room.toLowerCase().includes(q) || c.sku.toLowerCase().includes(q) ||
-        c.description.toLowerCase().includes(q) || c.projectName.toLowerCase().includes(q) ||
-        (!isNaN(qNum) && (Math.abs(c.clientPrice - qNum) < 1 || Math.abs(c.cost - qNum) < 1))
-      );
-      if (clipMatches.length > 0) {
-        html += '<div class="search-section"><div class="search-section-title">Products (' + clipMatches.length + ')</div>';
-        clipMatches.slice(0, 10).forEach(c => {
-          const imgTag = c.imageUrl ? '<img src="' + escAttr(c.imageUrl) + '" style="width:32px;height:32px;border-radius:4px;object-fit:cover;" onerror="this.style.display=\'none\'">' : '';
-          html += '<div class="search-item" onclick="closeGlobalSearch();navigate(\'#/project/' + c.projectId + '/boards\')">' +
-            '<div class="search-item-icon" style="padding:0;">' + (imgTag || '🛋️') + '</div>' +
-            '<div class="search-item-body"><div class="search-item-title">' + esc(c.title) + '</div><div class="search-item-sub">' + esc(c.projectName) + (c.vendor ? ' • ' + esc(c.vendor) : '') + (c.room ? ' • ' + esc(c.room) : '') + '</div></div>' +
-            (c.clientPrice ? '<div class="search-item-right"><div class="search-item-amount">$' + c.clientPrice.toLocaleString('en-US',{minimumFractionDigits:2}) + '</div><div class="search-item-badge">' + esc(c.category) + '</div></div>' : '') + '</div>';
+      // Products
+      if (prodResults.length > 0) {
+        html += '<div style="font-size:15px;font-weight:700;color:var(--navy);margin:24px 0 10px;border-bottom:2px solid var(--gold);padding-bottom:6px;">📦 Products (' + prodResults.length + ')</div>';
+        html += '<div class="card" style="overflow:hidden;margin-bottom:16px;"><table style="width:100%;border-collapse:collapse;"><thead><tr><th style="' + thStyle + '">Product</th><th style="' + thStyle + '">Vendor</th><th style="' + thStyle + '">Category</th><th style="' + thStyle + '">SKU</th><th style="' + thStyle + 'text-align:right;">Cost</th><th style="' + thStyle + 'text-align:right;">Sell</th></tr></thead><tbody>';
+        prodResults.slice(0,40).forEach(function(p) {
+          var cost = parseFloat(p.cost || p.costPrice || p.unitCost) || 0;
+          var sell = parseFloat(p.clientPrice || p.sellPrice || p.totalSelling) || 0;
+          html += '<tr style="cursor:pointer;" onclick="showProductDetail(\'' + p.id + '\')"><td style="' + tdStyle + 'font-weight:600;">' + esc(p.title||'') + '</td><td style="' + tdStyle + '">' + esc(p.vendor||p.manufacturer||'') + '</td><td style="' + tdStyle + '">' + esc(p.category||'') + '</td><td style="' + tdStyle + 'font-size:11px;color:var(--gray-400);">' + esc(p.sku||'') + '</td><td style="' + tdStyle + 'text-align:right;font-family:monospace;">' + (cost ? formatMoney(cost) : '—') + '</td><td style="' + tdStyle + 'text-align:right;font-family:monospace;color:var(--green);">' + (sell ? formatMoney(sell) : '—') + '</td></tr>';
         });
-        html += '</div>';
+        html += '</tbody></table></div>';
       }
 
-      if (!html) html = '<div class="search-empty">No results for "' + esc(query) + '"</div>';
-      R.innerHTML = html;
+      if (totalResults === 0) {
+        html += '<div style="text-align:center;padding:60px;color:var(--gray-400);"><div style="font-size:48px;margin-bottom:16px;">🔍</div><div style="font-size:16px;">No results found for "' + esc(query) + '"</div><div style="font-size:13px;margin-top:8px;">Try searching by vendor name, invoice number, product name, or amount</div></div>';
+      }
+
+      C.innerHTML = html;
     }
 
     // ==================== SORT/FILTER HELPERS ====================
@@ -8198,7 +8150,7 @@ async function renderBoardsTab(T, proj) {
             const isValidUrl = imgUrl.startsWith('http://') || imgUrl.startsWith('https://') || imgUrl.startsWith('data:');
             const filename = item.originalFile || imgUrl.split('/').pop() || 'Image';
             return `
-            <div class="ib-item" draggable="${window._ibSelectMode ? 'false' : 'true'}"
+            <div class="ib-item" draggable="${window._ibSelectMode && window._ibSelectSectionId===section.id ? 'false' : 'true'}"
               ondragstart="ibDragStart(event,'${projectId}','${section.id}',${origIdx})"
               ondragover="event.preventDefault();ibDragOver(event,this)"
               ondragleave="ibDragLeave(this)"
@@ -9738,13 +9690,17 @@ async function renderBoardsTab(T, proj) {
         var doc = await db.collection('boards').doc(projectId).collection('ideabooks').doc(toSectionId).get();
         var images = doc.exists ? (doc.data().images || []) : [];
         var item = images.splice(from.index, 1)[0];
-        images.splice(toIndex, 0, item);
+        // Adjust target if dragging forward in same array
+        var adjustedTo = from.index < toIndex ? toIndex - 1 : toIndex;
+        images.splice(adjustedTo, 0, item);
         await db.collection('boards').doc(projectId).collection('ideabooks').doc(toSectionId).update({ images: images });
       } else {
         // Move between sections
         await ibMoveToSection(projectId, from.sectionId, from.index, toSectionId);
+        window._ibRestoreScrollTo = toSectionId;
         return; // ibMoveToSection already re-renders
       }
+      window._ibRestoreScrollTo = toSectionId;
       renderProjectDetail();
     }
 
@@ -9807,6 +9763,8 @@ async function renderBoardsTab(T, proj) {
         var toImages = toDoc.data().images || [];
         toImages.push(item);
         await db.collection('boards').doc(projectId).collection('ideabooks').doc(toSectionId).update({ images: toImages });
+        showToast('Moved to section');
+        window._ibRestoreScrollTo = toSectionId;
         renderProjectDetail();
       } catch(e) { alert('Error moving: ' + e.message); }
     }
@@ -16922,7 +16880,13 @@ async function renderBoardsTab(T, proj) {
       const projDoc = await db.collection('boards').doc(projectId).get();
       const projData = projDoc.exists ? { id: projectId, ...projDoc.data() } : { id: projectId };
 
-      renderDocEditPage('invoice', projectId, invoiceId, docData, items, projData);
+      // Show view mode first, edit on button click
+      if (window._forceEditMode) {
+        window._forceEditMode = false;
+        renderDocEditPage('invoice', projectId, invoiceId, docData, items, projData);
+      } else {
+        renderDocViewPage('invoice', projectId, invoiceId, docData, items, projData);
+      }
     }
 
     // ==================== PO DETAIL ====================
@@ -26994,7 +26958,7 @@ async function renderBoardsTab(T, proj) {
 
     // Filter out POs, services, labor, and junk entries
     function isRealProduct(p) {
-      const t = (p.title || p.name || '').toLowerCase().trim();
+      const t = String(p.title || p.name || '').toLowerCase().trim();
       if (!t || t === 'untitled') return false;
       // Filter out PO references
       if (t.startsWith('po ') || t.startsWith('po-') || t.match(/^po\s*po-/i)) return false;
