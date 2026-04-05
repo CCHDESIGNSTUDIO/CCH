@@ -15317,27 +15317,265 @@ async function renderBoardsTab(T, proj) {
     }
 
     function docEditAddItem() {
-      // Houzz-style popup: choose source — Selections, Product Library, or blank new item
-      var overlay = document.createElement('div');
-      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:2000;display:flex;align-items:center;justify-content:center;';
-      overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
-      overlay.innerHTML = '<div style="background:#FFFFFF;width:480px;box-shadow:0 20px 60px rgba(14,22,41,0.25);padding:0;">' +
-        '<div style="padding:20px 24px;border-bottom:1px solid rgba(14,22,41,0.08);font-size:18px;font-weight:700;color:#0E1629;display:flex;justify-content:space-between;align-items:center;">Add Item <button onclick="this.closest(\'div[style*=fixed]\').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#7A7060;">&times;</button></div>' +
-        '<div style="padding:16px 24px;">' +
-          '<div onclick="this.closest(\'div[style*=fixed]\').remove();docEditPickFromSelections()" style="display:flex;align-items:center;gap:16px;padding:16px;cursor:pointer;border:1px solid rgba(14,22,41,0.08);margin-bottom:12px;transition:background 0.15s;" onmouseover="this.style.background=\'#F5F3EE\'" onmouseout="this.style.background=\'#FFFFFF\'">' +
-            '<div style="width:48px;height:48px;background:rgba(196,164,100,0.1);display:flex;align-items:center;justify-content:center;font-size:24px;">📋</div>' +
-            '<div><div style="font-size:15px;font-weight:600;color:#0E1629;">From Project Selections</div><div style="font-size:12px;color:#7A7060;margin-top:2px;">Pick items already clipped to this project\'s room boards</div></div>' +
-          '</div>' +
-          '<div onclick="this.closest(\'div[style*=fixed]\').remove();docEditPickFromLibrary()" style="display:flex;align-items:center;gap:16px;padding:16px;cursor:pointer;border:1px solid rgba(14,22,41,0.08);margin-bottom:12px;transition:background 0.15s;" onmouseover="this.style.background=\'#F5F3EE\'" onmouseout="this.style.background=\'#FFFFFF\'">' +
-            '<div style="width:48px;height:48px;background:rgba(196,164,100,0.1);display:flex;align-items:center;justify-content:center;font-size:24px;">📦</div>' +
-            '<div><div style="font-size:15px;font-weight:600;color:#0E1629;">From Product Library</div><div style="font-size:12px;color:#7A7060;margin-top:2px;">Search your master product catalog</div></div>' +
-          '</div>' +
-          '<div onclick="this.closest(\'div[style*=fixed]\').remove();docEditAddBlankItem()" style="display:flex;align-items:center;gap:16px;padding:16px;cursor:pointer;border:1px solid rgba(14,22,41,0.08);transition:background 0.15s;" onmouseover="this.style.background=\'#F5F3EE\'" onmouseout="this.style.background=\'#FFFFFF\'">' +
-            '<div style="width:48px;height:48px;background:rgba(196,164,100,0.1);display:flex;align-items:center;justify-content:center;font-size:24px;">✏️</div>' +
-            '<div><div style="font-size:15px;font-weight:600;color:#0E1629;">Add New Item</div><div style="font-size:12px;color:#7A7060;margin-top:2px;">Create a blank line item from scratch</div></div>' +
-          '</div>' +
-        '</div></div>';
-      document.body.appendChild(overlay);
+      openDocItemsSidebar();
+    }
+
+    // ── Tabbed sidebar for adding items to proposals/invoices/POs ──
+    async function openDocItemsSidebar() {
+      var existing = document.getElementById('docItemsSidebar');
+      if (existing) { existing.remove(); return; }
+      if (!_docEdit || !_docEdit.projectId) return;
+
+      var panel = document.createElement('div');
+      panel.id = 'docItemsSidebar';
+      panel.style.cssText = 'position:fixed;top:0;right:0;width:380px;height:100vh;background:#FFFFFF;border-left:2px solid var(--gold,#C9A96E);box-shadow:-6px 0 30px rgba(0,0,0,0.15);z-index:1500;display:flex;flex-direction:column;overflow:hidden;';
+
+      // Header
+      var headerHtml = '<div style="padding:14px 18px;border-bottom:1px solid #E5E2DA;display:flex;justify-content:space-between;align-items:center;">' +
+        '<div style="font-size:15px;font-weight:700;color:#0E1629;">Add Item</div>' +
+        '<button onclick="document.getElementById(\'docItemsSidebar\').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#7A7060;">×</button>' +
+      '</div>';
+
+      // Tabs
+      var tabsHtml = '<div style="display:flex;border-bottom:2px solid #E5E2DA;">' +
+        '<button class="dis-tab" data-tab="products" onclick="switchDocSidebarTab(\'products\')" style="flex:1;padding:10px 0;font-size:12px;font-weight:700;border:none;cursor:pointer;background:#0E1629;color:#EDE8E0;border-bottom:2px solid var(--gold);">📦 Products</button>' +
+        '<button class="dis-tab" data-tab="services" onclick="switchDocSidebarTab(\'services\')" style="flex:1;padding:10px 0;font-size:12px;font-weight:700;border:none;cursor:pointer;background:#fff;color:#7A7060;border-bottom:2px solid transparent;">🛠 Services</button>' +
+        '<button class="dis-tab" data-tab="expenses" onclick="switchDocSidebarTab(\'expenses\')" style="flex:1;padding:10px 0;font-size:12px;font-weight:700;border:none;cursor:pointer;background:#fff;color:#7A7060;border-bottom:2px solid transparent;">💰 Expenses</button>' +
+      '</div>';
+
+      // Search + source toggle (products tab)
+      var searchHtml = '<div id="disSearchArea">' +
+        '<div style="padding:10px 14px;border-bottom:1px solid #E5E2DA;">' +
+          '<input id="disSearchInput" placeholder="Search products..." style="width:100%;padding:8px 12px;border:1px solid #E5E2DA;border-radius:4px;font-size:13px;outline:none;box-sizing:border-box;" oninput="filterDocSidebar()">' +
+        '</div>' +
+        '<div style="padding:6px 14px;border-bottom:1px solid #E5E2DA;display:flex;gap:0;">' +
+          '<button id="disSrcAll" onclick="window._disSrc=\'all\';filterDocSidebar()" style="flex:1;padding:6px 0;background:#0E1629;color:white;border:none;font-size:11px;font-weight:600;cursor:pointer;border-radius:4px 0 0 4px;">All</button>' +
+          '<button id="disSrcProject" onclick="window._disSrc=\'project\';filterDocSidebar()" style="flex:1;padding:6px 0;background:#fff;color:#7A7060;border:1px solid #E5E2DA;border-left:none;font-size:11px;font-weight:600;cursor:pointer;">This Project</button>' +
+          '<button id="disSrcLibrary" onclick="window._disSrc=\'library\';filterDocSidebar()" style="flex:1;padding:6px 0;background:#fff;color:#7A7060;border:1px solid #E5E2DA;border-left:none;font-size:11px;font-weight:600;cursor:pointer;border-radius:0 4px 4px 0;">Library</button>' +
+        '</div>' +
+      '</div>';
+
+      // Content area
+      var contentHtml = '<div id="disContent" style="flex:1;overflow-y:auto;"></div>';
+
+      // Blank item button at bottom
+      var footerHtml = '<div style="padding:10px 14px;border-top:1px solid #E5E2DA;">' +
+        '<button onclick="docEditAddBlankItem();document.getElementById(\'docItemsSidebar\').remove()" style="width:100%;padding:10px;background:none;border:2px dashed #E5E2DA;color:#7A7060;font-size:13px;cursor:pointer;font-weight:600;">✏️ Add Blank Item</button>' +
+      '</div>';
+
+      panel.innerHTML = headerHtml + tabsHtml + searchHtml + contentHtml + footerHtml;
+      document.body.appendChild(panel);
+
+      // Load products
+      window._disSrc = 'all';
+      window._disTab = 'products';
+      window._disProducts = [];
+      showToast('Loading products...');
+
+      var items = [];
+      var seen = new Set();
+      try {
+        var clipSnap = await db.collection('boards').doc(_docEdit.projectId).collection('clips').get();
+        clipSnap.forEach(function(d) {
+          var c = d.data();
+          if (c.title) {
+            var k = (c.title + '|' + (c.vendor||'')).toLowerCase();
+            if (!seen.has(k)) { seen.add(k); items.push({id: d.id, _source: 'project', ...c}); }
+          }
+        });
+      } catch(e) {}
+      try {
+        var libSnap = await db.collection('productLibrary').limit(500).get();
+        libSnap.forEach(function(d) {
+          var p = d.data();
+          if (p.title) {
+            var k = (p.title + '|' + (p.vendor||'')).toLowerCase();
+            if (!seen.has(k)) { seen.add(k); items.push({id: d.id, _source: 'library', ...p}); }
+          }
+        });
+      } catch(e) {}
+      try {
+        var prodSnap = await db.collection('products').limit(500).get();
+        prodSnap.forEach(function(d) {
+          var p = d.data();
+          if (p.title) {
+            var k = (p.title + '|' + (p.vendor||'')).toLowerCase();
+            if (!seen.has(k)) { seen.add(k); items.push({id: d.id, _source: 'library', ...p}); }
+          }
+        });
+      } catch(e) {}
+
+      items.sort(function(a, b) {
+        if (a._source === 'project' && b._source !== 'project') return -1;
+        if (b._source === 'project' && a._source !== 'project') return 1;
+        return (a.title || '').localeCompare(b.title || '');
+      });
+      window._disProducts = items;
+      filterDocSidebar();
+    }
+
+    function switchDocSidebarTab(tab) {
+      window._disTab = tab;
+      // Update tab styles
+      document.querySelectorAll('.dis-tab').forEach(function(t) {
+        var active = t.dataset.tab === tab;
+        t.style.background = active ? '#0E1629' : '#fff';
+        t.style.color = active ? '#EDE8E0' : '#7A7060';
+        t.style.borderBottom = active ? '2px solid var(--gold)' : '2px solid transparent';
+      });
+      // Show/hide search area (only for products)
+      var sa = document.getElementById('disSearchArea');
+      if (sa) sa.style.display = tab === 'products' ? '' : 'none';
+
+      if (tab === 'products') filterDocSidebar();
+      else if (tab === 'services') renderDocSidebarServices();
+      else if (tab === 'expenses') renderDocSidebarExpenses();
+    }
+
+    function filterDocSidebar() {
+      var q = ((document.getElementById('disSearchInput') || {}).value || '').toLowerCase();
+      var src = window._disSrc || 'all';
+      var items = window._disProducts || [];
+      var filtered = items.filter(function(i) {
+        if (src === 'project' && i._source !== 'project') return false;
+        if (src === 'library' && i._source !== 'library') return false;
+        if (q && !((i.title||'').toLowerCase().includes(q) || (i.vendor||'').toLowerCase().includes(q) || (i.sku||'').toLowerCase().includes(q))) return false;
+        return true;
+      });
+      // Update source button styles
+      ['All','Project','Library'].forEach(function(s) {
+        var btn = document.getElementById('disSrc' + s);
+        if (!btn) return;
+        var active = (s === 'All' && src === 'all') || (s === 'Project' && src === 'project') || (s === 'Library' && src === 'library');
+        btn.style.background = active ? '#0E1629' : '#fff';
+        btn.style.color = active ? 'white' : '#7A7060';
+      });
+      // Render grid
+      var c = document.getElementById('disContent');
+      if (!c) return;
+      c.innerHTML = '<div style="padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start;">' +
+        filtered.slice(0, 120).map(function(item) {
+          var img = item.imageUrl || item.image || '';
+          var isValid = img && (img.startsWith('http') || img.startsWith('data:') || img.startsWith('//'));
+          var cost = parseFloat(item.unitCost || item.costPrice || item.cost || item.tradeCost) || 0;
+          var sell = parseFloat(item.sellPrice || item.clientPrice || item.totalSelling || item.amount) || 0;
+          var price = sell > 0 ? sell : cost;
+          var srcBadge = item._source === 'project'
+            ? '<span style="position:absolute;top:4px;left:4px;background:rgba(201,169,110,0.92);color:#fff;font-size:9px;font-weight:700;padding:2px 5px;border-radius:2px;">PROJECT</span>' : '';
+          return '<div onclick="addSidebarProductToDoc(\'' + escAttr(item.id) + '\')" style="position:relative;background:#F9F8F5;border:1px solid #E5E2DA;cursor:pointer;overflow:hidden;transition:border-color 0.15s;border-radius:4px;" onmouseenter="this.style.borderColor=\'var(--gold)\'" onmouseleave="this.style.borderColor=\'#E5E2DA\'">' +
+            (isValid ? '<img src="' + escAttr(img) + '" style="width:100%;aspect-ratio:1;object-fit:cover;" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;color:#C4A464;font-size:28px;background:#F0EDE6;">📦</div>') +
+            srcBadge +
+            '<div style="padding:6px 8px;">' +
+              '<div style="font-weight:600;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#0E1629;">' + esc(item.title || 'Untitled') + '</div>' +
+              '<div style="font-size:10px;color:#7A7060;">' + esc(item.vendor || '') + '</div>' +
+              (price > 0 ? '<div style="font-size:11px;font-weight:600;color:var(--gold);font-family:monospace;">' + formatMoney(price) + '</div>' : '') +
+            '</div></div>';
+        }).join('') +
+        (filtered.length === 0 ? '<div style="grid-column:1/-1;text-align:center;padding:40px;color:#7A7060;">No products found</div>' : '') +
+      '</div>';
+    }
+
+    function addSidebarProductToDoc(itemId) {
+      var item = (window._disProducts || []).find(function(i) { return i.id === itemId; });
+      if (!item || !_docEdit) return;
+      var cost = parseFloat(item.unitCost || item.costPrice || item.cost || item.tradeCost || item.totalCost) || 0;
+      var sell = parseFloat(item.sellPrice || item.clientPrice || item.totalSelling || item.amount) || 0;
+      if (cost === 0 && sell > 0) cost = sell;
+      var mkup = (cost > 0 && sell > cost) ? Math.round(((sell - cost) / cost) * 100) : 0;
+      _docEdit.items.push({
+        title: item.title || '', description: item.description || '', vendor: item.vendor || '',
+        qty: 1, cost: cost, markupPct: mkup, shipping: 0, amount: sell > 0 ? sell : cost,
+        imageUrl: item.imageUrl || item.image || '', room: item.room || '', category: item.category || '',
+        shipTo: '', expenseType: 'product', sku: item.sku || ''
+      });
+      docEditRenderItems();
+      docEditAutoSave();
+      showToast('Added: ' + (item.title || 'item').substring(0, 40));
+    }
+
+    function renderDocSidebarServices() {
+      var c = document.getElementById('disContent');
+      if (!c) return;
+      var services = [
+        { name: 'Design Services', rate: 250, desc: 'Full design service — Cindy Holloway' },
+        { name: 'Blended Design Services', rate: 195, desc: 'Combined design + project management' },
+        { name: 'Project Management', rate: 195, desc: 'Coordination, scheduling, vendor management' },
+        { name: 'Sourcing / Procurement', rate: 195, desc: 'Product research, ordering, vendor negotiation' },
+        { name: 'Consultation', rate: 250, desc: 'Design consultation and advisory' },
+        { name: 'Installation / Supervision', rate: 125, desc: 'On-site supervision, install coordination' },
+        { name: 'Travel', rate: 125, desc: 'Travel time to/from project site' },
+        { name: 'Client Project Support (VH)', rate: 75, desc: 'Vanessa Holliday — assistant support' }
+      ];
+      c.innerHTML = '<div style="padding:8px;">' +
+        services.map(function(s) {
+          return '<div onclick="addSidebarServiceToDoc(\'' + escAttr(s.name) + '\',' + s.rate + ')" style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-bottom:1px solid #F0EDE6;cursor:pointer;transition:background 0.1s;" onmouseover="this.style.background=\'#F5F3EE\'" onmouseout="this.style.background=\'#fff\'">' +
+            '<div style="width:40px;height:40px;background:rgba(95,165,107,0.1);display:flex;align-items:center;justify-content:center;font-size:18px;border-radius:4px;flex-shrink:0;">🛠</div>' +
+            '<div style="flex:1;min-width:0;">' +
+              '<div style="font-size:13px;font-weight:600;color:#0E1629;">' + esc(s.name) + '</div>' +
+              '<div style="font-size:11px;color:#7A7060;margin-top:2px;">' + esc(s.desc) + '</div>' +
+            '</div>' +
+            '<div style="font-size:14px;font-weight:700;color:#5FA56B;font-family:monospace;flex-shrink:0;">$' + s.rate + '/hr</div>' +
+          '</div>';
+        }).join('') +
+      '</div>';
+    }
+
+    function addSidebarServiceToDoc(name, rate) {
+      if (!_docEdit) return;
+      _docEdit.items.push({
+        title: name, description: '', vendor: 'CCH Design',
+        qty: 1, cost: rate, markupPct: 0, shipping: 0, amount: rate,
+        imageUrl: '', room: '', category: 'Service',
+        shipTo: '', expenseType: 'service', sku: ''
+      });
+      docEditRenderItems();
+      docEditAutoSave();
+      showToast('Added service: ' + name);
+    }
+
+    function renderDocSidebarExpenses() {
+      var c = document.getElementById('disContent');
+      if (!c) return;
+      var expenses = [
+        { type: 'shipping', icon: '🚚', name: 'Freight / Shipping', desc: 'Delivery and shipping charges' },
+        { type: 'sales_tax', icon: '🏛️', name: 'Pre-Paid Sales Tax', desc: 'Tax collected and remitted on behalf of client' },
+        { type: 'handling', icon: '📦', name: 'Handling Fee', desc: 'Receiving, inspection, and storage' },
+        { type: 'expense', icon: '💳', name: 'General Expense', desc: 'Miscellaneous project expense' },
+        { type: 'discount', icon: '🏷️', name: 'Discount / Credit', desc: 'Price adjustment or credit to client' },
+        { type: 'other_expense', icon: '📋', name: 'Other Expense', desc: 'Any other project-related cost' }
+      ];
+      c.innerHTML = '<div style="padding:8px;">' +
+        expenses.map(function(e) {
+          var colors = { shipping:'var(--gold)', sales_tax:'#E16A5B', handling:'#7B1FA2', expense:'#FF8F00', discount:'#9B59B6', other_expense:'var(--gray-400)' };
+          return '<div onclick="addSidebarExpenseToDoc(\'' + e.type + '\',\'' + escAttr(e.name) + '\')" style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-bottom:1px solid #F0EDE6;cursor:pointer;transition:background 0.1s;" onmouseover="this.style.background=\'#F5F3EE\'" onmouseout="this.style.background=\'#fff\'">' +
+            '<div style="width:40px;height:40px;background:rgba(0,0,0,0.04);display:flex;align-items:center;justify-content:center;font-size:18px;border-radius:4px;flex-shrink:0;">' + e.icon + '</div>' +
+            '<div style="flex:1;min-width:0;">' +
+              '<div style="font-size:13px;font-weight:600;color:#0E1629;">' + esc(e.name) + '</div>' +
+              '<div style="font-size:11px;color:#7A7060;margin-top:2px;">' + esc(e.desc) + '</div>' +
+            '</div>' +
+            '<div style="font-size:11px;font-weight:600;color:' + (colors[e.type] || '#888') + ';flex-shrink:0;">ADD →</div>' +
+          '</div>';
+        }).join('') +
+      '</div>';
+    }
+
+    function addSidebarExpenseToDoc(type, name) {
+      if (!_docEdit) return;
+      _docEdit.items.push({
+        title: name, description: '', vendor: '',
+        qty: 1, cost: 0, markupPct: 0, shipping: 0, amount: 0,
+        imageUrl: '', room: '', category: '',
+        shipTo: '', expenseType: type, sku: ''
+      });
+      docEditRenderItems();
+      docEditAutoSave();
+      showToast('Added ' + name + ' — enter the amount');
+      // Scroll to and focus the new item's cost field
+      var idx = _docEdit.items.length - 1;
+      setTimeout(function() {
+        var el = document.getElementById('docEditRow' + idx);
+        if (el) { el.scrollIntoView({ behavior:'smooth', block:'center' }); }
+      }, 100);
     }
 
     function docEditAddBlankItem() {
@@ -16346,9 +16584,8 @@ async function renderBoardsTab(T, proj) {
           </div>
           <div id="docEditItemsArea"></div>
           <div class="doc-edit-add" style="display:flex;gap:12px;align-items:center;">
-            <button onclick="docEditAddItem()" style="background:#0E1629;color:#EDE8E0;border:none;padding:10px 20px;font-size:14px;cursor:pointer;font-weight:600;">+ Add another item</button>
-            <button onclick="docEditPickFromSelections()" style="background:#FFFFFF;border:2px solid #0E1629;color:#0E1629;padding:8px 18px;font-size:13px;cursor:pointer;font-weight:600;">📋 Add from Selections</button>
-            <button onclick="toggleMyItemsPanel()" style="background:#FFFFFF;border:2px solid var(--gold);color:var(--gold);padding:8px 18px;font-size:13px;cursor:pointer;font-weight:600;">🛍️ My Items</button>
+            <button onclick="openDocItemsSidebar()" style="background:#0E1629;color:#EDE8E0;border:none;padding:10px 20px;font-size:14px;cursor:pointer;font-weight:600;">+ Add Item</button>
+            <button onclick="docEditAddBlankItem()" style="background:#FFFFFF;border:2px solid #E5E2DA;color:#7A7060;padding:8px 18px;font-size:13px;cursor:pointer;font-weight:600;">✏️ Blank Line</button>
           </div>
         </div>`;
 
