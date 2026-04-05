@@ -2079,6 +2079,9 @@
         <div class="sidebar-logo-sub">Studio</div>
       </div>
       <div class="sidebar-nav">
+        <button class="nav-item" onclick="event.stopPropagation();openGlobalSearch()" style="background:rgba(14,22,41,0.02);border-radius:0;margin:4px 12px 10px;border:1px solid rgba(14,22,41,0.08);padding:8px 16px;">
+          <span class="nav-icon" style="font-size:14px;opacity:0.5;">🔍</span><span class="nav-label" style="color:rgba(14,22,41,0.3);font-size:11px;">Search... ⌘K</span>
+        </button>
         <button class="nav-item" data-page="dashboard">
           <span class="nav-icon">◈</span><span class="nav-label">Dashboard</span>
         </button>
@@ -2173,11 +2176,6 @@
     <div class="main">
       <div class="topbar">
         <div class="topbar-breadcrumb" id="breadcrumb"></div>
-        <button class="search-trigger" onclick="openGlobalSearch()" id="globalSearchTrigger">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-          Search everything...
-          <kbd>⌘K</kbd>
-        </button>
         <div class="topbar-actions" id="topbarActions"></div>
       </div>
       <div class="content" id="contentArea"></div>
