@@ -5855,6 +5855,11 @@
         return true;
       });
 
+      // Filter out design fees, services, labor — never show in selections
+      items = items.filter(function(item) {
+        return isRealProduct({ title: item.title, category: item.category, room: item.room, vendor: item.vendor, manufacturer: '', sku: item.sku || '', cost: item.cost, clientPrice: item.sell });
+      });
+
       // Get room boards for this project (for "Move to Board" feature)
       var roomBoards = [];
       try {
@@ -27207,8 +27212,8 @@ async function renderBoardsTab(T, proj) {
           if (!p.category) p.category = _roomToCat[p.room];
           p.room = '';
         }
-        if (['Time Track','Expense','Project Management','Designer Fee','Service','Labor','Fee',
-             'Etails','Details','Retail','Etail','Uncategorized','Time Billing','Expenses','Shipping'].indexOf(p.category) >= 0) p._hidden = true;
+        if (['Time Track','Expense','Project Management','Designer Fee','Design Fees','Design Fee','Design Services','Service','Labor','Fee',
+             'Etails','Details','Retail','Etail','Uncategorized','Time Billing','Expenses','Shipping','Consultation','Retainer'].indexOf(p.category) >= 0) p._hidden = true;
       });
       libraryProducts = libraryProducts.filter(function(p) { return !p._hidden; });
     }
