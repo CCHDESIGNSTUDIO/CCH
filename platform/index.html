@@ -19234,31 +19234,61 @@ async function renderBoardsTab(T, proj) {
       var endStr = window._payrollTo;
       var pLabel = new Date(startStr+'T12:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric'}) + ' – ' + new Date(endStr+'T12:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
 
-      // Load all time entries
+      // Load time entries — reuse global timeEntries if already loaded by Smart Time, otherwise fetch fresh
       var allEntries = [];
-      try {
-        var snap = await db.collection('timeEntries').limit(15000).get();
-        snap.forEach(function(d) { allEntries.push({id: d.id, ...d.data()}); });
-      } catch(e) {}
+      if (window.timeEntries && timeEntries.length > 0) {
+        allEntries = timeEntries;
+      } else {
+        try {
+          var snap = await db.collection('timeEntries').orderBy('date', 'desc').get();
+          snap.forEach(function(d) { allEntries.push({id: d.id, ...d.data()}); });
+        } catch(e) {
+          try {
+            var snap2 = await db.collection('timeEntries').get();
+            snap2.forEach(function(d) { allEntries.push({id: d.id, ...d.data()}); });
+          } catch(e2) { console.error('[Payroll] Failed to load timeEntries:', e2); }
+        }
+      }
 
-      // Get unique members for selector
-      var allMembers = [...new Set(allEntries.map(function(e) { return e.member || e.user || ''; }).filter(Boolean))].sort();
-      if (!window._payrollMember) window._payrollMember = 'Vanessa Holliday';
+      // Get unique members for selector — normalize: check member, user, createdBy fields
+      var memberSet = new Set();
+      allEntries.forEach(function(e) {
+        var m = e.member || e.user || e.createdBy || '';
+        if (m) memberSet.add(m);
+      });
+      var allMembers = [...memberSet].sort();
+      // Default to first member that includes 'vanessa' (case insensitive)
+      if (!window._payrollMember) {
+        var vanessaMatch = allMembers.find(function(m) { return m.toLowerCase().includes('vanessa'); });
+        window._payrollMember = vanessaMatch || allMembers[0] || '';
+      }
       var selectedMember = window._payrollMember;
 
       // Rate per member
       var memberRate = 65.00;
-      if (selectedMember === 'Vanessa Holliday') memberRate = 65.00;
-      // Future: add other contractor rates here
+      if (selectedMember.toLowerCase().includes('vanessa')) memberRate = 65.00;
 
-      // Filter to selected member + date range
+      // Filter to selected member + date range — use case-insensitive includes for robustness
+      var selectedLower = selectedMember.toLowerCase();
       var memberEntries = allEntries.filter(function(e) {
-        var m = (e.member || e.user || '');
-        if (m !== selectedMember) return false;
+        var m = (e.member || e.user || e.createdBy || '').toLowerCase();
+        if (m !== selectedLower && !m.includes(selectedLower.split(' ')[0])) return false;
         var d = (e.date || '').slice(0, 10);
         if (!d) return false;
         return d >= startStr && d <= endStr;
       });
+
+      // Debug: show sample entries for selected member (any date)
+      var memberAny = allEntries.filter(function(e) {
+        var m = (e.member || e.user || e.createdBy || '').toLowerCase();
+        return m.includes(selectedLower.split(' ')[0]);
+      });
+      var sample = memberAny.slice(0, 3).map(function(e) {
+        return { date: e.date, member: e.member, user: e.user, hours: e.hours, project: e.project, dateField: typeof e.date };
+      });
+      console.log('[Payroll Debug] Total entries:', allEntries.length, 'Members:', allMembers, 'Selected:', selectedMember);
+      console.log('[Payroll Debug] Date range:', startStr, 'to', endStr, 'Member entries (any date):', memberAny.length, 'In range:', memberEntries.length);
+      console.log('[Payroll Debug] Sample entries for', selectedMember, ':', JSON.stringify(sample));
 
       // Categorize entries
       var billable = [], nonBillable = [], personal = [], cch = [];
