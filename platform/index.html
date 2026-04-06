@@ -5425,7 +5425,7 @@
       `);
 
       const _isAdminUser = currentUser && ADMIN_EMAILS.includes((currentUser.email || '').toLowerCase());
-      const tabs = ['overview', 'tasks', 'selections', 'ideabooks', 'designboards', 'ffe', 'specbook', ...(_isAdminUser ? ['_div1', 'financials'] : []), '_div2', 'files', 'time', 'comms', 'notes'];
+      const tabs = ['overview', 'tasks', 'selections', 'boards', 'ideabooks', 'designboards', 'ffe', 'specbook', ...(_isAdminUser ? ['_div1', 'financials'] : []), '_div2', 'files', 'time', 'comms', 'notes'];
       const tabLabels = { overview: 'Overview', tasks: 'Tasks', selections: 'Selections', ideabooks: 'Inspiration', boards: 'Room Boards', designboards: 'Design Boards', ffe: 'FFE Tracker', specbook: 'Spec Book', financials: 'Financials', files: 'Files & Docs', time: 'Time', comms: 'Communications', notes: 'Notes' };
       const tabIcons = { overview: '◈', tasks: '✅', selections: '🛍️', ideabooks: '💡', boards: '🏠', designboards: '🎨', ffe: '🛋️', specbook: '📖', financials: '📊', files: '📁', time: '⏱️', comms: '💬', notes: '📝' };
 
