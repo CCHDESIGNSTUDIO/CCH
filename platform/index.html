@@ -6081,12 +6081,94 @@
             '<div><label style="font-size:12px;font-weight:600;color:#0E1629;display:block;margin-bottom:4px;">Sell Price</label><input class="form-input" id="selEditSell" type="number" step="0.01" value="' + (parseFloat(item.sell) || 0) + '" style="font-size:14px;font-weight:700;color:var(--gold);"></div>' +
           '</div>' +
           '<div style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;color:#0E1629;display:block;margin-bottom:4px;">Description</label><textarea class="form-input" id="selEditDesc" rows="2" style="font-size:13px;">' + esc(item.description || '') + '</textarea></div>' +
+
+          // Linked Documents section
+          '<div style="margin-bottom:12px;border-top:2px solid var(--gold);padding-top:14px;">' +
+            '<label style="font-size:12px;font-weight:700;color:#0E1629;display:block;margin-bottom:8px;">📎 Linked Documents</label>' +
+            '<div id="selEditLinkedDocs" style="font-size:12px;color:var(--gray-400);">Searching...</div>' +
+          '</div>' +
         '</div>' +
         '<div style="padding:14px 24px;border-top:1px solid rgba(14,22,41,0.08);display:flex;justify-content:flex-end;gap:10px;">' +
           '<button class="btn btn-secondary" onclick="this.closest(\'div[style*=fixed]\').remove()">Cancel</button>' +
           '<button class="btn btn-primary" onclick="selEditSave(' + idx + ');this.closest(\'div[style*=fixed]\').remove()">Save Changes</button>' +
         '</div></div>';
       document.body.appendChild(overlay);
+
+      // Load linked documents asynchronously
+      selEditLoadLinkedDocs(item);
+    }
+
+    async function selEditLoadLinkedDocs(item) {
+      var el = document.getElementById('selEditLinkedDocs');
+      if (!el) return;
+      var projectId = window._projSelProjectId;
+      if (!projectId) { el.innerHTML = '<span style="color:var(--gray-300);">No project context</span>'; return; }
+
+      var titleLower = (item.title || '').toLowerCase().trim();
+      var links = [];
+
+      // Check proposals
+      try {
+        var prSnap = await db.collection('boards').doc(projectId).collection('proposals').get();
+        prSnap.forEach(function(d) {
+          var data = d.data();
+          var matched = (data.items || []).some(function(it) { return (it.title || '').toLowerCase().trim() === titleLower; });
+          if (matched) links.push({ type: 'proposal', icon: '📋', label: data.proposalNum || data.name || data.number || d.id.slice(0,8), id: d.id, status: data.status || '', total: parseFloat(data.total) || 0 });
+        });
+      } catch(e) {}
+
+      // Check invoices
+      try {
+        var invSnap = await db.collection('boards').doc(projectId).collection('invoices').get();
+        invSnap.forEach(function(d) {
+          var data = d.data();
+          var matched = (data.items || []).some(function(it) { return (it.title || '').toLowerCase().trim() === titleLower; });
+          if (matched) links.push({ type: 'invoice', icon: '🧾', label: data.invoiceNum || data.number || d.id.slice(0,8), id: d.id, status: data.status || '', total: parseFloat(data.total) || 0 });
+        });
+      } catch(e) {}
+
+      // Check POs
+      try {
+        var poSnap = await db.collection('boards').doc(projectId).collection('purchaseOrders').get();
+        poSnap.forEach(function(d) {
+          var data = d.data();
+          var matched = (data.items || []).some(function(it) { return (it.title || '').toLowerCase().trim() === titleLower; });
+          if (matched) links.push({ type: 'po', icon: '📦', label: data.number || data.num || d.id.slice(0,8), id: d.id, status: data.status || '', total: parseFloat(data.total) || 0, vendor: data.vendor || '' });
+        });
+      } catch(e) {}
+
+      // Also include pre-loaded reference fields
+      if (item.invoice && !links.some(function(l) { return l.label === item.invoice; })) {
+        links.push({ type: 'invoice', icon: '🧾', label: item.invoice, id: '', status: '', total: 0 });
+      }
+      if (item.po && !links.some(function(l) { return l.label === item.po; })) {
+        links.push({ type: 'po', icon: '📦', label: item.po, id: '', status: '', total: 0 });
+      }
+      if (item.proposal && !links.some(function(l) { return l.label === item.proposal; })) {
+        links.push({ type: 'proposal', icon: '📋', label: item.proposal, id: '', status: '', total: 0 });
+      }
+
+      if (links.length === 0) {
+        el.innerHTML = '<div style="color:var(--gray-400);font-size:12px;padding:8px 0;">Not on any proposals, invoices, or POs yet</div>';
+        return;
+      }
+
+      el.innerHTML = links.map(function(l) {
+        var route = l.type === 'proposal' ? 'proposal' : l.type === 'invoice' ? 'invoice' : 'po';
+        var onclick = l.id ? 'onclick="this.closest(\'div[style*=fixed]\').remove();navigate(\'#/project/' + projectId + '/' + route + '/' + l.id + '\')"' : '';
+        var statusColors = { Paid:'#388E3C', Sent:'var(--gold)', Approved:'#388E3C', Draft:'var(--gray-400)', Ordered:'#3B82F6', Open:'#F97316' };
+        var sColor = statusColors[l.status] || 'var(--gray-500)';
+        return '<div ' + onclick + ' style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--gray-200);margin-bottom:6px;' + (l.id ? 'cursor:pointer;' : '') + 'transition:background 0.1s;" onmouseover="this.style.background=\'#F5F3EE\'" onmouseout="this.style.background=\'#fff\'">' +
+          '<span style="font-size:18px;">' + l.icon + '</span>' +
+          '<div style="flex:1;">' +
+            '<div style="font-weight:600;color:#0E1629;">' + esc(l.label) + '</div>' +
+            (l.vendor ? '<div style="font-size:10px;color:var(--gray-400);">' + esc(l.vendor) + '</div>' : '') +
+          '</div>' +
+          (l.status ? '<span style="font-size:10px;font-weight:600;color:' + sColor + ';text-transform:uppercase;">' + esc(l.status) + '</span>' : '') +
+          (l.total > 0 ? '<span style="font-size:12px;font-weight:600;color:var(--gold);font-family:monospace;margin-left:8px;">' + formatMoney(l.total) + '</span>' : '') +
+          (l.id ? '<span style="font-size:11px;color:var(--gold);margin-left:4px;">→</span>' : '') +
+        '</div>';
+      }).join('');
     }
 
     function selEditRecalc() {
