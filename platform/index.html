@@ -19278,18 +19278,6 @@ async function renderBoardsTab(T, proj) {
         return d >= startStr && d <= endStr;
       });
 
-      // Debug: show sample entries for selected member (any date)
-      var memberAny = allEntries.filter(function(e) {
-        var m = (e.member || e.user || e.createdBy || '').toLowerCase();
-        return m.includes(selectedLower.split(' ')[0]);
-      });
-      var sample = memberAny.slice(0, 3).map(function(e) {
-        return { date: e.date, member: e.member, user: e.user, hours: e.hours, project: e.project, dateField: typeof e.date };
-      });
-      console.log('[Payroll Debug] Total entries:', allEntries.length, 'Members:', allMembers, 'Selected:', selectedMember);
-      console.log('[Payroll Debug] Date range:', startStr, 'to', endStr, 'Member entries (any date):', memberAny.length, 'In range:', memberEntries.length);
-      console.log('[Payroll Debug] Sample entries for', selectedMember, ':', JSON.stringify(sample));
-
       // Categorize entries
       var billable = [], nonBillable = [], personal = [], cch = [];
       memberEntries.forEach(function(e) {
@@ -19319,152 +19307,169 @@ async function renderBoardsTab(T, proj) {
       var nonBillPay = nonBillHrs * memberRate;
       var personalPay = personalHrs * memberRate;
 
-      // Group billable by project
+      // Group ALL entries by project (not just billable) with detail entries
       var byProject = {};
-      billable.forEach(function(e) {
+      memberEntries.forEach(function(e) {
         var proj = e.project || e.projectName || 'Unassigned';
-        if (!byProject[proj]) byProject[proj] = { hours: 0, entries: 0 };
+        if (!byProject[proj]) byProject[proj] = { hours: 0, entries: [], category: '' };
         byProject[proj].hours += e._hrs;
-        byProject[proj].entries++;
+        byProject[proj].entries.push(e);
+        // Determine category
+        var pLow = proj.toLowerCase().trim();
+        if (pLow.includes('personal') || pLow.includes('pto') || pLow.includes('vacation')) byProject[proj].category = 'personal';
+        else if (pLow.startsWith('cch') || pLow.startsWith('cbh') || pLow === 'internal' || pLow === 'admin') byProject[proj].category = 'cch';
+        else if (e.billable === false || _isNonBillableProject(pLow)) byProject[proj].category = 'nonbillable';
+        else byProject[proj].category = 'billable';
       });
       var projectRows = Object.keys(byProject).sort(function(a, b) { return byProject[b].hours - byProject[a].hours; });
 
+      // Store data for XLSX export
+      window._payrollExportData = { member: selectedMember, rate: memberRate, period: pLabel, startStr: startStr, endStr: endStr, entries: memberEntries, byProject: byProject, totalHrs: totalHrs, totalPay: totalPay, billableHrs: billableHrs, cchHrs: cchHrs, nonBillHrs: nonBillHrs, personalHrs: personalHrs };
+
+      // Helper to render detail rows for a project
+      function projectDetailRows(proj) {
+        var entries = byProject[proj].entries.sort(function(a,b) { return (a.date||'').localeCompare(b.date||''); });
+        return entries.map(function(e) {
+          return '<tr style="border-bottom:1px solid var(--gray-50);background:#FAFAF7;">' +
+            '<td style="padding:5px 14px;padding-left:28px;font-size:11px;color:var(--gray-500);">' + esc(e.date || '') + '</td>' +
+            '<td style="padding:5px 14px;font-size:11px;color:var(--gray-500);">' + esc(e.service || e.description || '—') + '</td>' +
+            '<td style="padding:5px 14px;text-align:right;font-size:11px;font-family:monospace;">' + e._hrs.toFixed(2) + 'h</td>' +
+            '<td style="padding:5px 14px;text-align:right;font-size:11px;font-family:monospace;color:var(--gray-400);">' + formatMoney(e._hrs * memberRate) + '</td>' +
+          '</tr>';
+        }).join('');
+      }
+
+      var thS = 'padding:10px 14px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;';
+
       // Render
       C.innerHTML =
-        '<div style="max-width:800px;margin:0 auto;">' +
-
-        // Header
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">' +
+        // Header row
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">' +
           '<div>' +
-            '<h2 style="margin:0;font-size:20px;color:var(--navy);">💰 Subcontractor Payout — ' + esc(selectedMember) + '</h2>' +
-            '<div style="font-size:12px;color:var(--gray-400);margin-top:4px;">Pay Rate: $' + memberRate.toFixed(2) + '/hr · Confidential — Admin Only</div>' +
+            '<h2 style="margin:0;font-size:20px;color:var(--navy);">Subcontractor Payout — ' + esc(selectedMember) + '</h2>' +
+            '<div style="font-size:12px;color:var(--gray-400);margin-top:4px;">$' + memberRate.toFixed(2) + '/hr · Confidential</div>' +
+          '</div>' +
+          '<div style="display:flex;gap:8px;">' +
+            '<button class="btn btn-secondary btn-sm" onclick="exportPayrollXLSX()">📥 Export XLSX</button>' +
+            '<button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ Print</button>' +
+            '<button class="btn btn-secondary btn-sm" onclick="renderFinancials()">← Back</button>' +
           '</div>' +
         '</div>' +
 
-        // Member selector + date picker + quick period buttons
-        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;padding:14px 18px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:4px;flex-wrap:wrap;">' +
-          '<label style="font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.05em;">Member</label>' +
+        // Controls bar
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;padding:12px 16px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:4px;flex-wrap:wrap;">' +
           '<select onchange="window._payrollMember=this.value;renderPayrollReport()" style="padding:6px 10px;border:1px solid var(--gray-200);border-radius:4px;font-size:13px;">' +
-            allMembers.map(function(m) {
-              return '<option value="' + escAttr(m) + '"' + (m === selectedMember ? ' selected' : '') + '>' + esc(m) + '</option>';
-            }).join('') +
+            allMembers.map(function(m) { return '<option value="' + escAttr(m) + '"' + (m === selectedMember ? ' selected' : '') + '>' + esc(m) + '</option>'; }).join('') +
           '</select>' +
-          '<div style="height:20px;width:1px;background:var(--gray-200);margin:0 4px;"></div>' +
-          '<label style="font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.05em;">From</label>' +
-          '<input type="date" value="' + escAttr(startStr) + '" onchange="window._payrollFrom=this.value;renderPayrollReport()" style="padding:6px 10px;border:1px solid var(--gray-200);border-radius:4px;font-size:13px;font-family:monospace;">' +
-          '<label style="font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.05em;">To</label>' +
-          '<input type="date" value="' + escAttr(endStr) + '" onchange="window._payrollTo=this.value;renderPayrollReport()" style="padding:6px 10px;border:1px solid var(--gray-200);border-radius:4px;font-size:13px;font-family:monospace;">' +
-          '<div style="height:20px;width:1px;background:var(--gray-200);margin:0 4px;"></div>' +
+          '<input type="date" value="' + escAttr(startStr) + '" onchange="window._payrollFrom=this.value;renderPayrollReport()" style="padding:5px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:12px;font-family:monospace;">' +
+          '<span style="color:var(--gray-400);font-size:11px;">to</span>' +
+          '<input type="date" value="' + escAttr(endStr) + '" onchange="window._payrollTo=this.value;renderPayrollReport()" style="padding:5px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:12px;font-family:monospace;">' +
+          '<div style="height:16px;width:1px;background:var(--gray-200);"></div>' +
           '<button class="btn btn-sm" onclick="(function(){var n=new Date(),y=n.getFullYear(),m=n.getMonth();window._payrollFrom=y+\'-\'+String(m+1).padStart(2,\'0\')+\'-01\';window._payrollTo=y+\'-\'+String(m+1).padStart(2,\'0\')+\'-15\';renderPayrollReport()})()">1st–15th</button>' +
           '<button class="btn btn-sm" onclick="(function(){var n=new Date(),y=n.getFullYear(),m=n.getMonth(),ld=new Date(y,m+1,0).getDate();window._payrollFrom=y+\'-\'+String(m+1).padStart(2,\'0\')+\'-16\';window._payrollTo=y+\'-\'+String(m+1).padStart(2,\'0\')+\'-\'+ld;renderPayrollReport()})()">16th–End</button>' +
           '<button class="btn btn-sm" onclick="(function(){var n=new Date(),y=n.getFullYear(),m=n.getMonth()-1;if(m<0){m=11;y--;}window._payrollFrom=y+\'-\'+String(m+1).padStart(2,\'0\')+\'-16\';var ld=new Date(y,m+1,0).getDate();window._payrollTo=y+\'-\'+String(m+1).padStart(2,\'0\')+\'-\'+ld;renderPayrollReport()})()">Prev 16–End</button>' +
           '<button class="btn btn-sm" onclick="(function(){var n=new Date(),y=n.getFullYear(),m=n.getMonth()-1;if(m<0){m=11;y--;}window._payrollFrom=y+\'-\'+String(m+1).padStart(2,\'0\')+\'-01\';window._payrollTo=y+\'-\'+String(m+1).padStart(2,\'0\')+\'-15\';renderPayrollReport()})()">Prev 1–15</button>' +
         '</div>' +
 
-        // Period heading
-        '<div style="font-size:16px;font-weight:700;color:var(--navy);margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid var(--gold);">Pay Period: ' + esc(pLabel) + '</div>' +
-
-        // Summary cards
-        '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:28px;">' +
-          '<div style="background:var(--navy);padding:18px;text-align:center;border:1px solid rgba(200,185,154,0.15);">' +
-            '<div style="font-size:24px;font-weight:700;color:var(--gold);font-family:monospace;">' + totalHrs.toFixed(1) + 'h</div>' +
-            '<div style="font-size:10px;color:rgba(200,185,154,0.7);text-transform:uppercase;letter-spacing:0.1em;margin-top:4px;">Total Hours</div>' +
+        // Pay period + total
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">' +
+          '<div style="background:var(--navy);padding:20px;border:1px solid rgba(200,185,154,0.15);">' +
+            '<div style="font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Pay Period</div>' +
+            '<div style="font-size:18px;font-weight:700;color:white;">' + esc(pLabel) + '</div>' +
+            '<div style="font-size:12px;color:rgba(200,185,154,0.6);margin-top:4px;">' + totalHrs.toFixed(1) + ' hours · ' + memberEntries.length + ' entries</div>' +
           '</div>' +
-          '<div style="background:var(--navy);padding:18px;text-align:center;border:1px solid rgba(200,185,154,0.15);">' +
-            '<div style="font-size:24px;font-weight:700;color:#81C784;font-family:monospace;">' + billableHrs.toFixed(1) + 'h</div>' +
-            '<div style="font-size:10px;color:rgba(200,185,154,0.7);text-transform:uppercase;letter-spacing:0.1em;margin-top:4px;">Client Billable</div>' +
-          '</div>' +
-          '<div style="background:var(--navy);padding:18px;text-align:center;border:1px solid rgba(200,185,154,0.15);">' +
-            '<div style="font-size:24px;font-weight:700;color:#CE93D8;font-family:monospace;">' + cchHrs.toFixed(1) + 'h</div>' +
-            '<div style="font-size:10px;color:rgba(200,185,154,0.7);text-transform:uppercase;letter-spacing:0.1em;margin-top:4px;">CCH Internal</div>' +
-          '</div>' +
-          '<div style="background:var(--navy);padding:18px;text-align:center;border:1px solid rgba(200,185,154,0.15);">' +
-            '<div style="font-size:24px;font-weight:700;color:#90CAF9;font-family:monospace;">' + nonBillHrs.toFixed(1) + 'h</div>' +
-            '<div style="font-size:10px;color:rgba(200,185,154,0.7);text-transform:uppercase;letter-spacing:0.1em;margin-top:4px;">Non-Billable</div>' +
-          '</div>' +
-          '<div style="background:var(--navy);padding:18px;text-align:center;border:1px solid rgba(200,185,154,0.15);">' +
-            '<div style="font-size:24px;font-weight:700;color:#FFB74D;font-family:monospace;">' + personalHrs.toFixed(1) + 'h</div>' +
-            '<div style="font-size:10px;color:rgba(200,185,154,0.7);text-transform:uppercase;letter-spacing:0.1em;margin-top:4px;">Personal/PTO</div>' +
+          '<div style="background:var(--navy);padding:20px;border:1px solid rgba(200,185,154,0.15);text-align:right;">' +
+            '<div style="font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Total Payout</div>' +
+            '<div style="font-size:32px;font-weight:700;color:white;font-family:monospace;">' + formatMoney(totalPay) + '</div>' +
           '</div>' +
         '</div>' +
 
-        // TOTAL PAY — big card
-        '<div style="background:linear-gradient(135deg,#0E1629,#1a2744);border:2px solid var(--gold);padding:28px;text-align:center;margin-bottom:28px;">' +
-          '<div style="font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:0.2em;margin-bottom:8px;">Total Pay This Period</div>' +
-          '<div style="font-size:42px;font-weight:700;color:#FFFFFF;font-family:monospace;">' + formatMoney(totalPay) + '</div>' +
-          '<div style="display:flex;justify-content:center;gap:24px;margin-top:16px;font-size:12px;">' +
-            '<span style="color:#81C784;">Billable: ' + formatMoney(billablePay) + '</span>' +
-            '<span style="color:#CE93D8;">CCH: ' + formatMoney(cchPay) + '</span>' +
-            '<span style="color:#90CAF9;">Non-Bill: ' + formatMoney(nonBillPay) + '</span>' +
-            '<span style="color:#FFB74D;">Personal: ' + formatMoney(personalPay) + '</span>' +
-          '</div>' +
+        // Summary row
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;">' +
+          '<div style="padding:14px;text-align:center;border:1px solid var(--gray-200);border-radius:4px;"><div style="font-size:20px;font-weight:700;color:#81C784;font-family:monospace;">' + billableHrs.toFixed(1) + 'h</div><div style="font-size:10px;color:var(--gray-400);margin-top:2px;">Client · ' + formatMoney(billablePay) + '</div></div>' +
+          '<div style="padding:14px;text-align:center;border:1px solid var(--gray-200);border-radius:4px;"><div style="font-size:20px;font-weight:700;color:#CE93D8;font-family:monospace;">' + cchHrs.toFixed(1) + 'h</div><div style="font-size:10px;color:var(--gray-400);margin-top:2px;">CCH · ' + formatMoney(cchPay) + '</div></div>' +
+          '<div style="padding:14px;text-align:center;border:1px solid var(--gray-200);border-radius:4px;"><div style="font-size:20px;font-weight:700;color:#90CAF9;font-family:monospace;">' + nonBillHrs.toFixed(1) + 'h</div><div style="font-size:10px;color:var(--gray-400);margin-top:2px;">Non-Bill · ' + formatMoney(nonBillPay) + '</div></div>' +
+          '<div style="padding:14px;text-align:center;border:1px solid var(--gray-200);border-radius:4px;"><div style="font-size:20px;font-weight:700;color:#FFB74D;font-family:monospace;">' + personalHrs.toFixed(1) + 'h</div><div style="font-size:10px;color:var(--gray-400);margin-top:2px;">Personal · ' + formatMoney(personalPay) + '</div></div>' +
         '</div>' +
 
-        // Billable breakdown by project
-        '<div style="margin-bottom:28px;">' +
-          '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:12px;">Billable Hours by Project</div>' +
-          '<div class="card" style="overflow:hidden;">' +
-            '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
-              '<thead><tr style="border-bottom:2px solid var(--gray-200);">' +
-                '<th style="padding:10px 14px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Project</th>' +
-                '<th style="padding:10px 14px;text-align:right;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Entries</th>' +
-                '<th style="padding:10px 14px;text-align:right;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Hours</th>' +
-                '<th style="padding:10px 14px;text-align:right;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Pay @ $' + memberRate + '/hr</th>' +
-              '</tr></thead><tbody>' +
-              (projectRows.length > 0 ? projectRows.map(function(proj) {
-                var p = byProject[proj];
-                return '<tr style="border-bottom:1px solid var(--gray-100);">' +
-                  '<td style="padding:10px 14px;font-weight:600;color:var(--navy);">' + esc(proj) + '</td>' +
-                  '<td style="padding:10px 14px;text-align:right;color:var(--gray-500);">' + p.entries + '</td>' +
-                  '<td style="padding:10px 14px;text-align:right;font-family:monospace;font-weight:600;">' + p.hours.toFixed(1) + 'h</td>' +
-                  '<td style="padding:10px 14px;text-align:right;font-family:monospace;color:var(--gold);">' + formatMoney(p.hours * memberRate) + '</td>' +
-                '</tr>';
-              }).join('') : '<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--gray-400);">No billable entries this period</td></tr>') +
-              '<tr style="border-top:2px solid var(--gold);font-weight:700;">' +
-                '<td style="padding:12px 14px;color:var(--navy);">TOTAL BILLABLE</td>' +
-                '<td style="padding:12px 14px;text-align:right;">' + billable.length + '</td>' +
-                '<td style="padding:12px 14px;text-align:right;font-family:monospace;">' + billableHrs.toFixed(1) + 'h</td>' +
-                '<td style="padding:12px 14px;text-align:right;font-family:monospace;color:var(--gold);">' + formatMoney(billablePay) + '</td>' +
+        // Full breakdown by project with hour log
+        '<div style="font-size:15px;font-weight:700;color:var(--navy);margin-bottom:12px;">Hour Log by Client / Project</div>' +
+        '<div class="card" style="overflow:hidden;margin-bottom:24px;">' +
+          '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+            '<thead><tr style="border-bottom:2px solid var(--gray-200);">' +
+              '<th style="' + thS + '">Project</th>' +
+              '<th style="' + thS + '">Type</th>' +
+              '<th style="' + thS + 'text-align:right;">Hours</th>' +
+              '<th style="' + thS + 'text-align:right;">Pay</th>' +
+            '</tr></thead><tbody>' +
+            projectRows.map(function(proj) {
+              var p = byProject[proj];
+              var catLabel = p.category === 'billable' ? 'Client' : p.category === 'cch' ? 'CCH' : p.category === 'personal' ? 'Personal' : 'Non-Bill';
+              var catColor = p.category === 'billable' ? '#81C784' : p.category === 'cch' ? '#CE93D8' : p.category === 'personal' ? '#FFB74D' : '#90CAF9';
+              return '<tr style="border-bottom:1px solid var(--gray-200);cursor:pointer;" onclick="var d=this.nextElementSibling;while(d&&d.classList.contains(\'payout-detail\')){d.style.display=d.style.display===\'none\'?\'table-row\':\'none\';d=d.nextElementSibling;}">' +
+                '<td style="padding:10px 14px;font-weight:600;color:var(--navy);">' + esc(proj) + ' <span style="font-size:10px;color:var(--gray-400);font-weight:400;">(' + p.entries.length + ')</span></td>' +
+                '<td style="padding:10px 14px;"><span style="font-size:10px;font-weight:600;color:' + catColor + ';text-transform:uppercase;">' + catLabel + '</span></td>' +
+                '<td style="padding:10px 14px;text-align:right;font-family:monospace;font-weight:600;">' + p.hours.toFixed(1) + 'h</td>' +
+                '<td style="padding:10px 14px;text-align:right;font-family:monospace;color:var(--gold);">' + formatMoney(p.hours * memberRate) + '</td>' +
               '</tr>' +
-            '</tbody></table>' +
-          '</div>' +
-        '</div>' +
-
-        // CCH / Non-Billable / Personal detail
-        (cch.length > 0 ? '<div style="margin-bottom:20px;">' +
-          '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:12px;">CCH Internal (' + cchHrs.toFixed(1) + 'h — ' + formatMoney(cchPay) + ')</div>' +
-          '<div class="card" style="overflow:hidden;"><table style="width:100%;border-collapse:collapse;font-size:12px;">' +
-            '<thead><tr style="border-bottom:1px solid var(--gray-200);"><th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--gray-400);">Date</th><th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--gray-400);">Project</th><th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--gray-400);">Service</th><th style="padding:8px 12px;text-align:right;font-size:10px;color:var(--gray-400);">Hours</th></tr></thead><tbody>' +
-            cch.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); }).map(function(e) {
-              return '<tr style="border-bottom:1px solid var(--gray-100);"><td style="padding:6px 12px;color:var(--gray-500);">' + esc(e.date || '') + '</td><td style="padding:6px 12px;">' + esc(e.project || '') + '</td><td style="padding:6px 12px;color:var(--gray-500);">' + esc(e.service || e.description || '') + '</td><td style="padding:6px 12px;text-align:right;font-family:monospace;">' + e._hrs.toFixed(1) + 'h</td></tr>';
+              // Detail rows (hidden by default, toggle on click)
+              p.entries.sort(function(a,b) { return (a.date||'').localeCompare(b.date||''); }).map(function(e) {
+                return '<tr class="payout-detail" style="display:none;border-bottom:1px solid var(--gray-50);background:#FAFAF7;">' +
+                  '<td style="padding:5px 14px;padding-left:28px;font-size:11px;color:var(--gray-500);">' + esc(e.date || '') + '</td>' +
+                  '<td style="padding:5px 14px;font-size:11px;color:var(--gray-500);">' + esc(e.service || e.description || '—') + '</td>' +
+                  '<td style="padding:5px 14px;text-align:right;font-size:11px;font-family:monospace;">' + e._hrs.toFixed(2) + 'h</td>' +
+                  '<td style="padding:5px 14px;text-align:right;font-size:11px;font-family:monospace;color:var(--gray-400);">' + formatMoney(e._hrs * memberRate) + '</td>' +
+                '</tr>';
+              }).join('');
             }).join('') +
-          '</tbody></table></div></div>' : '') +
-
-        (nonBillable.length > 0 ? '<div style="margin-bottom:20px;">' +
-          '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:12px;">Non-Billable (' + nonBillHrs.toFixed(1) + 'h — ' + formatMoney(nonBillPay) + ')</div>' +
-          '<div class="card" style="overflow:hidden;"><table style="width:100%;border-collapse:collapse;font-size:12px;">' +
-            '<thead><tr style="border-bottom:1px solid var(--gray-200);"><th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--gray-400);">Date</th><th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--gray-400);">Project</th><th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--gray-400);">Service</th><th style="padding:8px 12px;text-align:right;font-size:10px;color:var(--gray-400);">Hours</th></tr></thead><tbody>' +
-            nonBillable.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); }).map(function(e) {
-              return '<tr style="border-bottom:1px solid var(--gray-100);"><td style="padding:6px 12px;color:var(--gray-500);">' + esc(e.date || '') + '</td><td style="padding:6px 12px;">' + esc(e.project || '') + '</td><td style="padding:6px 12px;color:var(--gray-500);">' + esc(e.service || e.description || '') + '</td><td style="padding:6px 12px;text-align:right;font-family:monospace;">' + e._hrs.toFixed(1) + 'h</td></tr>';
-            }).join('') +
-          '</tbody></table></div></div>' : '') +
-
-        (personal.length > 0 ? '<div style="margin-bottom:20px;">' +
-          '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:12px;">Personal / PTO (' + personalHrs.toFixed(1) + 'h — ' + formatMoney(personalPay) + ')</div>' +
-          '<div class="card" style="overflow:hidden;"><table style="width:100%;border-collapse:collapse;font-size:12px;">' +
-            '<thead><tr style="border-bottom:1px solid var(--gray-200);"><th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--gray-400);">Date</th><th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--gray-400);">Project</th><th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--gray-400);">Description</th><th style="padding:8px 12px;text-align:right;font-size:10px;color:var(--gray-400);">Hours</th></tr></thead><tbody>' +
-            personal.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); }).map(function(e) {
-              return '<tr style="border-bottom:1px solid var(--gray-100);"><td style="padding:6px 12px;color:var(--gray-500);">' + esc(e.date || '') + '</td><td style="padding:6px 12px;">' + esc(e.project || '') + '</td><td style="padding:6px 12px;color:var(--gray-500);">' + esc(e.service || e.description || '') + '</td><td style="padding:6px 12px;text-align:right;font-family:monospace;">' + e._hrs.toFixed(1) + 'h</td></tr>';
-            }).join('') +
-          '</tbody></table></div></div>' : '') +
-
-        // Print button
-        '<div style="text-align:center;margin-top:24px;padding-top:20px;border-top:1px solid var(--gray-200);">' +
-          '<button class="btn btn-primary" onclick="window.print()">🖨️ Print Report</button>' +
-          '<button class="btn btn-secondary" style="margin-left:8px;" onclick="renderFinancials()">← Back to Financials</button>' +
-        '</div>' +
-
+            '<tr style="border-top:2px solid var(--gold);font-weight:700;">' +
+              '<td style="padding:12px 14px;color:var(--navy);">TOTAL</td>' +
+              '<td style="padding:12px 14px;">' + memberEntries.length + ' entries</td>' +
+              '<td style="padding:12px 14px;text-align:right;font-family:monospace;">' + totalHrs.toFixed(1) + 'h</td>' +
+              '<td style="padding:12px 14px;text-align:right;font-family:monospace;color:var(--gold);">' + formatMoney(totalPay) + '</td>' +
+            '</tr>' +
+          '</tbody></table>' +
         '</div>';
+    }
+
+    // XLSX export for subcontractor payout
+    function exportPayrollXLSX() {
+      var d = window._payrollExportData;
+      if (!d) { showToast('No data to export', 'error'); return; }
+      // Build CSV (works without xlsx library)
+      var rows = [];
+      rows.push(['Subcontractor Payout — ' + d.member]);
+      rows.push(['Period: ' + d.period, '', 'Rate: $' + d.rate.toFixed(2) + '/hr']);
+      rows.push([]);
+      rows.push(['SUMMARY']);
+      rows.push(['Total Hours', d.totalHrs.toFixed(2)]);
+      rows.push(['Total Pay', '$' + d.totalPay.toFixed(2)]);
+      rows.push(['Billable Hours', d.billableHrs.toFixed(2), '$' + (d.billableHrs * d.rate).toFixed(2)]);
+      rows.push(['CCH Internal', d.cchHrs.toFixed(2), '$' + (d.cchHrs * d.rate).toFixed(2)]);
+      rows.push(['Non-Billable', d.nonBillHrs.toFixed(2), '$' + (d.nonBillHrs * d.rate).toFixed(2)]);
+      rows.push(['Personal/PTO', d.personalHrs.toFixed(2), '$' + (d.personalHrs * d.rate).toFixed(2)]);
+      rows.push([]);
+      rows.push(['DETAIL LOG']);
+      rows.push(['Date', 'Project', 'Category', 'Service', 'Hours', 'Pay']);
+      d.entries.sort(function(a,b) { return (a.date||'').localeCompare(b.date||''); }).forEach(function(e) {
+        var proj = e.project || e.projectName || '';
+        var pLow = proj.toLowerCase();
+        var cat = (pLow.includes('personal') || pLow.includes('pto')) ? 'Personal'
+                : (pLow.startsWith('cch') || pLow.startsWith('cbh')) ? 'CCH Internal'
+                : (e.billable === false) ? 'Non-Billable' : 'Client Billable';
+        rows.push([e.date || '', proj, cat, e.service || e.description || '', (e._hrs || parseFloat(e.hours) || 0).toFixed(2), '$' + ((e._hrs || parseFloat(e.hours) || 0) * d.rate).toFixed(2)]);
+      });
+
+      // Convert to CSV and download
+      var csv = rows.map(function(r) { return r.map(function(c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
+      var blob = new Blob([csv], { type: 'text/csv' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'Payout_' + d.member.replace(/\s/g, '_') + '_' + d.startStr + '_to_' + d.endStr + '.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Downloaded CSV — open in Excel');
     }
 
     // ==================== QB SYNC REPORT ====================
