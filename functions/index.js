@@ -184,3 +184,292 @@ exports.timelyWebhook = functions.https.onRequest(async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 });
+
+// ══════════════════════════════════════════════════════════
+// SEARCH INDEX + FINANCIAL SUMMARY — Denormalized for speed
+// ══════════════════════════════════════════════════════════
+
+// Callable via button in platform or scheduled
+exports.rebuildSearchIndex = functions.https.onRequest(async (req, res) => {
+  res.set("Access-Control-Allow-Origin", "https://cch-platform.web.app");
+  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.status(204).send("");
+
+  try {
+    console.log("[SearchIndex] Starting rebuild...");
+    const projSnap = await db.collection("projects").get();
+    const projNames = {};
+    const projClients = {};
+    projSnap.forEach(d => {
+      const data = d.data();
+      projNames[d.id] = data.name || d.id;
+      projClients[d.id] = data.clientName || "";
+    });
+    const projectIds = Object.keys(projNames);
+
+    // Collect all docs
+    let allItems = [];
+    let stats = { projects: 0, invoices: 0, pos: 0, proposals: 0, products: 0 };
+
+    // Projects
+    projSnap.forEach(d => {
+      const data = d.data();
+      allItems.push({
+        type: "project", id: d.id, projectId: d.id,
+        title: data.name || d.id,
+        subtitle: data.clientName || "",
+        status: data.status || "",
+        amount: parseFloat(data.designFee || data.fee || data.budget) || 0,
+        vendor: "",
+        number: "",
+        search: [data.name, data.clientName, data.projectAddress, d.id].filter(Boolean).join(" ").toLowerCase()
+      });
+      stats.projects++;
+    });
+
+    // Invoices, Proposals, POs from each project
+    for (const pid of projectIds) {
+      const pName = projNames[pid];
+      // Invoices
+      try {
+        const invSnap = await db.collection("boards").doc(pid).collection("invoices").get();
+        invSnap.forEach(d => {
+          const data = d.data();
+          const num = data.invoiceNum || data.number || "";
+          const total = parseFloat(data.total) || 0;
+          const vendor = data.vendor || "";
+          const client = data.clientName || projClients[pid] || "";
+          allItems.push({
+            type: "invoice", id: d.id, projectId: pid,
+            title: num || d.id.slice(0, 8),
+            subtitle: pName,
+            status: data.status || "Draft",
+            amount: total,
+            vendor: vendor,
+            client: client,
+            number: num,
+            date: data.date || data.createdAt || "",
+            search: [num, pName, vendor, client, data.status, data.memo, String(total)].filter(Boolean).join(" ").toLowerCase()
+          });
+          stats.invoices++;
+        });
+      } catch (e) {}
+
+      // Proposals
+      try {
+        const prSnap = await db.collection("boards").doc(pid).collection("proposals").get();
+        prSnap.forEach(d => {
+          const data = d.data();
+          const num = data.proposalNum || data.name || data.number || "";
+          const total = parseFloat(data.total) || 0;
+          const itemTitles = (data.items || []).map(it => [it.title, it.vendor].filter(Boolean).join(" ")).join(" ");
+          allItems.push({
+            type: "proposal", id: d.id, projectId: pid,
+            title: num || d.id.slice(0, 8),
+            subtitle: pName,
+            status: data.status || "Draft",
+            amount: total,
+            vendor: "",
+            number: num,
+            date: data.date || data.createdAt || "",
+            search: [num, pName, data.status, itemTitles, String(total)].filter(Boolean).join(" ").toLowerCase()
+          });
+          stats.proposals++;
+        });
+      } catch (e) {}
+
+      // POs
+      try {
+        const poSnap = await db.collection("boards").doc(pid).collection("purchaseOrders").get();
+        poSnap.forEach(d => {
+          const data = d.data();
+          const num = data.number || data.num || data.poNum || "";
+          const total = parseFloat(data.total) || 0;
+          const vendor = data.vendor || "";
+          allItems.push({
+            type: "po", id: d.id, projectId: pid,
+            title: num || d.id.slice(0, 8),
+            subtitle: pName,
+            status: data.status || "Draft",
+            amount: total,
+            vendor: vendor,
+            number: num,
+            date: data.date || data.orderDate || data.createdAt || "",
+            search: [num, pName, vendor, data.status, data.eta, String(total)].filter(Boolean).join(" ").toLowerCase()
+          });
+          stats.pos++;
+        });
+      } catch (e) {}
+    }
+
+    // Products from master library
+    try {
+      const prodSnap = await db.collection("products").get();
+      prodSnap.forEach(d => {
+        const p = d.data();
+        if (!p.title) return;
+        const cost = parseFloat(p.cost || p.costPrice || p.unitCost) || 0;
+        const sell = parseFloat(p.clientPrice || p.sellPrice || p.totalSelling) || 0;
+        allItems.push({
+          type: "product", id: d.id, projectId: "",
+          title: p.title,
+          subtitle: p.vendor || p.manufacturer || "",
+          status: p.category || "",
+          amount: sell || cost,
+          vendor: p.vendor || p.manufacturer || "",
+          number: p.sku || "",
+          search: [p.title, p.vendor, p.manufacturer, p.category, p.sku, p.description, p.room, p.finish, p.dimensions, String(cost), String(sell)].filter(Boolean).join(" ").toLowerCase()
+        });
+        stats.products++;
+      });
+    } catch (e) {}
+
+    // Write to _searchIndex in batches of 400
+    // First, delete old index
+    const oldSnap = await db.collection("_searchIndex").get();
+    let delBatch = db.batch();
+    let delCount = 0;
+    for (const doc of oldSnap.docs) {
+      delBatch.delete(doc.ref);
+      delCount++;
+      if (delCount % 400 === 0) { await delBatch.commit(); delBatch = db.batch(); }
+    }
+    if (delCount % 400 !== 0) await delBatch.commit();
+
+    // Write new index
+    let writeBatch = db.batch();
+    let writeCount = 0;
+    for (let i = 0; i < allItems.length; i++) {
+      const item = allItems[i];
+      const docRef = db.collection("_searchIndex").doc(item.type + "-" + item.id);
+      writeBatch.set(docRef, item);
+      writeCount++;
+      if (writeCount % 400 === 0) { await writeBatch.commit(); writeBatch = db.batch(); }
+    }
+    if (writeCount % 400 !== 0) await writeBatch.commit();
+
+    console.log("[SearchIndex] Done:", JSON.stringify(stats));
+    return res.status(200).json({ status: "ok", total: allItems.length, stats, deletedOld: delCount });
+
+  } catch (err) {
+    console.error("[SearchIndex] Error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Financial summary — one doc with all KPIs
+exports.rebuildFinancialSummary = functions.https.onRequest(async (req, res) => {
+  res.set("Access-Control-Allow-Origin", "https://cch-platform.web.app");
+  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.status(204).send("");
+
+  try {
+    console.log("[FinSummary] Starting rebuild...");
+    const projSnap = await db.collection("projects").get();
+    const projNames = {};
+    projSnap.forEach(d => { projNames[d.id] = d.data().name || d.id; });
+
+    let totalInvoiced = 0, totalPaid = 0, totalPOCost = 0;
+    let openInvoiceCount = 0, openInvoiceAmount = 0;
+    let openPOCount = 0, openPOAmount = 0;
+    let invoiceCount = 0, poCount = 0, proposalCount = 0;
+    const vendorSpend = {};
+    const projectRevenue = {};
+
+    for (const pid of Object.keys(projNames)) {
+      const pName = projNames[pid];
+      if (!projectRevenue[pName]) projectRevenue[pName] = { invoiced: 0, paid: 0, poCost: 0 };
+
+      try {
+        const invSnap = await db.collection("boards").doc(pid).collection("invoices").get();
+        invSnap.forEach(d => {
+          const data = d.data();
+          const total = parseFloat(data.total) || 0;
+          totalInvoiced += total;
+          invoiceCount++;
+          projectRevenue[pName].invoiced += total;
+          const pmts = (data.payments || []).reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+          if (pmts > 0) { totalPaid += pmts; projectRevenue[pName].paid += pmts; }
+          else if (data.status === "Paid") { totalPaid += total; projectRevenue[pName].paid += total; }
+          if (data.status !== "Paid" && data.status !== "Draft" && data.status !== "Cancelled") {
+            openInvoiceCount++;
+            openInvoiceAmount += total - pmts;
+          }
+        });
+      } catch (e) {}
+
+      try {
+        const poSnap = await db.collection("boards").doc(pid).collection("purchaseOrders").get();
+        poSnap.forEach(d => {
+          const data = d.data();
+          const total = parseFloat(data.total) || 0;
+          totalPOCost += total;
+          poCount++;
+          projectRevenue[pName].poCost += total;
+          const vendor = data.vendor || "Unknown";
+          if (!vendorSpend[vendor]) vendorSpend[vendor] = 0;
+          vendorSpend[vendor] += total;
+          if (!["Installed", "Received", "Cancelled", "Closed", "Paid"].includes(data.status)) {
+            openPOCount++;
+            openPOAmount += total;
+          }
+        });
+      } catch (e) {}
+
+      try {
+        const prSnap = await db.collection("boards").doc(pid).collection("proposals").get();
+        proposalCount += prSnap.size;
+      } catch (e) {}
+    }
+
+    // Time entries summary
+    let totalHours = 0, billableHours = 0, billableValue = 0;
+    const memberHours = {};
+    try {
+      const teSnap = await db.collection("timeEntries").limit(15000).get();
+      teSnap.forEach(d => {
+        const e = d.data();
+        const hrs = parseFloat(e.hours) || 0;
+        totalHours += hrs;
+        if (e.billable) { billableHours += hrs; billableValue += parseFloat(e.total) || 0; }
+        const member = e.member || e.user || "Unknown";
+        if (!memberHours[member]) memberHours[member] = { total: 0, billable: 0, value: 0 };
+        memberHours[member].total += hrs;
+        if (e.billable) { memberHours[member].billable += hrs; memberHours[member].value += parseFloat(e.total) || 0; }
+      });
+    } catch (e) {}
+
+    // Top vendors by spend
+    const topVendors = Object.entries(vendorSpend)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20)
+      .map(([name, amount]) => ({ name, amount }));
+
+    const summary = {
+      updatedAt: new Date().toISOString(),
+      totalInvoiced, totalPaid,
+      totalOutstanding: totalInvoiced - totalPaid,
+      totalPOCost,
+      openInvoiceCount, openInvoiceAmount,
+      openPOCount, openPOAmount,
+      invoiceCount, poCount, proposalCount,
+      projectCount: Object.keys(projNames).length,
+      totalHours: Math.round(totalHours * 10) / 10,
+      billableHours: Math.round(billableHours * 10) / 10,
+      billableValue: Math.round(billableValue * 100) / 100,
+      topVendors,
+      memberHours,
+      projectRevenue
+    };
+
+    await db.collection("_cache").doc("financialSummary").set(summary);
+    console.log("[FinSummary] Done:", invoiceCount, "invoices,", poCount, "POs");
+    return res.status(200).json({ status: "ok", summary });
+
+  } catch (err) {
+    console.error("[FinSummary] Error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});

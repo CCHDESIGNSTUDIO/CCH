@@ -2789,7 +2789,7 @@
       if (!query) return;
       var C = document.getElementById('contentArea');
       setBreadcrumb([{ label: 'Search Results' }]);
-      setTopbarActions('');
+      setTopbarActions('<button class="btn btn-secondary btn-sm" onclick="rebuildSearchIndexNow()" title="Refresh search index from Firestore">🔄 Rebuild Index</button>');
       C.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Searching for "' + esc(query) + '"...</div>';
 
       var q = query.toLowerCase();
@@ -2798,37 +2798,49 @@
       var thStyle = 'padding:10px 14px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--gray-400);font-weight:600;white-space:nowrap;';
       var tdStyle = 'padding:10px 14px;font-size:13px;border-bottom:1px solid var(--gray-100);';
 
-      // Load data from cached financial data + projects + products
-      await loadFinancialData();
-      var allInvoices = _cachedInvoices || [];
-      var allPOs = _cachedPOs || [];
-      var allProposals = _cachedProposals || [];
-
-      // Load projects
-      var projSnap = await getCachedBoards();
-      var projects = [];
-      projSnap.forEach(function(d) { var data = d.data(); projects.push({ id: d.id, name: data.name || d.id, status: data.status || '', clientName: data.clientName || '' }); });
-
-      // Load products
-      var products = [];
+      // Try _searchIndex first (fast), fall back to live scan
+      var allResults = [];
       try {
-        var pSnap = await db.collection('products').limit(3000).get();
-        pSnap.forEach(function(d) { var p = d.data(); if (p.title) products.push({id: d.id, ...p}); });
+        var idxSnap = await db.collection('_searchIndex').get();
+        if (idxSnap.size > 0) {
+          idxSnap.forEach(function(d) { allResults.push(d.data()); });
+        }
       } catch(e) {}
 
-      // ── Match function: does item match query? ──
-      function matchStr() {
-        var args = Array.prototype.slice.call(arguments);
-        return args.some(function(v) { return v && String(v).toLowerCase().includes(q); });
+      // If index is empty, build from live data
+      if (allResults.length === 0) {
+        showToast('Search index empty — searching live data...');
+        await loadFinancialData();
+        var allInvoices = _cachedInvoices || [];
+        var allPOs = _cachedPOs || [];
+        var allProposals = _cachedProposals || [];
+        var projSnap = await getCachedBoards();
+        projSnap.forEach(function(d) { var data = d.data(); allResults.push({ type:'project', id:d.id, projectId:d.id, title:data.name||d.id, subtitle:data.clientName||'', status:data.status||'', amount:0, vendor:'', number:'', search:[data.name,data.clientName,d.id].filter(Boolean).join(' ').toLowerCase() }); });
+        allInvoices.forEach(function(i) { allResults.push({ type:'invoice', id:i.id, projectId:i.projectId||'', title:i.invoiceNum||i.number||i.id.slice(0,8), subtitle:i.projectName||'', status:i.status||'Draft', amount:parseFloat(i.total)||0, vendor:i.vendor||'', number:i.invoiceNum||i.number||'', search:[i.invoiceNum,i.number,i.projectName,i.vendor,i.clientName,i.status,String(i.total)].filter(Boolean).join(' ').toLowerCase() }); });
+        allPOs.forEach(function(p) { allResults.push({ type:'po', id:p.id, projectId:p.projectId||'', title:p.number||p.num||p.id.slice(0,8), subtitle:p.projectName||'', status:p.status||'Draft', amount:parseFloat(p.total)||0, vendor:p.vendor||'', number:p.number||p.num||'', search:[p.number,p.num,p.vendor,p.projectName,p.status,String(p.total)].filter(Boolean).join(' ').toLowerCase() }); });
+        (allProposals||[]).forEach(function(p) { allResults.push({ type:'proposal', id:p.id, projectId:p.projectId||'', title:p.proposalNum||p.name||p.number||p.id.slice(0,8), subtitle:p.projectName||'', status:p.status||'Draft', amount:parseFloat(p.total)||0, vendor:'', number:p.proposalNum||p.name||p.number||'', search:[p.proposalNum,p.name,p.number,p.projectName,p.status,String(p.total)].filter(Boolean).join(' ').toLowerCase() }); });
+        try {
+          var pSnap = await db.collection('products').limit(3000).get();
+          pSnap.forEach(function(d) { var p = d.data(); if (p.title) allResults.push({ type:'product', id:d.id, projectId:'', title:p.title, subtitle:p.vendor||p.manufacturer||'', status:p.category||'', amount:parseFloat(p.clientPrice||p.sellPrice||p.cost)||0, vendor:p.vendor||p.manufacturer||'', number:p.sku||'', search:[p.title,p.vendor,p.manufacturer,p.category,p.sku,p.description,p.room,String(p.cost),String(p.clientPrice)].filter(Boolean).join(' ').toLowerCase() }); });
+        } catch(e) {}
       }
-      function matchAmt(amt) { return isNum && Math.abs((parseFloat(amt)||0) - qNum) < 1; }
 
-      // ── Search each category ──
-      var projResults = projects.filter(function(p) { return matchStr(p.name, p.clientName, p.id); });
-      var invResults = allInvoices.filter(function(i) { return matchStr(i.invoiceNum, i.number, i.projectName, i.status, i.vendor, i.clientName) || matchAmt(i.total); });
-      var poResults = allPOs.filter(function(p) { return matchStr(p.number, p.num, p.vendor, p.projectName, p.status) || matchAmt(p.total); });
-      var prResults = (allProposals||[]).filter(function(p) { return matchStr(p.proposalNum, p.name, p.number, p.projectName, p.status) || matchAmt(p.total) || (p.items||[]).some(function(it) { return matchStr(it.title, it.vendor); }); });
-      var prodResults = products.filter(function(p) { return matchStr(p.title, p.vendor, p.manufacturer, p.category, p.sku, p.description, p.room) || matchAmt(p.clientPrice) || matchAmt(p.cost) || matchAmt(p.sellPrice); });
+      // Filter results
+      var matched = allResults.filter(function(item) {
+        if (item.search && item.search.includes(q)) return true;
+        if (isNum && Math.abs((item.amount||0) - qNum) < 1) return true;
+        return false;
+      });
+
+      // Group by type
+      var grouped = { project:[], invoice:[], po:[], proposal:[], product:[] };
+      matched.forEach(function(r) { if (grouped[r.type]) grouped[r.type].push(r); });
+
+      var projResults = grouped.project;
+      var invResults = grouped.invoice;
+      var poResults = grouped.po;
+      var prResults = grouped.proposal;
+      var prodResults = grouped.product;
 
       var totalResults = projResults.length + invResults.length + poResults.length + prResults.length + prodResults.length;
 
@@ -5332,6 +5344,24 @@
       renderTimelyLoggedView();
     }
 
+    async function rebuildSearchIndexNow() {
+      showToast('Rebuilding search index...');
+      try {
+        var resp = await fetch('https://us-central1-cch-design-boards.cloudfunctions.net/rebuildSearchIndex', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}' });
+        var result = await resp.json();
+        showToast('✅ Index rebuilt: ' + (result.total || 0) + ' items indexed');
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+
+    async function rebuildFinancialSummaryNow() {
+      showToast('Rebuilding financial summary...');
+      try {
+        var resp = await fetch('https://us-central1-cch-design-boards.cloudfunctions.net/rebuildFinancialSummary', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}' });
+        var result = await resp.json();
+        showToast('✅ Financial summary updated');
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+
     async function syncTimelyNow() {
       showToast('Syncing from Timely...');
       try {
@@ -6982,74 +7012,63 @@
       const _contractorHrs = _timeEntries.filter(t => !_isOwnerMember(t.member||t.user||'')).reduce((s,t) => s + (parseFloat(t.hours)||0), 0);
       const _contractorCost = _contractorHrs * (TEAM_CONFIG.contractors[0] ? TEAM_CONFIG.contractors[0].rate : DEFAULT_CONTRACTOR_RATE);
 
+      // Collapsible room toggle for overview
+      if (!window._ovRoomCollapsed) window._ovRoomCollapsed = {};
+      window._ovToggleRoom = function(rm) {
+        window._ovRoomCollapsed[rm] = !window._ovRoomCollapsed[rm];
+        var key = rm.replace(/[^a-zA-Z0-9]/g, '_');
+        var sec = document.getElementById('ov-room-' + key);
+        var arrow = document.getElementById('ov-arrow-' + key);
+        if (sec) sec.style.display = window._ovRoomCollapsed[rm] ? 'none' : 'grid';
+        if (arrow) arrow.textContent = window._ovRoomCollapsed[rm] ? '▸' : '▾';
+      };
+
       T.innerHTML = `
         <style>
-          .dpo-card { background:#FFFFFF; border:1px solid rgba(14,22,41,0.08); border-radius:0; padding:0; overflow:hidden; }
-          .dpo-wrap { background:#FFFFFF; border-radius:0; padding:20px; margin:-8px -8px 0 -8px; }
-          .dpo-section { margin-bottom:20px; }
-          .dpo-section-title { font-size:11px; font-weight:700; color:#0E1629; text-transform:uppercase; letter-spacing:1.5px; margin-bottom:10px; }
-          .dpo-fin-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; }
-          .dpo-fin-card { background:#FFFFFF; border:1px solid rgba(14,22,41,0.08); border-radius:0; padding:14px 16px; text-align:center; }
-          .dpo-fin-value { font-size:20px; font-weight:700; font-family:var(--font-mono); margin-bottom:2px; color:#0E1629; }
-          .dpo-fin-label { font-size:9px; text-transform:uppercase; letter-spacing:1px; color:var(--gold); }
-          .dpo-layout { display:grid; grid-template-columns:1fr 300px; gap:20px; }
-          .dpo-quick-btn { background:var(--gray-50); border:1px solid rgba(14,22,41,0.1); color:var(--gold); padding:6px 14px; border-radius:0; cursor:pointer; font-size:11px; font-weight:600; font-family:var(--font-body); letter-spacing:0.03em; transition:all 0.2s; }
+          .dpo-wrap { background:#FFFFFF; padding:16px; margin:-8px -8px 0 -8px; }
+          .dpo-section { margin-bottom:14px; }
+          .dpo-section-title { font-size:10px; font-weight:700; color:var(--gold); text-transform:uppercase; letter-spacing:1.5px; margin-bottom:8px; }
+          .dpo-layout { display:grid; grid-template-columns:1fr 280px; gap:16px; }
+          .dpo-quick-btn { background:var(--gray-50); border:1px solid rgba(14,22,41,0.1); color:var(--gold); padding:4px 12px; border-radius:0; cursor:pointer; font-size:10px; font-weight:600; transition:all 0.2s; }
           .dpo-quick-btn:hover { background:var(--gold-light); border-color:var(--gold); }
-          .dpo-list-row { display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid rgba(14,22,41,0.06); cursor:pointer; font-size:12px; }
-          .dpo-list-row:hover { background:var(--gold-light); }
-          .dpo-list-row:last-child { border:none; }
-          .dpo-sidebar-card { background:#FFFFFF; border:1px solid rgba(14,22,41,0.08); border-radius:0; padding:14px 16px; margin-bottom:12px; }
-          .dpo-sidebar-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1.5px; color:var(--gold); margin-bottom:10px; }
-          .dpo-sidebar-row { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid rgba(14,22,41,0.05); font-size:12px; }
-          .dpo-sidebar-row:last-child { border:none; }
+          .dpo-list-row { display:flex; align-items:center; gap:8px; padding:6px 10px; border-bottom:1px solid rgba(14,22,41,0.05); cursor:pointer; font-size:12px; }
+          .dpo-list-row:hover { background:rgba(200,185,154,0.06); }
+          .dpo-sc { background:#FFFFFF; border:1px solid rgba(14,22,41,0.08); padding:12px 14px; margin-bottom:10px; }
+          .dpo-sc-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1.5px; color:var(--gold); margin-bottom:6px; }
+          .dpo-sc-row { display:flex; justify-content:space-between; padding:4px 0; font-size:12px; }
+          .ov-kpi { display:inline-flex; align-items:baseline; gap:4px; padding:0 14px; border-right:1px solid rgba(14,22,41,0.08); }
+          .ov-kpi:last-child { border:none; }
+          .ov-kpi-val { font-size:16px; font-weight:700; font-family:var(--font-mono); color:#0E1629; }
+          .ov-kpi-label { font-size:9px; text-transform:uppercase; letter-spacing:1px; color:var(--gold); }
+          .ov-room-hdr { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--gray-200); cursor:pointer; user-select:none; }
+          .ov-room-hdr:hover { background:rgba(200,185,154,0.04); margin:0 -14px; padding:10px 14px; }
+          .ov-tile-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; padding:12px 0; }
+          .ov-tile { border:1px solid rgba(14,22,41,0.06); overflow:hidden; cursor:pointer; transition:all 0.2s; }
+          .ov-tile:hover { border-color:var(--gold); box-shadow:0 4px 12px rgba(14,22,41,0.08); }
+          .ov-tile img { width:100%; aspect-ratio:1; object-fit:cover; background:var(--gray-100); display:block; }
+          .ov-tile-body { padding:8px 10px; }
+          .ov-tile-name { font-size:11px; font-weight:600; color:#0E1629; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+          .ov-tile-vendor { font-size:10px; color:var(--gray-400); margin-top:1px; }
+          .ov-tile-price { font-size:11px; font-weight:600; color:var(--gold); font-family:var(--font-mono); margin-top:3px; }
           @media (max-width:900px) { .dpo-layout { grid-template-columns:1fr; } }
         </style>
 
         <div class="dpo-wrap">
-          <!-- FINANCIAL HEALTH — top bar -->
-          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px;">
-            <div class="dpo-fin-card" style="border-left:3px solid var(--gold);">
-              <div class="dpo-fin-value" style="color:var(--gold);">${formatMoney(_timeVal)}</div>
-              <div class="dpo-fin-label">Logged Value</div>
-            </div>
-            <div class="dpo-fin-card" style="border-left:3px solid var(--cyan);">
-              <div class="dpo-fin-value">${formatMoney(totalInvoiced)}</div>
-              <div class="dpo-fin-label">Invoiced</div>
-            </div>
-            <div class="dpo-fin-card" style="border-left:3px solid var(--green);">
-              <div class="dpo-fin-value" style="color:var(--green);">${formatMoney(totalPaid)}</div>
-              <div class="dpo-fin-label">Paid</div>
-            </div>
-            <div class="dpo-fin-card" style="border-left:3px solid ${balance > 0 ? '#E16A5B' : 'var(--green)'};">
-              <div class="dpo-fin-value" style="color:${balance > 0 ? '#E16A5B' : 'var(--green)'};">${formatMoney(balance)}</div>
-              <div class="dpo-fin-label">Outstanding</div>
-            </div>
-            <div class="dpo-fin-card" style="border-left:3px solid #CE93D8;">
-              <div class="dpo-fin-value">${formatMoney(_pipelineTotal)}</div>
-              <div class="dpo-fin-label">Pipeline</div>
-            </div>
+          <!-- KPI BAR — single line -->
+          <div style="display:flex;align-items:center;padding:10px 0;margin-bottom:14px;border-bottom:1px solid rgba(14,22,41,0.08);flex-wrap:wrap;gap:4px 0;">
+            <span class="ov-kpi"><span class="ov-kpi-val" style="color:var(--gold);">${formatMoney(_timeVal)}</span><span class="ov-kpi-label">Logged</span></span>
+            <span class="ov-kpi"><span class="ov-kpi-val">${formatMoney(totalInvoiced)}</span><span class="ov-kpi-label">Invoiced</span></span>
+            <span class="ov-kpi"><span class="ov-kpi-val" style="color:var(--green);">${formatMoney(totalPaid)}</span><span class="ov-kpi-label">Paid</span></span>
+            <span class="ov-kpi"><span class="ov-kpi-val" style="color:${balance > 0 ? '#E16A5B' : 'var(--green)'};">${formatMoney(balance)}</span><span class="ov-kpi-label">Outstanding</span></span>
+            <span class="ov-kpi"><span class="ov-kpi-val" style="color:#CE93D8;">${formatMoney(_pipelineTotal)}</span><span class="ov-kpi-label">Pipeline</span></span>
+            <span class="ov-kpi"><span class="ov-kpi-val">${_selectionsCount}</span><span class="ov-kpi-label">Selections</span></span>
+            <span class="ov-kpi"><span class="ov-kpi-val">${_timeHrs.toFixed(0)}</span><span class="ov-kpi-label">Hours</span></span>
           </div>
 
-          <!-- COSTS ROW -->
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">
-            <div style="background:rgba(14,22,41,0.02);border:1px solid rgba(14,22,41,0.06);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
-              <span style="font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;">PO Costs</span>
-              <span style="font-size:14px;font-weight:600;font-family:var(--font-mono);color:#0E1629;">${formatMoney(_poTotal)}</span>
-            </div>
-            <div style="background:rgba(14,22,41,0.02);border:1px solid rgba(14,22,41,0.06);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
-              <span style="font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;">Contractors</span>
-              <span style="font-size:14px;font-weight:600;font-family:var(--font-mono);color:#0E1629;">${formatMoney(_contractorCost)}</span>
-            </div>
-            <div style="background:rgba(14,22,41,0.02);border:1px solid rgba(14,22,41,0.06);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
-              <span style="font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;">Efficiency</span>
-              <span style="font-size:14px;font-weight:600;font-family:var(--font-mono);color:#0E1629;">${_timeHrs > 0 ? Math.round(_timeBillHrs / _timeHrs * 100) : 0}%</span>
-            </div>
-          </div>
-
-          <!-- BURN RATE (hidden - moved to financials tab) -->
+          <!-- BURN RATE (hidden) -->
           ${(function() {
             var fee = parseFloat(proj.designFee || proj.fee || proj.budget || 0);
-            if (true || fee <= 0) return ''; // hidden for now
+            if (true) return ''; // hidden
             var internalCost = pTimeHrs * getMemberRate(currentUser ? currentUser.email : '');
             var profitRemaining = fee - internalCost;
             var feeUsedPct = Math.round(internalCost / fee * 100);
@@ -7111,49 +7130,18 @@
 
           <div class="dpo-layout">
             <div>
-              <!-- HOURS WORKED + SELECTIONS — side by side -->
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
-                <div class="dpo-sidebar-card" style="margin:0;" onclick="switchProjectTab('time')">
-                  <div class="dpo-sidebar-title">Hours Worked</div>
-                  <div style="display:flex;align-items:baseline;gap:12px;">
-                    <span style="font-size:24px;font-weight:700;font-family:var(--font-mono);color:var(--cyan);">${_timeHrs.toFixed(1)}</span>
-                    <span style="font-size:10px;color:var(--gold);">total</span>
-                    <span style="font-size:16px;font-weight:600;font-family:var(--font-mono);color:#0E1629;">${_timeBillHrs.toFixed(1)}</span>
-                    <span style="font-size:10px;color:var(--gold);">billable</span>
-                  </div>
-                </div>
-                <div class="dpo-sidebar-card" style="margin:0;cursor:pointer;" onclick="switchProjectTab('ffe')">
-                  <div class="dpo-sidebar-title">Selections <span style="color:#0E1629;font-size:12px;font-family:var(--font-mono);margin-left:4px;">${_selectionsCount}</span></div>
-                  <div style="font-size:16px;font-weight:700;font-family:var(--font-mono);color:var(--gold);">${formatMoney(_selectionsTotal)}</div>
-                  <div style="font-size:10px;color:var(--gray-400);margin-top:2px;">total value</div>
-                </div>
-              </div>
-
-              <!-- FINANCIALS (Invoice-only) -->
-              <div class="dpo-sidebar-card" style="margin-bottom:16px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                  <div class="dpo-sidebar-title" style="margin:0;">Financials</div>
-                  <span style="font-size:10px;color:var(--gray-400);">${invoices.length} invoice${invoices.length !== 1 ? 's' : ''}</span>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
-                  <div style="text-align:center;"><div style="font-size:18px;font-weight:700;font-family:var(--font-mono);color:var(--gold);">${formatMoney(totalInvoiced)}</div><div style="font-size:9px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-top:2px;">Invoiced</div></div>
-                  <div style="text-align:center;"><div style="font-size:18px;font-weight:700;font-family:var(--font-mono);color:var(--green);">${formatMoney(totalPaid)}</div><div style="font-size:9px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-top:2px;">Paid</div></div>
-                  <div style="text-align:center;"><div style="font-size:18px;font-weight:700;font-family:var(--font-mono);color:${balance > 0 ? '#E16A5B' : 'var(--green)'};">${formatMoney(balance)}</div><div style="font-size:9px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-top:2px;">Outstanding</div></div>
-                </div>
-              </div>
-
               <!-- TASKS -->
-              <div class="dpo-sidebar-card" style="margin-bottom:16px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                  <div class="dpo-sidebar-title" style="margin:0;">Tasks</div>
-                  <button class="dpo-quick-btn" style="padding:4px 10px;" onclick="switchProjectTab('tasks')">+ New Task</button>
+              <div class="dpo-section">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <div class="dpo-section-title" style="margin:0;">Tasks</div>
+                  <button class="dpo-quick-btn" onclick="switchProjectTab('tasks')">+ New Task</button>
                 </div>
                 ${(function() {
                   var tasks = (window._projTasks || []).filter(function(t){ return t.status !== 'Done'; });
-                  if (tasks.length === 0) return '<div style="font-size:12px;color:var(--gray-400);text-align:center;padding:12px;">No active tasks</div>';
+                  if (tasks.length === 0) return '<div style="font-size:11px;color:var(--gray-400);padding:8px 0;">No active tasks</div>';
                   var priColors = { Urgent: '#E16A5B', High: '#F9A825', Medium: 'var(--cyan)', Low: 'var(--gray-400)' };
                   var statusIcons = { 'To Do': '○', 'In Progress': '◐', 'Waiting': '◷', 'Done': '●' };
-                  return tasks.slice(0, 8).map(function(t) {
+                  return '<div style="border:1px solid rgba(14,22,41,0.06);">' + tasks.slice(0, 6).map(function(t) {
                     var pc = priColors[t.priority] || 'var(--gray-400)';
                     var si = statusIcons[t.status] || '○';
                     var overdue = t.dueDate && t.dueDate < new Date().toISOString().slice(0,10);
@@ -7164,88 +7152,113 @@
                       (t.dueDate ? '<span style="font-size:10px;font-family:var(--font-mono);color:' + (overdue ? '#E16A5B' : 'var(--gray-400)') + ';">' + t.dueDate.slice(5) + '</span>' : '') +
                     '</div>';
                   }).join('') +
-                  (tasks.length > 8 ? '<div style="text-align:center;font-size:10px;color:var(--gold);padding:6px;cursor:pointer;" onclick="switchProjectTab(\'tasks\')">+ ' + (tasks.length - 8) + ' more</div>' : '');
+                  (tasks.length > 6 ? '<div style="text-align:center;font-size:10px;color:var(--gold);padding:4px;cursor:pointer;" onclick="switchProjectTab(\'tasks\')">+ ' + (tasks.length - 6) + ' more</div>' : '') + '</div>';
                 })()}
               </div>
 
-              <!-- OPEN PROPOSALS (Revenue Opportunity) -->
+              <!-- SELECTIONS — Collapsible Room Sections -->
+              <div class="dpo-section">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <div class="dpo-section-title" style="margin:0;">Selections · ${_selectionsCount} items · ${formatMoney(_selectionsTotal)}</div>
+                  <button class="dpo-quick-btn" onclick="switchProjectTab('ffe')">View All</button>
+                </div>
+                ${rooms.length === 0 ? '<div style="font-size:11px;color:var(--gray-400);padding:8px 0;">No selections yet</div>' : rooms.map(function(rm) {
+                  var roomClips = byRoom[rm].filter(function(c) { return typeof isRealProduct === 'function' ? isRealProduct(c) : true; });
+                  if (roomClips.length === 0) return '';
+                  var roomTotal = roomClips.reduce(function(s,c) { return s + (parseMoney(c.clientPrice) || parseMoney(c.totalSelling) || 0); }, 0);
+                  var rmKey = rm.replace(/[^a-zA-Z0-9]/g, '_');
+                  var collapsed = window._ovRoomCollapsed[rm] !== false; // collapsed by default
+                  return '<div>' +
+                    '<div class="ov-room-hdr" onclick="_ovToggleRoom(\'' + escAttr(rm) + '\')">' +
+                      '<div style="display:flex;align-items:center;gap:8px;">' +
+                        '<span id="ov-arrow-' + rmKey + '" style="font-size:12px;color:var(--gray-400);width:14px;">' + (collapsed ? '▸' : '▾') + '</span>' +
+                        '<span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#0E1629;">' + esc(rm) + '</span>' +
+                        '<span style="font-size:11px;color:var(--gray-400);">' + roomClips.length + '</span>' +
+                      '</div>' +
+                      (roomTotal > 0 ? '<span style="font-size:12px;font-weight:600;color:var(--gold);font-family:var(--font-mono);">' + formatMoney(roomTotal) + '</span>' : '') +
+                    '</div>' +
+                    '<div id="ov-room-' + rmKey + '" class="ov-tile-grid" style="' + (collapsed ? 'display:none;' : '') + '">' +
+                      roomClips.slice(0, 12).map(function(c) {
+                        var img = c.imageUrl || (c.images && c.images[0]) || '';
+                        var price = parseMoney(c.clientPrice) || parseMoney(c.totalSelling) || 0;
+                        return '<div class="ov-tile" onclick="showClipDetail(\'' + escAttr(proj.id) + '\',\'' + escAttr(c.id) + '\')">' +
+                          (img ? '<img src="' + escAttr(img) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div style="width:100%;aspect-ratio:1;background:var(--gray-100);display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--gray-300);">🛋️</div>') +
+                          '<div class="ov-tile-body">' +
+                            '<div class="ov-tile-name">' + esc(c.title || 'Untitled') + '</div>' +
+                            '<div class="ov-tile-vendor">' + esc(c.vendor || '') + '</div>' +
+                            (price > 0 ? '<div class="ov-tile-price">' + formatMoney(price) + '</div>' : '') +
+                          '</div>' +
+                        '</div>';
+                      }).join('') +
+                      (roomClips.length > 12 ? '<div style="grid-column:1/-1;text-align:center;font-size:10px;color:var(--gold);padding:6px;cursor:pointer;" onclick="switchProjectTab(\'ffe\')">+ ' + (roomClips.length - 12) + ' more</div>' : '') +
+                    '</div>' +
+                  '</div>';
+                }).join('')}
+              </div>
+
+              <!-- OPEN PROPOSALS -->
               ${(function() {
                 if (_pipelineProposals.length === 0) return '';
-                return '<div class="dpo-sidebar-card" style="margin-bottom:16px;">' +
-                  '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><div class="dpo-sidebar-title" style="margin:0;">Revenue Opportunity</div><span style="font-size:14px;font-weight:700;font-family:var(--font-mono);color:var(--gold);">' + formatMoney(_pipelineTotal) + '</span></div>' +
+                return '<div class="dpo-section"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="dpo-section-title" style="margin:0;">Proposals · ' + formatMoney(_pipelineTotal) + '</div></div><div style="border:1px solid rgba(14,22,41,0.06);">' +
                   _pipelineProposals.map(function(p) {
-                    return '<div class="dpo-list-row" onclick="navigate(\'#/project/' + proj.id + '/proposal/' + p.id + '\')">' +
-                      '<span>📋</span>' +
-                      '<div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#0E1629;">' + esc(p.proposalNum || p.name || 'Proposal') + '</div>' +
-                      '<span class="badge badge-' + (p.status||'draft').toLowerCase() + '" style="font-size:9px;">' + esc(p.status || 'Draft') + '</span>' +
-                      '<span style="font-family:var(--font-mono);font-weight:600;color:#0E1629;">' + formatMoney(parseFloat(p.total)||0) + '</span>' +
-                    '</div>';
-                  }).join('') +
-                '</div>';
+                    return '<div class="dpo-list-row" onclick="navigate(\'#/project/' + proj.id + '/proposal/' + p.id + '\')"><span>📋</span><div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#0E1629;">' + esc(p.proposalNum || p.name || 'Proposal') + '</div><span class="badge badge-' + (p.status||'draft').toLowerCase() + '" style="font-size:9px;">' + esc(p.status || 'Draft') + '</span><span style="font-family:var(--font-mono);font-weight:600;color:#0E1629;">' + formatMoney(parseFloat(p.total)||0) + '</span></div>';
+                  }).join('') + '</div></div>';
               })()}
 
               <!-- OPEN INVOICES -->
               ${(function() {
                 if (_openInvoices.length === 0) return '';
-                return '<div class="dpo-sidebar-card" style="margin-bottom:16px;">' +
-                  '<div class="dpo-sidebar-title">Open Invoices</div>' +
+                return '<div class="dpo-section"><div class="dpo-section-title">Open Invoices</div><div style="border:1px solid rgba(14,22,41,0.06);">' +
                   _openInvoices.map(function(inv) {
-                    var total = parseFloat(inv.total) || 0;
-                    var paid = (inv.payments||[]).reduce(function(s,p){return s+(parseFloat(p.amount)||0);},0);
-                    var bal = total - paid;
-                    var num = inv.invoiceNum || inv.number || inv.id.slice(0,8);
-                    var overdue = inv.dueDate && inv.dueDate < new Date().toISOString().slice(0,10);
-                    return '<div class="dpo-list-row" onclick="navigate(\'#/project/' + proj.id + '/invoice/' + inv.id + '\')">' +
-                      '<span>🧾</span>' +
-                      '<div style="flex:1;color:#0E1629;font-weight:500;">#' + esc(num) + '</div>' +
-                      (overdue ? '<span style="font-size:9px;color:#E16A5B;font-weight:600;">OVERDUE</span>' : '') +
-                      '<span style="font-family:var(--font-mono);font-weight:600;color:' + (overdue ? '#E16A5B' : '#0E1629') + ';">' + formatMoney(bal) + '</span>' +
-                    '</div>';
-                  }).join('') +
-                '</div>';
+                    var total = parseFloat(inv.total)||0; var paid = (inv.payments||[]).reduce(function(s,p){return s+(parseFloat(p.amount)||0);},0); var bal = total-paid;
+                    var num = inv.invoiceNum||inv.number||inv.id.slice(0,8); var overdue = inv.dueDate && inv.dueDate < new Date().toISOString().slice(0,10);
+                    return '<div class="dpo-list-row" onclick="navigate(\'#/project/' + proj.id + '/invoice/' + inv.id + '\')"><span>🧾</span><div style="flex:1;color:#0E1629;font-weight:500;">#' + esc(num) + '</div>' + (overdue ? '<span style="font-size:9px;color:#E16A5B;font-weight:600;">OVERDUE</span>' : '') + '<span style="font-family:var(--font-mono);font-weight:600;color:' + (overdue ? '#E16A5B' : '#0E1629') + ';">' + formatMoney(bal) + '</span></div>';
+                  }).join('') + '</div></div>';
               })()}
 
               <!-- OPEN POs -->
               ${(function() {
                 if (_activePOs.length === 0) return '';
-                return '<div class="dpo-sidebar-card" style="margin-bottom:16px;">' +
-                  '<div class="dpo-sidebar-title">Open Purchase Orders</div>' +
-                  _activePOs.slice(0, 8).map(function(po) {
-                    return '<div class="dpo-list-row" onclick="navigate(\'#/project/' + proj.id + '/po/' + po.id + '\')">' +
-                      '<span>📦</span>' +
-                      '<div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#0E1629;">' + esc(po.number || po.num || po.id.slice(0,8)) + '</div>' +
-                      '<span style="font-size:10px;color:var(--gray-400);">' + esc(po.vendor || '') + '</span>' +
-                      '<span class="badge badge-' + (po.status||'draft').toLowerCase() + '" style="font-size:9px;">' + esc(po.status || 'Draft') + '</span>' +
-                      '<span style="font-family:var(--font-mono);font-weight:600;color:#0E1629;">' + formatMoney(parseFloat(po.total)||0) + '</span>' +
-                    '</div>';
-                  }).join('') +
-                  (_activePOs.length > 8 ? '<div style="text-align:center;font-size:10px;color:var(--gold);padding:6px;">+ ' + (_activePOs.length - 8) + ' more</div>' : '') +
-                '</div>';
+                return '<div class="dpo-section"><div class="dpo-section-title">Purchase Orders</div><div style="border:1px solid rgba(14,22,41,0.06);">' +
+                  _activePOs.slice(0, 6).map(function(po) {
+                    return '<div class="dpo-list-row" onclick="navigate(\'#/project/' + proj.id + '/po/' + po.id + '\')"><span>📦</span><div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#0E1629;">' + esc(po.number||po.num||po.id.slice(0,8)) + '</div><span style="font-size:10px;color:var(--gray-400);">' + esc(po.vendor||'') + '</span><span class="badge badge-' + (po.status||'draft').toLowerCase() + '" style="font-size:9px;">' + esc(po.status||'Draft') + '</span><span style="font-family:var(--font-mono);font-weight:600;color:#0E1629;">' + formatMoney(parseFloat(po.total)||0) + '</span></div>';
+                  }).join('') + '</div></div>';
               })()}
             </div>
 
             <!-- SIDEBAR -->
             <div>
               <!-- PROJECT DETAILS -->
-              <div class="dpo-sidebar-card">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                  <div class="dpo-sidebar-title" style="margin:0;">Project Details</div>
+              <div class="dpo-sc">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <div class="dpo-sc-title" style="margin:0;">Project Details</div>
                   <div style="display:flex;gap:4px;">
-                    <button class="dpo-quick-btn" style="padding:3px 10px;" onclick="showEditProjectModal('${proj.id}')">Edit</button>
-                    <button class="dpo-quick-btn" style="padding:3px 10px;" onclick="sendTextFromApp('${proj.id}')">Text</button>
+                    <button class="dpo-quick-btn" onclick="showEditProjectModal('${proj.id}')">Edit</button>
+                    <button class="dpo-quick-btn" onclick="sendTextFromApp('${proj.id}')">Text</button>
                   </div>
                 </div>
-                ${proj.clientName ? '<div style="font-size:14px;font-weight:600;color:#0E1629;margin-bottom:6px;">' + esc(proj.clientName) + '</div>' : ''}
-                ${proj.clientEmail ? '<div style="font-size:11px;color:var(--gold);margin-bottom:3px;">' + esc(proj.clientEmail) + '</div>' : ''}
-                ${proj.clientPhone ? '<div style="font-size:11px;color:var(--gray-400);margin-bottom:3px;">' + esc(proj.clientPhone) + '</div>' : ''}
-                ${proj.projectAddress ? '<div style="font-size:11px;color:var(--gray-400);margin-top:6px;">📍 ' + esc(proj.projectAddress) + '</div>' : ''}
+                ${proj.clientName ? '<div style="font-size:13px;font-weight:600;color:#0E1629;margin-bottom:4px;">' + esc(proj.clientName) + '</div>' : ''}
+                ${proj.clientEmail ? '<div style="font-size:11px;color:var(--gold);margin-bottom:2px;">' + esc(proj.clientEmail) + '</div>' : ''}
+                ${proj.clientPhone ? '<div style="font-size:11px;color:var(--gray-400);margin-bottom:2px;">' + esc(proj.clientPhone) + '</div>' : ''}
+                ${proj.projectAddress ? '<div style="font-size:10px;color:var(--gray-400);margin-top:4px;">📍 ' + esc(proj.projectAddress) + '</div>' : ''}
+              </div>
+
+              <!-- HOURS + FINANCIALS -->
+              <div class="dpo-sc">
+                <div class="dpo-sc-title">Hours & Financials</div>
+                <div class="dpo-sc-row"><span style="color:var(--gold);">Total Hours</span><span style="font-weight:600;font-family:var(--font-mono);color:var(--cyan);">${_timeHrs.toFixed(1)}</span></div>
+                <div class="dpo-sc-row"><span style="color:var(--gold);">Billable</span><span style="font-weight:600;font-family:var(--font-mono);">${_timeBillHrs.toFixed(1)}</span></div>
+                <div class="dpo-sc-row"><span style="color:var(--gold);">Invoiced</span><span style="font-weight:600;font-family:var(--font-mono);">${formatMoney(totalInvoiced)}</span></div>
+                <div class="dpo-sc-row"><span style="color:var(--gold);">Paid</span><span style="font-weight:600;font-family:var(--font-mono);color:var(--green);">${formatMoney(totalPaid)}</span></div>
+                <div class="dpo-sc-row"><span style="color:var(--gold);">Outstanding</span><span style="font-weight:600;font-family:var(--font-mono);color:${balance > 0 ? '#E16A5B' : 'var(--green)'};">${formatMoney(balance)}</span></div>
+                <div class="dpo-sc-row"><span style="color:var(--gold);">PO Costs</span><span style="font-weight:600;font-family:var(--font-mono);">${formatMoney(_poTotal)}</span></div>
               </div>
 
               <!-- PROJECT TEAM -->
-              <div class="dpo-sidebar-card">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                  <div class="dpo-sidebar-title" style="margin:0;">Project Team</div>
-                  <button class="dpo-quick-btn" style="padding:3px 10px;" onclick="addProjectMember('${proj.id}')">+ Add</button>
+              <div class="dpo-sc">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <div class="dpo-sc-title" style="margin:0;">Project Team</div>
+                  <button class="dpo-quick-btn" onclick="addProjectMember('${proj.id}')">+ Add</button>
                 </div>
                 ${(proj.members && proj.members.length > 0)
                   ? proj.members.map(function(m, idx) {
@@ -7262,10 +7275,10 @@
               </div>
 
               <!-- PINTEREST BOARD -->
-              <div class="dpo-sidebar-card">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                  <div class="dpo-sidebar-title" style="margin:0;">Pinterest Board</div>
-                  <button class="dpo-quick-btn" style="padding:3px 10px;" onclick="editPinterestBoard('${proj.id}')">Edit</button>
+              <div class="dpo-sc">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <div class="dpo-sc-title" style="margin:0;">Pinterest Board</div>
+                  <button class="dpo-quick-btn" onclick="editPinterestBoard('${proj.id}')">Edit</button>
                 </div>
                 ${(function(){
                   if (!proj.pinterestUrl) return '<div style="text-align:center;padding:20px;border:2px dashed rgba(200,185,154,0.15);cursor:pointer;" onclick="editPinterestBoard(\'' + proj.id + '\')"><div style="font-size:24px;margin-bottom:6px;">📌</div><div style="font-size:12px;color:var(--gray-400);">Link a Pinterest board</div><div style="font-size:10px;color:var(--gold);margin-top:4px;">Paste any Pinterest board URL</div></div>';
@@ -7277,9 +7290,9 @@
               </div>
 
               <!-- FILES & ATTACHMENTS -->
-              <div class="dpo-sidebar-card" id="projFilesCard${proj.id}">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                  <div class="dpo-sidebar-title" style="margin:0;">Files & Deliverables</div>
+              <div class="dpo-sc" id="projFilesCard${proj.id}">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <div class="dpo-sc-title" style="margin:0;">Files & Deliverables</div>
                   <div style="display:flex;gap:4px;">
                     <button class="dpo-quick-btn" style="padding:3px 8px;" onclick="addProjectFileLink('${proj.id}')">Link</button>
                     <label class="dpo-quick-btn" style="padding:3px 8px;cursor:pointer;margin:0;">Upload
@@ -7294,8 +7307,8 @@
 
               <!-- PO STATUS SUMMARY -->
               ${pos.length > 0 ? `
-              <div class="dpo-sidebar-card">
-                <div class="dpo-sidebar-title">PO Status</div>
+              <div class="dpo-sc">
+                <div class="dpo-sc-title">PO Status</div>
                 ${['Waiting for Confirmation','Ordered','At Receiver','At Workroom','Installed','Received'].map(status => {
                   const count = pos.filter(p => p.status === status).length;
                   if (count === 0) return '';
@@ -7305,8 +7318,8 @@
               </div>` : ''}
 
               <!-- RECENT ACTIVITY -->
-              <div class="dpo-sidebar-card">
-                <div class="dpo-sidebar-title">Recent Activity</div>
+              <div class="dpo-sc">
+                <div class="dpo-sc-title">Recent Activity</div>
                 <div class="dpo-activity">
                   ${activities.length === 0 ? '<div style="text-align:center;padding:20px;color:var(--gold);font-size:13px;">No recent activity</div>' :
                     activities.map(a => {
@@ -7669,46 +7682,10 @@ async function renderBoardsTab(T, proj) {
         rm.forEach(d => { const data = d.data(); if (data.name) roomMeta[data.name] = data; });
       } catch(e){}
 
-      // Auto-sync clips to productLibrary (throttled — max once per 5 min per project)
-      if (clips.length > 0) {
-        var syncKey = 'libSync_' + proj.id;
-        var lastSync = parseInt(sessionStorage.getItem(syncKey) || '0');
-        if (Date.now() - lastSync > 300000) { // 5 minutes
-          sessionStorage.setItem(syncKey, String(Date.now()));
-          (async function() {
-            try {
-              var existing = new Set();
-              var libSnap = await db.collection('productLibrary').where('project', '==', (proj.name || '')).limit(5000).get();
-              libSnap.forEach(function(d) {
-                var dd = d.data();
-                existing.add((dd.title + '|' + dd.vendor).toLowerCase().trim());
-              });
-              var batch = db.batch();
-              var count = 0;
-              clips.forEach(function(c) {
-                var title = (c.title || '').trim();
-                if (!title) return;
-                var key = (title + '|' + (c.vendor || '')).toLowerCase().trim();
-                if (existing.has(key)) return;
-                existing.add(key);
-                var ref = db.collection('productLibrary').doc();
-                batch.set(ref, {
-                  title: title, vendor: c.vendor || '', room: c.room || '', category: c.category || '',
-                  image: c.imageUrl || '', imageUrl: c.imageUrl || '',
-                  unitCost: parseMoney(c.cost) || 0, sellPrice: parseMoney(c.clientPrice) || parseMoney(c.totalSelling) || 0,
-                  sku: c.sku || '', description: c.description || '', project: proj.name || '',
-                  invoice: c.invoiceNum || '', po: c.poNum || '', proposal: c.proposalNum || '',
-                  status: c.approvalStatus || '', dimensions: c.dimensions || '', finish: c.finish || '',
-                  syncedAt: new Date().toISOString(), _fromClip: true
-                });
-                count++;
-                if (count >= 400) return;
-              });
-              if (count > 0) await batch.commit();
-            } catch(e) { console.warn('Library sync:', e); }
-          })();
-        }
-      }
+      // Auto-sync clips to productLibrary — DISABLED
+      // Was auto-writing clips to productLibrary collection every 5 min per project.
+      // This caused duplicates and polluted the library with room names as categories.
+      // Product library should only grow from intentional user actions (Add Product, Import).
 
       // Sort clips
       clips.sort((a, b) => {
@@ -9901,34 +9878,9 @@ async function renderBoardsTab(T, proj) {
       images[index] = item;
       await db.collection('boards').doc(projectId).collection('ideabooks').doc(sectionId).update({ images });
 
-      // Sync to Master Product Library if vendor is set
-      if (item.vendor && item.caption) {
-        try {
-          // Get project name for library entry
-          var projDoc = await db.collection('boards').doc(projectId).get();
-          var projName = projDoc.exists ? (projDoc.data().name || projectId) : projectId;
-          await db.collection('productLibrary').add({
-            title: item.caption || '',
-            vendor: item.vendor || '',
-            category: item.category || 'Ideabook Import',
-            image: item.imageUrl || '',
-            imageUrl: item.imageUrl || '',
-            sellPrice: parseFloat(item.price) || 0,
-            totalSell: parseFloat(item.price) || 0,
-            project: projName,
-            room: '',
-            source: 'ideabook',
-            sourceUrl: item.sourceUrl || '',
-            notes: item.notes || '',
-            tags: item.tags || [],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          });
-          showToast('Saved + added to Product Library');
-        } catch(e) { console.warn('Library sync skipped:', e); showToast('Saved'); }
-      } else {
-        showToast('Saved');
-      }
+      // Auto-sync to product library disabled — was adding duplicates on every save.
+      // Use "Add to Selections" button for intentional library additions.
+      showToast('Saved');
       closeModal();
       renderProjectDetail();
     }
@@ -12725,6 +12677,7 @@ async function renderBoardsTab(T, proj) {
           clientEmail: cEmail,
           clientPhone: cPhone,
           clientAddress: cAddr,
+          taxRate: parseFloat(projData.taxRate) || 0,
           payments: [],
           published: false
         };
@@ -14636,7 +14589,7 @@ async function renderBoardsTab(T, proj) {
     }
 
     // ==================== UNIVERSAL DOCUMENT PREVIEW ====================
-    async function previewDocument(type, projectId, docId) {
+    async function _previewDocumentOriginal(type, projectId, docId) {
       const collection = type === 'invoice' ? 'invoices' : type === 'po' ? 'purchaseOrders' : 'proposals';
       const typeLabel = type === 'invoice' ? 'Invoice' : type === 'po' ? 'Purchase Order' : 'Proposal';
       let docData = null, items = [];
@@ -14694,7 +14647,7 @@ async function renderBoardsTab(T, proj) {
       var docDate = docData.date || docData.createdAt || '';
       var dateStr = docDate ? new Date(docDate).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : '';
       var total = parseFloat(docData.total) || items.reduce(function(s,i) { return s + (parseFloat(i.amount)||0); }, 0);
-      var taxRate = parseFloat(docData.taxRate) || 0;
+      var taxRate = parseFloat(docData.taxRate) || parseFloat(proj.taxRate) || 0;
       var taxAmt = total * taxRate / 100;
       var grandTotal = total + taxAmt;
       var payments = docData.payments || [];
@@ -14714,6 +14667,7 @@ async function renderBoardsTab(T, proj) {
           '<div style="font-size:12px;font-weight:600;color:#999;">' + formatMoney(catTotal) + '</div></div>' +
           '<table><thead><tr><th style="width:110px;"></th><th>Item</th>' +
           (type === 'po' ? '<th>Vendor</th>' : '') +
+          '<th>Room</th>' +
           '<th style="text-align:center;">Qty</th>' +
           (type === 'po' ? '<th class="right">Cost</th>' : '<th class="right">Price</th>') +
           '<th class="right">Shipping</th>' +
@@ -14728,6 +14682,7 @@ async function renderBoardsTab(T, proj) {
             (it.description ? '<div style="font-size:11px;color:#888;margin-top:2px;">' + esc(it.description.substring(0,80)) + '</div>' : '') +
             (it.shipTo ? '<div style="font-size:10px;color:#aaa;margin-top:2px;">Ship to: ' + esc(it.shipTo) + '</div>' : '') +
             '</td>' + (type === 'po' ? '<td style="color:#888;font-size:12px;">' + esc(it.vendor||'') + '</td>' : '') +
+            '<td style="color:#888;font-size:12px;">' + esc(it.room || it.category || '') + '</td>' +
             '<td style="text-align:center;">' + qty + '</td>' +
             '<td class="right">' + formatMoney(unitPrice) + '</td>' +
             '<td class="right" style="color:#888;">' + (shipAmt > 0 ? formatMoney(shipAmt) : '—') + '</td>' +
@@ -14750,7 +14705,7 @@ async function renderBoardsTab(T, proj) {
 
       var totalsHtml = '<tr><td>Subtotal</td><td class="right">' + formatMoney(_pvSubtotal) + '</td></tr>';
       if (_pvShipping > 0) totalsHtml += '<tr><td>Shipping</td><td class="right">' + formatMoney(_pvShipping) + '</td></tr>';
-      if (taxRate > 0) totalsHtml += '<tr><td>Tax (' + taxRate + '%)</td><td class="right">' + formatMoney(_pvTax) + '</td></tr>';
+      totalsHtml += '<tr><td>Tax' + (taxRate > 0 ? ' (' + taxRate + '%)' : ' (none set)') + '</td><td class="right">' + formatMoney(_pvTax) + '</td></tr>';
       totalsHtml += '<tr class="total"><td>Total</td><td class="right">' + formatMoney(_pvGrand) + '</td></tr>';
       if (type !== 'po' && payments.length > 0) {
         payments.forEach(function(p) {
@@ -14826,6 +14781,16 @@ async function renderBoardsTab(T, proj) {
     }
 
     // ==================== ROOM BOARD PREVIEW ====================
+    // Delegate to window.previewDocument (overridable by fix modules)
+    window._previewDocumentOriginal = _previewDocumentOriginal;
+    async function previewDocument(type, projectId, docId) {
+      if (window.previewDocument && window.previewDocument !== previewDocument) {
+        return window.previewDocument(type, projectId, docId);
+      }
+      return _previewDocumentOriginal(type, projectId, docId);
+    }
+    window.previewDocument = previewDocument;
+
     async function previewRoomBoard(projectId) {
       var proj = {};
       try { var pd = await db.collection('boards').doc(projectId).get(); if (pd.exists) proj = pd.data(); } catch(e) {}
@@ -15168,6 +15133,7 @@ async function renderBoardsTab(T, proj) {
               '<option value="handling"' + (item.expenseType === 'handling' ? ' selected' : '') + '>Handling</option>' +
               '<option value="other_expense"' + (item.expenseType === 'other_expense' ? ' selected' : '') + '>Other</option>' +
             '</select></div>' +
+            '<div class="doc-edit-field" style="text-align:center;"><label>Taxable</label><input type="checkbox" data-idx="' + idx + '" data-field="taxable" onchange="docEditTaxableChange(this)" style="accent-color:var(--gold);width:18px;height:18px;cursor:pointer;" ' + (item.taxable !== false && (item.taxable === true || item.expenseType === 'product' || (!item.expenseType && !item.taxable)) ? 'checked' : '') + ' title="Check if this item is taxable"></div>' +
             '<div class="doc-edit-field doc-edit-room"><label>Room</label><select data-idx="' + idx + '" data-field="room" onchange="docEditFieldChange(this)">' + docEditBuildRoomOptions(_docEdit.rooms, item.room || item.category || '') + '</select></div>' +
             '<div class="doc-edit-field" style="grid-column:span 2;"><label>Ship To</label><select data-idx="' + idx + '" data-field="shipTo" onchange="docEditFieldChange(this)" style="font-size:12px;">' + _piShipToOptions(item.shipTo || '') + '</select></div>' +
           '</div>' +
@@ -15176,6 +15142,13 @@ async function renderBoardsTab(T, proj) {
       }).join('');
 
       docEditRecalcTotals();
+    }
+
+    function docEditTaxableChange(el) {
+      const idx = parseInt(el.dataset.idx);
+      _docEdit.items[idx].taxable = el.checked;
+      docEditRecalcTotals();
+      docEditAutoSave();
     }
 
     function docEditFieldChange(el) {
@@ -15211,7 +15184,7 @@ async function renderBoardsTab(T, proj) {
 
     function docEditRecalcTotals() {
       const items = _docEdit.items;
-      let subtotal = 0, totalShipping = 0;
+      let subtotal = 0, taxableSubtotal = 0, totalShipping = 0;
       items.forEach(item => {
         const sell = parseFloat(item.amount) || 0;
         const qty = parseFloat(item.qty) || 1;
@@ -15219,11 +15192,15 @@ async function renderBoardsTab(T, proj) {
         const mkup = parseFloat(item.markupPct) || 0;
         const ship = parseFloat(item.shipping) || 0;
         // Use selling price when no cost is set; otherwise use cost+markup calculation
-        subtotal += (cost === 0 && sell > 0) ? sell : cost * qty * (1 + mkup / 100);
+        const lineAmt = (cost === 0 && sell > 0) ? sell : cost * qty * (1 + mkup / 100);
+        subtotal += lineAmt;
+        // Only tax items marked taxable (default: products are taxable)
+        var isTaxable = item.taxable !== false && (item.taxable === true || item.expenseType === 'product' || (!item.expenseType && item.taxable !== false));
+        if (isTaxable) taxableSubtotal += lineAmt;
         totalShipping += ship;
       });
       const taxRate = parseFloat(_docEdit.docData.taxRate) || 0;
-      const tax = subtotal * (taxRate / 100);
+      const tax = taxableSubtotal * (taxRate / 100);
       const grandTotal = subtotal + totalShipping + tax;
 
       // Payments
@@ -15262,7 +15239,7 @@ async function renderBoardsTab(T, proj) {
         el.innerHTML = '<table>' +
           '<tr><td>Subtotal</td><td>' + formatMoney(subtotal) + '</td></tr>' +
           (totalShipping > 0 ? '<tr><td>Shipping Cost</td><td>' + formatMoney(totalShipping) + '</td></tr>' : '') +
-          '<tr><td>Sales Tax' + (taxRate > 0 ? ' (' + taxRate + '%)' : '') + '</td><td>' + formatMoney(tax) + '</td></tr>' +
+          '<tr><td>Sales Tax' + (taxRate > 0 ? ' (' + taxRate + '% on taxable)' : '') + '</td><td>' + formatMoney(tax) + '</td></tr>' +
           '<tr class="total-line"><td>Total</td><td>' + formatMoney(grandTotal) + '</td></tr>' +
           (totalPaid > 0 ? '<tr><td style="color:var(--green);">Payments</td><td style="color:var(--green);">-' + formatMoney(totalPaid) + '</td></tr>' : '') +
           (totalPaid > 0 ? '<tr class="total-line"><td><strong>Balance Due</strong></td><td><strong style="color:' + (balance <= 0 ? 'var(--green)' : 'var(--gold)') + ';">' + formatMoney(balance) + '</strong></td></tr>' : '') +
@@ -18041,30 +18018,52 @@ async function renderBoardsTab(T, proj) {
     // ==================== FINANCIALS ====================
     async function renderFinancials() {
       setBreadcrumb([{ label: 'Financials' }]);
-      setTopbarActions('');
+      setTopbarActions('<button class="btn btn-secondary btn-sm" onclick="rebuildFinancialSummaryNow();rebuildSearchIndexNow()" style="margin-right:8px;">🔄 Refresh Data</button>');
       const C = document.getElementById('contentArea');
+      C.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400)">Loading financials...</div>';
 
-      // Use cached financial data if available, load in background
-      await loadFinancialData();
-      var allInvoices = _cachedInvoices || [];
-      var allPOs = _cachedPOs || [];
-
-      window._allInvoices = allInvoices;
-      window._allPOs = allPOs;
-
-      // Compute KPIs
-      var totalInvoiced = allInvoices.reduce((s,i) => s + (parseFloat(i.total)||0), 0);
-      var totalPaid = 0;
-      allInvoices.forEach(inv => {
-        var pmts = (inv.payments||[]).reduce((s,p) => s+(parseFloat(p.amount)||0),0);
-        if (pmts > 0) totalPaid += pmts;
-        else if (inv.status === 'Paid') totalPaid += (parseFloat(inv.total)||0);
-      });
-      var totalOutstanding = totalInvoiced - totalPaid;
-      var totalPOCost = allPOs.reduce((s,p) => s + (parseFloat(p.total)||0), 0);
-      var openInvoices = allInvoices.filter(i => i.status !== 'Paid' && i.status !== 'Draft' && i.status !== 'Cancelled');
-      var openPOs = allPOs.filter(p => !['Installed','Received','Cancelled','Closed','Paid'].includes(p.status));
+      // Try cached summary first (instant from one Firestore doc)
+      var totalInvoiced = 0, totalPaid = 0, totalOutstanding = 0, totalPOCost = 0;
+      var openInvoiceCount = 0, openPOCount = 0, openInvAmt = 0, openPOAmt = 0;
       var totalTimeHrs = 0, totalTimeBillable = 0;
+      var invoiceCount = 0, poCount = 0, proposalCount = 0;
+      var usedCache = false;
+
+      try {
+        var summaryDoc = await db.collection('_cache').doc('financialSummary').get();
+        if (summaryDoc.exists) {
+          var s = summaryDoc.data();
+          totalInvoiced = s.totalInvoiced || 0; totalPaid = s.totalPaid || 0;
+          totalOutstanding = s.totalOutstanding || 0; totalPOCost = s.totalPOCost || 0;
+          openInvoiceCount = s.openInvoiceCount || 0; openPOCount = s.openPOCount || 0;
+          openInvAmt = s.openInvoiceAmount || 0; openPOAmt = s.openPOAmount || 0;
+          invoiceCount = s.invoiceCount || 0; poCount = s.poCount || 0; proposalCount = s.proposalCount || 0;
+          totalTimeHrs = s.totalHours || 0; totalTimeBillable = s.billableValue || 0;
+          usedCache = true;
+        }
+      } catch(e) {}
+
+      // If no cached summary, load live
+      if (!usedCache) {
+        await loadFinancialData();
+        var allInvoices = _cachedInvoices || [];
+        var allPOs2 = _cachedPOs || [];
+        totalInvoiced = allInvoices.reduce((s,i) => s + (parseFloat(i.total)||0), 0);
+        allInvoices.forEach(inv => {
+          var pmts = (inv.payments||[]).reduce((s,p) => s+(parseFloat(p.amount)||0),0);
+          if (pmts > 0) totalPaid += pmts;
+          else if (inv.status === 'Paid') totalPaid += (parseFloat(inv.total)||0);
+        });
+        totalOutstanding = totalInvoiced - totalPaid;
+        totalPOCost = allPOs2.reduce((s,p) => s + (parseFloat(p.total)||0), 0);
+        var oi = allInvoices.filter(i => i.status !== 'Paid' && i.status !== 'Draft' && i.status !== 'Cancelled');
+        openInvoiceCount = oi.length; openInvAmt = oi.reduce((s,i)=>s+(parseFloat(i.total)||0),0);
+        var op = allPOs2.filter(p => !['Installed','Received','Cancelled','Closed','Paid'].includes(p.status));
+        openPOCount = op.length; openPOAmt = op.reduce((s,p)=>s+(parseFloat(p.total)||0),0);
+        invoiceCount = allInvoices.length; poCount = allPOs2.length;
+      }
+      var openInvoices = { length: openInvoiceCount };
+      var openPOs = { length: openPOCount };
 
       // Report card builder
       function rCard(icon, title, desc, onclick) {
@@ -18108,21 +18107,21 @@ async function renderBoardsTab(T, proj) {
         // ── Open Transactions ──
         '<div style="font-size:16px;font-weight:700;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">📋</span> Open Transactions</div>' +
         '<div style="display:grid;gap:8px;margin-bottom:28px;">' +
-          rCard('🧾', 'Open Invoices (' + openInvoices.length + ')', 'Unpaid and partially paid invoices with aging — ' + formatMoney(openInvoices.reduce((s,i)=>s+(parseFloat(i.total)||0),0)) + ' outstanding', "runReport('arAging')") +
+          rCard('🧾', 'Open Invoices (' + openInvoiceCount + ')', 'Unpaid and partially paid invoices with aging — ' + formatMoney(openInvAmt) + ' outstanding', "runReport('arAging')") +
           '<div style="margin-top:8px;">' +
-            rCard('📦', 'Open Purchase Orders (' + openPOs.length + ')', 'POs not yet received or installed — ' + formatMoney(openPOs.reduce((s,p)=>s+(parseFloat(p.total)||0),0)) + ' pending', "navigate('#/allpos')") +
+            rCard('📦', 'Open Purchase Orders (' + openPOCount + ')', 'POs not yet received or installed — ' + formatMoney(openPOAmt) + ' pending', "navigate('#/allpos')") +
           '</div>' +
         '</div>' +
 
         // ── Transactions ──
         '<div style="font-size:16px;font-weight:700;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">✦</span> Transactions</div>' +
         '<div style="display:grid;gap:8px;margin-bottom:28px;">' +
-          rCard('🧾', 'All Invoices (' + allInvoices.length + ')', 'Complete invoice list — filter by status, project, date', "navigate('#/allinvoices')") +
+          rCard('🧾', 'All Invoices (' + invoiceCount + ')', 'Complete invoice list — filter by status, project, date', "navigate('#/allinvoices')") +
           '<div style="margin-top:8px;">' +
-            rCard('📦', 'All Purchase Orders (' + allPOs.length + ')', 'Complete PO list — filter by vendor, status, project', "navigate('#/allpos')") +
+            rCard('📦', 'All Purchase Orders (' + poCount + ')', 'Complete PO list — filter by vendor, status, project', "navigate('#/allpos')") +
           '</div>' +
           '<div style="margin-top:8px;">' +
-            rCard('📋', 'All Proposals (' + allProposals.length + ')', 'Complete proposal list — filter by status, project', "navigate('#/allproposals')") +
+            rCard('📋', 'All Proposals (' + proposalCount + ')', 'Complete proposal list — filter by status, project', "navigate('#/allproposals')") +
           '</div>' +
         '</div>' +
 
@@ -26939,8 +26938,8 @@ async function renderBoardsTab(T, proj) {
     let libraryProducts = [];
     let libraryFilter = { search: '', vendor: '', category: '' };
     let libraryViewMode = 'list';
-    let librarySortField = 'title';
-    let librarySortDir = 'asc';
+    let librarySortField = 'updatedAt';
+    let librarySortDir = 'desc';
 
     // Helper: get image from any of the possible field names
     function getProductImg(p) {
@@ -27462,12 +27461,14 @@ async function renderBoardsTab(T, proj) {
     function renderLibraryView() {
       const T = document.getElementById('contentArea');
       const vendorSet = new Set([...libraryProducts.map(p => p.vendor).filter(Boolean), ...(window._globalVendors || [])]);
-      const catSet = new Set([...libraryProducts.map(p => p.category).filter(Boolean), ...(window._globalCategories || [])]);
       const vendors = [...vendorSet].sort();
-      const categories = [...catSet].sort();
-      // Standard interior design categories (matches cleaned Houzz import)
-      ['Accessories','Architectural','Art','Bedding & Pillows','Fabric & Trim','Flooring','Furniture','Hardware','Lighting','Outdoor','Plumbing & Appliances','Tile & Stone','Wall Covering','Window Treatments'].forEach(function(c) { if (categories.indexOf(c) < 0) categories.push(c); });
-      categories.sort();
+      // Only show real design categories — not room names
+      const VALID_CATEGORIES = new Set([
+        'Accessories','Architectural','Art','Bedding & Pillows','Fabric & Trim','Flooring',
+        'Furniture','Hardware','Lighting','Outdoor','Plumbing & Appliances','Tile & Stone',
+        'Wall Covering','Window Treatments'
+      ]);
+      const categories = [...VALID_CATEGORIES].sort();
       const filtered = libraryProducts.filter(p => {
         if (libraryFilter.search) {
           const s = libraryFilter.search.toLowerCase();
@@ -27483,7 +27484,7 @@ async function renderBoardsTab(T, proj) {
                         str(p.category).includes(s);
           if (!match) return false;
         }
-        if (libraryFilter.vendor && (p.vendor || '') !== libraryFilter.vendor) return false;
+        if (libraryFilter.vendor && (p.vendor || '') !== libraryFilter.vendor && (p.manufacturer || '') !== libraryFilter.vendor) return false;
         if (libraryFilter.category && (p.category || '') !== libraryFilter.category) return false;
         return true;
       });
@@ -27627,12 +27628,12 @@ async function renderBoardsTab(T, proj) {
       const p = prefill || {};
       document.getElementById('modalContainer').innerHTML = `
         <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
-          <div class="modal" style="width:700px;max-height:90vh;overflow-y:auto;">
-            <div class="modal-header">
+          <div class="modal" style="width:700px;max-height:90vh;display:flex;flex-direction:column;">
+            <div class="modal-header" style="flex-shrink:0;">
               <div class="modal-title">${p.id ? 'Edit Product' : 'New Product'}</div>
               <button class="modal-close" onclick="closeModal()">&times;</button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="overflow-y:auto;flex:1;min-height:0;">
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
                 <div class="form-group" style="grid-column:span 2;">
                   <label class="form-label">Product Name *</label>
@@ -27732,7 +27733,7 @@ async function renderBoardsTab(T, proj) {
               </div>
               ` : ''}
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" style="flex-shrink:0;border-top:1px solid rgba(14,22,41,0.08);">
               ${p.id ? `<button class="btn" style="color:var(--red);margin-right:auto;" onclick="deleteProduct('${p.id}')">Delete</button>` : ''}
               <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
               <button class="btn btn-primary" onclick="saveProduct('${p.id || ''}')">${p.id ? 'Save Changes' : 'Add Product'}</button>
@@ -30055,6 +30056,58 @@ async function renderBoardsTab(T, proj) {
           </div>
         </div>
 
+        <!-- TAX CONFIGURATION -->
+        <div class="card" style="padding:24px;margin-bottom:24px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div>
+              <div style="font-size:16px;font-weight:700;color:var(--text-primary);">Tax Configuration</div>
+              <div style="font-size:12px;color:var(--gray-400);margin-top:4px;">Default sales tax rate for new invoices and proposals. Can be overridden per project or per document.</div>
+            </div>
+          </div>
+          <div style="display:grid;gap:12px;">
+            <div style="display:flex;align-items:center;gap:16px;padding:14px 16px;background:rgba(255,255,255,0.02);border:1px solid rgba(14,22,41,0.08);">
+              <div style="flex:1;">
+                <div style="font-size:13px;font-weight:600;color:#0E1629;">Default Tax Rate</div>
+                <div style="font-size:10px;color:var(--gray-400);margin-top:2px;">Applied to new invoices/proposals when no project-level rate is set</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <input type="number" step="0.01" min="0" max="15" value="${savedRates.defaultTaxRate || 0}" id="rate_defaultTaxRate" style="width:80px;background:#0E1629;color:white;border:1px solid rgba(255,255,255,0.12);padding:6px 10px;font-size:14px;font-weight:700;font-family:var(--font-mono);text-align:right;border-radius:0;">
+                <span style="font-size:11px;color:var(--gray-400);">%</span>
+              </div>
+            </div>
+            <div style="padding:14px 16px;background:rgba(255,255,255,0.02);border:1px solid rgba(14,22,41,0.08);">
+              <div style="font-size:13px;font-weight:600;color:#0E1629;margin-bottom:10px;">Taxable Item Types</div>
+              <div style="font-size:10px;color:var(--gray-400);margin-bottom:8px;">Check which item types should default to taxable when added to invoices/proposals.</div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;" id="taxableDefaults">
+                ${[
+                  { key: 'product', label: 'Products', default: true },
+                  { key: 'service', label: 'Services', default: false },
+                  { key: 'shipping', label: 'Shipping/Freight', default: true },
+                  { key: 'expense', label: 'Expenses', default: false },
+                  { key: 'handling', label: 'Handling Fees', default: false },
+                  { key: 'other_expense', label: 'Other', default: false }
+                ].map(function(t) {
+                  var checked = savedRates['taxable_' + t.key] != null ? savedRates['taxable_' + t.key] : t.default;
+                  return '<label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid rgba(14,22,41,0.06);cursor:pointer;font-size:12px;color:#0E1629;">' +
+                    '<input type="checkbox" id="taxable_' + t.key + '" ' + (checked ? 'checked' : '') + ' style="accent-color:var(--gold);width:16px;height:16px;">' +
+                    esc(t.label) +
+                  '</label>';
+                }).join('')}
+              </div>
+            </div>
+            <div style="padding:14px 16px;background:rgba(200,185,154,0.06);border:1px solid rgba(200,185,154,0.1);">
+              <div style="font-size:12px;font-weight:600;color:var(--gold);margin-bottom:6px;">Common California Tax Rates</div>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--gray-500);">
+                <span style="cursor:pointer;padding:4px 10px;border:1px solid rgba(14,22,41,0.08);background:#fff;" onclick="document.getElementById('rate_defaultTaxRate').value='7.75'">Orange County 7.75%</span>
+                <span style="cursor:pointer;padding:4px 10px;border:1px solid rgba(14,22,41,0.08);background:#fff;" onclick="document.getElementById('rate_defaultTaxRate').value='9.50'">Los Angeles 9.50%</span>
+                <span style="cursor:pointer;padding:4px 10px;border:1px solid rgba(14,22,41,0.08);background:#fff;" onclick="document.getElementById('rate_defaultTaxRate').value='8.75'">San Diego 8.75%</span>
+                <span style="cursor:pointer;padding:4px 10px;border:1px solid rgba(14,22,41,0.08);background:#fff;" onclick="document.getElementById('rate_defaultTaxRate').value='7.25'">CA Minimum 7.25%</span>
+                <span style="cursor:pointer;padding:4px 10px;border:1px solid rgba(14,22,41,0.08);background:#fff;" onclick="document.getElementById('rate_defaultTaxRate').value='8.25'">Utah 8.25%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- NON-BILLABLE PROJECTS -->
         <div class="card" style="padding:24px;margin-bottom:24px;">
           <div style="margin-bottom:16px;">
@@ -30204,6 +30257,14 @@ async function renderBoardsTab(T, proj) {
         idx++;
       }
       data.customRates = customRates;
+
+      // Collect tax configuration
+      var taxEl = document.getElementById('rate_defaultTaxRate');
+      if (taxEl) data.defaultTaxRate = parseFloat(taxEl.value) || 0;
+      ['product','service','shipping','expense','handling','other_expense'].forEach(function(key) {
+        var cb = document.getElementById('taxable_' + key);
+        if (cb) data['taxable_' + key] = cb.checked;
+      });
 
       try {
         await db.collection('settings').doc('serviceRates').set(data, { merge: true });
