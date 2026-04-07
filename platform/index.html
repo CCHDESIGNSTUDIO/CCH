@@ -1627,8 +1627,11 @@
     .badge-installed { background: var(--gold-light); color: var(--gold); }
     .badge-invoiced { background: var(--blue-light); color: var(--blue); }
     .badge-published { background: rgba(95,165,107,0.12); color: #5FA56B; border: 1px solid rgba(95,165,107,0.2); }
-    .badge-qb-synced { background: rgba(95,165,107,0.12); color: #5FA56B; border: 1px solid rgba(95,165,107,0.2); }
+    .badge-qb-sent { background: rgba(96,165,250,0.12); color: #60A5FA; border: 1px solid rgba(96,165,250,0.2); }
     .badge-qb-pending { background: rgba(200,185,154,0.12); color: var(--gold); border: 1px solid rgba(200,185,154,0.2); }
+    .badge-qb-paid { background: rgba(95,165,107,0.12); color: #5FA56B; border: 1px solid rgba(95,165,107,0.2); }
+    .badge-qb-partial { background: rgba(251,191,36,0.12); color: #F59E0B; border: 1px solid rgba(251,191,36,0.2); }
+    .badge-qb-synced { background: rgba(96,165,250,0.12); color: #60A5FA; border: 1px solid rgba(96,165,250,0.2); }
     .badge-partially-invoiced { background: rgba(200,185,154,0.12); color: var(--gold); }
     .badge-closed { background: rgba(255,255,255,0.06); color: var(--gray-500); }
     .badge-open { background: rgba(200,185,154,0.12); color: var(--gold); }
@@ -1821,12 +1824,12 @@
     .action-menu-wrap { position:relative;display:inline-block; }
     .action-dots { border:none;background:none;font-size:18px;cursor:pointer;padding:4px 8px;border-radius:4px;color:var(--gray-400);line-height:1; }
     .action-dots:hover { background:var(--gray-50);color:var(--gray-600); }
-    .action-menu-wrap .action-dropdown { position:absolute;right:0;top:100%;background:#fff;border:1px solid var(--gray-200);border-radius:0;box-shadow:0 8px 24px rgba(0,0,0,0.18);min-width:200px;z-index:9999;padding:4px 0; }
-    .action-menu-wrap .action-dropdown a { display:block;padding:9px 16px;font-size:13px;color:var(--gray-600);cursor:pointer;text-decoration:none;white-space:nowrap; }
-    .action-menu-wrap .action-dropdown a:hover { background:var(--gray-50);color:var(--gold); }
-    .action-menu-wrap .action-dropdown a.danger { color:var(--red); }
-    .action-menu-wrap .action-dropdown a.danger:hover { background:#fff5f5; }
-    .action-menu-wrap .action-dropdown .divider { height:1px;background:var(--gray-100);margin:4px 0; }
+    .action-menu-wrap .action-dropdown { position:fixed;background:#fff;border:1px solid rgba(14,22,41,0.15);border-radius:0;box-shadow:0 8px 32px rgba(14,22,41,0.25);min-width:220px;z-index:99999;padding:4px 0;max-height:400px;overflow-y:auto; }
+    .action-menu-wrap .action-dropdown a { display:block;padding:10px 16px;font-size:13px;color:#0E1629;cursor:pointer;text-decoration:none;white-space:nowrap;font-weight:500; }
+    .action-menu-wrap .action-dropdown a:hover { background:#F5F3EE;color:var(--gold); }
+    .action-menu-wrap .action-dropdown a.danger { color:#C62828;font-weight:600; }
+    .action-menu-wrap .action-dropdown a.danger:hover { background:#FFF5F5; }
+    .action-menu-wrap .action-dropdown .divider { height:1px;background:rgba(14,22,41,0.08);margin:4px 0; }
     .pub-yes { display:inline-block;background:#4CAF50;color:#0E1629;font-size:10px;font-weight:700;padding:2px 10px;border-radius:0; }
     .pub-no { display:inline-block;background:var(--gray-200);color:var(--gray-400);font-size:10px;font-weight:700;padding:2px 10px;border-radius:0; }
     .link-icon { color:var(--gray-300);font-size:16px; }
@@ -2010,6 +2013,7 @@
     /* ROOM BOARD TABLE ALIGNMENT */
     .data-table { width: 100%; border-collapse: collapse; }
     .data-table th, .data-table td { padding: 10px 12px; text-align: left; vertical-align: middle; font-size: 13px; border-bottom: 1px solid var(--border, #eee); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .data-table td.col-actions, .data-table td.col-links { overflow: visible !important; white-space: normal !important; }
     .data-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-400, #888); font-weight: 600; position: sticky; top: 0; background: var(--card, white); z-index: 2; }
     /* FFE / Selections table column widths (table-layout:fixed) */
     .data-table.ffe-table { table-layout: fixed; }
@@ -2505,14 +2509,20 @@
       return ' <span class="badge badge-published" style="font-size:10px;padding:2px 8px;border-radius:0;"><span class="badge-icon">✓</span>Published</span>';
     }
 
-    function qbBadge(qbDocId) {
-      if (!qbDocId) return ' <span class="badge badge-qb-pending" style="font-size:10px;padding:2px 8px;border-radius:0;" title="Not synced to QuickBooks">○ QB</span>';
-      return ' <span class="badge badge-qb-synced" style="font-size:10px;padding:2px 8px;border-radius:0;" title="QB #' + esc(String(qbDocId)) + '"><span class="badge-icon">✓</span>QB</span>';
+    function qbBadge(qbDocId, qbStatus) {
+      if (!qbDocId) return ' <span class="badge badge-qb-pending" style="font-size:10px;padding:2px 8px;border-radius:0;" title="Not sent to QuickBooks">○ QB</span>';
+      const st = (qbStatus || 'sent').toLowerCase();
+      if (st === 'paid') return ' <span class="badge badge-qb-paid" style="font-size:10px;padding:2px 8px;border-radius:0;" title="Paid — QB #' + esc(String(qbDocId)) + '"><span class="badge-icon">✓</span>QB Paid</span>';
+      if (st === 'partial') return ' <span class="badge badge-qb-partial" style="font-size:10px;padding:2px 8px;border-radius:0;" title="Partially Paid — QB #' + esc(String(qbDocId)) + '">◐ QB Partial</span>';
+      return ' <span class="badge badge-qb-sent" style="font-size:10px;padding:2px 8px;border-radius:0;" title="Sent to QB — #' + esc(String(qbDocId)) + '">↗ QB Sent</span>';
     }
 
-    function qbCellBadge(qbDocId) {
-      if (qbDocId) return '<span class="badge badge-qb-synced" style="font-size:10px;padding:3px 10px;border-radius:0;display:inline-flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;background:#2E7D32;border-radius:50%;display:inline-block;"></span> QB</span>';
-      return '<span style="font-size:10px;color:var(--gray-300);cursor:pointer;" title="Click to mark as synced to QB">○ QB</span>';
+    function qbCellBadge(qbDocId, qbStatus) {
+      if (!qbDocId) return '<span style="font-size:10px;color:var(--gray-300);cursor:pointer;" title="Not sent to QuickBooks">○ QB</span>';
+      const st = (qbStatus || 'sent').toLowerCase();
+      const colors = { paid: { bg: '#5FA56B', label: 'Paid' }, partial: { bg: '#F59E0B', label: 'Partial' }, sent: { bg: '#60A5FA', label: 'Sent' } };
+      const c = colors[st] || colors.sent;
+      return '<span class="badge badge-qb-' + st + '" style="font-size:10px;padding:3px 10px;border-radius:0;display:inline-flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;background:' + c.bg + ';border-radius:50%;display:inline-block;"></span> QB ' + c.label + '</span>';
     }
 
     // Derive QB ID from doc data — Houzz docs already synced to QB
@@ -2526,7 +2536,7 @@
     }
 
     function allBadges(item) {
-      return '<div class="status-badges">' + statusBadge(item.status) + publishedBadge(item.published) + qbBadge(getQbId(item)) + '</div>';
+      return '<div class="status-badges">' + statusBadge(item.status) + publishedBadge(item.published) + qbBadge(getQbId(item), item.qbStatus) + '</div>';
     }
 
     // ==================== STATE ====================
@@ -2537,6 +2547,33 @@
     let projects = [];
 
     // ==================== AUTH ====================
+    // ─── QB OAUTH CALLBACK HANDLER ─────────────────────────────────
+    // When Intuit redirects back to cch-platform.web.app?code=XXX&realmId=YYY
+    (function handleQBOAuthReturn() {
+      var params = new URLSearchParams(window.location.search);
+      var qbCode = params.get('code');
+      var qbRealmId = params.get('realmId');
+      if (!qbCode) return;
+      // Clean the URL so we don't re-process on refresh
+      window.history.replaceState({}, '', window.location.pathname + '#/projects');
+      // Wait for auth, then exchange the code
+      var _unsub = auth.onAuthStateChanged(function(u) {
+        _unsub();
+        if (!u) return;
+        showToast('Connecting to QuickBooks...');
+        firebase.functions().httpsCallable('qbAuthCallback')({ code: qbCode, realmId: qbRealmId })
+          .then(function(res) {
+            if (res.data.success) {
+              showToast('QuickBooks connected!');
+              alert('QuickBooks is now connected to CCH Studio!\n\nRealm ID: ' + (res.data.realmId || qbRealmId));
+            }
+          })
+          .catch(function(err) {
+            alert('QB Connection Error:\n' + (err.message || err));
+          });
+      });
+    })();
+
     auth.onAuthStateChanged(user => {
       // Allow client view/board without authentication
       var hashPage = (window.location.hash || '').replace('#/', '').split('/')[0];
@@ -4903,12 +4940,16 @@
         if (!doc.exists) return;
         var data = doc.data();
         var items = data.items || [];
+        var _clipTaxable = (item.taxable === 'taxable' || item.taxableItem === 'taxable' || item.taxable === true) ? true :
+          (item.taxable === 'non-taxable' || item.taxableItem === 'non-taxable' || item.taxable === false) ? false :
+          (typeof getDefaultTaxable === 'function' ? getDefaultTaxable(item.expenseType || 'product') : true);
         items.push({
           title: item.title || '', description: item.description || '',
           vendor: item.vendor || '', room: item.room || '', category: item.category || '',
           qty: 1, cost: parseFloat(item.unitCost || item.cost || 0),
           amount: parseFloat(item.sellPrice || item.clientPrice || item.totalSelling || 0),
-          imageUrl: item.imageUrl || item.image || '', sku: item.sku || ''
+          imageUrl: item.imageUrl || item.image || '', sku: item.sku || '',
+          taxable: _clipTaxable, expenseType: item.expenseType || 'product'
         });
         await docRef.update({ items: items });
         showToast('✅ Added: ' + (item.title || 'Item'));
@@ -5425,9 +5466,9 @@
       `);
 
       const _isAdminUser = currentUser && ADMIN_EMAILS.includes((currentUser.email || '').toLowerCase());
-      const tabs = ['overview', 'tasks', 'selections', 'boards', 'ideabooks', 'designboards', 'ffe', 'specbook', ...(_isAdminUser ? ['_div1', 'financials'] : []), '_div2', 'files', 'time', 'comms', 'notes'];
-      const tabLabels = { overview: 'Overview', tasks: 'Tasks', selections: 'Selections', ideabooks: 'Inspiration', boards: 'Room Boards', designboards: 'Design Boards', ffe: 'FFE Tracker', specbook: 'Spec Book', financials: 'Financials', files: 'Files & Docs', time: 'Time', comms: 'Communications', notes: 'Notes' };
-      const tabIcons = { overview: '◈', tasks: '✅', selections: '🛍️', ideabooks: '💡', boards: '🏠', designboards: '🎨', ffe: '🛋️', specbook: '📖', financials: '📊', files: '📁', time: '⏱️', comms: '💬', notes: '📝' };
+      const tabs = ['overview', 'tasks', 'selections', 'boards', 'ideabooks', 'designboards', 'ffe', 'specbook', '_div1', 'proposals', 'invoices', 'pos', ...(_isAdminUser ? ['financials'] : []), '_div2', 'files', 'time', 'comms', 'notes'];
+      const tabLabels = { overview: 'Overview', tasks: 'Tasks', selections: 'Selections', ideabooks: 'Inspiration', boards: 'Room Boards', designboards: 'Design Boards', ffe: 'FFE Tracker', specbook: 'Spec Book', proposals: 'Proposals', invoices: 'Invoices', pos: 'Purchase Orders', financials: 'Financials', files: 'Files & Docs', time: 'Time', comms: 'Communications', notes: 'Notes' };
+      const tabIcons = { overview: '◈', tasks: '✅', selections: '🛍️', ideabooks: '💡', boards: '🏠', designboards: '🎨', ffe: '🛋️', specbook: '📖', proposals: '📋', invoices: '💰', pos: '📦', financials: '📊', files: '📁', time: '⏱️', comms: '💬', notes: '📝' };
 
       // Load profit data for summary bar
       let _projInvoices = [], _projPOs = [], _projTime = [];
@@ -10801,7 +10842,7 @@ async function renderBoardsTab(T, proj) {
             <div class="empty-text">No proposals yet. Create one from scratch, your Room Boards, or Product Library.</div>
           </div>
         ` : `
-          <div class="card" style="padding:0;overflow:hidden;"><div class="table-wrap">
+          <div class="card" style="padding:0;overflow:visible;"><div class="table-wrap" style="overflow-x:auto;overflow-y:visible;">
             <table class="data-table fin-table">
               <thead><tr>
                 <th style="cursor:pointer;" onclick="projTabSortBy('number')">Title${projSortArrow('number')}</th>
@@ -10837,15 +10878,15 @@ async function renderBoardsTab(T, proj) {
                         <button class="action-dots" onclick="event.stopPropagation();toggleActionMenu(this)" style="font-size:18px;padding:4px 8px;border:none;background:none;cursor:pointer;color:var(--gray-400);">⋮</button>
                         <div class="action-dropdown" style="display:none">
                           <a onclick="navigate('#/project/${proj.id}/proposal/${p.id}');closeAllMenus()">✏️ Edit Proposal</a>
-                          ${p.status === 'Approved' || p.status === 'Invoiced'
-                            ? '<a onclick="navigate(\'#/project/'+proj.id+'/proposal/'+p.id+'\');closeAllMenus()">👁️ View Proposal</a>'
-                            : '<a onclick="navigate(\'#/project/'+proj.id+'/proposal/'+p.id+'\');closeAllMenus()">📨 Send Proposal</a>'}
+                          <a onclick="sendProposalToClient('${proj.id}','${p.id}');closeAllMenus()">📧 Send to Client</a>
+                          <a onclick="togglePublished('${proj.id}','${p.id}',${!p.published},'proposals');closeAllMenus()">${p.published ? '🔒 Unpublish from Dashboard' : '🌐 Publish to Client Dashboard'}</a>
                           <div class="divider"></div>
-                          <a onclick="convertProposalToInvoice('${proj.id}','${p.id}');closeAllMenus()">🧾 Start Invoice</a>
-                          <a onclick="togglePublished('${proj.id}','${p.id}',${!p.published},'proposals');closeAllMenus()">${p.published ? '🔒 Unpublish' : '🌐 Publish to Client'}</a>
-                          <a onclick="previewDocument('proposal','${proj.id}','${p.id}');closeAllMenus()">📄 PDF Preview</a>
-                          <a onclick="linkDocModal('${proj.id}','proposals','${p.id}');closeAllMenus()">🔗 Link Docs</a>
-                          <a onclick="setQBSynced('${proj.id}','proposals','${p.id}');closeAllMenus()">${getQbId(p) ? '✅ QB Synced' : '📤 Mark QB Synced'}</a>
+                          <a onclick="convertProposalToInvoice('${proj.id}','${p.id}');closeAllMenus()">🧾 Convert to Invoice</a>
+                          <a onclick="generatePOsFromDoc('${proj.id}','proposals','${p.id}');closeAllMenus()">📦 Generate POs</a>
+                          <div class="divider"></div>
+                          <a onclick="previewDocument('proposal','${proj.id}','${p.id}');closeAllMenus()">📄 Preview / PDF</a>
+                          <a onclick="generateTearSheetsFromDoc('${escAttr(proj.id)}','proposals','${escAttr(p.id)}','${escAttr(proj.name||'')}');closeAllMenus()">📑 Tear Sheets</a>
+                          <a onclick="linkDocModal('${proj.id}','proposals','${p.id}');closeAllMenus()">🔗 Link Documents</a>
                           <div class="divider"></div>
                           <a class="danger" onclick="deleteDoc('${proj.id}','proposals','${p.id}');closeAllMenus()">🗑️ Delete</a>
                         </div>
@@ -10987,7 +11028,7 @@ async function renderBoardsTab(T, proj) {
             </label>
             <span style="font-size:12px;color:var(--gray-400);">${invoices.length} invoice${invoices.length !== 1 ? 's' : ''}</span>
           </div>
-          <div class="card" style="padding:0;overflow:hidden;"><div class="table-wrap">
+          <div class="card" style="padding:0;overflow:visible;"><div class="table-wrap" style="overflow-x:auto;overflow-y:visible;">
             <table class="data-table fin-table" id="invoicesTable">
               <thead><tr>
                 <th style="cursor:pointer;" onclick="projTabSortBy('number')">Title${projSortArrow('number')}</th>
@@ -11222,7 +11263,7 @@ async function renderBoardsTab(T, proj) {
             </div>
             <div style="font-size:12px;color:var(--gray-400);">${pos.length} PO${pos.length !== 1 ? 's' : ''}</div>
           </div>
-          <div class="card" style="padding:0;overflow:hidden;"><div class="table-wrap">
+          <div class="card" style="padding:0;overflow:visible;"><div class="table-wrap" style="overflow-x:auto;overflow-y:visible;">
             <table class="data-table fin-table" id="posTable">
               <thead><tr>
                 <th style="cursor:pointer;" onclick="projTabSortBy('number')">PO Number${projSortArrow('number')}</th>
@@ -11266,7 +11307,7 @@ async function renderBoardsTab(T, proj) {
                           <a onclick="setQBSynced('${proj.id}','purchaseOrders','${po.id}');closeAllMenus()">${po.qbDocId ? '✅ QB Synced' : '📤 Mark QB Synced'}</a>
                           <a onclick="var s=prompt('New status:\\nOrdered, Shipped, At Receiver, At Workroom, Received, Installed, Cancelled');if(s){updatePOStatus('${proj.id}','${po.id}',s)};closeAllMenus()">📋 Change Status</a>
                           <div class="divider"></div>
-                          <a class="danger" onclick="if(confirm('Delete this PO?')){db.collection('boards').doc('${proj.id}').collection('purchaseOrders').doc('${po.id}').delete().then(()=>renderProjectDetail())};closeAllMenus()">🗑️ Delete</a>
+                          <a class="danger" onclick="if(confirm('Delete this PO?')){tryDeleteFromQB('${proj.id}','purchaseOrders','${po.id}').then(()=>db.collection('boards').doc('${proj.id}').collection('purchaseOrders').doc('${po.id}').delete()).then(()=>renderProjectDetail())};closeAllMenus()">🗑️ Delete</a>
                         </div>
                       </div>
                     </td>
@@ -13466,8 +13507,8 @@ async function renderBoardsTab(T, proj) {
                 <span class="badge ${prop.published ? 'badge-published' : 'badge-draft'}" style="font-size:11px;padding:4px 12px;cursor:pointer;" onclick="togglePublished('${projectId}','${proposalId}',${!prop.published})" title="${prop.published ? 'Click to unpublish from client' : 'Click to publish to client dashboard'}">
                   ${prop.published ? '<span class="badge-icon">✓</span>Published' : '○ Publish'}
                 </span>
-                <span class="badge ${getQbId(prop) ? 'badge-qb-synced' : 'badge-qb-pending'}" style="font-size:11px;padding:4px 12px;${getQbId(prop) ? '' : 'cursor:pointer;'}" ${getQbId(prop) ? 'title="QB #'+esc(String(getQbId(prop)))+'"' : 'title="Not yet synced to QuickBooks"'}>
-                  ${getQbId(prop) ? '<span class="badge-icon">✓</span> Synced' : '○ QB Sync'}
+                <span class="badge ${getQbId(prop) ? ('badge-qb-' + ((prop.qbStatus||'sent').toLowerCase())) : 'badge-qb-pending'}" style="font-size:11px;padding:4px 12px;${getQbId(prop) ? '' : 'cursor:pointer;'}" ${getQbId(prop) ? 'title="QB #'+esc(String(getQbId(prop)))+'"' : 'title="Not yet sent to QuickBooks"'}>
+                  ${getQbId(prop) ? ((prop.qbStatus||'sent')==='paid' ? '<span class="badge-icon">✓</span> QB Paid' : (prop.qbStatus==='partial' ? '◐ QB Partial' : '↗ QB Sent')) : '○ QB'}
                 </span>
               </div>
               <div style="font-size:28px;font-weight:700;color:var(--gold);margin-top:8px;">${formatMoney(prop.total || 0)}</div>
@@ -14053,9 +14094,28 @@ async function renderBoardsTab(T, proj) {
       renderProposalDetail(projectId, proposalId);
     }
 
+    // Delete from QB if doc was synced — called before Firestore delete
+    async function tryDeleteFromQB(projectId, collection, docId) {
+      try {
+        var snap = await db.collection('boards').doc(projectId).collection(collection).doc(docId).get();
+        if (!snap.exists) return;
+        var data = snap.data();
+        var qbId = data.qbDocId;
+        if (!qbId || /^(PR|IN|PO)-\d+/.test(qbId)) return; // Skip legacy Houzz IDs
+        var docType = collection === 'invoices' ? 'invoice' : (collection === 'purchaseOrders' ? 'purchaseorder' : null);
+        if (!docType) return;
+        var deleteFn = firebase.functions().httpsCallable('deleteFromQB');
+        await deleteFn({ qbDocId: qbId, docType: docType });
+        showToast('Also deleted from QuickBooks');
+      } catch(e) {
+        console.warn('QB delete failed (may need manual cleanup):', e.message);
+      }
+    }
+
     async function deleteProposal(projectId, proposalId) {
       if (!confirm('Are you sure you want to permanently delete this proposal? This cannot be undone.')) return;
       try {
+        await tryDeleteFromQB(projectId, 'proposals', proposalId);
         await db.collection('boards').doc(projectId).collection('proposals').doc(proposalId).delete();
         showToast('Proposal deleted');
         invalidateSearchCache();
@@ -14066,6 +14126,7 @@ async function renderBoardsTab(T, proj) {
     async function deleteInvoice(projectId, invoiceId) {
       if (!confirm('Are you sure you want to permanently delete this invoice? This cannot be undone.')) return;
       try {
+        await tryDeleteFromQB(projectId, 'invoices', invoiceId);
         await db.collection('boards').doc(projectId).collection('invoices').doc(invoiceId).delete();
         showToast('Invoice deleted');
         invalidateSearchCache();
@@ -14357,8 +14418,9 @@ async function renderBoardsTab(T, proj) {
         qbReference: _qbRef ? _qbRef.value.trim() : '',
         updatedAt: new Date().toISOString()
       };
-      // Also update the PO status based on QB status
+      // Update doc status based on QB status (for both POs and invoices)
       if (_qbStatus.value === 'paid') update.status = 'Paid';
+      if (_qbStatus.value === 'partial') update.status = 'Partially Paid';
       try {
         await db.collection('boards').doc(_docEdit.projectId).collection(_docEdit.collection).doc(_docEdit.docId).update(update);
         Object.assign(_docEdit.docData, update);
@@ -15653,7 +15715,8 @@ async function renderBoardsTab(T, proj) {
         title: item.title || '', description: item.description || '', vendor: item.vendor || '',
         qty: 1, cost: cost, markupPct: mkup, shipping: 0, amount: sell > 0 ? sell : cost,
         imageUrl: item.imageUrl || item.image || '', room: item.room || '', category: item.category || '',
-        shipTo: '', expenseType: 'product', sku: item.sku || ''
+        shipTo: '', expenseType: item.expenseType || 'product', sku: item.sku || '',
+        taxable: (item.taxable === 'taxable' || item.taxable === true) ? true : (item.taxable === 'non-taxable' || item.taxable === false) ? false : (typeof getDefaultTaxable === 'function' ? getDefaultTaxable(item.expenseType || 'product') : true)
       });
       docEditRenderItems();
       docEditAutoSave();
@@ -15816,7 +15879,8 @@ async function renderBoardsTab(T, proj) {
               title: p.title || '', vendor: p.vendor || '', category: p.category || '',
               room: p.room || '', qty: 1, cost: cost, markupPct: mkup, shipping: 0,
               amount: sell, imageUrl: p.image || p.imageUrl || '', description: p.description || '',
-              shipTo: '', expenseType: 'product'
+              shipTo: '', expenseType: p.expenseType || 'product',
+              taxable: (p.taxable === 'taxable' || p.taxable === true) ? true : (p.taxable === 'non-taxable' || p.taxable === false) ? false : (typeof getDefaultTaxable === 'function' ? getDefaultTaxable('product') : true)
             });
           });
           picker.remove();
@@ -15956,7 +16020,8 @@ async function renderBoardsTab(T, proj) {
         room: p.room || '', qty: 1, cost: cost, markupPct: mkup, shipping: 0,
         amount: sellPerUnit, imageUrl: p.imageUrl || p.image || '',
         description: p.description || '', sku: p.sku || '',
-        shipTo: '', expenseType: 'product'
+        shipTo: '', expenseType: p.expenseType || 'product',
+        taxable: (p.taxable === 'taxable' || p.taxable === true) ? true : (p.taxable === 'non-taxable' || p.taxable === false) ? false : (typeof getDefaultTaxable === 'function' ? getDefaultTaxable('product') : true)
       });
       docEditRenderItems();
       docEditAutoSave();
@@ -16032,7 +16097,8 @@ async function renderBoardsTab(T, proj) {
               title: c.title || '', description: c.description || '', vendor: c.vendor || '',
               qty: qty, cost: cost, markupPct: mkup, shipping: 0,
               amount: sellPerUnit * qty, imageUrl: c.imageUrl || c.image || '', room: c.room || '',
-              category: c.category || '', sku: c.sku || '', shipTo: '', expenseType: 'product'
+              category: c.category || '', sku: c.sku || '', shipTo: '', expenseType: c.expenseType || 'product',
+              taxable: (c.taxable === 'taxable' || c.taxable === true) ? true : (c.taxable === 'non-taxable' || c.taxable === false) ? false : (typeof getDefaultTaxable === 'function' ? getDefaultTaxable('product') : true)
             });
           });
           docEditRenderItems();
@@ -16789,21 +16855,24 @@ async function renderBoardsTab(T, proj) {
           <div id="docEditAttachmentsList"></div>
         </div>`;
 
-      const qbHTML = type === 'po' ? `
+      const qbHTML = (type === 'po' || type === 'invoice') ? `
         <div id="docEditQBSection" style="margin-top:16px;background:#F5F3EE;padding:16px 18px;border:1px solid rgba(14,22,41,0.08);">
-          <div style="font-size:12px;font-weight:700;margin-bottom:10px;color:#0E1629;letter-spacing:0.3px;">QuickBooks Status</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <div style="font-size:12px;font-weight:700;color:#0E1629;letter-spacing:0.3px;">QuickBooks</div>
+            ${!docData.qbDocId && (type === 'invoice' || type === 'po') ? '<button class="btn btn-sm" style="background:#60A5FA;color:white;border:none;font-size:11px;padding:3px 12px;" onclick="pushDocToQB(\'' + type + '\',\'' + projectId + '\',\'' + docId + '\')">Push to QB</button>' : ''}
+          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             <div>
-              <label style="font-size:11px;color:var(--gold);font-weight:600;display:block;margin-bottom:3px;">QB Sync Status</label>
+              <label style="font-size:11px;color:var(--gold);font-weight:600;display:block;margin-bottom:3px;">QB Status</label>
               <select class="form-select" id="docEditQbStatus" onchange="docEditSaveQBFields()" style="font-size:12px;padding:6px 10px;">
-                <option value=""${!docData.qbStatus ? ' selected' : ''}>Not Synced</option>
-                <option value="synced"${docData.qbStatus === 'synced' ? ' selected' : ''}>Synced to QB</option>
+                <option value=""${!docData.qbStatus ? ' selected' : ''}>Not Sent</option>
+                <option value="sent"${docData.qbStatus === 'sent' ? ' selected' : ''}>Sent to QB</option>
                 <option value="paid"${docData.qbStatus === 'paid' ? ' selected' : ''}>Paid in QB</option>
                 <option value="partial"${docData.qbStatus === 'partial' ? ' selected' : ''}>Partially Paid</option>
               </select>
             </div>
             <div>
-              <label style="font-size:11px;color:var(--gold);font-weight:600;display:block;margin-bottom:3px;">Payment Date (in QB)</label>
+              <label style="font-size:11px;color:var(--gold);font-weight:600;display:block;margin-bottom:3px;">Payment Date</label>
               <input type="date" class="form-input" id="docEditQbPayDate" value="${escAttr(docData.qbPaymentDate || '')}" onchange="docEditSaveQBFields()" style="font-size:12px;padding:6px 10px;">
             </div>
             <div style="grid-column:span 2;">
@@ -16811,6 +16880,7 @@ async function renderBoardsTab(T, proj) {
               <input class="form-input" id="docEditQbRef" value="${escAttr(docData.qbReference || '')}" placeholder="QB Bill #, Check #, or reference" onchange="docEditSaveQBFields()" style="font-size:12px;padding:6px 10px;">
             </div>
           </div>
+          ${docData.qbDocId ? '<div style="margin-top:8px;font-size:11px;color:var(--gray-400);">QB ID: ' + esc(String(docData.qbDocId)) + '</div>' : ''}
         </div>` : `
         <div style="margin-top:16px;">
           <button class="btn btn-secondary btn-sm" onclick="setQbPaymentConfirmation('${projectId}','${docId}','${collection}')" style="font-size:11px;">💳 QB Payment Confirmation</button>
@@ -19300,11 +19370,12 @@ async function renderBoardsTab(T, proj) {
       var cchHrs = cch.reduce(function(s, e) { return s + e._hrs; }, 0);
       var nonBillHrs = nonBillable.reduce(function(s, e) { return s + e._hrs; }, 0);
       var personalHrs = personal.reduce(function(s, e) { return s + e._hrs; }, 0);
-      var totalHrs = billableHrs + cchHrs + nonBillHrs + personalHrs;
+      // CCH is non-billable — combine for summary
+      var allNonBillHrs = cchHrs + nonBillHrs;
+      var totalHrs = billableHrs + allNonBillHrs + personalHrs;
       var totalPay = totalHrs * memberRate;
       var billablePay = billableHrs * memberRate;
-      var cchPay = cchHrs * memberRate;
-      var nonBillPay = nonBillHrs * memberRate;
+      var allNonBillPay = allNonBillHrs * memberRate;
       var personalPay = personalHrs * memberRate;
 
       // Group ALL entries by project (not just billable) with detail entries
@@ -19384,12 +19455,11 @@ async function renderBoardsTab(T, proj) {
           '</div>' +
         '</div>' +
 
-        // Summary row
-        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;">' +
-          '<div style="padding:14px;text-align:center;border:1px solid var(--gray-200);border-radius:4px;"><div style="font-size:20px;font-weight:700;color:#81C784;font-family:monospace;">' + billableHrs.toFixed(1) + 'h</div><div style="font-size:10px;color:var(--gray-400);margin-top:2px;">Client · ' + formatMoney(billablePay) + '</div></div>' +
-          '<div style="padding:14px;text-align:center;border:1px solid var(--gray-200);border-radius:4px;"><div style="font-size:20px;font-weight:700;color:#CE93D8;font-family:monospace;">' + cchHrs.toFixed(1) + 'h</div><div style="font-size:10px;color:var(--gray-400);margin-top:2px;">CCH · ' + formatMoney(cchPay) + '</div></div>' +
-          '<div style="padding:14px;text-align:center;border:1px solid var(--gray-200);border-radius:4px;"><div style="font-size:20px;font-weight:700;color:#90CAF9;font-family:monospace;">' + nonBillHrs.toFixed(1) + 'h</div><div style="font-size:10px;color:var(--gray-400);margin-top:2px;">Non-Bill · ' + formatMoney(nonBillPay) + '</div></div>' +
-          '<div style="padding:14px;text-align:center;border:1px solid var(--gray-200);border-radius:4px;"><div style="font-size:20px;font-weight:700;color:#FFB74D;font-family:monospace;">' + personalHrs.toFixed(1) + 'h</div><div style="font-size:10px;color:var(--gray-400);margin-top:2px;">Personal · ' + formatMoney(personalPay) + '</div></div>' +
+        // Summary row — Billable vs Non-Billable (includes CCH) vs Personal
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;">' +
+          '<div style="padding:14px;text-align:center;border:1px solid var(--gray-200);border-radius:4px;border-left:3px solid #81C784;"><div style="font-size:22px;font-weight:700;color:#81C784;font-family:monospace;">' + billableHrs.toFixed(1) + 'h</div><div style="font-size:10px;color:var(--gray-400);margin-top:2px;">Billable · ' + formatMoney(billablePay) + '</div></div>' +
+          '<div style="padding:14px;text-align:center;border:1px solid var(--gray-200);border-radius:4px;border-left:3px solid #90CAF9;"><div style="font-size:22px;font-weight:700;color:#90CAF9;font-family:monospace;">' + allNonBillHrs.toFixed(1) + 'h</div><div style="font-size:10px;color:var(--gray-400);margin-top:2px;">Non-Billable · ' + formatMoney(allNonBillPay) + '</div><div style="font-size:9px;color:var(--gray-300);margin-top:2px;">CCH: ' + cchHrs.toFixed(1) + 'h · Other: ' + nonBillHrs.toFixed(1) + 'h</div></div>' +
+          '<div style="padding:14px;text-align:center;border:1px solid var(--gray-200);border-radius:4px;border-left:3px solid #FFB74D;"><div style="font-size:22px;font-weight:700;color:#FFB74D;font-family:monospace;">' + personalHrs.toFixed(1) + 'h</div><div style="font-size:10px;color:var(--gray-400);margin-top:2px;">Personal/PTO · ' + formatMoney(personalPay) + '</div></div>' +
         '</div>' +
 
         // Full breakdown by project with hour log
@@ -19404,8 +19474,8 @@ async function renderBoardsTab(T, proj) {
             '</tr></thead><tbody>' +
             projectRows.map(function(proj) {
               var p = byProject[proj];
-              var catLabel = p.category === 'billable' ? 'Client' : p.category === 'cch' ? 'CCH' : p.category === 'personal' ? 'Personal' : 'Non-Bill';
-              var catColor = p.category === 'billable' ? '#81C784' : p.category === 'cch' ? '#CE93D8' : p.category === 'personal' ? '#FFB74D' : '#90CAF9';
+              var catLabel = p.category === 'billable' ? 'Billable' : p.category === 'cch' ? 'Non-Billable (CCH)' : p.category === 'personal' ? 'Personal/PTO' : 'Non-Billable';
+              var catColor = p.category === 'billable' ? '#81C784' : p.category === 'personal' ? '#FFB74D' : '#90CAF9';
               return '<tr style="border-bottom:1px solid var(--gray-200);cursor:pointer;" onclick="var d=this.nextElementSibling;while(d&&d.classList.contains(\'payout-detail\')){d.style.display=d.style.display===\'none\'?\'table-row\':\'none\';d=d.nextElementSibling;}">' +
                 '<td style="padding:10px 14px;font-weight:600;color:var(--navy);">' + esc(proj) + ' <span style="font-size:10px;color:var(--gray-400);font-weight:400;">(' + p.entries.length + ')</span></td>' +
                 '<td style="padding:10px 14px;"><span style="font-size:10px;font-weight:600;color:' + catColor + ';text-transform:uppercase;">' + catLabel + '</span></td>' +
@@ -19445,8 +19515,9 @@ async function renderBoardsTab(T, proj) {
       rows.push(['Total Hours', d.totalHrs.toFixed(2)]);
       rows.push(['Total Pay', '$' + d.totalPay.toFixed(2)]);
       rows.push(['Billable Hours', d.billableHrs.toFixed(2), '$' + (d.billableHrs * d.rate).toFixed(2)]);
-      rows.push(['CCH Internal', d.cchHrs.toFixed(2), '$' + (d.cchHrs * d.rate).toFixed(2)]);
-      rows.push(['Non-Billable', d.nonBillHrs.toFixed(2), '$' + (d.nonBillHrs * d.rate).toFixed(2)]);
+      rows.push(['Non-Billable (incl CCH)', (d.cchHrs + d.nonBillHrs).toFixed(2), '$' + ((d.cchHrs + d.nonBillHrs) * d.rate).toFixed(2)]);
+      rows.push(['  - CCH Internal', d.cchHrs.toFixed(2), '$' + (d.cchHrs * d.rate).toFixed(2)]);
+      rows.push(['  - Other Non-Billable', d.nonBillHrs.toFixed(2), '$' + (d.nonBillHrs * d.rate).toFixed(2)]);
       rows.push(['Personal/PTO', d.personalHrs.toFixed(2), '$' + (d.personalHrs * d.rate).toFixed(2)]);
       rows.push([]);
       rows.push(['DETAIL LOG']);
@@ -19454,9 +19525,9 @@ async function renderBoardsTab(T, proj) {
       d.entries.sort(function(a,b) { return (a.date||'').localeCompare(b.date||''); }).forEach(function(e) {
         var proj = e.project || e.projectName || '';
         var pLow = proj.toLowerCase();
-        var cat = (pLow.includes('personal') || pLow.includes('pto')) ? 'Personal'
-                : (pLow.startsWith('cch') || pLow.startsWith('cbh')) ? 'CCH Internal'
-                : (e.billable === false) ? 'Non-Billable' : 'Client Billable';
+        var cat = (pLow.includes('personal') || pLow.includes('pto')) ? 'Personal/PTO'
+                : (pLow.startsWith('cch') || pLow.startsWith('cbh') || pLow === 'internal' || pLow === 'admin') ? 'Non-Billable (CCH)'
+                : (e.billable === false) ? 'Non-Billable' : 'Billable';
         rows.push([e.date || '', proj, cat, e.service || e.description || '', (e._hrs || parseFloat(e.hours) || 0).toFixed(2), '$' + ((e._hrs || parseFloat(e.hours) || 0) * d.rate).toFixed(2)]);
       });
 
@@ -30959,7 +31030,7 @@ async function renderBoardsTab(T, proj) {
                     <td style="${tdStyle}color:var(--gray-400);font-size:12px;">${formatDate(p.dueDate || p.date)}</td>
                     <td style="${tdStyle}text-align:right;font-family:monospace;">${bal > 0 ? '$'+bal.toLocaleString('en-US',{minimumFractionDigits:2}) : '—'}</td>
                     <td style="${tdStyle}text-align:right;font-weight:600;font-family:monospace;">$${(parseFloat(p.total)||0).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
-                    <td style="${tdStyle}">${qbCellBadge(getQbId(p))}</td>
+                    <td style="${tdStyle}">${qbCellBadge(getQbId(p), p.qbStatus)}</td>
                     <td style="${tdStyle}text-align:center;" onclick="event.stopPropagation()">
                       <div class="action-menu-wrap" style="display:flex;align-items:center;justify-content:center;gap:6px;">
                         <button class="btn btn-primary btn-sm" style="font-size:12px;padding:6px 14px;white-space:nowrap;" onclick="event.stopPropagation();navigate('#/project/${p.projectId}/proposal/${p.id}')">Open</button>
@@ -31166,7 +31237,7 @@ async function renderBoardsTab(T, proj) {
                     <td style="${tdStyle}text-align:right;font-weight:600;font-family:monospace;">$${(parseFloat(inv.total)||0).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
                     <td style="${tdStyle}text-align:right;font-family:monospace;color:${(parseFloat(inv.total)||0) - bal > 0 ? '#5FA56B' : 'var(--gray-400)'};">${(parseFloat(inv.total)||0) - bal > 0 ? formatMoney((parseFloat(inv.total)||0) - bal) : '—'}</td>
                     <td style="${tdStyle}text-align:right;font-family:monospace;font-weight:600;${bal > 0 ? 'color:#C8B99A;' : 'color:#5FA56B;'}">${formatMoney(bal)}</td>
-                    <td style="${tdStyle}">${qbCellBadge(getQbId(inv))}</td>
+                    <td style="${tdStyle}">${qbCellBadge(getQbId(inv), inv.qbStatus)}</td>
                     <td style="${tdStyle}text-align:center;" onclick="event.stopPropagation()">
                       <div class="action-menu-wrap" style="display:flex;align-items:center;justify-content:center;gap:6px;">
                         <button class="btn btn-primary btn-sm" style="font-size:12px;padding:6px 14px;white-space:nowrap;" onclick="event.stopPropagation();navigate('#/project/${inv.projectId}/invoice/${inv.id}')">Open</button>
@@ -31321,7 +31392,7 @@ async function renderBoardsTab(T, proj) {
                     <td style="${tdStyle}text-align:right;font-weight:600;font-family:monospace;">$${(parseFloat(po.total)||0).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
                     <td style="${tdStyle}text-align:right;font-family:monospace;color:${(parseFloat(po.paidAmount)||0) > 0 ? '#5FA56B' : 'var(--gray-400)'};">${(parseFloat(po.paidAmount)||0) > 0 ? '$'+(parseFloat(po.paidAmount)).toLocaleString('en-US',{minimumFractionDigits:2}) : '—'}</td>
                     <td style="${tdStyle}text-align:right;font-weight:600;font-family:monospace;color:${((parseFloat(po.total)||0)-(parseFloat(po.paidAmount)||0)) > 0 ? '#C8B99A' : '#5FA56B'};">$${((parseFloat(po.total)||0)-(parseFloat(po.paidAmount)||0)).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
-                    <td style="${tdStyle}">${qbCellBadge(getQbId(po))}</td>
+                    <td style="${tdStyle}">${qbCellBadge(getQbId(po), po.qbStatus)}</td>
                     <td style="${tdStyle}text-align:center;" onclick="event.stopPropagation()">
                       <div class="action-menu-wrap" style="display:flex;align-items:center;justify-content:center;gap:4px;">
                         <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 10px;white-space:nowrap;" onclick="event.stopPropagation();navigate('#/project/${po.projectId}/po/${po.id}')">✏️ Edit</button>
@@ -31359,7 +31430,22 @@ async function renderBoardsTab(T, proj) {
       var dropdown = btn.nextElementSibling;
       var wasOpen = dropdown.style.display === 'block';
       closeAllMenus();
-      if (!wasOpen) dropdown.style.display = 'block';
+      if (!wasOpen) {
+        dropdown.style.display = 'block';
+        // Position fixed dropdown near the button
+        var rect = btn.getBoundingClientRect();
+        var menuH = dropdown.offsetHeight || 300;
+        var spaceBelow = window.innerHeight - rect.bottom;
+        if (spaceBelow < menuH && rect.top > menuH) {
+          // Open upward
+          dropdown.style.top = (rect.top - menuH) + 'px';
+        } else {
+          // Open downward
+          dropdown.style.top = rect.bottom + 'px';
+        }
+        dropdown.style.right = (window.innerWidth - rect.right) + 'px';
+        dropdown.style.left = 'auto';
+      }
     }
     function closeAllMenus() { document.querySelectorAll('.action-dropdown,.action-menu').forEach(function(d) { d.style.display = 'none'; }); }
     document.addEventListener('click', function(e) { if (!e.target.closest('.action-menu-wrap') && !e.target.closest('.action-menu') && !e.target.matches('[onclick*="nextElementSibling"]')) closeAllMenus(); });
@@ -31367,6 +31453,7 @@ async function renderBoardsTab(T, proj) {
     // Quick actions from hamburger menus
     async function deleteDoc(projectId, collection, docId) {
       if (!confirm('Delete this document? This cannot be undone.')) return;
+      await tryDeleteFromQB(projectId, collection, docId);
       await db.collection('boards').doc(projectId).collection(collection).doc(docId).delete();
       _cacheTime = 0; invalidateSearchCache();
       navigate(window.location.hash);
@@ -31484,7 +31571,7 @@ async function renderBoardsTab(T, proj) {
       var qbId = prompt('Enter QuickBooks ID (or leave blank to clear):', current);
       if (qbId === null) return;
       qbId = qbId.trim();
-      var update = { qbDocId: qbId || null };
+      var update = { qbDocId: qbId || null, qbStatus: qbId ? 'sent' : null };
       await db.collection('boards').doc(projectId).collection(collection).doc(docId).update(update);
       logDocActivity(projectId, collection, docId, 'qb_synced', qbId ? 'QB ID: ' + qbId : 'QB sync cleared');
       // Post to Teams → payment/QB channel
@@ -31546,16 +31633,15 @@ async function renderBoardsTab(T, proj) {
         const result = await pushFn({ projectId, docId, sendEmail: sendEmail });
 
         if (result.data.success) {
-          // Update button to show success
-          btn.innerHTML = '✅ QB Synced';
-          btn.style.background = '#2E7D32';
+          btn.innerHTML = '✅ QB Sent';
+          btn.style.background = '#60A5FA';
           btn.style.cursor = 'default';
 
           const msg = result.data.message === 'Already synced to QB' ?
-            'Already synced to QB (Doc ID: ' + result.data.qbDocId + ')' :
+            'Already sent to QB (Doc ID: ' + result.data.qbDocId + ')' :
             'Pushed to QuickBooks!\n\nQB Doc ID: ' + result.data.qbDocId +
             (result.data.emailSent ? '\n✉️ Payment request emailed to client.' : '');
-          alert(msg);
+          showToast(result.data.message === 'Already synced to QB' ? 'Already in QB' : 'Sent to QuickBooks');
 
           // Refresh to show green badge
           _cacheTime = 0;
