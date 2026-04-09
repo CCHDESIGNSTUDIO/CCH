@@ -14,6 +14,12 @@ service cloud.firestore {
       );
     }
 
+    // Admin config (QB tokens, etc.) — admin only
+    match /admin/{docId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
     // Boards + subcollections — open for Clipper (uses API key, no auth)
     match /boards/{projectId} {
       allow read: if true;
@@ -73,17 +79,22 @@ service cloud.firestore {
       allow read: if isAuth();
       allow write: if isAdmin();
     }
+    // Product master library — Clipper extension saves here with API key only (no Firebase Auth)
     match /products/{docId} {
-      allow read: if isAuth();
-      allow write: if isAdmin();
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if isAdmin();
     }
+    // Client directory — Clipper needs read to filter projects; writes stay signed-in users only
     match /clients/{docId} {
-      allow read: if isAuth();
+      allow read: if true;
       allow write: if isAuth();
     }
+    // Vendor directory — Clipper needs read + create (“+ New vendor”); edits stay admin-only
     match /vendors/{docId} {
-      allow read: if isAuth();
-      allow write: if isAdmin();
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isAdmin();
     }
     match /workrooms/{docId} {
       allow read: if isAuth();

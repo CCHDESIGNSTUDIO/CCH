@@ -150,41 +150,85 @@ async function printProposal(projectId, proposalId) {
   var items = p.items || [];
   var total = parseFloat(p.total)||0;
   var dateStr = p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}) : new Date().toLocaleDateString();
-  var rows = items.map(function(item) {
+  var hideList = (typeof getClientHiddenColumnList === 'function') ? getClientHiddenColumnList(p) : ['cost','markupPct','vendor'];
+  function H(k) { return hideList.indexOf(k) >= 0; }
+  function _pf(n) {
+    var x = parseFloat(n)||0;
+    return x.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  }
+  var thead = '<th style="width:80px;">Image</th><th>Description</th>';
+  if (!H('vendor')) thead += '<th>Vendor</th>';
+  if (!H('room')) thead += '<th>Room</th>';
+  thead += '<th style="text-align:center;">Qty</th>';
+  if (!H('unitPrice')) thead += '<th style="text-align:right;">Unit Price</th>';
+  if (!H('retailPrice')) thead += '<th style="text-align:right;">Retail</th>';
+  if (!H('cost')) thead += '<th style="text-align:right;">Cost</th>';
+  if (!H('markupPct')) thead += '<th style="text-align:right;">Mkup %</th>';
+  if (!H('shipping')) thead += '<th style="text-align:right;">Ship</th>';
+  thead += '<th style="text-align:right;">Line Total</th>';
+  var colCount = 2;
+  if (!H('vendor')) colCount++;
+  if (!H('room')) colCount++;
+  colCount++;
+  if (!H('unitPrice')) colCount++;
+  if (!H('retailPrice')) colCount++;
+  if (!H('cost')) colCount++;
+  if (!H('markupPct')) colCount++;
+  if (!H('shipping')) colCount++;
+  colCount++;
+  var rowParts = [];
+  for (var ri = 0; ri < items.length; ri++) {
+    var item = items[ri];
+    if (item && item.lineKind === 'group') {
+      rowParts.push('<tr><td colspan="' + colCount + '" style="background:#F5F3EE;font-weight:600;padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#7A7060;border-bottom:1px solid rgba(27,51,82,0.12);">' + esc(item.title || 'Section') + '</td></tr>');
+      continue;
+    }
     var img = item.imageUrl
       ? '<img style="width:72px;height:72px;object-fit:cover;border-radius:4px;" src="' + item.imageUrl + '">'
       : '<div style="width:72px;height:72px;background:#f5f5f5;border-radius:4px;text-align:center;line-height:72px;">Item</div>';
-    var lt = ((item.qty||1)*(item.unitPrice||0)).toLocaleString('en-US',{minimumFractionDigits:2});
-    var up = (parseFloat(item.unitPrice)||0).toLocaleString('en-US',{minimumFractionDigits:2});
-    return '<tr>' +
+    var qty = parseFloat(item.qty)||1;
+    var amt = parseFloat(item.amount)||0;
+    var up = qty > 0 ? amt/qty : 0;
+    var ship = parseFloat(item.shipping)||0;
+    var cst = parseFloat(item.cost)||0;
+    var mk = parseFloat(item.markupPct)||0;
+    var rtl = parseFloat(item.retailPrice)||0;
+    var row = '<tr>' +
       '<td style="padding:10px;">' + img + '</td>' +
-      '<td style="padding:10px;"><strong>' + esc(item.description||item.title||'') + '</strong></td>' +
-      '<td style="padding:10px;color:#666;">' + esc(item.room||'') + '</td>' +
-      '<td style="padding:10px;color:#666;">' + esc(item.vendor||'') + '</td>' +
-      '<td style="padding:10px;text-align:center;">' + (item.qty||1) + '</td>' +
-      '<td style="padding:10px;text-align:right;">$' + up + '</td>' +
-      '<td style="padding:10px;text-align:right;font-weight:600;">$' + lt + '</td></tr>';
-  }).join('');
+      '<td style="padding:10px;"><strong>' + esc(item.title||item.description||'') + '</strong>' +
+      (item.description && item.title ? '<div style="font-size:11px;color:#888;margin-top:4px;">' + esc(item.description) + '</div>' : '') + '</td>';
+    if (!H('vendor')) row += '<td style="padding:10px;color:#666;">' + esc(item.vendor||'') + '</td>';
+    if (!H('room')) row += '<td style="padding:10px;color:#666;">' + esc(item.room||item.category||'') + '</td>';
+    row += '<td style="padding:10px;text-align:center;">' + qty + '</td>';
+    if (!H('unitPrice')) row += '<td style="padding:10px;text-align:right;">$' + _pf(up) + '</td>';
+    if (!H('retailPrice')) row += '<td style="padding:10px;text-align:right;color:#666;">' + (rtl > 0 ? '$' + _pf(rtl) : '—') + '</td>';
+    if (!H('cost')) row += '<td style="padding:10px;text-align:right;color:#666;">' + (cst > 0 ? '$' + _pf(cst) : '—') + '</td>';
+    if (!H('markupPct')) row += '<td style="padding:10px;text-align:right;color:#666;">' + (mk > 0 ? (String(mk) + '%') : '—') + '</td>';
+    if (!H('shipping')) row += '<td style="padding:10px;text-align:right;color:#666;">' + (ship > 0 ? '$' + _pf(ship) : '—') + '</td>';
+    row += '<td style="padding:10px;text-align:right;font-weight:600;">$' + _pf(amt) + '</td></tr>';
+    rowParts.push(row);
+  }
+  var rows = rowParts.join('');
   var totalFmt = total.toLocaleString('en-US',{minimumFractionDigits:2});
   var win = window.open('','_blank');
   win.document.write('<!DOCTYPE html><html><head><title>' + projName + '</title>');
-  win.document.write('<style>body{font-family:Helvetica,Arial,sans-serif;margin:0;padding:40px;font-size:13px;color:#1a1a1a}');
-  win.document.write('.hdr{display:flex;justify-content:space-between;border-bottom:3px solid #00B8D4;padding-bottom:20px;margin-bottom:28px}');
-  win.document.write('.logo{font-size:32px;font-weight:800;letter-spacing:6px}.sub{font-size:9px;letter-spacing:5px;color:#999;text-transform:uppercase}');
-  win.document.write('.addr{font-size:10px;color:#999;margin-top:6px}.meta{text-align:right}');
-  win.document.write('table{width:100%;border-collapse:collapse}th{background:#f5f5f5;padding:9px;text-align:left;font-size:9px;text-transform:uppercase;color:#666;font-weight:600;border-bottom:2px solid #e0e0e0}');
-  win.document.write('td{border-bottom:1px solid #f0f0f0;vertical-align:middle}');
-  win.document.write('.tot{margin-top:24px;display:flex;justify-content:flex-end}.tot-box{width:280px;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden}');
-  win.document.write('.tr{display:flex;justify-content:space-between;padding:8px 14px;font-size:12px}.grand{background:#1a1a1a;color:white;font-weight:700;font-size:14px}');
-  win.document.write('.ftr{margin-top:40px;padding-top:16px;border-top:1px solid #eee;font-size:10px;color:#aaa;text-align:center}');
-  win.document.write('@media print{body{padding:20px}}</style></head><body>');
+  win.document.write('<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">');
+  win.document.write('<style>body{font-family:"DM Sans",Helvetica,Arial,sans-serif;margin:0;padding:40px;font-size:13px;color:#1B3352;background:#FAFAF7}');
+  win.document.write('.hdr{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:16px}');
+  win.document.write('.logo{font-family:"DM Serif Display",Georgia,serif;font-size:36px;font-weight:600;letter-spacing:4px;color:#1B3352}.sub{font-size:10px;letter-spacing:4px;color:#5EC6C6;text-transform:uppercase;margin-top:2px}');
+  win.document.write('.addr{font-size:10px;color:#7A7060;margin-top:6px;line-height:1.5}.meta{text-align:right}');
+  win.document.write('.rule{height:3px;background:#5EC6C6;margin-bottom:28px}');
+  win.document.write('table{width:100%;border-collapse:collapse}th{background:#F5F3EE;padding:9px 10px;text-align:left;font-size:9px;text-transform:uppercase;color:#7A7060;font-weight:600;border-bottom:2px solid rgba(27,51,82,0.12)}');
+  win.document.write('td{border-bottom:1px solid rgba(27,51,82,0.08);vertical-align:middle;color:#1B3352}');
+  win.document.write('.tot{margin-top:24px;display:flex;justify-content:flex-end}.tot-box{width:280px;border:1px solid rgba(27,51,82,0.12);border-radius:8px;overflow:hidden;background:#fff}');
+  win.document.write('.tr{display:flex;justify-content:space-between;padding:8px 14px;font-size:12px}.grand{background:#1B3352;color:#EDE8E0;font-weight:700;font-size:14px}');
+  win.document.write('.ftr{margin-top:40px;padding-top:16px;border-top:1px solid rgba(27,51,82,0.1);font-size:10px;color:#7A7060;text-align:center}');
+  win.document.write('@media print{body{padding:20px;background:#fff}}</style></head><body>');
   win.document.write('<div class="hdr">');
-  win.document.write('<div><div class="logo">CCH</div><div class="sub">Design Inc.</div><div class="addr">2481 N. Riverside Dr. - Santa Ana, CA - www.cchdesign.com</div></div>');
-  win.document.write('<div class="meta"><h2 style="font-size:18px;font-weight:300;letter-spacing:3px;text-transform:uppercase;margin:0;">' + esc(p.name||'Proposal') + '</h2><div>Project: <strong>' + esc(projName) + '</strong></div><div>' + dateStr + '</div></div>');
-  win.document.write('</div>');
-  win.document.write('<table><thead><tr>');
-  win.document.write('<th style="width:80px;">Image</th><th>Description</th><th>Room</th><th>Vendor</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Unit Price</th><th style="text-align:right;">Total</th>');
-  win.document.write('</tr></thead><tbody>' + rows + '</tbody></table>');
+  win.document.write('<div><div class="logo">CCH</div><div class="sub">Design Inc.</div><div class="addr">2481 N. Riverside Dr. · Santa Ana, CA · www.cchdesign.com</div></div>');
+  win.document.write('<div class="meta"><h2 style="font-size:18px;font-weight:600;letter-spacing:2px;text-transform:uppercase;margin:0;color:#1B3352;">' + esc(p.name||'Proposal') + '</h2><div style="margin-top:6px;color:#7A7060;">Project: <strong style="color:#1B3352">' + esc(projName) + '</strong></div><div style="color:#7A7060;">' + dateStr + '</div></div>');
+  win.document.write('</div><div class="rule"></div>');
+  win.document.write('<table><thead><tr>' + thead + '</tr></thead><tbody>' + rows + '</tbody></table>');
   win.document.write('<div class="tot"><div class="tot-box"><div class="tr"><span>Subtotal</span><span>$' + totalFmt + '</span></div><div class="tr grand"><span>TOTAL</span><span>$' + totalFmt + '</span></div></div></div>');
   win.document.write('<div class="ftr">CCH Design Inc. - Valid 30 days - Thank you for your business</div>');
   win.document.write('</body></html>');
@@ -297,7 +341,12 @@ async function showNewClientModal(existingId) {
   var c = {};
   if (existingId) { var cd = await db.collection('clients').doc(existingId).get(); if (cd.exists) c = cd.data(); }
   var title = existingId ? 'Edit Client' : 'New Client';
-  var deleteBtn = existingId ? '<button class="btn btn-secondary btn-sm" style="color:var(--red);border-color:var(--red);" onclick="deleteClient(\'' + existingId + '\')">Delete</button>' : '<div></div>';
+  var deleteBtn = existingId ? '<button class="btn btn-secondary btn-sm" style="color:var(--red);border-color:var(--red);" onclick="deleteClient(\'' + existingId + '\')">Delete</button>' : '';
+  var footerActions = '<div style="display:flex;gap:8px;"><button class="btn btn-secondary" onclick="closeModal()">Cancel</button>' +
+    '<button class="btn btn-primary" onclick="saveClient(\'' + (existingId||'') + '\')">Save Client</button></div>';
+  var modalFooter = existingId
+    ? '<div class="modal-footer" style="justify-content:space-between;align-items:center;">' + deleteBtn + footerActions + '</div>'
+    : '<div class="modal-footer" style="justify-content:flex-end;align-items:center;">' + footerActions + '</div>';
   document.getElementById('modalContainer').innerHTML =
     '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">' +
     '<div class="modal" style="width:580px;">' +
@@ -311,10 +360,8 @@ async function showNewClientModal(existingId) {
     '<div class="form-group" style="grid-column:span 2;"><label class="form-label">Secondary Address</label><input class="form-input" id="clAddress2" value="' + escAttr(c.address2||'') + '"></div>' +
     '<div class="form-group" style="grid-column:span 2;"><label class="form-label">Notes</label><textarea class="form-textarea" id="clNotes" rows="2">' + esc(c.notes||'') + '</textarea></div>' +
     '</div></div>' +
-    '<div class="modal-footer" style="justify-content:space-between;">' + deleteBtn +
-    '<div style="display:flex;gap:8px;"><button class="btn btn-secondary" onclick="closeModal()">Cancel</button>' +
-    '<button class="btn btn-primary" onclick="saveClient(\'' + (existingId||'') + '\')">Save Client</button></div>' +
-    '</div></div></div>';
+    modalFooter +
+    '</div></div>';
 }
 
 async function saveClient(existingId) {
@@ -557,6 +604,11 @@ function switchVendorTab(tab) {
 
 async function loadVendorProducts(vendorName) {
   var vn = vendorName.toLowerCase().trim();
+  if (!vn) {
+    window._vendorDetail.products = [];
+    renderVendorProductsTab();
+    return;
+  }
   var products = [];
 
   // Scan all projects for clips with this vendor
@@ -571,7 +623,9 @@ async function loadVendorProducts(vendorName) {
         var data = d.data();
         var cv = (data.vendor || '').toLowerCase().trim();
         var cm = (data.manufacturer || '').toLowerCase().trim();
-        if (cv === vn || cm === vn || cv.indexOf(vn) >= 0 || vn.indexOf(cv) >= 0) {
+        var cvMatch = cv && (cv === vn || cv.indexOf(vn) >= 0 || vn.indexOf(cv) >= 0);
+        var cmMatch = cm && (cm === vn || cm.indexOf(vn) >= 0 || vn.indexOf(cm) >= 0);
+        if (cvMatch || cmMatch) {
           products.push(Object.assign({ _clipId: d.id, _projectId: boards[i].id, _projectName: boards[i].name }, data));
         }
       });
@@ -655,6 +709,11 @@ async function loadVendorPOs(vendorName) {
   C.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400);">Loading purchase orders...</div>';
 
   var vn = vendorName.toLowerCase().trim();
+  if (!vn) {
+    window._vendorDetail.pos = [];
+    C.innerHTML = '<div class="empty-state"><div class="empty-icon">🛒</div><div class="empty-text">No purchase orders found for this vendor.</div></div>';
+    return;
+  }
   var pos = [];
 
   // Scan all projects for POs with this vendor
@@ -668,7 +727,7 @@ async function loadVendorPOs(vendorName) {
       posSnap.forEach(function(d) {
         var data = d.data();
         var pv = (data.vendor || '').toLowerCase().trim();
-        if (pv === vn || pv.indexOf(vn) >= 0 || vn.indexOf(pv) >= 0) {
+        if (pv && (pv === vn || pv.indexOf(vn) >= 0 || vn.indexOf(pv) >= 0)) {
           pos.push(Object.assign({ _poId: d.id, _projectId: boards[i].id, _projectName: boards[i].name }, data));
         }
       });

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head><title>CCH Studio — QuickBooks Connect</title></head>
+<body style="font-family:'DM Sans',sans-serif;text-align:center;padding:80px 20px;background:#F5F3EE;">
+<div style="max-width:500px;margin:0 auto;background:white;padding:40px;border:1px solid #E5E2DA;">
+  <h1 style="color:#1B3352;margin-bottom:8px;">QuickBooks Connect</h1>
+  <p style="color:#888;margin-bottom:30px;">CCH Design Studio</p>
+  <div id="status"></div>
+</div>
+<script>
+  var CLIENT_ID = 'ABANZD7ynJxIwmujoEXbztoyHJHO3AHpoRNBGD0J4AJq7pwL33';
+  var REDIRECT = 'https://cch-platform.web.app/qbauth.html';
+  var REALM_ID = '1389735275';
+  var statusEl = document.getElementById('status');
+
+  // Check if we got a code back from Intuit
+  var params = new URLSearchParams(window.location.search);
+  var code = params.get('code');
+  var realmId = params.get('realmId') || REALM_ID;
+
+  if (code) {
+    statusEl.innerHTML = '<p style="color:#60A5FA;font-size:18px;">Got authorization code!</p>' +
+      '<p>Code: <code style="font-size:11px;word-break:break-all;">' + code + '</code></p>' +
+      '<p>Realm ID: <code>' + realmId + '</code></p>' +
+      '<p style="margin-top:20px;color:#888;">Copy the code above, or loading CCH Studio to auto-connect...</p>';
+
+    // Try to exchange via cloud function
+    var script = document.createElement('script');
+    script.src = 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js';
+    script.onload = function() {
+      var s2 = document.createElement('script');
+      s2.src = 'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js';
+      s2.onload = function() {
+        var s3 = document.createElement('script');
+        s3.src = 'https://www.gstatic.com/firebasejs/9.22.0/firebase-functions-compat.js';
+        s3.onload = function() {
+          var s4 = document.createElement('script');
+          s4.src = 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js';
+          s4.onload = initFirebase;
+          document.head.appendChild(s4);
+        };
+        document.head.appendChild(s3);
+      };
+      document.head.appendChild(s2);
+    };
+    document.head.appendChild(script);
+
+    function initFirebase() {
+      firebase.initializeApp({
+        apiKey: "AIzaSyBRjz-RFPHO6AHYMCe3kp5bJoiTu2RAnps",
+        authDomain: "cch-design-boards.firebaseapp.com",
+        projectId: "cch-design-boards"
+      });
+
+      // Check if already signed in
+      firebase.auth().onAuthStateChanged(function(user) {
+        if (user) {
+          exchangeToken(code, realmId);
+        } else {
+          // If not signed in, save to Firestore directly won't work
+          // Just show manual instructions
+          statusEl.innerHTML += '<p style="color:#C9A96E;margin-top:16px;">Not signed in. Saving token directly...</p>';
+          // Write directly to Firestore using REST
+          saveTokenDirect(code, realmId);
+        }
+      });
+    }
+
+    function exchangeToken(code, realmId) {
+      statusEl.innerHTML += '<p style="color:#60A5FA;">Exchanging token with QuickBooks...</p>';
+      firebase.functions().httpsCallable('qbAuthCallback')({ code: code, realmId: realmId, redirectUri: REDIRECT })
+        .then(function(res) {
+          statusEl.innerHTML = '<h2 style="color:#5FA56B;">Connected!</h2>' +
+            '<p>QuickBooks is now linked to CCH Studio.</p>' +
+            '<p style="color:#888;">Realm ID: ' + (res.data.realmId || realmId) + '</p>' +
+            '<p style="margin-top:20px;"><a href="https://cch-platform.web.app" style="color:#60A5FA;font-size:18px;">Open CCH Studio</a></p>';
+        })
+        .catch(function(err) {
+          statusEl.innerHTML += '<p style="color:red;">Error: ' + err.message + '</p>' +
+            '<p>Copy the code above and give it to Claude to save manually.</p>';
+        });
+    }
+
+    function saveTokenDirect(code, realmId) {
+      statusEl.innerHTML += '<p style="color:#888;">Please sign in to CCH Studio first, then visit this link again.</p>' +
+        '<p><a href="https://cch-platform.web.app" style="color:#60A5FA;">Go to CCH Studio to sign in</a></p>';
+    }
+
+  } else {
+    // No code — show the Connect button
+    var authUrl = 'https://appcenter.intuit.com/connect/oauth2?' +
+      'client_id=' + CLIENT_ID +
+      '&response_type=code' +
+      '&scope=com.intuit.quickbooks.accounting' +
+      '&redirect_uri=' + encodeURIComponent(REDIRECT) +
+      '&state=cchstudio2026';
+
+    statusEl.innerHTML = '<a href="' + authUrl + '" style="display:inline-block;padding:16px 40px;background:#2CA01C;color:white;text-decoration:none;font-size:16px;font-weight:600;border-radius:4px;">Connect to QuickBooks</a>' +
+      '<p style="color:#888;margin-top:16px;font-size:13px;">This will redirect you to Intuit to authorize CCH Studio.</p>';
+  }
+</script>
+</body>
+</html>

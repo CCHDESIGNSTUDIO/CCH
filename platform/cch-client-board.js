@@ -54,7 +54,8 @@
     // Load board data
     try {
       var doc = await db.collection('boards').doc(projectId).collection('designBoards').doc(boardId).get();
-      cbState.boardData = doc.data();
+      if (!doc.exists) throw new Error('Board not found');
+      cbState.boardData = doc.data() || {};
     } catch(e) {
       document.getElementById('contentArea').innerHTML = '<div style="padding:60px;text-align:center;color:#999;">Board not found.</div>';
       return;
@@ -166,7 +167,7 @@
       '<div style="width:100%;min-height:100vh;background:' + DARK + ';font-family:\'Cormorant Garamond\',Garamond,Georgia,serif;color:' + CREAM + ';">' +
 
         // Top bar
-        '<div style="padding:20px 32px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(200,169,110,0.12);position:sticky;top:0;background:rgba(26,23,20,0.95);backdrop-filter:blur(20px);z-index:10;">' +
+        '<div style="padding:20px 32px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(200,169,110,0.12);position:sticky;top:0;background:rgba(21,42,69,0.96);backdrop-filter:blur(20px);z-index:10;">' +
           '<div><span style="font-family:Playfair Display,Georgia,serif;font-size:14px;font-weight:700;color:#C4A052;letter-spacing:2px;">CCH</span><span style="font-family:Cormorant Garamond,Georgia,serif;font-size:11px;letter-spacing:3px;color:' + MUTED + ';text-transform:uppercase;margin-left:6px;">Design Inc.</span></div>' +
           '<div style="display:flex;align-items:center;gap:16px;">' +
             '<button onclick="cbSetView(\'dashboard\')" style="background:none;border:1px solid rgba(200,169,110,0.2);border-radius:4px;padding:8px 16px;color:' + MUTED + ';cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:2px;text-transform:uppercase;font-family:inherit;">' + dashSvg + ' Dashboard</button>' +
@@ -442,7 +443,8 @@
         clientPrice: item.sellPrice || 0,
         qty: 1,
         imageUrl: item.imageUrl || '',
-        clipId: item.id || ''
+        clipId: item.id || '',
+        lineApprovalStatus: 'pending'
       };
     });
 

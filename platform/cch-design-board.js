@@ -31,6 +31,12 @@
   // ---- Utility ----
   function genId() { return 'el_' + (dbEditor.nextId++); }
   function esc(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+  function escJsStr(s) {
+    return String(s || '')
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/\r?\n/g, ' ');
+  }
   function fmt$(n) { return '$' + (parseFloat(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
 
   // ---- Save state for undo ----
@@ -92,8 +98,8 @@
                   '</div>' +
                 '</div>' +
                 '<div style="display:flex;gap:4px;flex-shrink:0;">' +
-                  '<button class="btn btn-secondary btn-sm" style="padding:4px 8px;font-size:11px;" onclick="event.stopPropagation();editBoardMeta(\'' + proj.id + '\',\'' + b.id + '\',\'' + esc(d.title || '') + '\',\'' + esc(d.room || '') + '\')">✏️</button>' +
-                  '<button class="btn btn-sm" style="padding:4px 8px;font-size:11px;background:#fee;color:var(--red);" onclick="event.stopPropagation();deleteDesignBoard(\'' + proj.id + '\',\'' + b.id + '\',\'' + esc(d.title || 'this board') + '\')">🗑️</button>' +
+                  '<button class="btn btn-secondary btn-sm" style="padding:4px 8px;font-size:11px;" onclick="event.stopPropagation();editBoardMeta(\'' + proj.id + '\',\'' + b.id + '\',\'' + escJsStr(d.title || '') + '\',\'' + escJsStr(d.room || '') + '\')">✏️</button>' +
+                  '<button class="btn btn-sm" style="padding:4px 8px;font-size:11px;background:#fee;color:var(--red);" onclick="event.stopPropagation();deleteDesignBoard(\'' + proj.id + '\',\'' + b.id + '\',\'' + escJsStr(d.title || 'this board') + '\')">🗑️</button>' +
                 '</div>' +
               '</div>' +
               '<div style="display:flex;gap:6px;margin-top:8px;">' +
@@ -162,7 +168,11 @@
 
     // Load board data
     var doc = await db.collection('boards').doc(projectId).collection('designBoards').doc(boardId).get();
-    dbEditor.boardData = doc.data();
+    if (!doc.exists) {
+      document.getElementById('contentArea').innerHTML = '<div style="padding:60px;text-align:center;color:#999;">Design board not found.</div>';
+      return;
+    }
+    dbEditor.boardData = doc.data() || {};
     dbEditor.elements = (dbEditor.boardData.elements || []).map(function(el) { return Object.assign({}, el); });
     dbEditor.showPricing = dbEditor.boardData.showPricing !== false;
     dbEditor.clientView = false;
@@ -934,7 +944,8 @@
         qty: 1,
         markupPct: el.cost > 0 ? Math.round(((el.sellPrice || 0) - el.cost) / el.cost * 100) : 0,
         imageUrl: el.imageUrl || '',
-        clipId: el.clipId || ''
+        clipId: el.clipId || '',
+        lineApprovalStatus: 'pending'
       };
     });
 

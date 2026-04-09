@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CCH Studio — Bugs &amp; Features QA Checklist</title>
+  <style>
+    :root {
+      --bg: #f7f5f0;
+      --card: #fff;
+      --navy: #1b3352;
+      --gold: #c4a464;
+      --open: #b71c1c;
+      --fixed: #2e7d32;
+      --def: #757575;
+      --prog: #1565c0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--navy);
+      line-height: 1.45;
+      margin: 0;
+      padding: 24px 20px 80px;
+      max-width: 920px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    h1 { font-size: 1.35rem; margin: 0 0 8px; font-weight: 700; }
+    .sub { color: #5c5c5c; font-size: 0.9rem; margin-bottom: 20px; }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 20px;
+      padding: 14px 16px;
+      background: var(--card);
+      border: 1px solid rgba(27,51,82,0.12);
+      border-radius: 8px;
+    }
+    .toolbar button {
+      padding: 8px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--navy);
+      background: var(--navy);
+      color: #ede8e0;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .toolbar button.secondary { background: #fff; color: var(--navy); }
+    .stats { font-size: 13px; color: #555; margin-left: auto; }
+    section {
+      background: var(--card);
+      border: 1px solid rgba(27,51,82,0.1);
+      border-radius: 8px;
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+    section h2 {
+      margin: 0;
+      padding: 12px 16px;
+      font-size: 0.95rem;
+      background: linear-gradient(90deg, rgba(196,164,100,0.2), transparent);
+      border-bottom: 1px solid rgba(27,51,82,0.08);
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 28px 40px 52px 1fr auto;
+      gap: 8px 10px;
+      align-items: start;
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+      font-size: 13px;
+    }
+    .row:last-child { border-bottom: none; }
+    .row input[type="checkbox"] { margin-top: 3px; width: 18px; height: 18px; cursor: pointer; }
+    .row .id { font-weight: 700; color: var(--gold); font-variant-numeric: tabular-nums; }
+    .badge {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 2px 6px;
+      border-radius: 4px;
+      width: fit-content;
+    }
+    .badge.bug { background: rgba(183,28,28,0.12); color: var(--open); }
+    .badge.feat { background: rgba(21,101,192,0.1); color: var(--prog); }
+    .desc { color: #222; }
+    .meta {
+      font-size: 11px;
+      color: #666;
+      text-align: right;
+      max-width: 140px;
+    }
+    .row.pdf-fixed { border-left: 4px solid var(--fixed); }
+    .row.pdf-open { border-left: 4px solid rgba(183,28,28,0.35); }
+    .row.pdf-def { border-left: 4px solid var(--def); opacity: 0.85; }
+    .row.pdf-prog { border-left: 4px solid var(--prog); }
+    .st-fixed { color: var(--fixed); font-weight: 600; }
+    .st-open { color: var(--open); font-weight: 600; }
+    .st-def { color: var(--def); font-weight: 600; }
+    .st-prog { color: var(--prog); font-weight: 600; }
+    .recent {
+      background: rgba(94,198,198,0.12);
+      border: 1px solid rgba(94,198,198,0.35);
+      padding: 14px 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 13px;
+    }
+    .recent h2 { font-size: 1rem; margin: 0 0 10px; background: none; padding: 0; border: none; }
+    .recent .row { grid-template-columns: 28px 1fr; border: none; padding: 6px 0; }
+    .filter-wrap { margin-bottom: 12px; }
+    .filter-wrap label { font-size: 13px; margin-right: 12px; }
+  </style>
+</head>
+<body>
+  <h1>CCH Studio — Bugs &amp; Features QA Checklist</h1>
+  <p class="sub">
+    Source: <strong>CCH_Studio_Bugs_and_Features_Master.pdf</strong> (v9.6.0 · compiled March 26, 2026).
+    Check a row when you have verified behavior in the current build. Progress saves in this browser only (<code>localStorage</code>).
+  </p>
+
+  <div class="toolbar">
+    <button type="button" id="btnExport">Export checked IDs</button>
+    <button type="button" class="secondary" id="btnUncheckOpen">Uncheck all OPEN</button>
+    <button type="button" class="secondary" id="btnClear">Clear all checks</button>
+    <span class="stats" id="statLine"></span>
+  </div>
+
+  <div class="filter-wrap">
+    <label><input type="checkbox" id="hideFixed" /> Hide PDF “FIXED” rows (focus on open + verify)</label>
+    <label><input type="checkbox" id="onlyOpen" /> Show only PDF OPEN / IN PROGRESS</label>
+  </div>
+
+  <div class="recent">
+    <h2>Post-PDF / recent build — also verify</h2>
+    <p style="margin:0 0 8px;color:#444;font-size:12px;">Not in the March PDF; tick after you test current hosting + Clipper.</p>
+    <label class="row"><input type="checkbox" data-recent="proj-density" /> <span class="desc">Projects list &amp; shared tables: denser type/spacing (deployed hosting)</span></label>
+    <label class="row"><input type="checkbox" data-recent="clipper-cat" /> <span class="desc">Clipper: room names / “Rooms” filtered out of <strong>Category</strong> dropdown</span></label>
+    <label class="row"><input type="checkbox" data-recent="clipper-imgs" /> <span class="desc">Clipper v3.8.9+: multi-image select + ★ cover image + Quick Clip multi-select</span></label>
+    <label class="row"><input type="checkbox" data-recent="billing-cats" /> <span class="desc">Invoice / service billing categories aligned to Smart Time–style list (platform)</span></label>
+    <label class="row"><input type="checkbox" data-recent="product-cats" /> <span class="desc">Master FFE / product categories + “Accessories” spelling (platform + Clipper)</span></label>
+  </div>
+
+  <div id="sections"></div>
+
+  <script>
+(function () {
+  var STORAGE = 'cch-qa-checklist-v1';
+  var sections = [
+    { title: '1. TIME TRACKING / TIME AGENT', items: [
+      [1,'BUG','OPEN','Desktop log import stores raw app names — no normalization before Firestore write','CCW2_SMART_TIME_AUDIT'],
+      [2,'BUG','OPEN','Bucket panel nested apps use raw names — skips _normalizeAppName()','CCW2_SMART_TIME_AUDIT'],
+      [3,'BUG','OPEN','Memories display label uses raw names for label selection','CCW2_SMART_TIME_AUDIT'],
+      [4,'BUG','OPEN','Day app totals in bucket use raw names — counts separated incorrectly','CCW2_SMART_TIME_AUDIT'],
+      [5,'BUG','OPEN','Smart consolidation key does not use _normalizeAppName() — Chrome vs Google Chrome merge keys','CCW2_SMART_TIME_AUDIT'],
+      [6,'BUG','OPEN','No retroactive cleanup of legacy raw app names in Firestore','CCW2_SMART_TIME_AUDIT'],
+      [7,'BUG','OPEN','bulkImportDesktopTime() structural defect — function body split by inner pushLogToFirestore redefinition','CCW2_AUDIT_REPORT'],
+      [8,'BUG','OPEN','Race condition: global timeEntries reassigned to [] during merge','CCW2_AUDIT_REPORT'],
+      [9,'BUG','OPEN','Time Agent v4 scheduled task may point to old script name','CCW1.1 Handoff'],
+      [10,'BUG','FIXED','Time agent $url vs $patchUrl variable name mismatch','Feature Tracker'],
+      [11,'BUG','FIXED','Time agent wrong email (cynthiacbh vs cindy@cchdesign.com)','Tech Support'],
+      [12,'BUG','FIXED','Display name Cynthia vs Cindy','Tech Support'],
+      [13,'BUG','FIXED','Smart Time buckets showing 0m — Firestore index missing','CCW1.1 Handoff'],
+      [14,'BUG','OPEN','Smart Time showing large unexplained time blocks','Status Report'],
+      [15,'BUG','OPEN','Vanessa time agent: same $url bug — fixed script deploy','Feature Tracker'],
+      [16,'BUG','OPEN','Time agent user must restart PowerShell to pick up fixes','Feature Tracker'],
+      [17,'BUG','OPEN','Vanessa time not pushing/logging','Tech Support'],
+      [18,'BUG','OPEN','Vanessa no time entries showing','Tech Support'],
+      [19,'BUG','OPEN','Teams calls not showing in timeline but showing on agent','Tech Support'],
+      [20,'BUG','OPEN','Smart Time wrong timezone on Cindy entries','Tech Support'],
+      [21,'BUG','OPEN','Cindy Smart Time not capturing Teams calls','Tech Support'],
+      [22,'BUG','OPEN','Smart Time big block of time that should not be there','Tech Support'],
+      [23,'BUG','OPEN','Smart Time — need to edit logged time','Tech Support'],
+      [24,'BUG','OPEN','PowerShell time agent errors/broken','Tech Support'],
+      [25,'BUG','FIXED','Firestore data poisoning (both agents same doc ID)','CCW2 Code Audit'],
+      [26,'BUG','FIXED','AI categorization 401 errors','CCW2 Code Audit'],
+      [27,'BUG','FIXED','Timeline block bunching from v2/v3 data mix','CCW2 Code Audit'],
+      [28,'BUG','FIXED','Chrome / Google Chrome duplication','CCW2 Code Audit'],
+      [29,'BUG','FIXED','POWERPNT vs PowerPoint duplication','CCW2 Code Audit'],
+      [30,'BUG','FIXED','Missing Teams call details and PowerPoint file names in captures','CCW2 Code Audit'],
+      [31,'FEAT','DEFERRED','AI time categorization — needs API key server-side','Status Report'],
+      [32,'FEAT','OPEN','Auto-generate monthly invoices from Smart Time hours','CCW1.1 Handoff'],
+      [33,'FEAT','OPEN','Manual time LOGGED badge on timeline','CCW1.1 Handoff'],
+      [34,'FEAT','OPEN','Calendar date picker for Smart Time navigation','Tech Support'],
+      [35,'FEAT','OPEN','Hover tooltips with timestamps on memories (Timely parity)','Competitive Analysis'],
+      [36,'FEAT','OPEN','Gray-out assigned captures after drag to bucket (Timely parity)','Competitive Analysis'],
+      [37,'FEAT','OPEN','Filter memories to unassigned only (Timely parity)','Competitive Analysis'],
+      [38,'FEAT','OPEN','Select individual memories including Outlook, Chrome','Tech Support'],
+      [39,'FEAT','OPEN','Click individual memory and move out of a group','Tech Support'],
+      [40,'FEAT','OPEN','Smart Time — more info details in the view','Tech Support'],
+      [41,'FEAT','OPEN','Service type column on Time Ledger','Competitive Analysis'],
+      [42,'FEAT','OPEN','Rate column on Time Ledger','Competitive Analysis'],
+      [43,'FEAT','OPEN','Invoice link column on Time Ledger','Competitive Analysis'],
+      [44,'FEAT','OPEN','AI time reconstruction from activity feed (Architecture Phase 5)','Architecture Plan'],
+      [45,'FEAT','OPEN','Eliminate per-website-page session tracking that is not useful','Tech Support']
+    ]},
+    { title: '2. PROPOSALS & INVOICES', items: [
+      [46,'BUG','FIXED','Invoice # not auto-generating reliably','CCW1.1 Handoff'],
+      [47,'BUG','FIXED','Invoice numbering should not start at 6000','CCW1.1 Handoff'],
+      [48,'BUG','FIXED','Invoice cannot add items','Tech Support'],
+      [49,'BUG','OPEN','Invoice: image did not transfer from proposal; pricing did not transfer','Tech Support'],
+      [50,'BUG','OPEN','Proposal: image/pricing; client info should auto-transfer','Tech Support'],
+      [51,'BUG','OPEN','Proposal: no ship-to dropdown; images; room dropdown','Tech Support'],
+      [52,'BUG','OPEN','Missing null check on doc.data() in proposal detail if deleted','CCW2_AUDIT_REPORT'],
+      [53,'BUG','OPEN','Invoice not generating #; status should start Draft/Sent','Tech Support'],
+      [54,'BUG','FIXED','createInvoice async declaration removed then restored','CCW1.1 Handoff'],
+      [55,'BUG','FIXED','Proposal to Invoice conversion (qty, total, clip matching)','Project memory'],
+      [56,'FEAT','OPEN','Proposals: week/month/YTD summary at top','Tech Support'],
+      [57,'FEAT','OPEN','Invoices: weekly/monthly/YTD/All filter at top','Tech Support'],
+      [58,'FEAT','OPEN','Proposals: multiple images, edit','Tech Support'],
+      [59,'FEAT','OPEN','Proposal tax by project ship location','Tech Support'],
+      [60,'FEAT','IN_PROGRESS','Proposal → Invoice → PO full lifecycle workflow','CCW1.1 Handoff'],
+      [61,'FEAT','OPEN','Button to add attachments on invoices','Tech Support'],
+      [62,'FEAT','OPEN','Shipping cost tracking','CCW1.1 Handoff'],
+      [63,'FEAT','OPEN','Credits & Retainers tracking (Houzz parity)','Master Checklist'],
+      [64,'FEAT','OPEN','Invoice reminder emails to clients','Master Checklist'],
+      [65,'FEAT','OPEN','Email PO to vendor','Master Checklist'],
+      [66,'FEAT','OPEN','Markup Revenue stat on invoices page (Houzz parity)','Competitive Analysis'],
+      [67,'FEAT','OPEN','Connected Docs cross-linking proposals/invoices/POs','Competitive Analysis']
+    ]},
+    { title: '3. QUICKBOOKS INTEGRATION', items: [
+      [68,'BUG','OPEN','getQbId() false positives — Houzz-numbered docs treated as QB-synced','CCW2_QB_REPORT'],
+      [69,'BUG','OPEN','Partially paid estimation hardcoded at 50%','CCW2_QB_REPORT'],
+      [70,'BUG','OPEN','Patch tool date logic hardcoded dates','CCW2_QB_REPORT'],
+      [71,'BUG','FIXED','Cloud Function hardcoded QB Item Reference','CCW2_QB_REPORT'],
+      [72,'BUG','OPEN','bulkMarkQBSynced sets qbDocId = document number not QB ID','CCW2_QB_REPORT'],
+      [73,'BUG','OPEN','Webhook does not validate HMAC signature','CCW2_QB_REPORT'],
+      [74,'BUG','FIXED','QB PO push missing shipping and tax','CCW2_QB_REPORT'],
+      [75,'BUG','OPEN','Invoice push UnitPrice floating-point division rounding','CCW2_QB_REPORT'],
+      [76,'BUG','OPEN','Dead fields in hasQbId()','CCW2_QB_REPORT'],
+      [77,'BUG','FIXED','functions.config() deprecated in Functions v2','CCW2_QB_REPORT'],
+      [78,'BUG','OPEN','QB status section only on POs not invoices','CCW2_QB_REPORT'],
+      [79,'BUG','OPEN','Houzz payment data not imported ($0 Paid / $1.8M Outstanding)','Feature Tracker'],
+      [80,'BUG','OPEN','Webhook 401 error','Tech Support'],
+      [81,'FEAT','OPEN','Automated QB sync (manual buttons only today)','CCW1.1 Handoff'],
+      [82,'FEAT','OPEN','QB reconnection / Connect to QuickBooks in admin','CCW2_QB_REPORT'],
+      [83,'FEAT','OPEN','QB error recovery / retry queue','CCW2_QB_REPORT'],
+      [84,'FEAT','OPEN','QB Sync Report grouped by project','CCW2_QB_REPORT']
+    ]},
+    { title: '4. DESIGN BOARD', items: [
+      [85,'BUG','OPEN','dbUndo() JSON.parse without try-catch','CCW2_AUDIT_REPORT'],
+      [86,'BUG','OPEN','Mouse drag listeners not deduplicated','CCW2_AUDIT_REPORT'],
+      [87,'BUG','OPEN','Console errors on Design Board pages','Status Report'],
+      [88,'BUG','OPEN','Cannot edit text; images stuck together','Tech Support'],
+      [89,'FEAT','OPEN','Layers, snapping, alignment, grids on canvas','Feature Tracker'],
+      [90,'FEAT','OPEN','Presentation/slideshow mode for Design Boards','Feature Tracker']
+    ]},
+    { title: '5. CLIENT PORTAL', items: [
+      [91,'BUG','OPEN','Client Portal JSX prototype not connected to Firestore — static demo','Status Report'],
+      [92,'BUG','OPEN','Client dashboard link wrong destination','Tech Support'],
+      [93,'BUG','OPEN','Webhook messages — clients never see POs; time entry noise','Tech Support'],
+      [94,'FEAT','OPEN','Client Dashboard redesign (rings, palette, approvals, messaging)','Design Vision'],
+      [95,'FEAT','OPEN','Client approval by line item on proposals','Master Checklist'],
+      [96,'FEAT','OPEN','Client messaging/notifications system','Architecture Plan'],
+      [97,'FEAT','OPEN','Eye button — hide internal pricing from client view','Master Checklist']
+    ]},
+    { title: '6. DASHBOARD / FINANCIALS', items: [
+      [98,'BUG','OPEN','Overview profit missing contractor labor costs (Vanessa/Cindy rates)','CCW3 Handoff'],
+      [99,'BUG','OPEN','Dashboard hardcoded rates — should use TEAM_CONFIG','CCW3 Handoff'],
+      [100,'BUG','OPEN','Three different profit formulas across Overview/Dashboard/Financials','CCW3 Handoff'],
+      [101,'BUG','OPEN','Hardcoded contractor names in financial calcs (6 locations)','CCW2_AUDIT_REPORT'],
+      [102,'BUG','FIXED','Hardcoded $75 hourly rate in 3+ places','CCW2_AUDIT_REPORT'],
+      [103,'BUG','OPEN','Race condition on global financial cache — no locking','CCW2_AUDIT_REPORT'],
+      [104,'BUG','OPEN','Project Financials gray color (design preference)','Tech Support'],
+      [105,'BUG','OPEN','Dashboard black boxes — need change','Tech Support'],
+      [106,'BUG','OPEN','Vanessa Dashboard classic: black only navy; unreadable text','Tech Support'],
+      [107,'BUG','OPEN','Vanessa Feb time — missing invoice numbers and payments','Tech Support'],
+      [108,'FEAT','OPEN','Vanessa Contractor Dashboard redesign per mockup','Design Vision'],
+      [109,'FEAT','OPEN','Studio Snapshot owner dashboard per mockup','Design Vision'],
+      [110,'FEAT','OPEN','Profit Tracker redesign per mockup','Design Vision'],
+      [111,'FEAT','OPEN','One shared calcProjectProfit() everywhere','CCW3 Handoff'],
+      [112,'FEAT','OPEN','Charts/graphs for analytics','Feature Tracker'],
+      [113,'FEAT','OPEN','CSV export for reports','Feature Tracker'],
+      [114,'FEAT','OPEN','Client profitability reports','Feature Tracker'],
+      [115,'FEAT','OPEN','Weekly BI report — Monday Cloud Function (Phase 6)','Architecture Plan'],
+      [116,'FEAT','OPEN','Dashboard open proposal email link → client contact info','Tech Support'],
+      [117,'FEAT','OPEN','Vanessa Review unlogged time → link to Smart Time','Tech Support']
+    ]},
+    { title: '7. PROJECT MANAGEMENT', items: [
+      [118,'BUG','OPEN','Client Information missing from Project Dashboard','Tech Support'],
+      [119,'BUG','OPEN','Project client field should be dropdown from Client list','Tech Support'],
+      [120,'BUG','OPEN','Time in Project edit — change client dropdown broken','Tech Support'],
+      [121,'BUG','OPEN','Clients: add to project; show associated projects','Tech Support'],
+      [122,'BUG','OPEN','Activity page is empty','Tech Support'],
+      [123,'BUG','OPEN','Project selected in ledger then Smart Time filters to only that','Tech Support'],
+      [124,'FEAT','OPEN','Tasks & Punchlist (Houzz parity)','Feature Tracker'],
+      [125,'FEAT','OPEN','Files/attachments hub per project','Master Checklist'],
+      [126,'FEAT','OPEN','Schedule milestones / Gantt (Houzz parity)','Master Checklist'],
+      [127,'FEAT','OPEN','Project detail redesign: Flat Fee, Burn Rate, Team Cost','Design Vision'],
+      [128,'FEAT','OPEN','Team and contacts project-specific','Tech Support'],
+      [129,'FEAT','OPEN','Daily Logs (field/site visit — Houzz parity)','Competitive Analysis'],
+      [130,'FEAT','OPEN','Contracts/Retainers as document type (Houzz parity)','Competitive Analysis'],
+      [131,'FEAT','OPEN','Change Orders as document type (Houzz parity)','Competitive Analysis']
+    ]},
+    { title: '8. SECURITY / CODE QUALITY', items: [
+      [132,'BUG','FIXED','XSS: innerHTML with unescaped image URLs','CCW2_AUDIT_REPORT'],
+      [133,'BUG','OPEN','XSS: inline onclick with unescaped data','CCW2_AUDIT_REPORT'],
+      [134,'BUG','OPEN','onerror handlers use innerHTML','CCW2_AUDIT_REPORT'],
+      [135,'BUG','OPEN','esc()/escAttr() at end of file — fragile','CCW2_AUDIT_REPORT'],
+      [136,'BUG','OPEN','Missing expenseType validation on PO lines','CCW2_AUDIT_REPORT'],
+      [137,'BUG','OPEN','15+ silent catch blocks','CCW2_AUDIT_REPORT'],
+      [138,'BUG','OPEN','Firestore reads without .exists checks','CCW2_AUDIT_REPORT'],
+      [139,'BUG','OPEN','Unhandled async errors in Firestore (15+ locations)','CCW2_AUDIT_REPORT'],
+      [140,'BUG','OPEN','Report generation — overlay not removed on error','CCW2_AUDIT_REPORT'],
+      [141,'BUG','OPEN','Promise.all without per-item error tracking (tear sheet import)','CCW2_AUDIT_REPORT'],
+      [142,'BUG','OPEN','p.cost || p.productCost falsy zero bug','CCW2_AUDIT_REPORT'],
+      [143,'BUG','OPEN','setTimeout async without element existence check','CCW2_AUDIT_REPORT'],
+      [144,'BUG','OPEN','Duplicate ADMIN_EMAILS (2 locations)','CCW2_AUDIT_REPORT'],
+      [145,'BUG','OPEN','Duplicate status color maps (3 locations)','CCW2_AUDIT_REPORT'],
+      [146,'BUG','OPEN','Duplicate expense total calculations (2 locations)','CCW2_AUDIT_REPORT'],
+      [147,'BUG','OPEN','30+ console.log in production','CCW2_AUDIT_REPORT'],
+      [148,'BUG','OPEN','Potential v2 legacy fallback unreachable','CCW2_AUDIT_REPORT'],
+      [149,'BUG','OPEN','External script dependency — no onerror','CCW2_AUDIT_REPORT'],
+      [150,'BUG','FIXED','CCH_BUILD ReferenceError broke login','CCW1.1 Handoff'],
+      [151,'BUG','FIXED','Duplicate _isAdminUser const declaration','CCW2 Code Audit'],
+      [152,'FEAT','OPEN','White-label refactoring — 231 hardcoded CCH references','CCW1.1 Handoff']
+    ]},
+    { title: '9. UI / THEME', items: [
+      [153,'BUG','OPEN','Classic white theme — text unreadable, black boxes','Tech Support'],
+      [154,'BUG','OPEN','Project Classic view — black boxes','Tech Support'],
+      [155,'BUG','OPEN','Cannot read text on top tabs','Tech Support'],
+      [156,'BUG','OPEN','White text on left band hard to read','Tech Support'],
+      [157,'BUG','OPEN','Ideabooks lettering unreadable','Tech Support'],
+      [158,'BUG','OPEN','PO page on Classic unreadable','Tech Support'],
+      [159,'BUG','OPEN','Color palette did not change across all projects','Tech Support'],
+      [160,'BUG','FIXED','Status dropdown black options in modals','CCW1.1 Handoff'],
+      [161,'BUG','FIXED','Action dropdown z-index clipped behind table rows','CCW1.1 Handoff'],
+      [162,'BUG','IN_PROGRESS','Use navy (#0E1629) not black for dark UI','Feedback memory']
+    ]},
+    { title: '10. NAVIGATION / UX', items: [
+      [163,'BUG','FIXED','Double-navigate race on Time Reconciliation/Ledger','CCW2 Code Audit'],
+      [164,'BUG','FIXED','Duplicate toolbar','CCW2 Code Audit'],
+      [165,'BUG','OPEN','Event listener leak: scroll on section switch never removed','CCW2_AUDIT_REPORT'],
+      [166,'BUG','OPEN','Event listener leak: global click without cleanup','CCW2_AUDIT_REPORT'],
+      [167,'BUG','OPEN','Lightbox keyboard handler not cleaned up on close','CCW2_AUDIT_REPORT'],
+      [168,'BUG','OPEN','Window._ globals persist across navigations','CCW2_AUDIT_REPORT'],
+      [169,'BUG','OPEN','closeAllMenus() DOM queries every click — performance','CCW2_AUDIT_REPORT'],
+      [170,'BUG','FIXED','Vendor detail tabs jump to CCH Hub instead of in place','Feature Tracker'],
+      [171,'BUG','OPEN','Session and other button do nothing','Tech Support'],
+      [172,'BUG','FIXED','Selections search cursor lost on typing','Feature Tracker'],
+      [173,'FEAT','OPEN','Cmd+K AI command bar for natural language Firestore','Feature memory']
+    ]},
+    { title: '11. OTHER (Selections, Clipper, Ideabooks, FFE, Performance, Data)', items: [
+      [174,'BUG','OPEN','Selections search cannot type in search box','Tech Support'],
+      [175,'BUG','OPEN','Product Library needs page numbers / next page','Tech Support'],
+      [176,'BUG','OPEN','Library items not grabbing costs and PO and invoices','Tech Support'],
+      [177,'BUG','FIXED','Vendor detail: POs show unrelated items','Feature Tracker'],
+      [178,'BUG','FIXED','Clips not syncing to Product Library','Feature Tracker'],
+      [179,'BUG','OPEN','Vendor/PO page jumps to CCH Design Hub','Tech Support'],
+      [180,'BUG','OPEN','Vendor/PO — unclear what is being pulled','Tech Support'],
+      [181,'BUG','OPEN','Remove add from URL; sort by category/vendor/product','Tech Support'],
+      [182,'BUG','OPEN','TIME BILLING should never be a board','Tech Support'],
+      [183,'BUG','OPEN','Clipper right-click clip; images stuck at top','Tech Support'],
+      [184,'BUG','OPEN','Clipper does not clear images','Tech Support'],
+      [185,'BUG','OPEN','Clipper not saving source link on Add to Idea Boards','Tech Support'],
+      [186,'BUG','OPEN','Clipper and Ideabook issues (cannot send)','Tech Support'],
+      [187,'BUG','OPEN','Ideabooks: delete item or board','Tech Support'],
+      [188,'BUG','OPEN','Assets: move or copy to boards','Tech Support'],
+      [189,'BUG','OPEN','Highlighted layout text — grabbed Chrome; description wrong','Tech Support'],
+      [190,'BUG','FIXED','Race condition renderFFETab() multiple async loads','CCW2_AUDIT_REPORT'],
+      [191,'BUG','OPEN','Console errors on FFE page','Tech Support'],
+      [192,'BUG','OPEN','Client room board view issues','Tech Support'],
+      [193,'BUG','OPEN','Bug requests show not received','Tech Support'],
+      [194,'BUG','OPEN','innerHTML += in loops re-parse','CCW2_AUDIT_REPORT'],
+      [195,'BUG','OPEN','No Firestore query caching — refetch every tab','CCW2_AUDIT_REPORT'],
+      [196,'BUG','OPEN','Nested Firestore loops _peLoadLinkedDocs rate limits','CCW2_AUDIT_REPORT'],
+      [197,'BUG','OPEN','Functions over 200 lines — break up','CCW2_AUDIT_REPORT'],
+      [198,'BUG','OPEN','Hardcoded room names array goes stale','CCW2_AUDIT_REPORT'],
+      [199,'BUG','OPEN','Inconsistent naming conventions','CCW2_AUDIT_REPORT'],
+      [200,'BUG','OPEN','Legacy CSS display:none dead code','CCW2_AUDIT_REPORT'],
+      [201,'BUG','OPEN','POs without vendor names (legacy Houzz)','Master Checklist'],
+      [202,'BUG','OPEN','Room board cover images need renderings','Master Checklist'],
+      [203,'BUG','OPEN','ETA dates on POs from Houzz tracking','Master Checklist'],
+      [204,'BUG','OPEN','Houzz product images only thumbnails — need full-res','CCW3 Handoff'],
+      [205,'FEAT','OPEN','Unified Activity Feed (Architecture Phase 1)','Architecture Plan'],
+      [206,'FEAT','OPEN','Bi-weekly client update report renderer','Architecture Plan'],
+      [207,'FEAT','OPEN','Post Update for Client composer','Architecture Plan'],
+      [208,'FEAT','OPEN','Twilio SMS webhook (Phase 2)','Architecture Plan'],
+      [209,'FEAT','OPEN','Microsoft Teams messages (Phase 3)','Architecture Plan'],
+      [210,'FEAT','OPEN','SharePoint file uploads (Phase 3)','Architecture Plan'],
+      [211,'FEAT','OPEN','Outlook email integration (Phase 3)','Architecture Plan'],
+      [212,'FEAT','OPEN','Google Drive push notifications (Phase 4)','Architecture Plan'],
+      [213,'FEAT','OPEN','Dropbox webhooks (Phase 4)','Architecture Plan'],
+      [214,'FEAT','OPEN','Fabric columns (usage + workroom/ship-to)','Master Checklist'],
+      [215,'FEAT','OPEN','Tearsheets/spec sheet attachments on products','Master Checklist'],
+      [216,'FEAT','OPEN','Document status linkage per selection item','Feature Tracker'],
+      [217,'FEAT','OPEN','Specifications columns on selections','Feature Tracker'],
+      [218,'FEAT','OPEN','Approval status badges on selections','Feature Tracker'],
+      [219,'FEAT','OPEN','Vendor info dropdown on asset detail','Feature Tracker'],
+      [220,'FEAT','OPEN','Hide/show vendor & sources toggle','Feature Tracker'],
+      [221,'FEAT','OPEN','Project-vendor relationship tracking','Feature Tracker'],
+      [222,'FEAT','OPEN','Communication history per vendor/client','Feature Tracker'],
+      [223,'FEAT','OPEN','Bulk product import from external catalogs','Feature Tracker'],
+      [224,'FEAT','OPEN','Product Library cleanup — labor/services out','Master Checklist'],
+      [225,'FEAT','DEFERRED','Supabase migration (Technology Sovereignty Phase 2)','Status Report'],
+      [226,'FEAT','DEFERRED','Offline queue + service worker (Phase 2)','Status Report']
+    ]}
+  ];
+
+  function rowClass(st) {
+    if (st === 'FIXED') return 'pdf-fixed';
+    if (st === 'DEFERRED') return 'pdf-def';
+    if (st === 'IN_PROGRESS') return 'pdf-prog';
+    return 'pdf-open';
+  }
+  function stClass(st) {
+    if (st === 'FIXED') return 'st-fixed';
+    if (st === 'DEFERRED') return 'st-def';
+    if (st === 'IN_PROGRESS') return 'st-prog';
+    return 'st-open';
+  }
+
+  function render() {
+    var host = document.getElementById('sections');
+    var hideFixed = document.getElementById('hideFixed').checked;
+    var onlyOpen = document.getElementById('onlyOpen').checked;
+    host.innerHTML = '';
+    sections.forEach(function (sec) {
+      var el = document.createElement('section');
+      var h = document.createElement('h2');
+      h.textContent = sec.title;
+      el.appendChild(h);
+      var rowCount = 0;
+      sec.items.forEach(function (it) {
+        var id = it[0], type = it[1], st = it[2], desc = it[3], src = it[4];
+        if (hideFixed && st === 'FIXED') return;
+        if (onlyOpen && st !== 'OPEN' && st !== 'IN_PROGRESS') return;
+        rowCount++;
+        var row = document.createElement('label');
+        row.className = 'row ' + rowClass(st);
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.dataset.id = String(id);
+        var saved = loadState();
+        cb.checked = !!saved['i' + id];
+        cb.addEventListener('change', saveState);
+        var idSpan = document.createElement('span');
+        idSpan.className = 'id';
+        idSpan.textContent = '#' + id;
+        var badge = document.createElement('span');
+        badge.className = 'badge ' + (type === 'BUG' ? 'bug' : 'feat');
+        badge.textContent = type === 'BUG' ? 'Bug' : 'Feature';
+        var d = document.createElement('span');
+        d.className = 'desc';
+        d.textContent = desc;
+        var m = document.createElement('span');
+        m.className = 'meta';
+        m.innerHTML = '<span class="' + stClass(st) + '">' + st + '</span><br>' + escapeHtml(src);
+        row.appendChild(cb);
+        row.appendChild(idSpan);
+        row.appendChild(badge);
+        row.appendChild(d);
+        row.appendChild(m);
+        el.appendChild(row);
+      });
+      if (rowCount > 0) host.appendChild(el);
+    });
+    updateStats();
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function loadState() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE) || '{}');
+    } catch (e) { return {}; }
+  }
+  function saveState() {
+    var prev = loadState();
+    var o = {};
+    sections.forEach(function (sec) {
+      sec.items.forEach(function (it) {
+        var id = it[0];
+        var cb = document.querySelector('#sections input[type=checkbox][data-id="' + id + '"]');
+        if (cb) o['i' + id] = cb.checked;
+        else if (prev['i' + id] !== undefined) o['i' + id] = prev['i' + id];
+      });
+    });
+    document.querySelectorAll('.recent input[type=checkbox][data-recent]').forEach(function (c) {
+      o['r' + c.dataset.recent] = c.checked;
+    });
+    localStorage.setItem(STORAGE, JSON.stringify(o));
+    updateStats();
+  }
+
+  function updateStats() {
+    var total = 226;
+    var checked = 0;
+    var o = loadState();
+    for (var k in o) if (o[k]) checked++;
+    var pdfChecked = 0;
+    for (var i = 1; i <= 226; i++) if (o['i' + i]) pdfChecked++;
+    document.getElementById('statLine').textContent =
+      'PDF items checked: ' + pdfChecked + ' / ' + total + ' · All keys (incl. recent): ' + checked;
+  }
+
+  function restoreRecent() {
+    var o = loadState();
+    document.querySelectorAll('.recent input[data-recent]').forEach(function (c) {
+      c.checked = !!o['r' + c.dataset.recent];
+      c.onchange = saveState;
+    });
+  }
+
+  document.getElementById('btnClear').onclick = function () {
+    if (!confirm('Clear all checklist progress in this browser?')) return;
+    localStorage.removeItem(STORAGE);
+    render();
+    restoreRecent();
+  };
+  document.getElementById('btnUncheckOpen').onclick = function () {
+    var o = loadState();
+    sections.forEach(function (sec) {
+      sec.items.forEach(function (it) {
+        var st = it[2];
+        if (st === 'OPEN' || st === 'IN_PROGRESS') delete o['i' + it[0]];
+      });
+    });
+    localStorage.setItem(STORAGE, JSON.stringify(o));
+    render();
+    restoreRecent();
+  };
+  document.getElementById('btnExport').onclick = function () {
+    var o = loadState();
+    var ids = [];
+    for (var i = 1; i <= 226; i++) if (o['i' + i]) ids.push(i);
+    var recent = [];
+    document.querySelectorAll('.recent input[data-recent]').forEach(function (c) {
+      if (o['r' + c.dataset.recent]) recent.push(c.dataset.recent);
+    });
+    var text = 'Verified PDF #IDs: ' + ids.join(', ') + (ids.length ? '' : '(none)') +
+      '\nVerified recent keys: ' + (recent.length ? recent.join(', ') : '(none)');
+    navigator.clipboard.writeText(text).then(function () {
+      alert('Copied to clipboard:\n\n' + text);
+    }).catch(function () {
+      prompt('Copy:', text);
+    });
+  };
+  document.getElementById('hideFixed').onchange = render;
+  document.getElementById('onlyOpen').onchange = render;
+
+  render();
+  restoreRecent();
+})();
+  </script>
+</body>
+</html>
