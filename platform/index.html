@@ -35001,19 +35001,71 @@ async function renderBoardsTab(T, proj) {
         '<div><div class="cp-proj-name">' + esc(projName) + '</div><div class="cp-proj-sub">Client Dashboard</div></div>' +
       '</div></div>';
 
-      // --- Hero ---
-      html += '<div class="cp-hero cp-section">' +
-        '<h1>Welcome, ' + esc(clientFirst) + '</h1>' +
-        '<p>Here\'s your project overview for ' + esc(projName) + '</p>' +
+      // --- Hero Image Banner ---
+      var _heroUrl = '';
+      try {
+        var _heroSnap = await db.collection('boards').doc(projectId).collection('heroImages').limit(1).get();
+        _heroSnap.forEach(function(d) { _heroUrl = d.data().url || ''; });
+      } catch(e) {}
+      if (!_heroUrl) {
+        // Fallback: use first room cover or clip image
+        try {
+          var _rmSnap = await db.collection('boards').doc(projectId).collection('roomMeta').limit(1).get();
+          _rmSnap.forEach(function(d) { if (d.data().coverImage) _heroUrl = d.data().coverImage; });
+        } catch(e) {}
+      }
+      if (!_heroUrl && realClips.length > 0) {
+        for (var ci = 0; ci < realClips.length; ci++) {
+          var _cu = realClips[ci].imageUrl || realClips[ci].image || '';
+          if (_cu && _cu.startsWith('http')) { _heroUrl = _cu; break; }
+        }
+      }
+
+      html += '<div style="position:relative;width:100%;height:280px;overflow:hidden;background:linear-gradient(135deg,#0A1F3D,#1B3352);">' +
+        (_heroUrl ? '<img src="' + escAttr(_heroUrl) + '" style="width:100%;height:100%;object-fit:cover;opacity:0.5;" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '') +
+        '<div style="position:absolute;bottom:0;left:0;right:0;padding:32px 40px;background:linear-gradient(180deg,rgba(10,31,61,0.1) 0%,rgba(10,31,61,0.7) 100%);">' +
+          '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.15em;color:rgba(255,255,255,0.7);font-family:\'DM Sans\',sans-serif;margin-bottom:8px;">Welcome to your project dashboard</div>' +
+          '<div style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:32px;color:#FFFFFF;line-height:1.2;">Designing Your Story</div>' +
+          '<div style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:28px;color:rgba(255,255,255,0.85);font-style:italic;margin-top:2px;">at ' + esc(projName) + '</div>' +
+        '</div>' +
       '</div>';
 
-      // --- Stats ---
-      html += '<div class="cp-section cp-section-block"><div class="cp-stats">' +
-        '<div class="cp-card cp-stat"><div class="cp-stat-icon">💰</div><div class="cp-stat-val cp-price" style="color:#C4A464;">' + formatMoney(totalBilled) + '</div><div class="cp-stat-label">Total Billed</div></div>' +
-        '<div class="cp-card cp-stat"><div class="cp-stat-icon">✓</div><div class="cp-stat-val cp-price" style="color:#3CB371;">' + formatMoney(totalPaid) + '</div><div class="cp-stat-label">Paid</div></div>' +
-        '<div class="cp-card cp-stat"><div class="cp-stat-icon">⏳</div><div class="cp-stat-val cp-price" style="color:' + (outstanding > 0 ? '#D44' : '#3CB371') + ';">' + formatMoney(outstanding) + '</div><div class="cp-stat-label">Outstanding</div></div>' +
-        '<div class="cp-card cp-stat"><div class="cp-stat-icon">🪑</div><div class="cp-stat-val" style="color:#1B3352;">' + realClips.length + '</div><div class="cp-stat-label">Selections</div></div>' +
-      '</div></div>';
+      // --- Action Required: ONLY open/pending items (NO billing totals) ---
+      var _openInvoices = invoices.filter(function(inv) { return inv.status === 'Sent' || inv.status === 'Unpaid' || inv.status === 'Due' || inv.status === 'Overdue'; });
+      var _pendingProposals = proposals.filter(function(p) { return p.status === 'Sent' || p.status === 'Published' || p.status === 'Pending' || p.status === 'In Review'; });
+      var _hasOpen = _openInvoices.length > 0 || _pendingProposals.length > 0;
+
+      html += '<div class="cp-section cp-section-block" style="margin-top:32px;">';
+      if (_hasOpen) {
+        html += '<div class="cp-section-label" style="color:#E89A3A;">Action Required</div>';
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">';
+        // Open proposals
+        html += '<div class="cp-card" style="padding:20px;">' +
+          '<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.12em;color:#5C6B80;font-weight:600;margin-bottom:12px;">Open Proposals</div>' +
+          (_pendingProposals.length > 0 ? _pendingProposals.map(function(p) {
+            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F0F0F0;">' +
+              '<div><div style="font-size:13px;font-weight:600;color:#0A1F3D;">' + esc(p.proposalNum || p.name || '') + '</div><div style="font-size:11px;color:#9CA3AF;">' + esc(p.status || '') + '</div></div>' +
+              '<div style="font-family:monospace;font-weight:600;color:#C4A464;">' + formatMoney(p.total || 0) + '</div>' +
+            '</div>';
+          }).join('') : '<div style="font-size:13px;color:#9CA3AF;padding:12px 0;">No pending proposals</div>') +
+        '</div>';
+        // Open invoices
+        html += '<div class="cp-card" style="padding:20px;">' +
+          '<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.12em;color:#5C6B80;font-weight:600;margin-bottom:12px;">Open Invoices</div>' +
+          (_openInvoices.length > 0 ? _openInvoices.map(function(inv) {
+            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F0F0F0;">' +
+              '<div><div style="font-size:13px;font-weight:600;color:#0A1F3D;">' + esc(inv.invoiceNum || inv.number || '') + '</div><div style="font-size:11px;color:#9CA3AF;">' + esc(inv.status || '') + '</div></div>' +
+              '<div style="font-family:monospace;font-weight:600;color:#0A1F3D;">' + formatMoney(inv.total || 0) + '</div>' +
+            '</div>';
+          }).join('') : '<div style="font-size:13px;color:#9CA3AF;padding:12px 0;">No open invoices</div>') +
+        '</div>';
+        html += '</div>';
+      } else {
+        html += '<div class="cp-card" style="padding:24px;text-align:center;">' +
+          '<div style="font-size:13px;color:#9CA3AF;">You\'re all caught up — no open items right now.</div>' +
+        '</div>';
+      }
+      html += '</div>';
 
       // --- In Progress (from latest update or computed) ---
       var progressRooms = [];
