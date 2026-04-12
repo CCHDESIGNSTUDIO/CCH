@@ -18795,9 +18795,75 @@ async function renderBoardsTab(T, proj) {
       } catch(e) { console.error('Link save failed:', e); alert('Failed to link documents'); }
     }
 
-    // ── Stub functions for menu actions (prevent console errors) ──
+    // ── Send to Client — proposals + invoices ──
+    async function sendProposalToClient(projectId, docId) {
+      await _sendDocToClient(projectId, 'proposals', docId, 'Proposal');
+    }
     async function sendInvoiceToClient(projectId, docId) {
-      showToast('Email sending not yet configured — publish to Client Dashboard instead', 'warning');
+      await _sendDocToClient(projectId, 'invoices', docId, 'Invoice');
+    }
+    async function _sendDocToClient(projectId, collection, docId, docType) {
+      try {
+        var docRef = db.collection('boards').doc(projectId).collection(collection).doc(docId);
+        var doc = await docRef.get();
+        if (!doc.exists) return;
+        var data = doc.data();
+        var docNum = data.proposalNum || data.invoiceNum || data.number || data.name || docId.slice(0,8);
+
+        // Update status to Published + set published flag
+        var updates = { published: true, publishedAt: new Date().toISOString() };
+        if (data.status === 'Draft') updates.status = 'Sent';
+        await docRef.update(updates);
+
+        // Get client info from project
+        var projDoc = await db.collection('boards').doc(projectId).get();
+        var proj = projDoc.exists ? projDoc.data() : {};
+        var clientEmail = proj.clientEmail || '';
+        var clientName = proj.clientName || '';
+        var clientFirst = clientName.split(' ')[0] || 'there';
+
+        // Log activity
+        logDocActivity(projectId, collection, docId, 'sent_to_client', docType + ' sent to ' + (clientName || 'client'));
+
+        // Build client portal link
+        var portalUrl = window.location.origin + '/#/clientview/' + projectId;
+        var total = parseFloat(data.total) || 0;
+
+        // Show modal with link + email draft
+        var overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:3000;display:flex;align-items:center;justify-content:center;';
+        overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+        overlay.innerHTML =
+          '<div style="background:#FFFFFF;width:520px;box-shadow:0 20px 60px rgba(0,0,0,0.3);padding:0;">' +
+            '<div style="padding:20px 24px;border-bottom:1px solid #E2E2E2;display:flex;justify-content:space-between;align-items:center;"><span style="font-size:16px;font-weight:700;color:#0A1F3D;">' + docType + ' Sent to Client</span><button onclick="this.closest(\'div[style*=fixed]\').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#9CA3AF;">&times;</button></div>' +
+            '<div style="padding:24px;">' +
+              '<div style="background:#F4F6FA;padding:16px;margin-bottom:16px;border:1px solid #E2E2E2;">' +
+                '<div style="font-size:12px;font-weight:600;color:#0A1F3D;margin-bottom:4px;">' + esc(docNum) + ' — ' + formatMoney(total) + '</div>' +
+                '<div style="font-size:12px;color:#5C6B80;">Status updated to <strong>Sent</strong> · Published to Client Dashboard</div>' +
+              '</div>' +
+
+              '<div style="margin-bottom:16px;">' +
+                '<div style="font-size:11px;font-weight:600;color:#5C6B80;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">Client Portal Link</div>' +
+                '<div style="display:flex;gap:8px;">' +
+                  '<input id="clientLinkInput" value="' + escAttr(portalUrl) + '" readonly style="flex:1;padding:8px 12px;border:1px solid #E2E2E2;font-size:12px;font-family:monospace;color:#0A1F3D;">' +
+                  '<button onclick="navigator.clipboard.writeText(document.getElementById(\'clientLinkInput\').value);this.textContent=\'Copied!\';setTimeout(()=>this.textContent=\'Copy\',2000)" style="padding:8px 16px;background:#0A1F3D;color:white;border:none;font-size:12px;font-weight:600;cursor:pointer;">Copy</button>' +
+                '</div>' +
+              '</div>' +
+
+              (clientEmail ? '<div style="margin-bottom:16px;">' +
+                '<div style="font-size:11px;font-weight:600;color:#5C6B80;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">Email Client</div>' +
+                '<a href="mailto:' + escAttr(clientEmail) + '?subject=' + encodeURIComponent('CCH Design — ' + docType + ' ' + docNum + ' Ready for Review') + '&body=' + encodeURIComponent('Hi ' + clientFirst + ',\n\nA new ' + docType.toLowerCase() + ' is ready for your review:\n\n' + docType + ': ' + docNum + '\nAmount: ' + formatMoney(total) + '\n\nPlease review on your Client Dashboard:\n' + portalUrl + '\n\nThank you,\nCCH Design') + '&bcc=' + encodeURIComponent('cindy@cchdesign.com') + '" style="display:inline-block;padding:10px 20px;background:#C4A464;color:white;text-decoration:none;font-size:13px;font-weight:600;" target="_blank">Open Email to ' + esc(clientFirst) + '</a>' +
+                '<div style="font-size:11px;color:#9CA3AF;margin-top:6px;">Opens your email client with a pre-filled message · BCC: cindy@cchdesign.com</div>' +
+              '</div>' : '<div style="font-size:12px;color:#9CA3AF;margin-bottom:16px;">No client email on file — <a href="#" onclick="this.closest(\'div[style*=fixed]\').remove();showEditProjectModal(\'' + projectId + '\')" style="color:#C4A464;">add one in project settings</a></div>') +
+
+            '</div>' +
+          '</div>';
+        document.body.appendChild(overlay);
+
+        showToast(docType + ' ' + docNum + ' sent to client');
+        _cacheTime = 0;
+        invalidateSearchCache();
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
     async function markInvoicePastDue(projectId, docId) {
       try {
@@ -36014,15 +36080,25 @@ async function renderBoardsTab(T, proj) {
     }
 
     function copyClientLink(projectId) {
-      const url = window.location.origin + '/#/clientview/' + projectId;
-      navigator.clipboard.writeText(url).then(() => {
-        const btn = event.target.closest('button');
-        const orig = btn.innerHTML;
-        btn.innerHTML = '✓ Copied!';
-        setTimeout(() => { btn.innerHTML = orig; }, 2000);
-      }).catch(() => {
+      var url = window.location.origin + '/#/clientview/' + projectId;
+      navigator.clipboard.writeText(url).then(function() {
+        showToast('Client link copied to clipboard');
+      }).catch(function() {
         prompt('Copy this client link:', url);
       });
+      // Publish any Draft proposals/invoices for this project
+      _publishDraftsOnShare(projectId);
+    }
+    async function _publishDraftsOnShare(projectId) {
+      try {
+        var prSnap = await db.collection('boards').doc(projectId).collection('proposals').get();
+        prSnap.forEach(function(d) {
+          var data = d.data();
+          if (data.status === 'Draft' && !data.published) {
+            db.collection('boards').doc(projectId).collection('proposals').doc(d.id).update({ published: true, status: 'Sent', publishedAt: new Date().toISOString() });
+          }
+        });
+      } catch(e) {}
     }
 
     async function clientApproveProposal(projectId, proposalId) {
