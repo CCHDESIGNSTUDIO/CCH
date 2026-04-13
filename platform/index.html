@@ -31017,7 +31017,10 @@ async function renderBoardsTab(T, proj) {
                       </div>
                       <div class="form-group" style="grid-column:span 2;">
                         <label class="form-label">Product website</label>
-                        <input class="form-input" id="prodUrl" value="${escAttr(p.vendorUrl || p.productUrl || '')}" placeholder="https://…">
+                        <div style="display:flex;gap:6px;">
+                          <input class="form-input" id="prodUrl" value="${escAttr(p.vendorUrl || p.productUrl || p.clippedFromUrl || p.pageUrl || '')}" placeholder="https://…" style="flex:1;">
+                          ${(p.vendorUrl || p.productUrl || p.clippedFromUrl || p.pageUrl) ? '<a href="' + escAttr(p.vendorUrl || p.productUrl || p.clippedFromUrl || p.pageUrl) + '" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="white-space:nowrap;font-size:10px;padding:4px 10px;">Open ↗</a>' : ''}
+                        </div>
                       </div>
                       <div class="form-group" style="grid-column:span 2;">
                         <label class="form-label">Client description</label>
@@ -31316,6 +31319,8 @@ async function renderBoardsTab(T, proj) {
       try {
         if (existingId) {
           await db.collection('products').doc(existingId).update(data);
+          // Sync changes back to any project clips that reference this product
+          syncProductToClips(existingId, data);
         } else {
           data.createdAt = new Date().toISOString();
           await db.collection('products').add(data);
@@ -31325,6 +31330,48 @@ async function renderBoardsTab(T, proj) {
       } catch(e) {
         alert('Error saving product: ' + e.message);
       }
+    }
+
+    // Sync product library edits back to project clips
+    async function syncProductToClips(productId, data) {
+      try {
+        var projSnap = await getCachedBoards();
+        var titleLower = (data.title || '').toLowerCase().trim();
+        var vendorLower = (data.vendor || '').toLowerCase().trim();
+        var updated = 0;
+        for (var pd of projSnap.docs) {
+          var clipSnap = await db.collection('boards').doc(pd.id).collection('clips').get();
+          for (var cd of clipSnap.docs) {
+            var clip = cd.data();
+            var match = false;
+            // Match by libraryProductId (direct link)
+            if (clip.libraryProductId === productId) match = true;
+            // Or match by title + vendor
+            if (!match && (clip.title || '').toLowerCase().trim() === titleLower && (clip.vendor || '').toLowerCase().trim() === vendorLower) match = true;
+            if (match) {
+              var patch = {};
+              if (data.imageUrl && data.imageUrl !== clip.imageUrl) patch.imageUrl = data.imageUrl;
+              if (data.costPrice != null) patch.cost = data.costPrice;
+              if (data.costPrice != null) patch.unitCost = data.costPrice;
+              if (data.sellPrice != null) patch.clientPrice = data.sellPrice;
+              if (data.sellPrice != null) patch.totalSelling = data.sellPrice;
+              if (data.title && data.title !== clip.title) patch.title = data.title;
+              if (data.vendor && data.vendor !== clip.vendor) patch.vendor = data.vendor;
+              if (data.category) patch.category = data.category;
+              if (data.sku) patch.sku = data.sku;
+              if (data.dimensions) patch.dimensions = data.dimensions;
+              if (data.finish) patch.finish = data.finish;
+              if (data.images) patch.images = data.images;
+              if (Object.keys(patch).length > 0) {
+                patch._libSyncAt = new Date().toISOString();
+                await db.collection('boards').doc(pd.id).collection('clips').doc(cd.id).update(patch);
+                updated++;
+              }
+            }
+          }
+        }
+        if (updated > 0) showToast('Updated ' + updated + ' clip(s) across projects');
+      } catch(e) { console.warn('Clip sync error:', e); }
     }
 
     async function deleteProduct(id) {
