@@ -31903,18 +31903,32 @@ async function renderBoardsTab(T, proj) {
     async function addProductToProject(projectId, productId) {
       const p = libraryProducts.find(x => x.id === productId);
       if (!p) return;
+      var _cost = parseFloat(p.costPrice || p.cost || p.unitCost || p.tradeCost || p.totalCost) || 0;
+      var _sell = parseFloat(p.sellPrice || p.clientPrice || p.totalSelling || p.price || p.amount) || 0;
+      var _retail = parseFloat(p.retailPrice) || 0;
+      var _imgUrl = getProductImg(p) || p.imageUrl || p.image || '';
+      // Get all images from product
+      var _imgs = (p.images || []).slice();
+      if (_imgUrl && _imgs.indexOf(_imgUrl) < 0) _imgs.unshift(_imgUrl);
       try {
         await db.collection('boards').doc(projectId).collection('clips').add({
           title: p.title || 'Untitled',
-          imageUrl: getProductImg(p) || null,
-          category: p.category || 'Product Library',
-          vendor: p.vendor || null,
-          clientPrice: p.sellPrice ? '$' + parseFloat(p.sellPrice).toFixed(2) : null,
-          cost: p.costPrice ? '$' + parseFloat(p.costPrice).toFixed(2) : null,
+          imageUrl: _imgUrl || null,
+          images: _imgs.length > 0 ? _imgs : null,
+          category: p.category || '',
+          vendor: p.vendor || p.manufacturer || null,
+          cost: _cost,
+          unitCost: _cost,
+          clientPrice: _sell,
+          unitSellingPrice: _sell,
+          totalSelling: _sell,
+          retailPrice: _retail || null,
           description: p.description || null,
           finish: p.finish || null,
           materials: p.materials || null,
+          dimensions: p.dimensions || null,
           sku: p.sku || null,
+          room: '',
           savedAt: new Date().toISOString(),
           source: 'product-library',
           libraryProductId: productId
