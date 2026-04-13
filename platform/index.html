@@ -30931,9 +30931,12 @@ async function renderBoardsTab(T, proj) {
         if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
         return '';
       }
-      var _costPf = (p.costPrice !== undefined && p.costPrice !== null && p.costPrice !== '') ? p.costPrice : (parseFloat(p.cost || p.unitCost || 0) || '');
-      var _sellPf = (p.sellPrice !== undefined && p.sellPrice !== null && p.sellPrice !== '') ? p.sellPrice : (parseFloat(p.clientPrice || p.totalSelling || 0) || '');
-      var _retailPf = (p.retailPrice !== undefined && p.retailPrice !== null && p.retailPrice !== '') ? p.retailPrice : '';
+      var _costPf = parseMoney(p.costPrice) || parseMoney(p.cost) || parseMoney(p.unitCost) || parseMoney(p.tradeCost) || '';
+      var _sellPf = parseMoney(p.sellPrice) || parseMoney(p.clientPrice) || parseMoney(p.totalSelling) || parseMoney(p.unitSellingPrice) || '';
+      var _retailPf = parseMoney(p.retailPrice) || '';
+      if (_costPf === 0) _costPf = '';
+      if (_sellPf === 0) _sellPf = '';
+      if (_retailPf === 0) _retailPf = '';
       var _cNum = parseFloat(_costPf) || 0;
       var _sNum = parseFloat(_sellPf) || 0;
       var _mkPf = (_cNum > 0 && _sNum > 0) ? ((_sNum - _cNum) / _cNum * 100).toFixed(2) : '';
