@@ -14721,7 +14721,7 @@ async function renderBoardsTab(T, proj) {
         <button class="btn btn-secondary btn-sm" onclick="previewDocument('proposal','${projectId}','${proposalId}')">👁️ Preview</button>
         <button class="btn btn-secondary btn-sm" onclick="editProposalMeta('${projectId}','${proposalId}')">✏️ Edit Details</button>
         <button class="btn btn-secondary btn-sm" onclick="addProposalLineItem('${projectId}','${proposalId}')">+ Add Item</button>
-            <button class="btn btn-secondary btn-sm" onclick="showMyItemsPanel('${projectId}','proposals','${proposalId}')">🛍️ My Items</button>
+            <button class="btn btn-secondary btn-sm" onclick="openDocItemsSidebar()">🛍️ My Items</button>
         <button class="btn btn-dark btn-sm" onclick="convertProposalToInvoice('${projectId}','${proposalId}')">🧾 Convert to Invoice</button>
         <button class="btn btn-dark btn-sm" onclick="generatePOsFromDoc('${projectId}','proposals','${proposalId}')">📦 Generate POs by Vendor</button>
             <button class="btn btn-secondary btn-sm" onclick="generateTearSheetsFromDoc('${escAttr(projectId)}','proposals','${escAttr(proposalId)}','${escAttr(proj.name || projName)}')">📄 Tear Sheets</button>
@@ -17681,7 +17681,7 @@ async function renderBoardsTab(T, proj) {
       openDocItemsSidebar();
     }
 
-    // ── Tabbed sidebar for adding items to proposals/invoices/POs ──
+    // ── Browse & Add to Proposal/Invoice/PO — Right Sidebar ──
     async function openDocItemsSidebar() {
       var existing = document.getElementById('docItemsSidebar');
       if (existing) { existing.remove(); return; }
@@ -17689,47 +17689,50 @@ async function renderBoardsTab(T, proj) {
 
       var panel = document.createElement('div');
       panel.id = 'docItemsSidebar';
-      panel.style.cssText = 'position:fixed;top:0;right:0;width:380px;height:100vh;background:#FFFFFF;border-left:2px solid var(--gold,#C9A96E);box-shadow:-6px 0 30px rgba(0,0,0,0.15);z-index:1500;display:flex;flex-direction:column;overflow:hidden;';
+      panel.style.cssText = 'position:fixed;top:0;right:0;width:400px;height:100vh;background:#FFFFFF;border-left:1px solid #E2E2E2;box-shadow:-4px 0 24px rgba(0,0,0,0.1);z-index:1500;display:flex;flex-direction:column;overflow:hidden;';
 
       // Header
-      var headerHtml = '<div style="padding:14px 18px;border-bottom:1px solid #E5E2DA;display:flex;justify-content:space-between;align-items:center;">' +
-        '<div style="font-size:15px;font-weight:700;color:#1B3352;">Add Item</div>' +
+      var headerHtml = '<div style="padding:14px 18px;border-bottom:1px solid #E2E2E2;display:flex;justify-content:space-between;align-items:center;">' +
+        '<div style="font-size:15px;font-weight:700;color:#1B3352;">Browse & Add to Proposal</div>' +
         '<button onclick="document.getElementById(\'docItemsSidebar\').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#5C6B80;">×</button>' +
       '</div>';
 
-      // Tabs
-      var tabsHtml = '<div style="display:flex;border-bottom:2px solid #E5E2DA;">' +
-        '<button class="dis-tab" data-tab="products" onclick="switchDocSidebarTab(\'products\')" style="flex:1;padding:10px 0;font-size:12px;font-weight:700;border:none;cursor:pointer;background:#1B3352;color:#FFFFFF;border-bottom:2px solid var(--gold);">📦 Products</button>' +
-        '<button class="dis-tab" data-tab="services" onclick="switchDocSidebarTab(\'services\')" style="flex:1;padding:10px 0;font-size:12px;font-weight:700;border:none;cursor:pointer;background:#fff;color:#5C6B80;border-bottom:2px solid transparent;">🛠 Services</button>' +
-        '<button class="dis-tab" data-tab="expenses" onclick="switchDocSidebarTab(\'expenses\')" style="flex:1;padding:10px 0;font-size:12px;font-weight:700;border:none;cursor:pointer;background:#fff;color:#5C6B80;border-bottom:2px solid transparent;">💰 Expenses</button>' +
+      // Search bar
+      var searchHtml = '<div style="padding:10px 14px;border-bottom:1px solid #E2E2E2;">' +
+        '<input id="disSearchInput" placeholder="Search by name or vendor..." style="width:100%;padding:9px 12px;border:1px solid #E2E2E2;border-radius:0;font-size:13px;outline:none;box-sizing:border-box;font-family:DM Sans,sans-serif;" oninput="filterDocSidebar()">' +
       '</div>';
 
-      // Search + source toggle (products tab)
-      var searchHtml = '<div id="disSearchArea">' +
-        '<div style="padding:10px 14px;border-bottom:1px solid #E5E2DA;">' +
-          '<input id="disSearchInput" placeholder="Search products..." style="width:100%;padding:8px 12px;border:1px solid #E5E2DA;border-radius:4px;font-size:13px;outline:none;box-sizing:border-box;" oninput="filterDocSidebar()">' +
-        '</div>' +
-        '<div style="padding:6px 14px;border-bottom:1px solid #E5E2DA;display:flex;gap:0;">' +
-          '<button id="disSrcAll" onclick="window._disSrc=\'all\';filterDocSidebar()" style="flex:1;padding:6px 0;background:#1B3352;color:white;border:none;font-size:11px;font-weight:600;cursor:pointer;border-radius:4px 0 0 4px;">All</button>' +
-          '<button id="disSrcProject" onclick="window._disSrc=\'project\';filterDocSidebar()" style="flex:1;padding:6px 0;background:#fff;color:#5C6B80;border:1px solid #E5E2DA;border-left:none;font-size:11px;font-weight:600;cursor:pointer;">This Project</button>' +
-          '<button id="disSrcLibrary" onclick="window._disSrc=\'library\';filterDocSidebar()" style="flex:1;padding:6px 0;background:#fff;color:#5C6B80;border:1px solid #E5E2DA;border-left:none;font-size:11px;font-weight:600;cursor:pointer;border-radius:0 4px 4px 0;">Library</button>' +
-        '</div>' +
+      // Filter pills
+      var pillStyle = function(active) { return 'padding:6px 14px;font-size:11px;font-weight:600;border:1px solid ' + (active ? '#1B3352' : '#E2E2E2') + ';background:' + (active ? '#1B3352' : '#fff') + ';color:' + (active ? '#fff' : '#5C6B80') + ';cursor:pointer;white-space:nowrap;'; };
+      var pillsHtml = '<div style="padding:8px 14px;border-bottom:1px solid #E2E2E2;display:flex;gap:6px;flex-wrap:wrap;">' +
+        '<button id="disPillAll" onclick="window._disFilter=\'all\';filterDocSidebar()" style="' + pillStyle(true) + '">All</button>' +
+        '<button id="disPillProducts" onclick="window._disFilter=\'products\';filterDocSidebar()" style="' + pillStyle(false) + '">Products</button>' +
+        '<button id="disPillServices" onclick="window._disFilter=\'services\';filterDocSidebar()" style="' + pillStyle(false) + '">Services</button>' +
+        '<button id="disPillExpenses" onclick="window._disFilter=\'expenses\';filterDocSidebar()" style="' + pillStyle(false) + '">Expenses</button>' +
+        '<button id="disPillLabor" onclick="window._disFilter=\'labor\';filterDocSidebar()" style="' + pillStyle(false) + '">Labor</button>' +
+      '</div>';
+
+      // Source toggle (Project / Library)
+      var srcHtml = '<div style="padding:6px 14px;border-bottom:1px solid #E2E2E2;display:flex;gap:0;" id="disSrcArea">' +
+        '<button id="disSrcAll" onclick="window._disSrc=\'all\';filterDocSidebar()" style="flex:1;padding:6px 0;background:#1B3352;color:white;border:none;font-size:11px;font-weight:600;cursor:pointer;">All</button>' +
+        '<button id="disSrcProject" onclick="window._disSrc=\'project\';filterDocSidebar()" style="flex:1;padding:6px 0;background:#fff;color:#5C6B80;border:1px solid #E2E2E2;border-left:none;font-size:11px;font-weight:600;cursor:pointer;">This Project</button>' +
+        '<button id="disSrcLibrary" onclick="window._disSrc=\'library\';filterDocSidebar()" style="flex:1;padding:6px 0;background:#fff;color:#5C6B80;border:1px solid #E2E2E2;border-left:none;font-size:11px;font-weight:600;cursor:pointer;">Library</button>' +
       '</div>';
 
       // Content area
       var contentHtml = '<div id="disContent" style="flex:1;overflow-y:auto;"></div>';
 
       // Blank item button at bottom
-      var footerHtml = '<div style="padding:10px 14px;border-top:1px solid #E5E2DA;">' +
-        '<button onclick="docEditAddBlankItem();document.getElementById(\'docItemsSidebar\').remove()" style="width:100%;padding:10px;background:none;border:2px dashed #E5E2DA;color:#5C6B80;font-size:13px;cursor:pointer;font-weight:600;">✏️ Add Blank Item</button>' +
+      var footerHtml = '<div style="padding:10px 14px;border-top:1px solid #E2E2E2;">' +
+        '<button onclick="docEditAddBlankItem();document.getElementById(\'docItemsSidebar\').remove()" style="width:100%;padding:10px;background:none;border:2px dashed #E2E2E2;color:#5C6B80;font-size:13px;cursor:pointer;font-weight:600;">✏️ Add Blank Item</button>' +
       '</div>';
 
-      panel.innerHTML = headerHtml + tabsHtml + searchHtml + contentHtml + footerHtml;
+      panel.innerHTML = headerHtml + searchHtml + pillsHtml + srcHtml + contentHtml + footerHtml;
       document.body.appendChild(panel);
 
       // Load products
       window._disSrc = 'all';
-      window._disTab = 'products';
+      window._disFilter = 'all';
       window._disProducts = [];
       showToast('Loading products...');
 
@@ -17775,34 +17778,23 @@ async function renderBoardsTab(T, proj) {
       filterDocSidebar();
     }
 
-    function switchDocSidebarTab(tab) {
-      window._disTab = tab;
-      // Update tab styles
-      document.querySelectorAll('.dis-tab').forEach(function(t) {
-        var active = t.dataset.tab === tab;
-        t.style.background = active ? '#1B3352' : '#fff';
-        t.style.color = active ? '#FFFFFF' : '#5C6B80';
-        t.style.borderBottom = active ? '2px solid var(--gold)' : '2px solid transparent';
-      });
-      // Show/hide search area (only for products)
-      var sa = document.getElementById('disSearchArea');
-      if (sa) sa.style.display = tab === 'products' ? '' : 'none';
-
-      if (tab === 'products') filterDocSidebar();
-      else if (tab === 'services') renderDocSidebarServices();
-      else if (tab === 'expenses') renderDocSidebarExpenses();
-    }
-
     function filterDocSidebar() {
       var q = ((document.getElementById('disSearchInput') || {}).value || '').toLowerCase();
       var src = window._disSrc || 'all';
-      var items = window._disProducts || [];
-      var filtered = items.filter(function(i) {
-        if (src === 'project' && i._source !== 'project') return false;
-        if (src === 'library' && i._source !== 'library') return false;
-        if (q && !((i.title||'').toLowerCase().includes(q) || (i.vendor||'').toLowerCase().includes(q) || (i.sku||'').toLowerCase().includes(q))) return false;
-        return true;
+      var filter = window._disFilter || 'all';
+      var c = document.getElementById('disContent');
+      if (!c) return;
+
+      // Update pill styles
+      ['All','Products','Services','Expenses','Labor'].forEach(function(s) {
+        var btn = document.getElementById('disPill' + s);
+        if (!btn) return;
+        var active = filter === s.toLowerCase();
+        btn.style.background = active ? '#1B3352' : '#fff';
+        btn.style.color = active ? '#fff' : '#5C6B80';
+        btn.style.borderColor = active ? '#1B3352' : '#E2E2E2';
       });
+
       // Update source button styles
       ['All','Project','Library'].forEach(function(s) {
         var btn = document.getElementById('disSrc' + s);
@@ -17811,29 +17803,90 @@ async function renderBoardsTab(T, proj) {
         btn.style.background = active ? '#1B3352' : '#fff';
         btn.style.color = active ? 'white' : '#5C6B80';
       });
-      // Render grid
+
+      // Show/hide source toggle (only for products/all)
+      var srcArea = document.getElementById('disSrcArea');
+      if (srcArea) srcArea.style.display = (filter === 'services' || filter === 'expenses' || filter === 'labor') ? 'none' : '';
+
+      // Services view
+      if (filter === 'services') { renderDocSidebarServices(); return; }
+      // Expenses view
+      if (filter === 'expenses') { renderDocSidebarExpenses(); return; }
+      // Labor view
+      if (filter === 'labor') { renderDocSidebarLabor(); return; }
+
+      // Products view (filter === 'all' or 'products')
+      var items = window._disProducts || [];
+      var filtered = items.filter(function(i) {
+        if (src === 'project' && i._source !== 'project') return false;
+        if (src === 'library' && i._source !== 'library') return false;
+        if (q && !((i.title||'').toLowerCase().includes(q) || (i.vendor||'').toLowerCase().includes(q) || (i.sku||'').toLowerCase().includes(q))) return false;
+        return true;
+      });
+
+      // Separate project items and library items
+      var projItems = filtered.filter(function(i) { return i._source === 'project'; });
+      var libItems = filtered.filter(function(i) { return i._source !== 'project'; });
+
+      function renderItemCard(item) {
+        var img = item.imageUrl || item.image || '';
+        var isValid = img && (img.startsWith('http') || img.startsWith('data:') || img.startsWith('//'));
+        var cost = parseMoney(item.unitCost || item.costPrice || item.cost || item.tradeCost) || 0;
+        var sell = parseMoney(item.sellPrice || item.clientPrice || item.totalSelling || item.amount) || 0;
+        var price = sell > 0 ? sell : cost;
+        return '<div onclick="addSidebarProductToDoc(\'' + escAttr(item.id) + '\')" style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid #F0F0F0;cursor:pointer;transition:background 0.1s;" onmouseover="this.style.background=\'#FAFAFA\'" onmouseout="this.style.background=\'#fff\'">' +
+          (isValid ? '<img src="' + escAttr(img) + '" style="width:48px;height:48px;object-fit:cover;flex-shrink:0;" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div style="width:48px;height:48px;background:#F4F6FA;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">📦</div>') +
+          '<div style="flex:1;min-width:0;">' +
+            '<div style="font-size:13px;font-weight:600;color:#1B3352;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(item.title || 'Untitled') + '</div>' +
+            '<div style="font-size:11px;color:#5C6B80;">' + esc(item.vendor || '') + '</div>' +
+          '</div>' +
+          (price > 0 ? '<div style="font-size:12px;font-weight:700;color:#1B3352;font-family:monospace;flex-shrink:0;">' + formatMoney(price) + '</div>' : '') +
+        '</div>';
+      }
+
+      var html = '';
+      // Section: In this Project
+      if (projItems.length > 0 && (src === 'all' || src === 'project')) {
+        html += '<div style="padding:8px 14px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:#C4A464;background:#FAFAFA;border-bottom:1px solid #E2E2E2;">In this Project (' + projItems.length + ')</div>';
+        html += projItems.slice(0, 50).map(renderItemCard).join('');
+      }
+      // Section: Master Product Library
+      if (libItems.length > 0 && (src === 'all' || src === 'library')) {
+        html += '<div style="padding:8px 14px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:#5C6B80;background:#FAFAFA;border-bottom:1px solid #E2E2E2;">Master Product Library (' + libItems.length + ')</div>';
+        html += libItems.slice(0, 80).map(renderItemCard).join('');
+      }
+      if (filtered.length === 0) {
+        html = '<div style="text-align:center;padding:40px;color:#5C6B80;">No products found</div>';
+      }
+      c.innerHTML = html;
+    }
+
+    function renderDocSidebarLabor() {
       var c = document.getElementById('disContent');
       if (!c) return;
-      c.innerHTML = '<div style="padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start;">' +
-        filtered.slice(0, 120).map(function(item) {
-          var img = item.imageUrl || item.image || '';
-          var isValid = img && (img.startsWith('http') || img.startsWith('data:') || img.startsWith('//'));
-          var cost = parseFloat(item.unitCost || item.costPrice || item.cost || item.tradeCost) || 0;
-          var sell = parseFloat(item.sellPrice || item.clientPrice || item.totalSelling || item.amount) || 0;
-          var price = sell > 0 ? sell : cost;
-          var srcBadge = item._source === 'project'
-            ? '<span style="position:absolute;top:4px;left:4px;background:rgba(201,169,110,0.92);color:#fff;font-size:9px;font-weight:700;padding:2px 5px;border-radius:2px;">PROJECT</span>' : '';
-          return '<div onclick="addSidebarProductToDoc(\'' + escAttr(item.id) + '\')" style="position:relative;background:#F0F4F9;border:1px solid #E5E2DA;cursor:pointer;overflow:hidden;transition:border-color 0.15s;border-radius:4px;" onmouseenter="this.style.borderColor=\'var(--gold)\'" onmouseleave="this.style.borderColor=\'#E5E2DA\'">' +
-            (isValid ? '<img src="' + escAttr(img) + '" style="width:100%;aspect-ratio:1;object-fit:cover;" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<label onclick="event.stopPropagation()" style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;color:#C4A464;font-size:24px;background:#EDF1F7;cursor:pointer;flex-direction:column;gap:2px;" title="Upload image"><span>📷</span><span style="font-size:8px;color:#5C6B80;">Upload</span><input type="file" accept="image/*" style="display:none;" onchange="event.stopPropagation();window._pdUploadImage(this.files[0],\'' + escAttr(item.id) + '\');this.value=\'\'"></label>') +
-            srcBadge +
-            '<div style="padding:6px 8px;">' +
-              '<div style="font-weight:600;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#1B3352;">' + esc(item.title || 'Untitled') + '</div>' +
-              '<div style="font-size:10px;color:#5C6B80;">' + esc(item.vendor || '') + '</div>' +
-              (price > 0 ? '<div style="font-size:11px;font-weight:600;color:var(--gold);font-family:monospace;">' + formatMoney(price) + '</div>' : '') +
-            '</div></div>';
-        }).join('') +
-        (filtered.length === 0 ? '<div style="grid-column:1/-1;text-align:center;padding:40px;color:#5C6B80;">No products found</div>' : '') +
-      '</div>';
+      var labor = [
+        { name: 'Installation Labor', rate: 125, desc: 'On-site install, assembly, placement' },
+        { name: 'Delivery & White Glove', rate: 0, desc: 'White glove delivery — enter amount' },
+        { name: 'Carpentry / Millwork', rate: 0, desc: 'Custom carpentry, built-ins, millwork' },
+        { name: 'Electrical Work', rate: 0, desc: 'Electrical install, fixture wiring' },
+        { name: 'Plumbing Work', rate: 0, desc: 'Plumbing install, fixture hookup' },
+        { name: 'Painting / Wallpaper', rate: 0, desc: 'Paint labor, wallpaper installation' },
+        { name: 'Tile Installation', rate: 0, desc: 'Tile, stone, flooring install' },
+        { name: 'Upholstery / Reupholstery', rate: 0, desc: 'Custom upholstery, reupholstery work' },
+        { name: 'Window Treatment Install', rate: 0, desc: 'Drapery, shade, blind installation' },
+        { name: 'General Labor', rate: 0, desc: 'Other labor — enter amount' }
+      ];
+      c.innerHTML = '<div style="padding:4px 14px 4px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:#5C6B80;background:#FAFAFA;border-bottom:1px solid #E2E2E2;padding-top:8px;">Labor & Trade Work</div>' +
+        labor.map(function(s) {
+          return '<div onclick="addSidebarServiceToDoc(\'' + escAttr(s.name) + '\',' + s.rate + ')" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid #F0F0F0;cursor:pointer;transition:background 0.1s;" onmouseover="this.style.background=\'#FAFAFA\'" onmouseout="this.style.background=\'#fff\'">' +
+            '<div style="width:36px;height:36px;background:rgba(27,51,82,0.06);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🔨</div>' +
+            '<div style="flex:1;min-width:0;">' +
+              '<div style="font-size:13px;font-weight:600;color:#1B3352;">' + esc(s.name) + '</div>' +
+              '<div style="font-size:11px;color:#5C6B80;">' + esc(s.desc) + '</div>' +
+            '</div>' +
+            (s.rate > 0 ? '<div style="font-size:12px;font-weight:700;color:#5FA56B;font-family:monospace;flex-shrink:0;">$' + s.rate + '</div>' : '<div style="font-size:10px;color:#5C6B80;flex-shrink:0;">Enter $</div>') +
+          '</div>';
+        }).join('');
     }
 
     function addSidebarProductToDoc(itemId) {
