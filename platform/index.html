@@ -20044,6 +20044,73 @@ async function renderBoardsTab(T, proj) {
       // Re-render selection picker items if the picker is open
     }
 
+    // ── Apply QB IDs from Houzz Transaction Report ──
+    async function applyHouzzQBIds() {
+      showToast('Loading QB IDs from Houzz...');
+      try {
+        var resp = await fetch('/houzz_qb_ids.json');
+        if (!resp.ok) throw new Error('Could not load houzz_qb_ids.json');
+        var qbMap = await resp.json();
+        var qbCodes = Object.keys(qbMap);
+        showToast('Loaded ' + qbCodes.length + ' QB IDs. Scanning projects...');
+
+        var projSnap = await getCachedBoards();
+        var updated = 0, matched = 0, skipped = 0;
+        var batch = db.batch();
+        var batchCount = 0;
+
+        for (var pd of projSnap.docs) {
+          var pid = pd.id;
+          // Invoices
+          try {
+            var invSnap = await db.collection('boards').doc(pid).collection('invoices').get();
+            invSnap.forEach(function(d) {
+              var data = d.data();
+              var code = data.invoiceNum || data.number || '';
+              if (code && qbMap[code] && !getQbId(data)) {
+                batch.update(d.ref, { qbDocId: qbMap[code], _qbIdSource: 'houzz-import' });
+                batchCount++; updated++;
+              } else if (code && qbMap[code]) { matched++; }
+            });
+          } catch(e) {}
+          // Proposals
+          try {
+            var prSnap = await db.collection('boards').doc(pid).collection('proposals').get();
+            prSnap.forEach(function(d) {
+              var data = d.data();
+              var code = data.proposalNum || data.name || data.number || '';
+              if (code && qbMap[code] && !getQbId(data)) {
+                batch.update(d.ref, { qbDocId: qbMap[code], _qbIdSource: 'houzz-import' });
+                batchCount++; updated++;
+              } else if (code && qbMap[code]) { matched++; }
+            });
+          } catch(e) {}
+          // POs
+          try {
+            var poSnap = await db.collection('boards').doc(pid).collection('purchaseOrders').get();
+            poSnap.forEach(function(d) {
+              var data = d.data();
+              var code = data.number || data.num || data.poNum || '';
+              if (code && qbMap[code] && !getQbId(data)) {
+                batch.update(d.ref, { qbDocId: qbMap[code], _qbIdSource: 'houzz-import' });
+                batchCount++; updated++;
+              } else if (code && qbMap[code]) { matched++; }
+            });
+          } catch(e) {}
+          // Commit in batches of 400
+          if (batchCount >= 400) {
+            await batch.commit();
+            batch = db.batch();
+            showToast('Applied ' + updated + ' QB IDs so far...');
+            batchCount = 0;
+          }
+        }
+        if (batchCount > 0) await batch.commit();
+        showToast('✅ Applied ' + updated + ' QB IDs (' + matched + ' already had QB IDs)');
+        _cacheTime = 0;
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+
     // ── Auto-Link Documents from Houzz Transaction Report ──
     async function autoLinkAllDocs() {
       showToast('Auto-linking documents from Houzz data...');
@@ -36533,7 +36600,7 @@ async function renderBoardsTab(T, proj) {
 
     async function renderAllInvoices() {
       setBreadcrumb([{ label: 'Invoices' }]);
-      setTopbarActions('<button class="btn btn-secondary" style="margin-right:8px;" onclick="autoLinkAllDocs()">🔗 Auto-Link Docs</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="compareBugletrailInvoices()">🔍 Compare 7225 Bugletrail</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="auditPaymentApplicationAllClients()">🧾 Audit Applied Payments</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="dedupActiveProjectProducts()">🧹 Dedup 10 Active Projects</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="importPaymentData()">💰 Import Payments</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="importInvoicePaymentsOnly()">💵 Invoice payments only</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="bulkInvoiceCleanup()">🧹 Cleanup</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="bulkMarkQBSynced(\'invoices\')">Sync All QB</button><button class="btn btn-primary" onclick="showNewInvoiceModalGlobal()">+ New Invoice</button>');
+      setTopbarActions('<button class="btn btn-secondary" style="margin-right:8px;" onclick="applyHouzzQBIds()">🟢 Apply QB IDs</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="autoLinkAllDocs()">🔗 Auto-Link Docs</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="importPaymentData()">💰 Import Payments</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="bulkInvoiceCleanup()">🧹 Cleanup</button><button class="btn btn-primary" onclick="showNewInvoiceModalGlobal()">+ New Invoice</button>');
       const T = document.getElementById('contentArea');
       T.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Loading invoices...</div>';
       try {
