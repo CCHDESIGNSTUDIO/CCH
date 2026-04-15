@@ -5851,14 +5851,14 @@
           '<img src="' + escAttr(heroUrl) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' +
         '</div>';
       }
-      // Hero + extras: hero takes 65%, extras grid takes 35%
-      return '<div class="img-col" style="display:grid;grid-template-columns:1.8fr 1fr;gap:6px;padding:12px;align-items:stretch;">' +
-        '<div style="display:flex;align-items:center;justify-content:center;overflow:hidden;">' +
+      // Hero + extras: hero takes 65%, extras grid takes 35%, pure white
+      return '<div class="img-col" style="display:grid;grid-template-columns:1.8fr 1fr;gap:8px;padding:16px;align-items:stretch;background:#fff;">' +
+        '<div style="display:flex;align-items:center;justify-content:center;overflow:hidden;background:#fff;">' +
           '<img src="' + escAttr(heroUrl) + '" style="max-width:100%;max-height:100%;object-fit:contain;" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' +
         '</div>' +
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
           validExtras.slice(0, 4).map(function(u) {
-            return '<div style="display:flex;align-items:center;justify-content:center;overflow:hidden;">' +
+            return '<div style="display:flex;align-items:center;justify-content:center;overflow:hidden;background:#fff;">' +
               '<img src="' + escAttr(u) + '" style="width:100%;height:100%;object-fit:cover;" referrerpolicy="no-referrer" onerror="this.parentElement.style.display=\'none\'">' +
             '</div>';
           }).join('') +
@@ -44401,17 +44401,17 @@ async function renderBoardsTab(T, proj) {
         '.tb-btn { background:transparent;color:#C4A464;border:1px solid #C4A464;padding:6px 14px;font-size:11px;font-weight:600;cursor:pointer;font-family:"DM Sans",sans-serif;transition:all 0.15s; }' +
         '.tb-btn:hover { background:#C4A464;color:#1B3352; }' +
         '.page { width:11in;height:8.5in;background:#fff;margin:56px auto 16px;display:flex;flex-direction:column;box-shadow:0 1px 8px rgba(0,0,0,0.08);page-break-after:always;overflow:hidden; }' +
-        '.page-header { display:flex;align-items:center;justify-content:space-between;padding:10px 28px;background:#1B3352;flex-shrink:0; }' +
+        '.page-header { display:flex;align-items:center;justify-content:space-between;padding:12px 28px;background:#fff;border-bottom:1px solid #E8E8E8;flex-shrink:0; }' +
         '.logo-block { display:flex;align-items:center;gap:8px; }' +
-        '.logo-cch { font-family:"Cormorant Garamond",Georgia,serif;font-size:20px;font-weight:700;color:#C4A464;letter-spacing:3px;line-height:1; }' +
-        '.logo-sub { font-size:7px;letter-spacing:3px;color:rgba(255,255,255,0.35);text-transform:uppercase; }' +
+        '.logo-cch { font-family:"Cormorant Garamond",Georgia,serif;font-size:22px;font-weight:700;color:#1B3352;letter-spacing:3px;line-height:1; }' +
+        '.logo-sub { font-size:7px;letter-spacing:3px;color:#9E9A8F;text-transform:uppercase; }' +
         '.project-info { text-align:right; }' +
-        '.proj-name { font-size:12px;font-weight:600;color:#fff;letter-spacing:0.5px; }' +
-        '.proj-meta { font-size:9px;color:rgba(255,255,255,0.35);margin-top:1px; }' +
+        '.proj-name { font-size:12px;font-weight:600;color:#1B3352;letter-spacing:0.5px; }' +
+        '.proj-meta { font-size:9px;color:#9E9A8F;margin-top:1px; }' +
         '.img-col { flex:1;display:flex;align-items:center;justify-content:center;background:#fff;overflow:hidden;min-height:0; }' +
         '.img-col img { max-width:100%;max-height:100%;object-fit:contain; }' +
         '.no-img { display:none; }' +
-        '.detail-col { flex-shrink:0;padding:12px 28px 10px;border-top:1px solid #E8E8E8;display:flex;gap:24px;align-items:flex-start; }' +
+        '.detail-col { flex-shrink:0;padding:12px 28px 8px;border-top:1px solid #E8E8E8;display:flex;gap:24px;align-items:flex-start;margin-top:auto; }' +
         '.detail-left { flex:1;min-width:0; }' +
         '.detail-right { flex-shrink:0; }' +
         '.product-title { font-family:"Cormorant Garamond",Georgia,serif;font-size:18px;font-weight:600;color:#1B3352;line-height:1.2;margin-bottom:1px; }' +
