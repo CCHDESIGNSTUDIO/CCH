@@ -44393,7 +44393,7 @@ async function renderBoardsTab(T, proj) {
     // Shared CSS for tear sheet pages — image-dominant portrait layout
     function _getTearSheetCSS() {
       return '*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }' +
-        'body { font-family: "DM Sans", sans-serif; background: #E8E6E2; color: #1B3352; }' +
+        'body { font-family: "DM Sans", sans-serif; background: #FFFFFF; color: #1B3352; }' +
         '.toolbar { position:fixed;top:0;left:0;right:0;z-index:999;background:#1B3352;display:flex;align-items:center;justify-content:space-between;padding:12px 24px;box-shadow:0 2px 12px rgba(0,0,0,0.3); }' +
         '.toolbar-title { color:#fff;font-size:14px;font-weight:600;letter-spacing:0.5px;max-width:50%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }' +
         '.toolbar-actions { display:flex;gap:10px; }' +
@@ -44413,12 +44413,12 @@ async function renderBoardsTab(T, proj) {
         '.proj-meta { font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px;letter-spacing:0.5px; }' +
 
         // Image — hero, takes most of the page
-        '.img-col { background:#F5F3EE;display:flex;align-items:center;justify-content:center;flex:1;min-height:0;padding:24px;overflow:hidden; }' +
+        '.img-col { background:#FFFFFF;display:flex;align-items:center;justify-content:center;flex:1;min-height:0;padding:24px;overflow:hidden; }' +
         '.img-col img { max-width:100%;max-height:100%;object-fit:contain; }' +
-        '.no-img { color:#9E9A8F;text-align:center;font-size:16px;line-height:1.6; }' +
+        '.no-img { display:none; }' +
 
         // Detail bar — compact row below image
-        '.detail-col { padding:20px 32px;border-top:1px solid #E2E0DC; }' +
+        '.detail-col { padding:20px 32px;border-top:1px solid #E8E8E8; }' +
         '.product-title { font-family:"Cormorant Garamond",Georgia,serif;font-size:24px;font-weight:600;color:#1B3352;line-height:1.2;margin-bottom:2px; }' +
         '.product-room { font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#C4A464;margin-bottom:12px;font-weight:600; }' +
         '.spec-table { display:flex;flex-wrap:wrap;gap:0; }' +
@@ -44432,7 +44432,7 @@ async function renderBoardsTab(T, proj) {
         '.price-note { font-size:11px;font-family:"DM Sans",sans-serif;font-weight:400;color:rgba(255,255,255,0.6);margin-left:8px; }' +
 
         // Footer
-        '.page-footer { display:flex;justify-content:space-between;align-items:center;padding:8px 32px;border-top:1px solid #E2E0DC;font-size:9px;color:#9E9A8F;letter-spacing:0.5px; }' +
+        '.page-footer { display:flex;justify-content:space-between;align-items:center;padding:8px 32px;border-top:1px solid #E8E8E8;font-size:9px;color:#9E9A8F;letter-spacing:0.5px; }' +
 
         '@page { size:8.5in 11in portrait;margin:0; }' +
         '@media print { .toolbar{display:none!important;} body{background:white;} .page{margin:0;box-shadow:none;width:100%;min-height:100vh;} }';
