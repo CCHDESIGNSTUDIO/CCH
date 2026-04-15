@@ -7250,14 +7250,16 @@
           var c = d.data();
           if (!c || !c.title) return;
           var img = c.imageUrl || (Array.isArray(c.images) && c.images[0]) || '';
-          var cost = parseFloat(c.unitCost) || parseFloat(c.cost) || 0;
-          var sell = parseFloat(c.unitSellingPrice) || parseFloat(c.clientPrice) || parseFloat(c.totalSelling) || 0;
+          var cost = parseMoney(c.unitCost) || parseMoney(c.cost) || parseMoney(c.costPrice) || 0;
+          var sell = parseMoney(c.unitSellingPrice) || parseMoney(c.clientPrice) || parseMoney(c.totalSelling) || parseMoney(c.sellPrice) || parseMoney(c.retailPrice) || 0;
           items.push({
             id: 'clip-' + d.id, source: 'boardclip', title: c.title || '', vendor: c.vendor || '',
             room: (c.room || '').trim(), category: (c.category || '').trim(),
             image: img, cost: cost, sell: sell,
             status: c.status || '', sku: c.sku || '', description: c.description || '',
-            proposal: '', invoice: '', po: '', _clipDocId: d.id
+            proposal: '', invoice: '', po: '', _clipDocId: d.id,
+            savedAt: c.savedAt || c.createdAt || c.addedAt || '',
+            expenseType: c.expenseType || ''
           });
         });
       } catch(e) { console.log('Selections clips load:', e); }
@@ -7420,6 +7422,13 @@
         var rbSnap = await db.collection('boards').doc(proj.id).collection('ideabooks').get();
         rbSnap.forEach(function(d) { var data = d.data(); roomBoards.push({ id: d.id, name: data.name || data.room || 'Untitled' }); });
       } catch(e) {}
+
+      // Sort newest first
+      items.sort(function(a, b) {
+        var da = a.savedAt || a.createdAt || a.addedAt || '';
+        var db2 = b.savedAt || b.createdAt || b.addedAt || '';
+        return (db2 > da) ? 1 : (db2 < da) ? -1 : 0;
+      });
 
       // Store for move function
       window._projSelections = items;
