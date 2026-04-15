@@ -5842,32 +5842,28 @@
       return extras;
     }
 
-    function _tearSheetImageColumnHtml(heroUrl, extraUrls) {
-      var hasExtras = extraUrls && extraUrls.length > 0;
-      var html = '';
-      html += '<div class="img-col" style="padding:16px;display:grid;' + (hasExtras ? 'grid-template-columns:1.5fr 1fr;' : '') + 'gap:8px;align-items:stretch;border-right:1px solid #e8e6e0;">';
-      html += '<div style="background:#f0eeea;display:flex;align-items:center;justify-content:center;min-height:280px;' + (hasExtras ? 'grid-row:1/3;' : '') + 'overflow:hidden;">';
-      if (heroUrl) {
-        html += '<img src="' + escAttr(heroUrl) + '" alt="" style="max-width:100%;max-height:520px;object-fit:contain;width:100%;height:auto;" referrerpolicy="no-referrer" onerror="this.outerHTML=\'<div class=no-img>No image on file</div>\'">';
-      } else {
-        html += '<div class="no-img">No image on file</div>';
+    function _tearSheetImageHtml(heroUrl, extraUrls) {
+      var validExtras = (extraUrls || []).filter(function(u) { return u && u.startsWith('http'); });
+      if (!heroUrl && validExtras.length === 0) return '<div class="img-col"></div>';
+      if (validExtras.length === 0) {
+        // Single hero image — full width
+        return '<div class="img-col">' +
+          '<img src="' + escAttr(heroUrl) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' +
+        '</div>';
       }
-      html += '</div>';
-      if (hasExtras) {
-        html += '<div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:6px;">';
-        var labels = ['ANGLE', 'DETAIL', 'CONTEXT', 'IN SITU'];
-        for (var si = 0; si < 4; si++) {
-          if (extraUrls[si]) {
-            html += '<div style="background:#f0eeea;display:flex;align-items:center;justify-content:center;overflow:hidden;border:1px solid #e8e6e0;">' +
-              '<img src="' + escAttr(extraUrls[si]) + '" alt="" style="max-width:100%;max-height:140px;object-fit:contain;" referrerpolicy="no-referrer" onerror="this.outerHTML=\'<div style=color:#bbb;font-size:11px;letter-spacing:1px;text-align:center;padding:20px;>' + labels[si] + '</div>\'"></div>';
-          } else {
-            html += '<div style="background:#f0eeea;display:flex;align-items:center;justify-content:center;border:1px solid #e8e6e0;"><span style="color:#bbb;font-size:11px;letter-spacing:1px;">' + labels[si] + '</span></div>';
-          }
-        }
-        html += '</div>';
-      }
-      html += '</div>';
-      return html;
+      // Hero + extras: hero takes 65%, extras grid takes 35%
+      return '<div class="img-col" style="display:grid;grid-template-columns:1.8fr 1fr;gap:6px;padding:12px;align-items:stretch;">' +
+        '<div style="display:flex;align-items:center;justify-content:center;overflow:hidden;">' +
+          '<img src="' + escAttr(heroUrl) + '" style="max-width:100%;max-height:100%;object-fit:contain;" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">' +
+          validExtras.slice(0, 4).map(function(u) {
+            return '<div style="display:flex;align-items:center;justify-content:center;overflow:hidden;">' +
+              '<img src="' + escAttr(u) + '" style="width:100%;height:100%;object-fit:cover;" referrerpolicy="no-referrer" onerror="this.parentElement.style.display=\'none\'">' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+      '</div>';
     }
 
     async function showTearSheetPricingDialog(opts) {
@@ -5969,9 +5965,7 @@
               '<div class="logo-block"><div class="logo-cch">CCH</div><div class="logo-sub">Design Inc.</div></div>' +
               '<div class="project-info"><div class="proj-name">' + esc(projectName || '') + '</div><div class="proj-meta">Product Specification &middot; ' + today + '</div></div>' +
             '</div>' +
-            '<div class="img-col">' +
-              (heroUrl ? '<img src="' + escAttr(heroUrl) + '" referrerpolicy="no-referrer" onerror="this.outerHTML=\'<div class=no-img>No image on file</div>\'">' : '<div class="no-img">No image on file</div>') +
-            '</div>' +
+            _tearSheetImageHtml(heroUrl, extras) +
             '<div class="detail-col">' +
               '<div class="detail-left">' +
                 '<div class="product-title">' + esc(item.title || item.description || 'Untitled Product') + '</div>' +
@@ -44494,9 +44488,7 @@ async function renderBoardsTab(T, proj) {
               <div class="proj-meta">Product Specification &middot; ${today}</div>
             </div>
           </div>
-          <div class="img-col">
-            ${heroUrl ? '<img src="' + escAttr(heroUrl) + '" referrerpolicy="no-referrer" onerror="this.outerHTML=\'<div class=no-img>No image on file</div>\'">' : '<div class="no-img">No image on file</div>'}
-          </div>
+          ${_tearSheetImageHtml(heroUrl, extras)}
           <div class="detail-col">
             <div class="detail-left">
               <div class="product-title">${esc(c.title || 'Untitled Product')}</div>
