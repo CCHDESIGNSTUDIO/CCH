@@ -7305,7 +7305,8 @@
             image: item.imageUrl || item.image || '',
             cost: parseFloat(item.cost) || 0, sell: parseFloat(item.amount) || parseFloat(item.total) || 0,
             status: 'Invoiced (' + (inv.number || inv.id) + ')', sku: item.sku || '',
-            description: '', proposal: '', invoice: inv.number || '', po: ''
+            description: '', proposal: '', invoice: inv.number || '', po: '',
+            expenseType: item.expenseType || ''
           });
         });
       });
@@ -7326,7 +7327,8 @@
               image: item.imageUrl || item.image || '',
               cost: parseFloat(item.cost) || 0, sell: parseFloat(item.amount) || parseFloat(item.total) || 0,
               status: 'Proposed (' + (prop.number || d.id) + ')', sku: item.sku || '',
-              description: '', proposal: prop.number || '', invoice: '', po: ''
+              description: '', proposal: prop.number || '', invoice: '', po: '',
+              expenseType: item.expenseType || ''
             });
           });
         });
@@ -7357,7 +7359,8 @@
               image: item.imageUrl || item.image || '',
               cost: parseFloat(item.cost) || parseFloat(item.amount) || 0, sell: 0,
               status: 'PO (' + (po.number || d.id) + ')', sku: item.sku || '',
-              description: '', proposal: '', invoice: '', po: po.number || ''
+              description: '', proposal: '', invoice: '', po: po.number || '',
+              expenseType: item.expenseType || ''
             });
           });
         });
@@ -7382,6 +7385,15 @@
           });
         });
       } catch(e) {}
+
+      // Filter out services, labor, expenses, fees — only show PRODUCTS in selections
+      items = items.filter(function(item) {
+        // Filter by expenseType (from proposals/invoices/POs)
+        var et = (item.expenseType || '').toLowerCase();
+        if (et && et !== 'product' && et !== '') return false;
+        // Filter by isRealProduct (catches design fees, services by title/category)
+        return isRealProduct({ title: item.title, category: item.category, room: item.room, vendor: item.vendor, manufacturer: '', sku: item.sku || '', cost: item.cost, clientPrice: item.sell });
+      });
 
       // Keep all rows in memory (including duplicates) for diagnostics.
       items.forEach(function(item) {
