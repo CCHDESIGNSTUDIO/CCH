@@ -40324,9 +40324,60 @@ async function renderBoardsTab(T, proj) {
     }
 
     async function showClipDetail(projectId, clipId) {
-      const doc = await db.collection('boards').doc(projectId).collection('clips').doc(clipId).get();
-      if (!doc.exists) { alert('Product not found.'); return; }
-      const clip = { id: doc.id, ...doc.data() };
+      var doc = await db.collection('boards').doc(projectId).collection('clips').doc(clipId).get();
+      if (!doc.exists) { showToast('Product not found', 'error'); return; }
+      var clip = { id: doc.id, ...doc.data() };
+
+      // Try to find matching product in library — open unified modal
+      var libraryProductId = clip.libraryProductId || null;
+      var libProduct = null;
+      if (libraryProductId) {
+        libProduct = libraryProducts.find(function(p) { return p.id === libraryProductId; });
+      }
+      if (!libProduct) {
+        // Match by title + vendor
+        var tLow = (clip.title || '').toLowerCase().trim();
+        var vLow = (clip.vendor || '').toLowerCase().trim();
+        libProduct = libraryProducts.find(function(p) {
+          return (p.title || '').toLowerCase().trim() === tLow && (p.vendor || '').toLowerCase().trim() === vLow;
+        });
+      }
+
+      if (libProduct) {
+        // Open the library modal for the matched product
+        showNewProductModal(libProduct);
+        return;
+      }
+
+      // No library match — build a prefill from clip data and open library modal
+      // Save will create a new product in library
+      var prefill = {
+        title: clip.title || '',
+        vendor: clip.vendor || '',
+        manufacturer: clip.manufacturer || '',
+        category: clip.category || '',
+        sku: clip.sku || '',
+        imageUrl: clip.imageUrl || (clip.images && clip.images[0]) || '',
+        images: clip.images || [],
+        costPrice: parseMoney(clip.unitCost || clip.cost) || null,
+        sellPrice: parseMoney(clip.clientPrice || clip.unitSellingPrice || clip.totalSelling) || null,
+        retailPrice: parseMoney(clip.retailPrice) || null,
+        description: clip.description || '',
+        clientDescription: clip.clientDescription || clip.description || '',
+        dimensions: clip.dimensions || '',
+        finish: clip.finish || '',
+        materials: clip.materials || '',
+        vendorUrl: clip.productUrl || clip.pageUrl || clip.vendorUrl || '',
+        productUrl: clip.productUrl || clip.pageUrl || '',
+        room: clip.room || '',
+        _clipProjectId: projectId,
+        _clipDocId: clipId
+      };
+      showNewProductModal(prefill);
+      return;
+
+      // ===== LEGACY CLIP DETAIL BELOW (kept for reference) =====
+      var clip_legacy = clip;
 
       // Master category list + board custom categories; exclude room names (same as Clipper)
       let boardCustomCategories = [];
