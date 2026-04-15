@@ -5943,16 +5943,14 @@
           var total = sell * qty;
 
           var fields = [
-            ['Room', item.room || ''],
-            ['Category', item.category || ''],
-            ['Item Code / SKU', item.sku || ''],
-            ['Vendor / Brand', item.vendor || ''],
+            ['SKU', item.sku || ''],
             ['Dimensions', item.dimensions || ''],
+            ['Finish', item.finish || ''],
           ];
           if (pricing) {
             if (qty > 1) {
               fields.push(['Qty', qty]);
-              fields.push(['Unit Cost', fmt(sell)]);
+              fields.push(['Unit', fmt(sell)]);
               fields.push(['Total', fmt(total)]);
             } else if (sell > 0) {
               fields.push(['Price', fmt(sell)]);
@@ -5968,12 +5966,13 @@
             _tearSheetImageHtml(heroUrl, extras) +
             '<div class="detail-col">' +
               '<div class="detail-left">' +
-                '<div class="product-title">' + esc(item.title || item.description || 'Untitled Product') + '</div>' +
-                '<div class="product-room">' + esc(item.room || item.category || '') + (item.vendor ? ' &middot; ' + esc(item.vendor) : '') + '</div>' +
+                '<div class="product-title">' + esc(item.title || 'Untitled Product') + '</div>' +
+                '<div class="product-room">' + esc(item.vendor || '') + (item.room ? ' &middot; ' + esc(item.room) : '') + '</div>' +
                 '<div class="spec-table">' +
                   fields.map(function(f) { return '<div class="spec-row"><div class="spec-label">' + esc(f[0]) + '</div><div class="spec-val">' + esc(String(f[1])) + '</div></div>'; }).join('') +
                 '</div>' +
-                (item.description && item.title ? '<div class="desc-block"><div class="desc-text">' + esc(item.description).substring(0, 150) + '</div></div>' : '') +
+                (item.description ? '<div class="desc-block"><div class="desc-text">' + esc(item.description).substring(0, 200) + '</div></div>' : '') +
+                (item.notes ? '<div class="desc-block" style="margin-top:6px;"><div class="spec-label" style="margin-bottom:2px;">Notes</div><div class="desc-text" style="font-style:italic;">' + esc(item.notes).substring(0, 200) + '</div></div>' : '') +
               '</div>' +
             '</div>' +
             '<div class="page-footer"><div>CCH Design Inc. &nbsp;&middot;&nbsp; Confidential</div><div>' + esc(item.room || '') + '</div></div>' +
@@ -44414,8 +44413,8 @@ async function renderBoardsTab(T, proj) {
         '.detail-col { flex-shrink:0;padding:12px 28px 8px;border-top:1px solid #E8E8E8;display:flex;gap:24px;align-items:flex-start;margin-top:auto; }' +
         '.detail-left { flex:1;min-width:0; }' +
         '.detail-right { flex-shrink:0; }' +
-        '.product-title { font-family:"Cormorant Garamond",Georgia,serif;font-size:18px;font-weight:600;color:#1B3352;line-height:1.2;margin-bottom:1px; }' +
-        '.product-room { font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#C4A464;font-weight:600;margin-bottom:6px; }' +
+        '.product-title { font-family:"Cormorant Garamond",Georgia,serif;font-size:20px;font-weight:600;color:#1B3352;line-height:1.2;margin-bottom:2px; }' +
+        '.product-room { font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#9E9A8F;font-weight:500;margin-bottom:6px; }' +
         '.spec-table { display:flex;flex-wrap:wrap;gap:0; }' +
         '.spec-row { display:inline-flex;align-items:baseline;padding:2px 16px 2px 0; }' +
         '.spec-label { font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;color:#9E9A8F;margin-right:6px; }' +
@@ -44459,16 +44458,14 @@ async function renderBoardsTab(T, proj) {
         const qty = parseFloat(c.qty) || 1;
         const total = parseMoney(c.totalSelling) || (sell * qty);
         const fields = [
-          ['Room', c.room || c.category || ''],
-          ['Item Code', c.sku || c.itemCode || ''],
-          ['Vendor / Brand', c.vendor || c.manufacturer || ''],
-          ['Finish / Material', c.finish || ''],
+          ['SKU', c.sku || c.itemCode || ''],
           ['Dimensions', c.dimensions || ''],
+          ['Finish', c.finish || ''],
         ];
         if (pricing) {
           if (qty > 1) {
             fields.push(['Qty', qty]);
-            fields.push(['Unit Cost', fmt(sell)]);
+            fields.push(['Unit', fmt(sell)]);
             fields.push(['Total', fmt(total)]);
           } else if (sell > 0) {
             fields.push(['Price', fmt(sell)]);
@@ -44492,7 +44489,7 @@ async function renderBoardsTab(T, proj) {
           <div class="detail-col">
             <div class="detail-left">
               <div class="product-title">${esc(c.title || 'Untitled Product')}</div>
-              <div class="product-room">${esc(c.room || c.category || '')}${c.vendor ? ' &middot; ' + esc(c.vendor) : ''}</div>
+              <div class="product-room">${esc(c.vendor || c.manufacturer || '')}${c.room ? ' &middot; ' + esc(c.room) : ''}</div>
               <div class="spec-table">
                 ${filteredFields.map(([label, val]) => `
                   <div class="spec-row">
@@ -44500,7 +44497,8 @@ async function renderBoardsTab(T, proj) {
                     <div class="spec-val">${esc(String(val))}</div>
                   </div>`).join('')}
               </div>
-              ${c.description ? `<div class="desc-block"><div class="desc-text">${esc(c.description).substring(0, 150)}</div></div>` : ''}
+              ${c.description ? `<div class="desc-block"><div class="desc-text">${esc(c.description).substring(0, 200)}</div></div>` : ''}
+              ${c.notes ? `<div class="desc-block" style="margin-top:6px;"><div class="spec-label" style="margin-bottom:2px;">Notes</div><div class="desc-text" style="font-style:italic;">${esc(c.notes).substring(0, 200)}</div></div>` : ''}
             </div>
           </div>
           <div class="page-footer">
