@@ -6004,6 +6004,15 @@
     }
 
     
+    async function inlineUpdateClipField(projectId, clipId, field, value) {
+      try {
+        var update = {};
+        update[field] = value;
+        await db.collection('boards').doc(projectId).collection('clips').doc(clipId).update(update);
+        showToast(field.charAt(0).toUpperCase() + field.slice(1) + ' updated');
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+
     function inlineEditClip(projectId, clipId, field, element) {
       var oldVal = element.textContent.trim();
       if (oldVal === '-') oldVal = '';
@@ -9852,8 +9861,8 @@ async function renderBoardsTab(T, proj) {
                     '<td onclick="showClipDetail(\'' + escAttr(proj.id) + '\',\'' + escAttr(clip.id) + '\')">' + imgTag + '</td>' +
                     '<td class="inline-edit-cell" onclick="inlineEditClip(\'' + escAttr(proj.id) + '\',\'' + escAttr(clip.id) + '\',\'title\',this)"><strong>' + esc(clip.title || 'Untitled') + '</strong>' + (clip.pageUrl ? ' <a href="' + escAttr(clip.pageUrl) + '" target="_blank" onclick="event.stopPropagation()" title="View source" style="color:var(--gold);font-size:11px;text-decoration:none;">🔗</a>' : '') + (clip.description ? '<br><span style="color:var(--gray-400);font-size:11px;">' + esc(clip.description).substring(0, 60) + '</span>' : '') + '</td>' +
                     '<td class="inline-edit-cell" style="font-size:12px;" onclick="inlineEditClip(\'' + escAttr(proj.id) + '\',\'' + escAttr(clip.id) + '\',\'vendor\',this)">' + esc(clip.vendor || '-') + (clip.manufacturer ? '<br><span style="color:var(--gray-400)">' + esc(clip.manufacturer) + '</span>' : '') + '</td>' +
-                    '<td style="font-size:12px;">' + esc(clip.category || '-') + '</td>' +
-                    '<td style="font-size:12px;">' + esc(clip.room || '-') + '</td>' +
+                    '<td onclick="event.stopPropagation()" style="font-size:12px;cursor:pointer;"><select class="form-input" style="font-size:11px;padding:2px 4px;border-color:transparent;background:transparent;min-width:90px;cursor:pointer;" onchange="inlineUpdateClipField(\'' + escAttr(proj.id) + '\',\'' + escAttr(clip.id) + '\',\'category\',this.value)" onfocus="this.style.borderColor=\'var(--gold)\'" onblur="this.style.borderColor=\'transparent\'">' + (function(){ var cats = [...new Set(clips.map(function(c){return c.category;}).filter(Boolean))].sort(); var opts = '<option value=""' + (!clip.category ? ' selected' : '') + '>—</option>'; cats.forEach(function(c){ opts += '<option value="' + escAttr(c) + '"' + (clip.category === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }); return opts; })() + '</select></td>' +
+                    '<td onclick="event.stopPropagation()" style="font-size:12px;cursor:pointer;"><select class="form-input" style="font-size:11px;padding:2px 4px;border-color:transparent;background:transparent;min-width:90px;cursor:pointer;" onchange="inlineUpdateClipField(\'' + escAttr(proj.id) + '\',\'' + escAttr(clip.id) + '\',\'room\',this.value)" onfocus="this.style.borderColor=\'var(--gold)\'" onblur="this.style.borderColor=\'transparent\'">' + (function(){ var rms = [...new Set(clips.map(function(c){return c.room;}).filter(Boolean))].sort(); var opts = '<option value=""' + (!clip.room ? ' selected' : '') + '>—</option>'; rms.forEach(function(r){ opts += '<option value="' + escAttr(r) + '"' + (clip.room === r ? ' selected' : '') + '>' + esc(r) + '</option>'; }); return opts; })() + '</select></td>' +
                     '<td class="inline-edit-cell" style="color:var(--gray-600);cursor:pointer;" onclick="inlineEditClip(\'' + escAttr(proj.id) + '\',\'' + escAttr(clip.id) + '\',\'cost\',this)">' + (cost > 0 ? formatMoney(cost) : '-') + '</td>' +
                     '<td class="inline-edit-cell" style="color:var(--green);font-weight:600;cursor:pointer;" onclick="inlineEditClip(\'' + escAttr(proj.id) + '\',\'' + escAttr(clip.id) + '\',\'clientPrice\',this)">' + (sell > 0 ? formatMoney(sell) : '-') + '</td>' +
                     '<td>' + (markup > 0 ? markup + '%' : '-') + '</td>' +
