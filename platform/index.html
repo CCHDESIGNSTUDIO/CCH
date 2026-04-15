@@ -5967,7 +5967,7 @@
             '<div class="detail-col">' +
               '<div class="detail-left">' +
                 '<div class="product-title">' + esc(item.title || 'Untitled Product') + '</div>' +
-                '<div class="product-room">' + esc(item.vendor || '') + (item.room ? ' &middot; ' + esc(item.room) : '') + '</div>' +
+                (item.room ? '<div class="product-room">' + esc(item.room) + '</div>' : '') +
                 '<div class="spec-table">' +
                   fields.map(function(f) { return '<div class="spec-row"><div class="spec-label">' + esc(f[0]) + '</div><div class="spec-val">' + esc(String(f[1])) + '</div></div>'; }).join('') +
                 '</div>' +
@@ -44414,7 +44414,7 @@ async function renderBoardsTab(T, proj) {
         '.detail-left { flex:1;min-width:0; }' +
         '.detail-right { flex-shrink:0; }' +
         '.product-title { font-family:"Cormorant Garamond",Georgia,serif;font-size:20px;font-weight:600;color:#1B3352;line-height:1.2;margin-bottom:2px; }' +
-        '.product-room { font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#9E9A8F;font-weight:500;margin-bottom:6px; }' +
+        '.product-room { font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#C4A464;font-weight:600;margin-bottom:8px; }' +
         '.spec-table { display:flex;flex-wrap:wrap;gap:0; }' +
         '.spec-row { display:inline-flex;align-items:baseline;padding:2px 16px 2px 0; }' +
         '.spec-label { font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;color:#9E9A8F;margin-right:6px; }' +
@@ -44489,7 +44489,7 @@ async function renderBoardsTab(T, proj) {
           <div class="detail-col">
             <div class="detail-left">
               <div class="product-title">${esc(c.title || 'Untitled Product')}</div>
-              <div class="product-room">${esc(c.vendor || c.manufacturer || '')}${c.room ? ' &middot; ' + esc(c.room) : ''}</div>
+              ${c.room ? '<div class="product-room">' + esc(c.room) + '</div>' : ''}
               <div class="spec-table">
                 ${filteredFields.map(([label, val]) => `
                   <div class="spec-row">
