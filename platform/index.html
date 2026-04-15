@@ -5963,19 +5963,19 @@
               '<div class="logo-block"><div class="logo-cch">CCH</div><div class="logo-sub">Design Inc.</div></div>' +
               '<div class="project-info"><div class="proj-name">' + esc(projectName || '') + '</div><div class="proj-meta">Product Specification &middot; ' + today + '</div></div>' +
             '</div>' +
-            '<div class="page-body">' +
-              _tearSheetImageColumnHtml(heroUrl, extras) +
-              '<div class="detail-col">' +
-                '<div class="product-title">' + esc(item.title || item.description || 'Untitled Product') + '</div>' +
-                '<div class="product-room">' + esc(item.room || item.category || '') + '</div>' +
-                '<div class="spec-table">' +
-                  fields.map(function(f) { return '<div class="spec-row"><div class="spec-label">' + esc(f[0]) + '</div><div class="spec-val">' + esc(String(f[1])) + '</div></div>'; }).join('') +
-                '</div>' +
-                (item.description && item.title ? '<div class="desc-block"><div class="desc-label">Description</div><div class="desc-text">' + esc(item.description) + '</div></div>' : '') +
-                (pricing && total > 0 ? '<div class="price-callout">' + fmt(total) + (qty > 1 ? '<span class="price-note"> (' + qty + ' x ' + fmt(sell) + ')</span>' : '') + '</div>' : '') +
-              '</div>' +
+            '<div class="img-col">' +
+              (heroUrl ? '<img src="' + escAttr(heroUrl) + '" referrerpolicy="no-referrer" onerror="this.outerHTML=\'<div class=no-img>No image on file</div>\'">' : '<div class="no-img">No image on file</div>') +
             '</div>' +
-            '<div class="page-footer"><div>CCH Design Inc. &nbsp;&middot;&nbsp; Confidential — For Client Review Only</div><div>' + esc(item.room || '') + '</div></div>' +
+            '<div class="detail-col">' +
+              '<div class="product-title">' + esc(item.title || item.description || 'Untitled Product') + '</div>' +
+              '<div class="product-room">' + esc(item.room || item.category || '') + (item.vendor ? ' &middot; ' + esc(item.vendor) : '') + '</div>' +
+              '<div class="spec-table">' +
+                fields.map(function(f) { return '<div class="spec-row"><div class="spec-label">' + esc(f[0]) + '</div><div class="spec-val">' + esc(String(f[1])) + '</div></div>'; }).join('') +
+              '</div>' +
+              (item.description && item.title ? '<div class="desc-block"><div class="desc-label">Description</div><div class="desc-text">' + esc(item.description).substring(0, 200) + '</div></div>' : '') +
+              (pricing && total > 0 ? '<div class="price-callout">' + fmt(total) + (qty > 1 ? '<span class="price-note"> (' + qty + ' x ' + fmt(sell) + ')</span>' : '') + '</div>' : '') +
+            '</div>' +
+            '<div class="page-footer"><div>CCH Design Inc. &nbsp;&middot;&nbsp; Confidential</div><div>' + esc(item.room || '') + '</div></div>' +
           '</div>';
         }).join('');
 
@@ -44390,41 +44390,51 @@ async function renderBoardsTab(T, proj) {
       showToast(selected.length + ' items — Spec Book ready');
     }
 
-    // Shared CSS for tear sheet pages
+    // Shared CSS for tear sheet pages — image-dominant portrait layout
     function _getTearSheetCSS() {
       return '*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }' +
-        'body { font-family: "DM Sans", sans-serif; background: #f5f4f0; color: #1B3352; }' +
+        'body { font-family: "DM Sans", sans-serif; background: #E8E6E2; color: #1B3352; }' +
         '.toolbar { position:fixed;top:0;left:0;right:0;z-index:999;background:#1B3352;display:flex;align-items:center;justify-content:space-between;padding:12px 24px;box-shadow:0 2px 12px rgba(0,0,0,0.3); }' +
         '.toolbar-title { color:#fff;font-size:14px;font-weight:600;letter-spacing:0.5px;max-width:50%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }' +
         '.toolbar-actions { display:flex;gap:10px; }' +
         '.tb-btn { background:transparent;color:#C4A464;border:1px solid #C4A464;padding:8px 16px;font-size:12px;font-weight:600;letter-spacing:0.5px;cursor:pointer;font-family:"DM Sans",sans-serif;transition:all 0.15s; }' +
         '.tb-btn:hover { background:#C4A464;color:#1B3352; }' +
-        '.page { width:11in;min-height:8.5in;background:#fff;margin:72px auto 24px;display:grid;grid-template-rows:auto 1fr auto;box-shadow:0 2px 16px rgba(0,0,0,0.10);page-break-after:always; }' +
-        '.page-header { display:flex;align-items:center;justify-content:space-between;padding:24px 40px;border-bottom:3px solid #1B3352;background:#1B3352; }' +
+
+        // Page — portrait 8.5 × 11, image dominant
+        '.page { width:8.5in;min-height:11in;background:#fff;margin:72px auto 24px;display:flex;flex-direction:column;box-shadow:0 2px 20px rgba(0,0,0,0.12);page-break-after:always;overflow:hidden; }' +
+
+        // Header — thin navy bar
+        '.page-header { display:flex;align-items:center;justify-content:space-between;padding:16px 32px;background:#1B3352; }' +
         '.logo-block { display:flex;flex-direction:column; }' +
-        '.logo-cch { font-family:"Cormorant Garamond",Georgia,serif;font-size:32px;font-weight:700;color:#C4A464;letter-spacing:4px;line-height:1; }' +
-        '.logo-sub { font-size:9px;letter-spacing:4px;color:rgba(255,255,255,0.5);text-transform:uppercase;margin-top:2px; }' +
+        '.logo-cch { font-family:"Cormorant Garamond",Georgia,serif;font-size:24px;font-weight:700;color:#C4A464;letter-spacing:4px;line-height:1; }' +
+        '.logo-sub { font-size:8px;letter-spacing:4px;color:rgba(255,255,255,0.4);text-transform:uppercase;margin-top:1px; }' +
         '.project-info { text-align:right; }' +
-        '.proj-name { font-size:18px;font-weight:600;color:#fff;letter-spacing:0.5px; }' +
-        '.proj-meta { font-size:11px;color:rgba(255,255,255,0.5);margin-top:3px;letter-spacing:0.5px; }' +
-        '.page-body { display:grid;grid-template-columns:1fr 1fr;min-height:0; }' +
-        '.img-col { background:#f0eeea;display:flex;align-items:center;justify-content:center;padding:32px;border-right:1px solid #e8e6e0;overflow:hidden; }' +
-        '.img-col img { max-width:100%;max-height:580px;object-fit:contain; }' +
+        '.proj-name { font-size:14px;font-weight:600;color:#fff;letter-spacing:0.5px; }' +
+        '.proj-meta { font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px;letter-spacing:0.5px; }' +
+
+        // Image — hero, takes most of the page
+        '.img-col { background:#F5F3EE;display:flex;align-items:center;justify-content:center;flex:1;min-height:0;padding:24px;overflow:hidden; }' +
+        '.img-col img { max-width:100%;max-height:100%;object-fit:contain; }' +
         '.no-img { color:#9E9A8F;text-align:center;font-size:16px;line-height:1.6; }' +
-        '.detail-col { padding:40px 44px;display:flex;flex-direction:column;justify-content:flex-start; }' +
-        '.product-title { font-family:"Cormorant Garamond",Georgia,serif;font-size:30px;font-weight:600;color:#1B3352;line-height:1.2;margin-bottom:4px; }' +
-        '.product-room { font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#C4A464;margin-bottom:28px;font-weight:600; }' +
-        '.spec-table { margin-bottom:24px; }' +
-        '.spec-row { display:flex;align-items:baseline;padding:7px 0;border-bottom:1px solid #f0efeb; }' +
-        '.spec-label { font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:#9E9A8F;width:160px;flex-shrink:0; }' +
-        '.spec-val { font-size:14px;color:#1B3352;font-weight:500; }' +
-        '.desc-block { margin-top:4px;margin-bottom:20px; }' +
-        '.desc-label { font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:#9E9A8F;margin-bottom:8px; }' +
-        '.desc-text { font-size:13px;color:#6B6760;line-height:1.65; }' +
-        '.price-callout { margin-top:auto;padding-top:20px;border-top:2px solid #1B3352;font-family:"Cormorant Garamond",Georgia,serif;font-size:36px;font-weight:700;color:#1B3352; }' +
-        '.price-note { font-size:14px;font-family:"DM Sans",sans-serif;font-weight:400;color:#9E9A8F;margin-left:8px; }' +
-        '.page-footer { display:flex;justify-content:space-between;align-items:center;padding:12px 40px;border-top:1px solid #e8e6e0;font-size:10px;color:#9E9A8F;letter-spacing:0.5px;background:#FAFAF8; }' +
-        '@page { size:11in 8.5in landscape;margin:0; }' +
+
+        // Detail bar — compact row below image
+        '.detail-col { padding:20px 32px;border-top:1px solid #E2E0DC; }' +
+        '.product-title { font-family:"Cormorant Garamond",Georgia,serif;font-size:24px;font-weight:600;color:#1B3352;line-height:1.2;margin-bottom:2px; }' +
+        '.product-room { font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#C4A464;margin-bottom:12px;font-weight:600; }' +
+        '.spec-table { display:flex;flex-wrap:wrap;gap:0; }' +
+        '.spec-row { display:flex;align-items:baseline;padding:4px 0;width:50%;min-width:200px; }' +
+        '.spec-label { font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:#9E9A8F;width:110px;flex-shrink:0; }' +
+        '.spec-val { font-size:12px;color:#1B3352;font-weight:500; }' +
+        '.desc-block { margin-top:8px; }' +
+        '.desc-label { font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:#9E9A8F;margin-bottom:4px; }' +
+        '.desc-text { font-size:11px;color:#6B6760;line-height:1.5; }' +
+        '.price-callout { display:inline-block;margin-top:8px;padding:8px 20px;background:#1B3352;font-family:"Cormorant Garamond",Georgia,serif;font-size:24px;font-weight:700;color:#C4A464; }' +
+        '.price-note { font-size:11px;font-family:"DM Sans",sans-serif;font-weight:400;color:rgba(255,255,255,0.6);margin-left:8px; }' +
+
+        // Footer
+        '.page-footer { display:flex;justify-content:space-between;align-items:center;padding:8px 32px;border-top:1px solid #E2E0DC;font-size:9px;color:#9E9A8F;letter-spacing:0.5px; }' +
+
+        '@page { size:8.5in 11in portrait;margin:0; }' +
         '@media print { .toolbar{display:none!important;} body{background:white;} .page{margin:0;box-shadow:none;width:100%;min-height:100vh;} }';
     }
 
@@ -44480,24 +44490,24 @@ async function renderBoardsTab(T, proj) {
               <div class="proj-meta">Product Specification &middot; ${today}</div>
             </div>
           </div>
-          <div class="page-body">
-            ${_tearSheetImageColumnHtml(heroUrl, extras)}
-            <div class="detail-col">
-              <div class="product-title">${esc(c.title || 'Untitled Product')}</div>
-              <div class="product-room">${esc(c.room || c.category || '')}</div>
-              <div class="spec-table">
-                ${fields.map(([label, val]) => `
-                  <div class="spec-row">
-                    <div class="spec-label">${esc(label)}</div>
-                    <div class="spec-val">${esc(String(val))}</div>
-                  </div>`).join('')}
-              </div>
-              ${c.description ? `<div class="desc-block"><div class="desc-label">Description</div><div class="desc-text">${esc(c.description)}</div></div>` : ''}
-              ${pricing && total > 0 ? `<div class="price-callout">${fmt(total)}<span class="price-note">${qty > 1 ? ` (${qty} &times; ${fmt(sell)})` : ''}</span></div>` : ''}
+          <div class="img-col">
+            ${heroUrl ? '<img src="' + escAttr(heroUrl) + '" referrerpolicy="no-referrer" onerror="this.outerHTML=\'<div class=no-img>No image on file</div>\'">' : '<div class="no-img">No image on file</div>'}
+          </div>
+          <div class="detail-col">
+            <div class="product-title">${esc(c.title || 'Untitled Product')}</div>
+            <div class="product-room">${esc(c.room || c.category || '')}${c.vendor ? ' &middot; ' + esc(c.vendor) : ''}</div>
+            <div class="spec-table">
+              ${fields.map(([label, val]) => `
+                <div class="spec-row">
+                  <div class="spec-label">${esc(label)}</div>
+                  <div class="spec-val">${esc(String(val))}</div>
+                </div>`).join('')}
             </div>
+            ${c.description ? `<div class="desc-block"><div class="desc-label">Description</div><div class="desc-text">${esc(c.description).substring(0, 200)}</div></div>` : ''}
+            ${pricing && total > 0 ? `<div class="price-callout">${fmt(total)}<span class="price-note">${qty > 1 ? ` (${qty} &times; ${fmt(sell)})` : ''}</span></div>` : ''}
           </div>
           <div class="page-footer">
-            <div>CCH Design Inc. &nbsp;&middot;&nbsp; Confidential — For Client Review Only</div>
+            <div>CCH Design Inc. &nbsp;&middot;&nbsp; Confidential</div>
             <div>${esc(c.room || '')}</div>
           </div>
         </div>`;
