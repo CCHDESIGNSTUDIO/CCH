@@ -4723,6 +4723,15 @@
                 <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:13px;"><span style="color:var(--gold);">Projects</span><span style="color:#1B3352;font-weight:700;font-family:var(--font-mono);">${Object.keys(timeByProject).length}</span></div>
               </div>
 
+              <!-- CEO Briefings -->
+              <div class="vd-side-card" id="ceoBriefingPanel">
+                <div class="vd-side-title" style="display:flex;justify-content:space-between;align-items:center;">
+                  <span>Briefings</span>
+                  <button onclick="composeBriefing()" style="background:none;border:none;color:var(--gold);font-size:16px;cursor:pointer;padding:0;" title="New briefing">+</button>
+                </div>
+                <div id="ceoBriefingList" style="font-size:12px;color:var(--gray-400);">Loading...</div>
+              </div>
+
               <!-- Quick Actions -->
               <div style="margin-bottom:16px;">
                 <div class="vd-side-title" style="margin-bottom:10px;">Quick Actions</div>
@@ -4737,8 +4746,117 @@
           </div>
         </div>
         `;
+        // Load briefings after render
+        loadCeoBriefings();
       }
     }
+
+    // ==================== CEO BRIEFINGS ====================
+    async function loadCeoBriefings() {
+      var el = document.getElementById('ceoBriefingList');
+      if (!el) return;
+      try {
+        var snap = await db.collection('briefings').orderBy('date', 'desc').limit(10).get();
+        var briefings = [];
+        snap.forEach(function(d) { briefings.push({ id: d.id, ...d.data() }); });
+
+        if (briefings.length === 0) {
+          el.innerHTML = '<div style="text-align:center;padding:12px;color:var(--gray-400);font-size:11px;">No briefings yet</div>';
+          return;
+        }
+
+        var unreadCount = briefings.filter(function(b) { return !b.read; }).length;
+        el.innerHTML = briefings.map(function(b) {
+          var typeIcon = b.type === 'daily' ? '📋' : b.type === 'weekly' ? '📊' : b.type === 'monthly' ? '📈' : '📝';
+          var priorityColor = b.priority === 'high' ? '#E16A5B' : b.priority === 'medium' ? '#C4A464' : 'var(--gray-400)';
+          var isRead = b.read;
+          var dateStr = b.date ? new Date(b.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+          return '<div onclick="toggleBriefing(\'' + escAttr(b.id) + '\',this)" style="padding:10px 0;border-bottom:1px solid rgba(27,51,82,0.06);cursor:pointer;' + (isRead ? 'opacity:0.5;' : '') + '">' +
+            '<div style="display:flex;align-items:center;gap:8px;">' +
+              '<span style="font-size:14px;">' + typeIcon + '</span>' +
+              '<div style="flex:1;min-width:0;">' +
+                '<div style="font-size:12px;font-weight:' + (isRead ? '400' : '700') + ';color:#1B3352;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(b.title || 'Untitled') + '</div>' +
+                '<div style="font-size:10px;color:var(--gray-400);">' + esc(dateStr) + ' · ' + esc(b.type || '') + '</div>' +
+              '</div>' +
+              (b.priority === 'high' ? '<span style="width:6px;height:6px;background:' + priorityColor + ';border-radius:50%;flex-shrink:0;"></span>' : '') +
+            '</div>' +
+            '<div class="briefing-body" style="display:none;margin-top:8px;padding:8px 0 4px 22px;font-size:11px;color:#5C6B80;line-height:1.5;white-space:pre-wrap;">' + esc(b.body || '') + '</div>' +
+          '</div>';
+        }).join('');
+      } catch(e) {
+        // Collection might not exist yet
+        el.innerHTML = '<div style="text-align:center;padding:12px;color:var(--gray-400);font-size:11px;">No briefings yet</div>';
+      }
+    }
+
+    async function toggleBriefing(briefingId, el) {
+      var body = el.querySelector('.briefing-body');
+      if (!body) return;
+      var isVisible = body.style.display !== 'none';
+      body.style.display = isVisible ? 'none' : 'block';
+      // Mark as read when expanding
+      if (!isVisible) {
+        try {
+          await db.collection('briefings').doc(briefingId).update({ read: true });
+          el.style.opacity = '0.5';
+        } catch(e) {}
+      }
+    }
+
+    async function composeBriefing() {
+      var title = await cchPrompt('Briefing title:', '', 'New Briefing');
+      if (!title) return;
+      var body = await cchPrompt('Briefing body:', '', 'Briefing Content');
+      if (!body) return;
+      var type = 'daily';
+      try {
+        var typeResult = await cchDialog({
+          title: 'Briefing Type',
+          message: 'Select the briefing type:',
+          showCancel: true,
+          confirmText: 'Create',
+          buttons: [
+            { label: 'Daily', value: 'daily' },
+            { label: 'Weekly', value: 'weekly' },
+            { label: 'Monthly', value: 'monthly' }
+          ]
+        });
+        if (typeResult && typeResult.value) type = typeResult.value;
+      } catch(e) {}
+      var priority = 'normal';
+
+      try {
+        await db.collection('briefings').add({
+          type: type,
+          date: new Date().toISOString(),
+          title: title.trim(),
+          body: body.trim(),
+          priority: priority,
+          read: false,
+          createdBy: currentUser ? currentUser.email : 'system',
+          createdAt: new Date().toISOString()
+        });
+        showToast('Briefing created');
+        loadCeoBriefings();
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+
+    // Write a briefing from a scheduled task or external source
+    window.writeBriefing = async function(opts) {
+      opts = opts || {};
+      try {
+        await db.collection('briefings').add({
+          type: opts.type || 'daily',
+          date: opts.date || new Date().toISOString(),
+          title: opts.title || 'Automated Briefing',
+          body: opts.body || '',
+          priority: opts.priority || 'normal',
+          read: false,
+          createdBy: opts.source || 'cowork-agent',
+          createdAt: new Date().toISOString()
+        });
+      } catch(e) { console.error('writeBriefing error:', e); }
+    };
 
     // ==================== CHANGELOG DATA (Release Notes page only — not shown on dashboard) ====================
     function getCchFeaturesChangelog() {
