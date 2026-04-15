@@ -43402,7 +43402,7 @@ async function renderBoardsTab(T, proj) {
             </div>
           </div>
           <div class="page-body">
-            ${_tearSheetImageColumnHtml(heroUrl, extras)}
+            ${_tearSheetImageHtml(heroUrl, extras)}
             <div class="detail-col">
               <div class="product-title">${esc(c.title || 'Untitled Product')}</div>
               <div class="product-room">${esc(c.room || c.category || '')}</div>
@@ -43508,7 +43508,7 @@ async function renderBoardsTab(T, proj) {
               '<div class="project-info"><div class="proj-name">' + esc(projectName) + '</div><div class="proj-meta">' + esc(boardName) + ' &middot; ' + today + '</div></div>' +
             '</div>' +
             '<div class="page-body">' +
-              _tearSheetImageColumnHtml(imgSrc, []) +
+              _tearSheetImageHtml(imgSrc, []) +
               '<div class="detail-col">' +
                 '<div class="product-title">' + esc(el.title || 'Untitled Product') + '</div>' +
                 '<div class="product-room">' + esc(boardName) + '</div>' +
