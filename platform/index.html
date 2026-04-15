@@ -7387,11 +7387,15 @@
       } catch(e) {}
 
       // Filter out services, labor, expenses, fees — only show PRODUCTS in selections
+      var NON_PRODUCT_TYPES = ['service','shipping','sales_tax','handling','expense','discount','labor','other_expense'];
       items = items.filter(function(item) {
         // Filter by expenseType (from proposals/invoices/POs)
         var et = (item.expenseType || '').toLowerCase();
-        if (et && et !== 'product' && et !== '') return false;
-        // Filter by isRealProduct (catches design fees, services by title/category)
+        if (et && NON_PRODUCT_TYPES.indexOf(et) >= 0) return false;
+        // Filter by category name (catches Time Billing, CCH services, etc.)
+        var cat = (item.category || '').toLowerCase();
+        if (cat === 'time billing' || cat === 'time track' || cat === 'time tracking' || cat === 'service' || cat === 'services') return false;
+        // Filter by isRealProduct (catches design fees, services by title)
         return isRealProduct({ title: item.title, category: item.category, room: item.room, vendor: item.vendor, manufacturer: '', sku: item.sku || '', cost: item.cost, clientPrice: item.sell });
       });
 
