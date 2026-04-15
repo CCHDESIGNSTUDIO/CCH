@@ -5952,10 +5952,16 @@
             ['Item Code / SKU', item.sku || ''],
             ['Vendor / Brand', item.vendor || ''],
             ['Dimensions', item.dimensions || ''],
-            ['Qty', qty > 1 ? qty : ''],
           ];
-          if (pricing && sell > 0) fields.push(['Unit Price', fmt(sell)]);
-          if (pricing && total > 0 && qty > 1) fields.push(['Total', fmt(total)]);
+          if (pricing) {
+            if (qty > 1) {
+              fields.push(['Qty', qty]);
+              fields.push(['Unit Cost', fmt(sell)]);
+              fields.push(['Total', fmt(total)]);
+            } else if (sell > 0) {
+              fields.push(['Price', fmt(sell)]);
+            }
+          }
           fields = fields.filter(function(f) { return f[1] !== '' && f[1] !== null; });
 
           return '<div class="page">' +
@@ -5973,7 +5979,6 @@
                 fields.map(function(f) { return '<div class="spec-row"><div class="spec-label">' + esc(f[0]) + '</div><div class="spec-val">' + esc(String(f[1])) + '</div></div>'; }).join('') +
               '</div>' +
               (item.description && item.title ? '<div class="desc-block"><div class="desc-label">Description</div><div class="desc-text">' + esc(item.description).substring(0, 200) + '</div></div>' : '') +
-              (pricing && total > 0 ? '<div class="price-callout">' + fmt(total) + (qty > 1 ? '<span class="price-note"> (' + qty + ' x ' + fmt(sell) + ')</span>' : '') + '</div>' : '') +
             '</div>' +
             '<div class="page-footer"><div>CCH Design Inc. &nbsp;&middot;&nbsp; Confidential</div><div>' + esc(item.room || '') + '</div></div>' +
           '</div>';
@@ -44473,10 +44478,17 @@ async function renderBoardsTab(T, proj) {
           ['Vendor / Brand', c.vendor || c.manufacturer || ''],
           ['Finish / Material', c.finish || ''],
           ['Dimensions', c.dimensions || ''],
-          ['Qty', qty > 1 ? qty : ''],
-          pricing ? ['Unit Price', fmt(sell)] : null,
-          pricing && total > 0 ? ['Total', fmt(total)] : null,
-        ].filter(f => f && f[1] !== '' && f[1] !== null);
+        ];
+        if (pricing) {
+          if (qty > 1) {
+            fields.push(['Qty', qty]);
+            fields.push(['Unit Cost', fmt(sell)]);
+            fields.push(['Total', fmt(total)]);
+          } else if (sell > 0) {
+            fields.push(['Price', fmt(sell)]);
+          }
+        }
+        const filteredFields = fields.filter(f => f && f[1] !== '' && f[1] !== null);
 
         return `
         <div class="page">
@@ -44497,14 +44509,13 @@ async function renderBoardsTab(T, proj) {
             <div class="product-title">${esc(c.title || 'Untitled Product')}</div>
             <div class="product-room">${esc(c.room || c.category || '')}${c.vendor ? ' &middot; ' + esc(c.vendor) : ''}</div>
             <div class="spec-table">
-              ${fields.map(([label, val]) => `
+              ${filteredFields.map(([label, val]) => `
                 <div class="spec-row">
                   <div class="spec-label">${esc(label)}</div>
                   <div class="spec-val">${esc(String(val))}</div>
                 </div>`).join('')}
             </div>
             ${c.description ? `<div class="desc-block"><div class="desc-label">Description</div><div class="desc-text">${esc(c.description).substring(0, 200)}</div></div>` : ''}
-            ${pricing && total > 0 ? `<div class="price-callout">${fmt(total)}<span class="price-note">${qty > 1 ? ` (${qty} &times; ${fmt(sell)})` : ''}</span></div>` : ''}
           </div>
           <div class="page-footer">
             <div>CCH Design Inc. &nbsp;&middot;&nbsp; Confidential</div>
