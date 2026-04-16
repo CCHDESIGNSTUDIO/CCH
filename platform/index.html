@@ -5359,6 +5359,17 @@
       return it && it.lineKind === 'group';
     }
 
+    /** Optional per-line note (internal). New: includeAdditionalNote + additionalNotes. Legacy: workroomNote only. */
+    function cchLineAdditionalNotesText(it) {
+      if (!it) return '';
+      if (it.includeAdditionalNote && String(it.additionalNotes || '').trim()) return String(it.additionalNotes).trim();
+      if (String(it.workroomNote || '').trim()) return String(it.workroomNote).trim();
+      return '';
+    }
+    function cchLineHasAdditionalNotes(it) {
+      return cchLineAdditionalNotesText(it) !== '';
+    }
+
     /** Drop section headers marked hideFromClient and all lines in those groups (client portal, Preview, print/PDF). */
     function proposalItemsForClientFacing(items) {
       var out = [];
@@ -5840,6 +5851,7 @@
         var imgTag = _pvThumb ? '<img src="' + escAttr(_pvThumb) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '';
         itemsHtml += '<tr><td>' + imgTag + '</td><td><strong>' + esc(it.title || 'Item') + '</strong>' +
           (it.description ? '<div style="font-size:11px;color:#888;margin-top:2px;">' + esc(it.description.substring(0, 80)) + '</div>' : '') +
+          (isPO && cchLineHasAdditionalNotes(it) ? '<div style="font-size:10px;color:#666;margin-top:2px;font-style:italic;">Notes: ' + esc(String(cchLineAdditionalNotesText(it)).substring(0, 200)) + '</div>' : '') +
           (it.shipTo ? '<div style="font-size:10px;color:#aaa;margin-top:2px;">Ship to: ' + esc(it.shipTo) + '</div>' : '') +
           '</td>';
         if (isPO) {
@@ -6090,6 +6102,7 @@
                   fields.map(function(f) { return '<div class="spec-row"><div class="spec-label">' + esc(f[0]) + '</div><div class="spec-val">' + esc(String(f[1])) + '</div></div>'; }).join('') +
                 '</div>' +
                 (item.description ? '<div class="desc-block"><div class="desc-text">' + esc(item.description).substring(0, 200) + '</div></div>' : '') +
+                (cchLineHasAdditionalNotes(item) ? '<div class="desc-block" style="margin-top:6px;"><div class="spec-label" style="margin-bottom:2px;">Additional notes</div><div class="desc-text" style="font-style:italic;">' + esc(cchLineAdditionalNotesText(item)).substring(0, 300) + '</div></div>' : '') +
                 (item.notes ? '<div class="desc-block" style="margin-top:6px;"><div class="spec-label" style="margin-bottom:2px;">Notes</div><div class="desc-text" style="font-style:italic;">' + esc(item.notes).substring(0, 200) + '</div></div>' : '') +
               '</div>' +
             '</div>' +
@@ -6875,7 +6888,10 @@
       } catch(err) { showToast('Sync error: ' + err.message, 'error'); }
     }
 
-    function closeModal() { document.getElementById('modalContainer').innerHTML = ''; }
+    function closeModal() {
+      document.getElementById('modalContainer').innerHTML = '';
+      window._productModalCtx = null;
+    }
 
     function cchDialog(opts) {
       opts = opts || {};
@@ -7553,15 +7569,39 @@
       window._projSelRoomBoards = roomBoards;
       window._projSelProjectId = proj.id;
 
+      // Primary board doc (same source as editSelectionItem) — proj.categories alone can be stale/empty
+      var boardDocCats = [];
+      var boardDocRoomsExtra = [];
+      try {
+        var _bMainSnap = await db.collection('boards').doc(proj.id).get();
+        if (_bMainSnap.exists) {
+          var _bMainData = _bMainSnap.data();
+          boardDocCats = _bMainData.categories || [];
+          boardDocRoomsExtra = _bMainData.rooms || [];
+        }
+      } catch (eBoard) {}
+
       // Filters
       var rooms = [...new Set(items.map(function(i) { return i.room; }).filter(Boolean))].sort();
       var roomKeySet = new Set(rooms.map(function(r) { return String(r).toLowerCase().trim(); }));
       (proj.rooms || []).forEach(function(r) { if (r) roomKeySet.add(String(r).toLowerCase().trim()); });
-      var boardCatsSel = (proj.categories && proj.categories.length) ? proj.categories : [];
+      (boardDocRoomsExtra || []).forEach(function(r) { if (r) roomKeySet.add(String(r).toLowerCase().trim()); });
+      var boardCatsSel = Array.from(new Set([].concat(
+        (proj.categories && proj.categories.length) ? proj.categories : [],
+        boardDocCats
+      )));
       var itemCats = items.map(function(i) { return i.category; }).filter(Boolean);
-      var roomListForCats = Array.from(new Set([].concat(proj.rooms || [], rooms)));
+      var roomListForCats = Array.from(new Set([].concat(proj.rooms || [], rooms, boardDocRoomsExtra)));
+      // Never strip canonical FFE types (e.g. "Lighting") just because a room/board shares the same name
+      var _cchMasterCatLc = new Set((window.CCH_PRODUCT_CATEGORIES_MASTER || []).map(function(c) { return String(c).toLowerCase().trim(); }));
       var categories = _cchMergedCategoryList(boardCatsSel.concat(itemCats), roomListForCats).filter(function(c) {
-        return c && !roomKeySet.has(String(c).toLowerCase().trim());
+        if (!c) return false;
+        var cl = String(c).toLowerCase().trim();
+        if (_cchMasterCatLc.has(cl)) return true;
+        return !roomKeySet.has(cl);
+      });
+      categories = Array.from(new Set(categories.map(function(x) { return String(x); }))).sort(function(a, b) {
+        return String(a).localeCompare(String(b), undefined, { sensitivity: 'base' });
       });
       var vendors = [...new Set(items.map(function(i) { return i.vendor; }).filter(Boolean))].sort();
       var sources = [...new Set(items.map(function(i) { return i.source; }))];
@@ -7638,8 +7678,12 @@
       var totalCost = sortedFiltered.reduce(function(s, i) { return s + (parseFloat(i.cost) || 0); }, 0);
       var totalSell = sortedFiltered.reduce(function(s, i) { return s + (parseFloat(i.sell) || 0); }, 0);
       function _selCategoryOptionsHtml(current) {
-        return categoriesWithExpenses.map(function(c) {
-          var sel = String(current || '') === String(c) ? ' selected' : '';
+        var cur = String(current || '').trim();
+        var opts = categoriesWithExpenses.slice();
+        if (cur && opts.indexOf(cur) < 0) opts.push(cur);
+        opts.sort(function(a, b) { return String(a).localeCompare(String(b), undefined, { sensitivity: 'base' }); });
+        return opts.map(function(c) {
+          var sel = cur === String(c) ? ' selected' : '';
           return '<option value="' + escAttr(c) + '"' + sel + '>' + esc(c) + '</option>';
         }).join('');
       }
@@ -7822,8 +7866,8 @@
       `;
     }
 
-    // Edit a selection item inline
-    function editSelectionItem(idx) {
+    // Legacy compact editor (invoice / proposal / PO / ideabook clip rows — not full library schema)
+    function _editSelectionItemLegacyOverlay(idx) {
       var items = window._projSelections || [];
       var item = items[idx];
       if (!item) return;
@@ -7878,9 +7922,126 @@
         document.body.appendChild(overlay);
         selEditLoadLinkedDocs(item);
       }).catch(function(e) {
-        console.error('editSelectionItem:', e);
+        console.error('_editSelectionItemLegacyOverlay:', e);
         showToast('Could not load project for category list', 'error');
       });
+    }
+
+    // Selections ✏️ — use same tabbed modal as Main Product Library (room board clips + library rows)
+    async function editSelectionItem(idx) {
+      var items = window._projSelections || [];
+      var item = items[idx];
+      if (!item) return;
+      var projectId = window._projSelProjectId;
+      if (!projectId) { showToast('No project context', 'error'); return; }
+      var proj = window._currentProject || {};
+      var projName = (proj.name || '').trim();
+
+      if (item.source === 'boardclip' && item._clipDocId) {
+        try {
+          var cs = await db.collection('boards').doc(projectId).collection('clips').doc(item._clipDocId).get();
+          var c = cs.exists ? cs.data() : {};
+          var roomListForModal = [];
+          var boardName = projName;
+          try {
+            var bs = await db.collection('boards').doc(projectId).get();
+            if (bs.exists) {
+              var bd = bs.data();
+              if ((bd.name || '').trim()) boardName = (bd.name || '').trim();
+              roomListForModal = [].concat(bd.rooms || []);
+            }
+            var rmSnap2 = await db.collection('boards').doc(projectId).collection('roomMeta').get();
+            rmSnap2.forEach(function(d) {
+              var nm = d.data().name;
+              if (nm && roomListForModal.indexOf(nm) < 0) roomListForModal.push(nm);
+            });
+          } catch (eBr) {}
+          var _rm = (c.room || item.room || '').trim();
+          if (_rm && roomListForModal.indexOf(_rm) < 0) roomListForModal.push(_rm);
+          roomListForModal.sort();
+          var prefill = {
+            title: c.title || item.title || '',
+            clientTitle: c.clientTitle || '',
+            vendor: c.vendor || item.vendor || '',
+            manufacturer: c.manufacturer || '',
+            category: c.category || item.category || '',
+            sku: c.sku || item.sku || '',
+            imageUrl: c.imageUrl || item.image || '',
+            images: (c.images && c.images.length) ? c.images.slice() : (item.image ? [item.image] : []),
+            costPrice: parseMoney(c.unitCost || c.cost) || (parseFloat(item.cost) || '') || null,
+            sellPrice: parseMoney(c.clientPrice || c.unitSellingPrice || c.totalSelling) || (parseFloat(item.sell) || '') || null,
+            retailPrice: parseMoney(c.retailPrice) || null,
+            markupPct: c.markupPct,
+            sellingQty: c.qty || c.sellingQuantity || 1,
+            description: c.notes || '',
+            clientDescription: c.clientDescription || c.description || '',
+            vendorDescription: c.vendorDescription || '',
+            vendorUrl: c.pageUrl || c.vendorUrl || c.productUrl || '',
+            productUrl: c.productUrl || c.pageUrl || '',
+            materials: c.materials || '',
+            finish: c.finish || '',
+            dimensions: c.dimensions || '',
+            room: c.room || item.room || '',
+            projectId: projectId,
+            project: boardName,
+            _roomList: roomListForModal,
+            _clipProjectId: projectId,
+            _clipDocId: item._clipDocId,
+            _fromSelections: true,
+            __modalTitle: 'Edit selection'
+          };
+          showNewProductModal(prefill);
+        } catch (e) {
+          console.error('editSelectionItem clip:', e);
+          showToast('Could not open editor', 'error');
+        }
+        return;
+      }
+
+      if (item.source === 'library' && item.id && String(item.id).indexOf('clip-') !== 0) {
+        try {
+          var ls = await db.collection('productLibrary').doc(item.id).get();
+          var d = ls.exists ? ls.data() : {};
+          var roomListLib = [];
+          var boardNameLib = projName;
+          try {
+            var bsL = await db.collection('boards').doc(projectId).get();
+            if (bsL.exists) {
+              var bdL = bsL.data();
+              if ((bdL.name || '').trim()) boardNameLib = (bdL.name || '').trim();
+              roomListLib = [].concat(bdL.rooms || []);
+            }
+            var rmSnapL = await db.collection('boards').doc(projectId).collection('roomMeta').get();
+            rmSnapL.forEach(function(d0) {
+              var nm0 = d0.data().name;
+              if (nm0 && roomListLib.indexOf(nm0) < 0) roomListLib.push(nm0);
+            });
+          } catch (eBl) {}
+          var _rmL = (item.room || '').trim();
+          if (_rmL && roomListLib.indexOf(_rmL) < 0) roomListLib.push(_rmL);
+          roomListLib.sort();
+          var prefill = Object.assign({ id: item.id }, d);
+          prefill.imageUrl = prefill.imageUrl || prefill.image || item.image || '';
+          if (prefill.costPrice == null && prefill.unitCost != null) prefill.costPrice = prefill.unitCost;
+          if (prefill.sellPrice == null && d.sellPrice != null) prefill.sellPrice = d.sellPrice;
+          if (prefill.costPrice == null && item.cost) prefill.costPrice = parseFloat(item.cost);
+          if (prefill.sellPrice == null && item.sell) prefill.sellPrice = parseFloat(item.sell);
+          if (prefill.room == null || !String(prefill.room).trim()) prefill.room = item.room || '';
+          if (prefill.category == null || !String(prefill.category).trim()) prefill.category = item.category || '';
+          prefill.projectId = projectId;
+          prefill.project = boardNameLib || prefill.project || '';
+          prefill._roomList = roomListLib;
+          prefill._fromSelections = true;
+          prefill.__modalTitle = 'Edit selection';
+          showNewProductModal(prefill);
+        } catch (e2) {
+          console.error('editSelectionItem library:', e2);
+          showToast('Could not load product', 'error');
+        }
+        return;
+      }
+
+      _editSelectionItemLegacyOverlay(idx);
     }
 
     async function selEditLoadLinkedDocs(item) {
@@ -11149,6 +11310,14 @@ async function renderBoardsTab(T, proj) {
     }
 
     // ==================== IMPORT NIICE BOARD ====================
+    /** After Niice zip import: close modal, optional Inspiration section focus, open project Inspiration tab. */
+    window.ibFinishNiiceImportNavigate = function(projectId, sectionId) {
+      closeModal();
+      var sid = sectionId && String(sectionId).trim();
+      ibActiveSection = sid ? sid : null;
+      navigate('#/project/' + projectId + '/ideabooks');
+    };
+
     function ibImportNiice(projectId) {
       // Create hidden file input for zip
       var input = document.createElement('input');
@@ -11173,6 +11342,7 @@ async function renderBoardsTab(T, proj) {
 
         var progressEl = document.getElementById('niiceImportProgress');
         var results = [];
+        var lastNiiceImportedSectionId = null;
 
         for (var f = 0; f < files.length; f++) {
           var file = files[f];
@@ -11252,9 +11422,10 @@ async function renderBoardsTab(T, proj) {
                   var isEtsy = filename.startsWith('il_');
                   return { imageUrl: url, caption: '', sourceUrl: '', vendor: isEtsy ? 'Etsy' : '', showPrice: true, showSource: true, stars: 0, comments: [], tags: [], addedAt: new Date().toISOString(), importedFrom: 'niice', originalFile: filename };
                 });
-                await db.collection('boards').doc(projectId).collection('ideabooks').add({
+                var _niiceSfRef = await db.collection('boards').doc(projectId).collection('ideabooks').add({
                   name: sfName, description: 'Imported from Niice — ' + sfImages.length + ' images', images: sfImages, order: maxOrder + f * 100 + si + 1, createdAt: new Date().toISOString(), source: 'niice-import', parentBoard: boardName
                 });
+                lastNiiceImportedSectionId = _niiceSfRef.id;
                 sectionCount++;
                 progressEl.innerHTML += '<div style="padding:2px 0;font-size:12px;color:var(--green);">  ✓ ' + sfImages.length + ' images → "' + esc(sfName) + '"</div>';
               }
@@ -11314,6 +11485,7 @@ async function renderBoardsTab(T, proj) {
               createdAt: new Date().toISOString(),
               source: 'niice-import'
             });
+            lastNiiceImportedSectionId = docRef.id;
 
             progressEl.innerHTML += '<div style="padding:2px 0;font-size:12px;color:var(--green);font-weight:600;">  ✓ ' + images.length + ' images imported as "' + esc(boardName) + '"</div>';
             results.push({ name: boardName, status: 'ok', count: images.length, id: docRef.id });
@@ -11334,7 +11506,7 @@ async function renderBoardsTab(T, proj) {
           '<div style="font-size:13px;margin-top:4px;">' + totalBoards + ' board(s) · ' + totalImported + ' total images</div>' +
           '</div>' +
           '<div style="text-align:right;margin-top:12px;">' +
-            '<button class="btn btn-primary" onclick="closeModal();ibActiveSection=\'' + (results[0] && results[0].id ? results[0].id : '') + '\';renderProjectDetail();">View Boards</button>' +
+            '<button class="btn btn-primary" onclick="ibFinishNiiceImportNavigate(\'' + escJsStr(projectId) + '\',\'' + escJsStr(lastNiiceImportedSectionId || '') + '\')">View in Inspiration</button>' +
           '</div>';
       };
       input.click();
@@ -15552,7 +15724,7 @@ async function renderBoardsTab(T, proj) {
             var rows = [];
             var pid = projectId;
             var prid = proposalId;
-            var propTableColspan = _isProposalEditMode ? 15 : 12;
+            var propTableColspan = _isProposalEditMode ? 16 : 13;
             var hiddenGidsForPrint = {};
             items.forEach(function(it) {
               if (isProposalGroupHeaderItem(it) && it.hideFromClient && it.groupId) hiddenGidsForPrint[it.groupId] = true;
@@ -15651,6 +15823,11 @@ async function renderBoardsTab(T, proj) {
                   itemDescCell +
                   '<td style="font-size:12px;padding:4px;"><input class="form-input" style="font-size:11px;padding:3px 4px;width:100%;min-width:0;box-sizing:border-box;" value="' + escAttr(item.vendor || '') + '" onchange="updateProposalItemField(\'' + escAttr(pid) + '\',\'' + escAttr(prid) + '\',' + idx + ',\'vendor\',this.value)"></td>' +
                   '<td style="font-size:12px;padding:4px;"><select class="form-input" style="font-size:10px;padding:2px 2px;max-width:100%;width:100%;min-width:0;box-sizing:border-box;" onchange="updateProposalItemField(\'' + escAttr(pid) + '\',\'' + escAttr(prid) + '\',' + idx + ',\'room\',this.value)">' + roomOpts + '</select></td>' +
+                  '<td style="text-align:center;padding:4px;width:36px;vertical-align:middle;" title="' + (cchLineHasAdditionalNotes(item) ? escAttr(cchLineAdditionalNotesText(item)) : 'Additional note (edit line)') + '">' +
+                    (cchLineHasAdditionalNotes(item)
+                      ? '<span role="button" tabindex="0" style="font-size:15px;cursor:pointer;" onclick="event.stopPropagation();editProposalItem(\'' + escAttr(pid) + '\',\'' + escAttr(prid) + '\',' + idx + ')">📝</span>'
+                      : '<span style="color:var(--gray-300);font-size:11px;">—</span>') +
+                  '</td>' +
                   '<td class="amount" style="font-size:12px;padding:4px;"><input type="number" step="0.25" min="0.25" class="form-input" style="font-size:11px;padding:3px;width:100%;max-width:44px;text-align:right;box-sizing:border-box;" value="' + qty + '" onchange="updateProposalItemField(\'' + escAttr(pid) + '\',\'' + escAttr(prid) + '\',' + idx + ',\'qty\',this.value)"></td>' +
                   '<td class="amount" style="font-size:12px;padding:4px;"><input type="number" step="0.01" class="form-input" style="font-size:11px;padding:3px;width:100%;max-width:58px;text-align:right;box-sizing:border-box;" value="' + (cost > 0 ? cost.toFixed(2) : '') + '" placeholder="—" onchange="updateProposalItemField(\'' + escAttr(pid) + '\',\'' + escAttr(prid) + '\',' + idx + ',\'cost\',this.value||0)"></td>' +
                   '<td class="amount" style="font-size:12px;padding:4px;"><input type="number" step="0.5" class="form-input" style="font-size:11px;padding:3px;width:100%;max-width:44px;text-align:right;box-sizing:border-box;color:' + (markupPct > 0 ? 'var(--green)' : 'var(--gray-500)') + '" value="' + (markupPct || '') + '" placeholder="—" onchange="updateProposalItemField(\'' + escAttr(pid) + '\',\'' + escAttr(prid) + '\',' + idx + ',\'markupPct\',this.value||0)"></td>' +
@@ -15680,6 +15857,11 @@ async function renderBoardsTab(T, proj) {
                   itemDescCell +
                   '<td style="font-size:12px;padding:4px;">' + esc(item.vendor || '—') + '</td>' +
                   '<td style="font-size:12px;padding:4px;">' + esc(curRoom || '—') + '</td>' +
+                  '<td style="text-align:center;padding:4px;width:36px;vertical-align:middle;" title="' + (cchLineHasAdditionalNotes(item) ? escAttr(cchLineAdditionalNotesText(item)) : '') + '">' +
+                    (cchLineHasAdditionalNotes(item)
+                      ? '<span role="button" tabindex="0" style="font-size:15px;cursor:pointer;" onclick="event.stopPropagation();editProposalItem(\'' + escAttr(pid) + '\',\'' + escAttr(prid) + '\',' + idx + ')">📝</span>'
+                      : '<span style="color:var(--gray-300);font-size:11px;">—</span>') +
+                  '</td>' +
                   '<td class="amount" style="font-size:12px;padding:4px;text-align:right;">' + esc(String(qty)) + '</td>' +
                   '<td class="amount" style="font-size:12px;padding:4px;text-align:right;">' + (cost > 0 ? formatMoney(cost) : '—') + '</td>' +
                   '<td class="amount" style="font-size:12px;padding:4px;text-align:right;">' + (retailPrice > 0 ? formatMoney(retailPrice) : '—') + '</td>' +
@@ -15721,6 +15903,7 @@ async function renderBoardsTab(T, proj) {
               '<th style="font-size:11px;width:22%;">ITEM</th>' +
               '<th style="font-size:11px;width:11%;">VENDOR</th>' +
               '<th style="width:10%;font-size:11px;">ROOM</th>' +
+              '<th style="width:36px;font-size:9px;" title="Additional internal note">📝</th>' +
               '<th class="amount" style="font-size:11px;width:5%;">QTY</th>' +
               '<th class="amount" style="font-size:11px;width:7%;">COST</th>' +
               '<th class="amount" style="font-size:11px;width:5%;">Mkup %</th>' +
@@ -15736,6 +15919,7 @@ async function renderBoardsTab(T, proj) {
               '<th style="font-size:11px;width:24%;">ITEM</th>' +
               '<th style="font-size:11px;width:12%;">VENDOR</th>' +
               '<th style="width:11%;font-size:11px;">ROOM</th>' +
+              '<th style="width:36px;font-size:9px;" title="Additional internal note">📝</th>' +
               '<th class="amount" style="font-size:11px;width:5%;">QTY</th>' +
               '<th class="amount" style="font-size:11px;width:7%;">COST</th>' +
               '<th class="amount" style="font-size:11px;width:8%;">RETAIL</th>' +
@@ -16207,6 +16391,18 @@ async function renderBoardsTab(T, proj) {
                       <div class="form-group"><label class="form-label">Ship To</label><select class="form-input" id="piShipTo">${_piShipToOptions(item.shipTo || '')}</select></div>
                     </div>
                     <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea clip-detail-textarea-scroll" id="piDesc" rows="3">${esc(item.description || '')}</textarea></div>
+                    ${(() => {
+                      var _nt = String(item.additionalNotes || '').trim() || String(item.workroomNote || '').trim();
+                      var _on = !!(item.includeAdditionalNote && String(item.additionalNotes || '').trim()) || (!!_nt && item.includeAdditionalNote !== false);
+                      return '<div class="form-group" style="padding-top:8px;border-top:1px solid var(--gray-200);">' +
+                        '<label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--navy);user-select:none;line-height:1.35;">' +
+                        '<input type="checkbox" id="piIncludeAdditionalNote" style="margin-top:3px;accent-color:var(--gold);flex-shrink:0;" ' + (_on ? 'checked' : '') + '>' +
+                        '<span>Include additional note on this line item</span></label>' +
+                        '<div id="piAdditionalNotesWrap" style="margin-top:10px;' + (_on ? '' : 'display:none;') + '">' +
+                        '<label class="form-label" for="piAdditionalNotes">Additional notes</label>' +
+                        '<textarea class="form-textarea clip-detail-textarea-scroll" id="piAdditionalNotes" rows="3" placeholder="Workroom instructions, vendor notes, schedule tags, or any other notes…">' + esc(_nt) + '</textarea>' +
+                        '<div style="font-size:10px;color:var(--gray-500);margin-top:4px;line-height:1.35;">Optional internal note. Not shown on client proposal preview or client portal. Separate from client description and vendor description.</div></div></div>';
+                    })()}
                     ${item.libraryProductId ? `<div style="padding:10px 12px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:0;font-size:12px;color:var(--gray-600);">Linked to the product library — unit trade cost, unit client sell (line total ÷ qty), retail, SKU, and finish <strong>auto-sync</strong> when you save or edit the row.<div style="margin-top:8px;"><button type="button" class="btn btn-secondary btn-sm" onclick="syncLibraryProductFromProposalLine('${escAttr(projectId)}','${escAttr(proposalId)}',${idx})">Sync to library now</button> <button type="button" class="btn btn-sm" onclick="navigate('#/library');closeModal();" title="Open library">Open library</button></div></div>` : ''}
                   </div>
                 </div>
@@ -16221,6 +16417,17 @@ async function renderBoardsTab(T, proj) {
           </div>
         `;
         piMountProposalLineImages();
+        window._piToggleAdditionalNote = function() {
+          var cb = document.getElementById('piIncludeAdditionalNote');
+          var w = document.getElementById('piAdditionalNotesWrap');
+          if (!w) return;
+          w.style.display = (cb && cb.checked) ? 'block' : 'none';
+        };
+        var _picb = document.getElementById('piIncludeAdditionalNote');
+        if (_picb) {
+          _picb.addEventListener('change', window._piToggleAdditionalNote);
+          window._piToggleAdditionalNote();
+        }
       }).catch(async function(err) {
         console.error('editProposalItem', err);
         await cchAlert('Could not open line editor: ' + ((err && err.message) || String(err)), 'Proposal');
@@ -16433,6 +16640,18 @@ async function renderBoardsTab(T, proj) {
         description: document.getElementById('piDesc').value.trim(),
         shipTo: document.getElementById('piShipTo').value.trim()
       };
+      var _piInc = !!(document.getElementById('piIncludeAdditionalNote') && document.getElementById('piIncludeAdditionalNote').checked);
+      var _piNote = (_piInc && document.getElementById('piAdditionalNotes')) ? String(document.getElementById('piAdditionalNotes').value || '').trim() : '';
+      if (_piInc && !_piNote) _piInc = false;
+      if (_piInc) {
+        items[idx].includeAdditionalNote = true;
+        items[idx].additionalNotes = _piNote;
+        delete items[idx].workroomNote;
+      } else {
+        items[idx].includeAdditionalNote = false;
+        delete items[idx].additionalNotes;
+        delete items[idx].workroomNote;
+      }
       const total = items.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
       await db.collection('boards').doc(projectId).collection('proposals').doc(proposalId).update({
         items, total, updatedAt: new Date().toISOString(),
@@ -16933,6 +17152,16 @@ async function renderBoardsTab(T, proj) {
               </div>
               <div class="form-group"><label class="form-label">Ship To</label><select class="form-input" id="piShipTo">${_piShipToOptions('')}</select></div>
               <div class="form-group"><label class="form-label">Description</label><textarea class="form-input" id="piDesc" rows="2"></textarea></div>
+              <div class="form-group" style="padding-top:8px;border-top:1px solid var(--gray-200);">
+                <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--navy);user-select:none;line-height:1.35;">
+                  <input type="checkbox" id="piIncludeAdditionalNote" style="margin-top:3px;accent-color:var(--gold);flex-shrink:0;">
+                  <span>Include additional note on this line item</span>
+                </label>
+                <div id="piAdditionalNotesWrap" style="display:none;margin-top:10px;">
+                  <label class="form-label" for="piAdditionalNotes">Additional notes</label>
+                  <textarea class="form-input" id="piAdditionalNotes" rows="2" placeholder="Workroom instructions, vendor notes, schedule tags…"></textarea>
+                </div>
+              </div>
             </div>
             <div class="modal-footer">
               <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -16941,6 +17170,14 @@ async function renderBoardsTab(T, proj) {
           </div>
         </div>
       `;
+      window._piToggleAdditionalNote = function() {
+        var cb = document.getElementById('piIncludeAdditionalNote');
+        var w = document.getElementById('piAdditionalNotesWrap');
+        if (!w) return;
+        w.style.display = (cb && cb.checked) ? 'block' : 'none';
+      };
+      var _piCbAdd = document.getElementById('piIncludeAdditionalNote');
+      if (_piCbAdd) _piCbAdd.addEventListener('change', window._piToggleAdditionalNote);
       recalcLineItem();
     }
 
@@ -16975,6 +17212,12 @@ async function renderBoardsTab(T, proj) {
         lineType: (document.getElementById('piLineType') && document.getElementById('piLineType').value === 'labor') ? 'labor' : 'product',
         lineApprovalStatus: 'pending'
       });
+      var _piIncA = !!(document.getElementById('piIncludeAdditionalNote') && document.getElementById('piIncludeAdditionalNote').checked);
+      var _piTxtA = (_piIncA && document.getElementById('piAdditionalNotes')) ? String(document.getElementById('piAdditionalNotes').value || '').trim() : '';
+      if (_piIncA && !_piTxtA) _piIncA = false;
+      var _last = items[items.length - 1];
+      if (_piIncA) { _last.includeAdditionalNote = true; _last.additionalNotes = _piTxtA; }
+      else { _last.includeAdditionalNote = false; delete _last.additionalNotes; delete _last.workroomNote; }
       const total = items.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
       await db.collection('boards').doc(projectId).collection('proposals').doc(proposalId).update({ items, total });
       logDocActivity(projectId, 'proposals', proposalId, 'item_added', 'Added: ' + (document.getElementById('piTitle').value.trim() || 'New item'));
@@ -16993,7 +17236,11 @@ async function renderBoardsTab(T, proj) {
           await convertProposalToInvoice(projectId, proposalId);
           return;
         }
-        const invItems = items.filter(function(i) { return !isProposalGroupHeaderItem(i); }).map(i => ({ description: i.title + (i.vendor ? ' (' + i.vendor + ')' : ''), qty: parseInt(i.qty) || 1, amount: parseFloat(i.amount) || 0, lineTotal: parseFloat(i.amount) || 0, room: i.room || i.category || '' }));
+        const invItems = items.filter(function(i) { return !isProposalGroupHeaderItem(i); }).map(i => {
+          var o = { description: i.title + (i.vendor ? ' (' + i.vendor + ')' : ''), qty: parseInt(i.qty) || 1, amount: parseFloat(i.amount) || 0, lineTotal: parseFloat(i.amount) || 0, room: i.room || i.category || '' };
+          if (cchLineHasAdditionalNotes(i)) { o.includeAdditionalNote = true; o.additionalNotes = cchLineAdditionalNotesText(i); }
+          return o;
+        });
         const total = invItems.reduce((s, i) => s + i.lineTotal, 0);
         var _invNum = await getNextDocNumber('INV');
         var invRef = await db.collection('boards').doc(projectId).collection('invoices').add({
@@ -17020,7 +17267,11 @@ async function renderBoardsTab(T, proj) {
           byVendor[v].push(i);
         });
         for (const [vendor, vItems] of Object.entries(byVendor)) {
-          const poItems = vItems.map(i => ({ description: i.title, qty: parseInt(i.qty) || 1, cost: parseFloat(i.cost || i.amount) || 0, lineTotal: parseFloat(i.amount) || 0, room: i.room || i.category || '' }));
+          const poItems = vItems.map(i => {
+            var o = { description: i.title, qty: parseInt(i.qty) || 1, cost: parseFloat(i.cost || i.amount) || 0, lineTotal: parseFloat(i.amount) || 0, room: i.room || i.category || '' };
+            if (cchLineHasAdditionalNotes(i)) { o.includeAdditionalNote = true; o.additionalNotes = cchLineAdditionalNotesText(i); }
+            return o;
+          });
           const total = poItems.reduce((s, i) => s + i.lineTotal, 0);
           var _poNum = await getNextDocNumber('PO');
           await db.collection('boards').doc(projectId).collection('purchaseOrders').add({
@@ -17412,6 +17663,7 @@ async function renderBoardsTab(T, proj) {
           var _pvLineTitle = typeof window.invoiceLineDisplayTitle === 'function' ? window.invoiceLineDisplayTitle(it) : (it.title || 'Item');
           itemsHtml += '<tr>' + (showImgColLegacy ? '<td>' + imgTag + '</td>' : '') + '<td><strong>' + esc(_pvLineTitle) + '</strong>' +
             (_pvDesc ? '<div style="font-size:11px;color:#5C6B80;margin-top:2px;">' + esc(_pvDesc.substring(0,80)) + '</div>' : '') +
+            (isPO && cchLineHasAdditionalNotes(it) ? '<div style="font-size:10px;color:#5C6B80;margin-top:2px;font-style:italic;">Notes: ' + esc(String(cchLineAdditionalNotesText(it)).substring(0, 200)) + '</div>' : '') +
             (it.shipTo && type !== 'invoice' ? '<div style="font-size:10px;color:#aaa;margin-top:2px;">Ship to: ' + esc(it.shipTo) + '</div>' : '') +
             '</td>';
           if (isPO) {
@@ -18179,6 +18431,8 @@ async function renderBoardsTab(T, proj) {
           ? '<img src="' + escAttr(imgSrc) + '" class="doc-edit-img" onerror="this.outerHTML=\'<div class=doc-edit-img style=display:flex;align-items:center;justify-content:center;font-size:28px;cursor:pointer; onclick=docEditUpdateImage(' + idx + ')>📦</div>\'" onclick="docEditUpdateImage(' + idx + ')">'
           : (isServiceLine ? serviceNoImg : '<div class="doc-edit-img" style="display:flex;align-items:center;justify-content:center;font-size:28px;cursor:pointer;" onclick="docEditUpdateImage(' + idx + ')">📦</div>');
         const hideImgChrome = isInvoice && isServiceLine;
+        var _dnTxt = String(item.additionalNotes || '').trim() || String(item.workroomNote || '').trim();
+        var _dnOn = !!(item.includeAdditionalNote && String(item.additionalNotes || '').trim()) || (!!_dnTxt && item.includeAdditionalNote !== false);
 
         return '<div class="doc-edit-row" id="docEditRow' + idx + '">' +
           '<div class="doc-edit-reorder">' +
@@ -18196,6 +18450,11 @@ async function renderBoardsTab(T, proj) {
             '<textarea class="doc-edit-desc" data-idx="' + idx + '" data-field="description" onchange="docEditFieldChange(this)" placeholder="Summary (e.g. hours, scope)">' + esc(item.description || '') + '</textarea>' +
             '<div class="doc-edit-field-label">Notes (detail)</div>' +
             '<textarea class="doc-edit-notes" data-idx="' + idx + '" data-field="lineNotes" onchange="docEditFieldChange(this)" placeholder="Notes — detail under summary on preview/PDF">' + esc(item.lineNotes || item.notes || '') + '</textarea>' +
+            '<label style="font-size:11px;display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer;color:var(--navy);"><input type="checkbox" data-idx="' + idx + '" ' + (_dnOn ? 'checked ' : '') + 'onchange="docEditToggleAdditionalNote(this)" style="accent-color:var(--gold);"><span>Include additional note on this line item</span></label>' +
+            '<div class="doc-edit-addl-wrap" style="margin-top:6px;' + (_dnOn ? '' : 'display:none;') + '">' +
+            '<div class="doc-edit-field-label">Additional notes</div>' +
+            '<textarea class="doc-edit-notes" data-idx="' + idx + '" data-field="additionalNotes" onchange="docEditFieldChange(this)" placeholder="Workroom instructions, vendor notes, schedule tags…">' + esc(_dnTxt) + '</textarea>' +
+            '<div style="font-size:10px;color:var(--gray-500);margin-top:4px;line-height:1.35;">Not shown on client proposal preview or client portal. Separate from summary, notes (detail), and vendor description.</div></div>' +
           '</div>' +
           '<div class="doc-edit-nums">' +
             '<div class="doc-edit-field"><label>Qty</label><input type="number" step="0.5" min="0.25" value="' + qty + '" data-idx="' + idx + '" data-field="qty" onchange="docEditNumChange(this)"></div>' +
@@ -18227,6 +18486,19 @@ async function renderBoardsTab(T, proj) {
       docEditRecalcTotals();
     }
 
+    function docEditToggleAdditionalNote(el) {
+      var idx = parseInt(el.dataset.idx, 10);
+      var it = _docEdit.items[idx];
+      if (!it) return;
+      it.includeAdditionalNote = !!el.checked;
+      if (!el.checked) {
+        delete it.additionalNotes;
+        delete it.workroomNote;
+      }
+      docEditRenderItems();
+      docEditAutoSave();
+    }
+
     function docEditTaxableChange(el) {
       const idx = parseInt(el.dataset.idx);
       _docEdit.items[idx].taxable = el.checked;
@@ -18241,6 +18513,17 @@ async function renderBoardsTab(T, proj) {
       else if (field === 'lineNotes') {
         _docEdit.items[idx].lineNotes = el.value;
         _docEdit.items[idx].notes = el.value;
+      } else if (field === 'additionalNotes') {
+        var v = String(el.value || '').trim();
+        if (v) {
+          _docEdit.items[idx].additionalNotes = v;
+          _docEdit.items[idx].includeAdditionalNote = true;
+          delete _docEdit.items[idx].workroomNote;
+        } else {
+          _docEdit.items[idx].includeAdditionalNote = false;
+          delete _docEdit.items[idx].additionalNotes;
+          delete _docEdit.items[idx].workroomNote;
+        }
       } else _docEdit.items[idx][field] = el.value;
       docEditAutoSave();
     }
@@ -18653,9 +18936,10 @@ async function renderBoardsTab(T, proj) {
             for (var ri = 0; ri < rows.length; ri++) {
               var r = rows[ri];
               var clipRef = db.collection('boards').doc(t.projectId).collection('clips').doc();
-              await clipRef.set({
+              var _clipRow = {
                 title: r.title || '',
                 description: r.description || '',
+                vendorDescription: String(r.vendorDescription || '').trim(),
                 vendor: r.vendor || '',
                 room: r.room || '',
                 category: r.category || '',
@@ -18666,7 +18950,14 @@ async function renderBoardsTab(T, proj) {
                 sku: r.sku || '',
                 source: 'library',
                 addedAt: new Date().toISOString()
-              });
+              };
+              if (cchLineHasAdditionalNotes(r)) {
+                _clipRow.includeAdditionalNote = true;
+                _clipRow.additionalNotes = cchLineAdditionalNotesText(r);
+              } else {
+                _clipRow.includeAdditionalNote = false;
+              }
+              await clipRef.set(_clipRow);
             }
             if (toastMsg) showToast(toastMsg);
             if (window._currentProject) renderSelectionsTab(document.getElementById('projectTabContent'), window._currentProject);
@@ -18688,7 +18979,7 @@ async function renderBoardsTab(T, proj) {
         return;
       }
       var tx = typeof getDefaultTaxable === 'function' ? getDefaultTaxable('product') : true;
-      var blank = { title: '', description: '', vendor: '', qty: 1, cost: 0, markupPct: 0, shipping: 0, amount: 0, imageUrl: '', room: '', category: '', shipTo: '', expenseType: 'product', itemType: 'product', cchLineCategory: 'product', taxable: tx };
+      var blank = { title: '', description: '', includeAdditionalNote: false, vendor: '', qty: 1, cost: 0, markupPct: 0, shipping: 0, amount: 0, imageUrl: '', room: '', category: '', shipTo: '', expenseType: 'product', itemType: 'product', cchLineCategory: 'product', taxable: tx };
       if (t && t.mode === 'proposal') blank.lineApprovalStatus = 'pending';
       _cchOpenQbCategoryModal('Blank lines need a QuickBooks category before they can be added.', '', function(cat) {
         if (!cat) return;
@@ -18873,6 +19164,9 @@ async function renderBoardsTab(T, proj) {
         var blob = ((title || '') + ' ' + (vendor || '') + ' ' + (sku || '') + ' ' + (extra || '')).toLowerCase();
         return blob.indexOf(q) >= 0;
       }
+      function matchQItem(it) {
+        return matchQ(it.title, it.vendor, it.sku, (it.description || '') + ' ' + (it.vendorDescription || '') + ' ' + (it.additionalNotes || '') + ' ' + (it.workroomNote || ''));
+      }
 
       function itemMatchesFilter(it, f) {
         var cls = _cchSidebarClassifyItem(it);
@@ -18951,7 +19245,7 @@ async function renderBoardsTab(T, proj) {
 
       var items = window._disProducts || [];
       var filtered = items.filter(function(i) {
-        if (!matchQ(i.title, i.vendor, i.sku, i.description || '')) return false;
+        if (!matchQItem(i)) return false;
         return itemMatchesFilter(i, filter);
       });
       var projItems = filtered.filter(function(i) { return i._source === 'project'; });
@@ -19025,7 +19319,7 @@ async function renderBoardsTab(T, proj) {
           var ep = subKind === 'expense' ? (linEt === 'sales_tax' ? 'sales_tax' : linEt) : null;
           var pf = _cchPersistedFieldsForKind(subKind, ep);
           var cat0 = _cchExtractQbCategory(line) || _cchExtractQbCategory(item) || '';
-          newRows.push(Object.assign({
+          var _br = Object.assign({
             title: t, description: line.description || '', vendor: line.vendor || item.vendor || '',
             qty: parseFloat(line.qty) || 1, cost: cst, markupPct: 0, shipping: 0, amount: amt || cst,
             imageUrl: line.imageUrl || line.image || '', room: line.room || item.room || '',
@@ -19033,7 +19327,12 @@ async function renderBoardsTab(T, proj) {
             bundleParentTitle: item.title || '',
             category: cat0, qbCategory: cat0 || undefined,
             taxable: typeof getDefaultTaxable === 'function' ? getDefaultTaxable(pf.expenseType || 'product') : true
-          }, pf));
+          }, pf);
+          if (cchLineHasAdditionalNotes(line)) {
+            _br.includeAdditionalNote = true;
+            _br.additionalNotes = cchLineAdditionalNotesText(line);
+          }
+          newRows.push(_br);
         });
         _cchPersistRowsWithOptionalQbPrompt(newRows, 'Expanded bundle: ' + comps.length + ' lines');
         return;
@@ -19051,6 +19350,10 @@ async function renderBoardsTab(T, proj) {
         category: item.category || '', qbCategory: item.qbCategory || undefined,
         taxable: (item.taxable === 'taxable' || item.taxable === true) ? true : (item.taxable === 'non-taxable' || item.taxable === false) ? false : (typeof getDefaultTaxable === 'function' ? getDefaultTaxable('product') : true)
       }, pf);
+      if (cchLineHasAdditionalNotes(item)) {
+        row.includeAdditionalNote = true;
+        row.additionalNotes = cchLineAdditionalNotesText(item);
+      }
       if (item._source === 'library' && item.id) row.libraryProductId = item.id;
       if (item._clipId) row.clipId = item._clipId;
       _cchPersistRowsWithOptionalQbPrompt([row], 'Added bundled line: ' + (item.title || 'item').substring(0, 40));
@@ -19085,6 +19388,10 @@ async function renderBoardsTab(T, proj) {
         category: item.category || '', qbCategory: item.qbCategory || undefined,
         taxable: (item.taxable === 'taxable' || item.taxable === true) ? true : (item.taxable === 'non-taxable' || item.taxable === false) ? false : (typeof getDefaultTaxable === 'function' ? getDefaultTaxable(pf.expenseType || 'product') : true)
       }, pf);
+      if (cchLineHasAdditionalNotes(item)) {
+        row.includeAdditionalNote = true;
+        row.additionalNotes = cchLineAdditionalNotesText(item);
+      }
       if (cls === 'bundle') row.isBundle = true;
       if (item._source === 'library' && item.id) row.libraryProductId = item.id;
       if (item._clipId) row.clipId = item._clipId;
@@ -19135,7 +19442,7 @@ async function renderBoardsTab(T, proj) {
     }
 
     function docEditAddBlankItem() {
-      _docEdit.items.push({ title:'', description:'', vendor:'', qty:1, cost:0, markupPct:0, shipping:0, amount:0, imageUrl:'', room:'', category:'', shipTo:'', expenseType:'product' });
+      _docEdit.items.push({ title:'', description:'', includeAdditionalNote: false, vendor:'', qty:1, cost:0, markupPct:0, shipping:0, amount:0, imageUrl:'', room:'', category:'', shipTo:'', expenseType:'product' });
       docEditRenderItems();
       var el = document.getElementById('docEditRow' + (_docEdit.items.length - 1));
       if (el) el.scrollIntoView({ behavior:'smooth', block:'center' });
@@ -19235,13 +19542,20 @@ async function renderBoardsTab(T, proj) {
             var cost = parseFloat(p.costPrice) || parseFloat(p.cost) || parseFloat(p.unitCost) || 0;
             var sell = parseFloat(p.sellPrice) || parseFloat(p.clientPrice) || parseFloat(p.totalSell) || 0;
             var mkup = cost > 0 ? Math.round(((sell - cost) / cost) * 100) : 0;
-            _docEdit.items.push({
+            var _rowD = {
               title: p.title || '', vendor: p.vendor || '', category: p.category || '',
               room: p.room || '', qty: 1, cost: cost, markupPct: mkup, shipping: 0,
               amount: sell, imageUrl: p.image || p.imageUrl || '', description: p.description || '',
               shipTo: '', expenseType: p.expenseType || 'product',
               taxable: (p.taxable === 'taxable' || p.taxable === true) ? true : (p.taxable === 'non-taxable' || p.taxable === false) ? false : (typeof getDefaultTaxable === 'function' ? getDefaultTaxable('product') : true)
-            });
+            };
+            if (cchLineHasAdditionalNotes(p)) {
+              _rowD.includeAdditionalNote = true;
+              _rowD.additionalNotes = cchLineAdditionalNotesText(p);
+            } else {
+              _rowD.includeAdditionalNote = false;
+            }
+            _docEdit.items.push(_rowD);
           });
           picker.remove();
           docEditRenderItems();
@@ -19921,7 +20235,7 @@ async function renderBoardsTab(T, proj) {
           const totalCost = vitems.reduce((s,i) => s + ((parseFloat(i.cost || i.totalCost || 0)) * (parseFloat(i.qty) || 1)), 0);
           const totalSell = vitems.reduce((s,i) => s + (parseFloat(i.amount || i.totalSelling || i.clientPrice || 0)), 0);
 
-          const poItems = vitems.map(item => ({
+          const poItems = vitems.map(item => Object.assign({
             title: item.title || item.name || '',
             description: item.description || '',
             vendor: vendor,
@@ -19933,7 +20247,7 @@ async function renderBoardsTab(T, proj) {
             imageUrl: item.imageUrl || null,
             markupPct: item.markupPct || 0,
             shipping: item.shipping || 0
-          }));
+          }, cchLineHasAdditionalNotes(item) ? { includeAdditionalNote: true, additionalNotes: cchLineAdditionalNotesText(item) } : {}));
 
           var _cUser = (currentUser && currentUser.displayName) || (currentUser && currentUser.email) || 'Unknown';
           await db.collection('boards').doc(projectId).collection('purchaseOrders').add({
@@ -20842,9 +21156,16 @@ async function renderBoardsTab(T, proj) {
           clipSnap.forEach(d => {
             const c = d.data();
             if (c.poNum === poNum) {
-              items.push({ title: c.title || '', vendor: c.vendor || '', category: c.category || '', room: c.room || '',
+              var _poL = { title: c.title || '', vendor: c.vendor || '', category: c.category || '', room: c.room || '',
                 qty: c.qty || 1, cost: c.totalCost || c.cost || 0, markupPct: c.markupPct || 0, shipping: 0,
-                amount: c.totalCost || c.cost || 0, imageUrl: c.imageUrl || '', description: c.description || '' });
+                amount: c.totalCost || c.cost || 0, imageUrl: c.imageUrl || '', description: c.description || '' };
+              if (cchLineHasAdditionalNotes(c)) {
+                _poL.includeAdditionalNote = true;
+                _poL.additionalNotes = cchLineAdditionalNotesText(c);
+              } else {
+                _poL.includeAdditionalNote = false;
+              }
+              items.push(_poL);
               total += (c.totalCost || c.cost || 0);
               if (c.vendor && !vendor) vendor = c.vendor;
             }
@@ -20952,10 +21273,10 @@ async function renderBoardsTab(T, proj) {
       // Get selected project filter
       const filterProj = window._ibFilterProject || '';
 
-      // Load ideabooks — filter by project if selected, otherwise load first 30
+      // Load ideabooks from ALL projects
       let allBooks = [];
       const projectIds = filterProj ? [filterProj] : projSnap.docs.map(d => d.id);
-      const loadIds = projectIds.slice(0, filterProj ? 999 : 30);
+      const loadIds = projectIds;
       for (const pid of loadIds) {
         try {
           const s = await db.collection('boards').doc(pid).collection('ideabooks').get();
@@ -33235,6 +33556,11 @@ async function renderBoardsTab(T, proj) {
 
     function showNewProductModal(prefill) {
       const p = prefill || {};
+      window._productModalCtx = {
+        clipProjectId: p._clipProjectId || null,
+        clipDocId: p._clipDocId || null,
+        fromSelections: !!p._fromSelections
+      };
       function _dateInputVal(v) {
         if (v == null || v === '') return '';
         var s = String(v);
@@ -33251,7 +33577,17 @@ async function renderBoardsTab(T, proj) {
       if (_retailPf === 0) _retailPf = '';
       var _cNum = parseFloat(_costPf) || 0;
       var _sNum = parseFloat(_sellPf) || 0;
-      var _mkPf = (_cNum > 0 && _sNum > 0) ? ((_sNum - _cNum) / _cNum * 100).toFixed(2) : '';
+      var _mkSaved = parseFloat(p.markupPct != null && p.markupPct !== '' ? p.markupPct : (p.markupPercent != null && p.markupPercent !== '' ? p.markupPercent : NaN));
+      var _mkPf = '';
+      if (!isNaN(_mkSaved) && _mkSaved > 0) {
+        _mkPf = _mkSaved.toFixed(2);
+      } else if (_cNum > 0 && _sNum > 0) {
+        _mkPf = ((_sNum - _cNum) / _cNum * 100).toFixed(2);
+      }
+      var _plIsEdit = !!(p.id || p._clipDocId);
+      var _prodNoteText = String(p.additionalNotes || '').trim();
+      if (!_prodNoteText) _prodNoteText = String(p.workroomNote || '').trim();
+      var _prodNoteOn = !!(p.includeAdditionalNote && String(p.additionalNotes || '').trim()) || (!!_prodNoteText && p.includeAdditionalNote !== false);
 
       document.getElementById('modalContainer').innerHTML = `
         <style>
@@ -33264,7 +33600,7 @@ async function renderBoardsTab(T, proj) {
           <div class="modal" style="width:min(1180px,calc(100vw - 16px));max-height:96vh;display:flex;flex-direction:column;">
             <div class="modal-header" style="flex-shrink:0;align-items:flex-start;">
               <div>
-                <div class="modal-title">${p.id ? 'Edit library item' : 'Add library item'}</div>
+                <div class="modal-title">${esc(p.__modalTitle || (_plIsEdit ? (p.id ? 'Edit library item' : 'Edit room board item') : 'Add library item'))}</div>
                 <div style="font-size:11px;color:var(--gray-400);margin-top:4px;letter-spacing:0.02em;">Image · Details · Accounting · Schedule · Project</div>
               </div>
               <button type="button" class="modal-close" onclick="closeModal()">&times;</button>
@@ -33279,21 +33615,27 @@ async function renderBoardsTab(T, proj) {
                   <input type="file" id="prodImageFile" accept="image/*" style="display:none;" onchange="handleImageFile(this.files[0])">
                 </div>
                 <input class="form-input" id="prodImage" value="${escAttr(p.imageUrl || '')}" placeholder="Image URL…" style="margin-top:8px;font-size:12px;" oninput="updateImagePreview(this.value)">
-                ${p.id ? (function() {
+                ${(p.id || (p._clipDocId && ((p.images && p.images.length) || p.imageUrl))) ? (function() {
                   var imgs = (p.images || []).slice();
                   if (p.imageUrl && imgs.indexOf(p.imageUrl) < 0) imgs.unshift(p.imageUrl);
                   if (imgs.length === 0) return '<div style="margin-top:8px;font-size:10px;color:var(--gray-400);">No gallery yet.</div>';
                   var primaryUrl = p.imageUrl || imgs[0] || '';
+                  var hasLibId = !!p.id;
                   return '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;align-items:center;">' +
                     '<span style="font-size:10px;color:var(--gray-400);width:100%;">Gallery</span>' +
                     imgs.map(function(u) {
                       var isPrimary = u === primaryUrl;
-                      return '<div style="position:relative;width:48px;height:48px;border-radius:4px;overflow:hidden;border:2px solid ' + (isPrimary ? 'var(--gold)' : 'var(--gray-200)') + ';cursor:pointer;flex-shrink:0;" onclick="event.stopPropagation();window._peSetPrimary(\'' + p.id + '\',\'' + escAttr(u) + '\')" title="' + (isPrimary ? 'Primary' : 'Set primary') + '">' +
+                      var click = hasLibId
+                        ? 'event.stopPropagation();window._peSetPrimary(\'' + p.id + '\',\'' + escAttr(u) + '\')'
+                        : 'event.stopPropagation();(function(v){var el=document.getElementById(\'prodImage\');if(el){el.value=v;}if(typeof updateImagePreview===\'function\')updateImagePreview(v);})(' + JSON.stringify(u) + ')';
+                      return '<div style="position:relative;width:48px;height:48px;border-radius:4px;overflow:hidden;border:2px solid ' + (isPrimary ? 'var(--gold)' : 'var(--gray-200)') + ';cursor:pointer;flex-shrink:0;" onclick="' + click + '" title="' + (isPrimary ? 'Primary' : 'Set primary') + '">' +
                         '<img src="' + escAttr(u) + '" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.style.display=\'none\'">' +
                         '</div>';
                     }).join('') +
-                    '<div onclick="event.stopPropagation();document.getElementById(\'peAddImgFile\').click()" style="width:48px;height:48px;border-radius:4px;border:2px dashed var(--gray-300);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;color:var(--gray-400);">+</div>' +
-                    '<input type="file" id="peAddImgFile" accept="image/*" multiple style="display:none;" onchange="Array.from(this.files).forEach(function(f){window._peAddImg(f,\'' + p.id + '\')})">' +
+                    (hasLibId
+                      ? '<div onclick="event.stopPropagation();document.getElementById(\'peAddImgFile\').click()" style="width:48px;height:48px;border-radius:4px;border:2px dashed var(--gray-300);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;color:var(--gray-400);">+</div>' +
+                        '<input type="file" id="peAddImgFile" accept="image/*" multiple style="display:none;" onchange="Array.from(this.files).forEach(function(f){window._peAddImg(f,\'' + p.id + '\')})">'
+                      : '<div style="font-size:10px;color:var(--gray-500);width:100%;">Save to upload more photos to the clip.</div>') +
                   '</div>';
                 })() : ''}
               </div>
@@ -33350,6 +33692,7 @@ async function renderBoardsTab(T, proj) {
                       <div class="form-group" style="grid-column:span 2;">
                         <label class="form-label">Vendor description</label>
                         <textarea class="form-input" id="prodVendorDesc" rows="3" placeholder="Specs and notes for vendors / POs">${esc(p.vendorDescription || '')}</textarea>
+                        <div style="font-size:10px;color:var(--gray-500);margin-top:4px;line-height:1.35;">Vendor / PO specs — separate from <strong>client description</strong> and from the optional <strong>additional line note</strong> below.</div>
                       </div>
                       <div class="form-group">
                         <label class="form-label">Materials</label>
@@ -33371,6 +33714,17 @@ async function renderBoardsTab(T, proj) {
                       <div class="form-group" style="grid-column:span 2;">
                         <label class="form-label">Internal notes</label>
                         <textarea class="form-input" id="prodDesc" rows="2" placeholder="Team-only — search and reference">${esc(p.description || '')}</textarea>
+                      </div>
+                      <div class="form-group" style="grid-column:span 2;padding-top:4px;border-top:1px solid var(--gray-200);">
+                        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--navy);user-select:none;line-height:1.35;">
+                          <input type="checkbox" id="prodIncludeAdditionalNote" style="margin-top:3px;accent-color:var(--gold);flex-shrink:0;" ${_prodNoteOn ? 'checked' : ''}>
+                          <span>Include additional note on this line item</span>
+                        </label>
+                        <div id="prodAdditionalNotesWrap" style="margin-top:10px;${_prodNoteOn ? '' : 'display:none;'}">
+                          <label class="form-label" for="prodAdditionalNotes">Additional notes</label>
+                          <textarea class="form-input" id="prodAdditionalNotes" rows="3" placeholder="Workroom instructions, vendor notes, schedule tags, or any other notes…">${esc(_prodNoteText)}</textarea>
+                          <div style="font-size:10px;color:var(--gray-500);margin-top:4px;line-height:1.35;">Optional internal note for proposals, invoices, and POs. Not shown on client proposal preview or client portal. Separate from client description, vendor description, and internal notes above.</div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -33506,14 +33860,15 @@ async function renderBoardsTab(T, proj) {
                 </div>
                 <div class="form-group" style="margin-bottom:14px;">
                   <label class="form-label">Room / location</label>
-                  <input class="form-input" id="prodRoom" value="${escAttr(p.room || '')}" placeholder="e.g. Primary bath" style="font-size:12px;">
+                  <input class="form-input" id="prodRoom" value="${escAttr(p.room || '')}" placeholder="e.g. Primary bath" style="font-size:12px;"${(p._roomList && p._roomList.length) ? ' list="prodRoomList"' : ''}>
+                  ${(p._roomList && p._roomList.length) ? '<datalist id="prodRoomList">' + p._roomList.map(function(r) { return '<option value="' + escAttr(r) + '">'; }).join('') + '</datalist>' : ''}
                 </div>
               </div>
             </div>
             <div class="modal-footer" style="flex-shrink:0;border-top:1px solid rgba(27,51,82,0.08);">
               ${p.id ? `<button type="button" class="btn" style="color:var(--red);margin-right:auto;" onclick="deleteProduct('${p.id}')">Delete</button>` : ''}
               <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-              <button type="button" class="btn btn-primary" onclick="saveProduct('${p.id || ''}')">${p.id ? 'Save' : 'Add product'}</button>
+              <button type="button" class="btn btn-primary" onclick="saveProduct('${p.id || ''}')">${_plIsEdit ? 'Save' : 'Add product'}</button>
             </div>
           </div>
         </div>
@@ -33562,6 +33917,17 @@ async function renderBoardsTab(T, proj) {
       document.getElementById('prodMarkupPct').addEventListener('input', function() { prodAccountingSync('markup'); });
       document.getElementById('prodSell').addEventListener('input', function() { prodAccountingSync('sell'); });
       document.getElementById('prodSellQty').addEventListener('input', function() { prodAccountingSync('qty'); });
+      window._prodToggleAdditionalNoteWrap = function() {
+        var cb = document.getElementById('prodIncludeAdditionalNote');
+        var w = document.getElementById('prodAdditionalNotesWrap');
+        if (!w) return;
+        w.style.display = (cb && cb.checked) ? 'block' : 'none';
+      };
+      var _pcbA = document.getElementById('prodIncludeAdditionalNote');
+      if (_pcbA) {
+        _pcbA.addEventListener('change', window._prodToggleAdditionalNoteWrap);
+        window._prodToggleAdditionalNoteWrap();
+      }
       prodAccountingSync('init');
       if (p.id) { setTimeout(function() { _peLoadLinkedDocs(p.id); }, 100); }
       setTimeout(function() { window._plEditSetTab('details'); }, 0);
@@ -33702,18 +34068,155 @@ async function renderBoardsTab(T, proj) {
         owner: currentUser.email
       };
 
+      var _cbAN = document.getElementById('prodIncludeAdditionalNote');
+      var _taAN = document.getElementById('prodAdditionalNotes');
+      var _anOn = !!(_cbAN && _cbAN.checked);
+      var _anText = (_anOn && _taAN) ? String(_taAN.value || '').trim() : '';
+      if (_anOn && !_anText) _anOn = false;
+      data.includeAdditionalNote = _anOn;
+      if (_anOn) {
+        data.additionalNotes = _anText;
+        data.workroomNote = firebase.firestore.FieldValue.delete();
+      } else {
+        data.includeAdditionalNote = false;
+        data.additionalNotes = firebase.firestore.FieldValue.delete();
+        data.workroomNote = firebase.firestore.FieldValue.delete();
+      }
+
       if (data.costPrice != null && data.sellPrice != null && data.costPrice > 0) {
         data.markupPct = ((data.sellPrice - data.costPrice) / data.costPrice * 100).toFixed(1);
       }
 
       try {
+        var _mctx = window._productModalCtx || {};
+        // Room board clip — same modal as library; writes to boards/.../clips (not products)
+        if (_mctx.clipDocId && _mctx.clipProjectId) {
+          var clipUpd = {
+            title: data.title,
+            vendor: data.vendor,
+            manufacturer: data.manufacturer || null,
+            category: data.category,
+            sku: data.sku || null,
+            room: data.room || null,
+            imageUrl: data.imageUrl || null,
+            unitCost: data.costPrice != null ? data.costPrice : null,
+            cost: data.costPrice != null ? data.costPrice : null,
+            clientPrice: data.sellPrice != null ? data.sellPrice : null,
+            unitSellingPrice: data.sellPrice != null ? data.sellPrice : null,
+            totalSelling: data.sellPrice != null ? data.sellPrice : null,
+            retailPrice: data.retailPrice != null ? data.retailPrice : null,
+            clientTitle: data.clientTitle || null,
+            clientDescription: data.clientDescription || null,
+            description: data.clientDescription || null,
+            vendorDescription: data.vendorDescription || null,
+            notes: data.description || null,
+            pageUrl: data.vendorUrl || data.productUrl || null,
+            productUrl: data.productUrl || null,
+            materials: data.materials || null,
+            finish: data.finish || null,
+            dimensions: data.dimensions || null,
+            markupPct: data.markupPct != null ? parseFloat(data.markupPct) : null,
+            libraryItemKind: data.libraryItemKind || null,
+            estShipDate: data.estShipDate || null,
+            actualShipDate: data.actualShipDate || null,
+            receiveDate: data.receiveDate || null,
+            deliveryDate: data.deliveryDate || null,
+            installDate: data.installDate || null,
+            billingAddress: data.billingAddress || null,
+            shippingAddress: data.shippingAddress || null,
+            assignee: data.assignee || null,
+            sideMark: data.sideMark || null,
+            scheduleNotes: data.scheduleNotes || null,
+            purchaseQuantity: data.purchaseQty != null ? data.purchaseQty : null,
+            totalPurchaseCost: data.purchaseCost != null ? data.purchaseCost : null,
+            shippingSellingPrice: data.shippingCost != null ? data.shippingCost : null,
+            includeAdditionalNote: data.includeAdditionalNote,
+            additionalNotes: _anOn ? _anText : firebase.firestore.FieldValue.delete(),
+            workroomNote: firebase.firestore.FieldValue.delete(),
+            updatedAt: new Date().toISOString()
+          };
+          Object.keys(clipUpd).forEach(function(k) { if (clipUpd[k] === undefined) delete clipUpd[k]; });
+          await db.collection('boards').doc(_mctx.clipProjectId).collection('clips').doc(_mctx.clipDocId).update(clipUpd);
+          closeModal();
+          if (_mctx.fromSelections && window._currentProject) {
+            renderSelectionsTab(document.getElementById('projectTabContent'), window._currentProject);
+          }
+          showToast('✅ Saved');
+          return;
+        }
+
         if (existingId) {
+          var libSnap = await db.collection('productLibrary').doc(existingId).get();
+          if (libSnap.exists) {
+            var libData = {
+              title: data.title,
+              clientTitle: data.clientTitle,
+              vendor: data.vendor,
+              manufacturer: data.manufacturer,
+              category: data.category,
+              sku: data.sku,
+              room: data.room,
+              projectId: data.projectId,
+              project: data.project,
+              libraryItemKind: data.libraryItemKind,
+              imageUrl: data.imageUrl,
+              image: data.imageUrl,
+              unitCost: data.costPrice,
+              sellPrice: data.sellPrice,
+              retailPrice: data.retailPrice,
+              sellingQty: data.sellingQty,
+              purchaseQty: data.purchaseQty,
+              totalPurchaseCost: data.purchaseCost,
+              shippingSellingPrice: data.shippingCost,
+              shippingMarkupPct: data.shippingMarkupPct,
+              materials: data.materials,
+              finish: data.finish,
+              finishOptions: data.finishOptions,
+              dimensions: data.dimensions,
+              vendorUrl: data.vendorUrl,
+              productUrl: data.productUrl,
+              clientDescription: data.clientDescription,
+              vendorDescription: data.vendorDescription,
+              description: data.description,
+              estShipDate: data.estShipDate,
+              actualShipDate: data.actualShipDate,
+              receiveDate: data.receiveDate,
+              deliveryDate: data.deliveryDate,
+              installDate: data.installDate,
+              billingAddress: data.billingAddress,
+              shippingAddress: data.shippingAddress,
+              assignee: data.assignee,
+              sideMark: data.sideMark,
+              scheduleNotes: data.scheduleNotes,
+              includeAdditionalNote: data.includeAdditionalNote,
+              additionalNotes: _anOn ? _anText : firebase.firestore.FieldValue.delete(),
+              workroomNote: firebase.firestore.FieldValue.delete(),
+              updatedAt: data.updatedAt,
+              owner: data.owner,
+              markupPct: data.markupPct
+            };
+            Object.keys(libData).forEach(function(k) { if (libData[k] === undefined) delete libData[k]; });
+            await db.collection('productLibrary').doc(existingId).update(libData);
+            closeModal();
+            if (_mctx.fromSelections && window._currentProject) {
+              renderSelectionsTab(document.getElementById('projectTabContent'), window._currentProject);
+            } else {
+              renderProductLibrary();
+            }
+            showToast('✅ Saved');
+            return;
+          }
           await db.collection('products').doc(existingId).update(data);
-          // Sync changes back to any project clips that reference this product
           syncProductToClips(existingId, data);
         } else {
           data.createdAt = new Date().toISOString();
-          await db.collection('products').add(data);
+          var _newProd = Object.assign({}, data);
+          if (!_anOn) {
+            delete _newProd.additionalNotes;
+            delete _newProd.workroomNote;
+            _newProd.includeAdditionalNote = false;
+          }
+          await db.collection('products').add(_newProd);
         }
         closeModal();
         renderProductLibrary();
@@ -40446,6 +40949,24 @@ async function renderBoardsTab(T, proj) {
       if (!doc.exists) { showToast('Product not found', 'error'); return; }
       var clip = { id: doc.id, ...doc.data() };
 
+      var boardName = '';
+      var roomListForModal = [];
+      try {
+        var bs = await db.collection('boards').doc(projectId).get();
+        if (bs.exists) {
+          var bd = bs.data();
+          boardName = (bd.name || '').trim();
+          roomListForModal = [].concat(bd.rooms || []);
+        }
+        var rmSnap = await db.collection('boards').doc(projectId).collection('roomMeta').get();
+        rmSnap.forEach(function(d) {
+          var nm = d.data().name;
+          if (nm && roomListForModal.indexOf(nm) < 0) roomListForModal.push(nm);
+        });
+      } catch (eRm) {}
+      if (clip.room && String(clip.room).trim() && roomListForModal.indexOf(clip.room) < 0) roomListForModal.push(clip.room);
+      roomListForModal.sort();
+
       // Try to find matching product in library — open unified modal
       var libraryProductId = clip.libraryProductId || null;
       var libProduct = null;
@@ -40462,13 +40983,16 @@ async function renderBoardsTab(T, proj) {
       }
 
       if (libProduct) {
-        // Open the library modal for the matched product
-        showNewProductModal(libProduct);
+        showNewProductModal(Object.assign({}, libProduct, {
+          projectId: libProduct.projectId || projectId,
+          project: (libProduct.project || boardName || '').trim(),
+          _roomList: roomListForModal,
+          __modalTitle: 'Edit library item'
+        }));
         return;
       }
 
       // No library match — build a prefill from clip data and open library modal
-      // Save will create a new product in library
       var prefill = {
         title: clip.title || '',
         vendor: clip.vendor || '',
@@ -40480,14 +41004,21 @@ async function renderBoardsTab(T, proj) {
         costPrice: parseMoney(clip.unitCost || clip.cost) || null,
         sellPrice: parseMoney(clip.clientPrice || clip.unitSellingPrice || clip.totalSelling) || null,
         retailPrice: parseMoney(clip.retailPrice) || null,
-        description: clip.description || '',
+        markupPct: clip.markupPct,
+        sellingQty: clip.qty || clip.sellingQuantity || 1,
+        description: clip.notes || '',
         clientDescription: clip.clientDescription || clip.description || '',
+        vendorDescription: clip.vendorDescription || '',
         dimensions: clip.dimensions || '',
         finish: clip.finish || '',
         materials: clip.materials || '',
         vendorUrl: clip.productUrl || clip.pageUrl || clip.vendorUrl || '',
         productUrl: clip.productUrl || clip.pageUrl || '',
         room: clip.room || '',
+        projectId: projectId,
+        project: boardName,
+        _roomList: roomListForModal,
+        __modalTitle: 'Edit room board item',
         _clipProjectId: projectId,
         _clipDocId: clipId
       };
