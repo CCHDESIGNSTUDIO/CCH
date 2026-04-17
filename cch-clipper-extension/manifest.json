@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "CCH Clipper",
+  "version": "1.0.0",
+  "description": "Capture product pages as JSON for CCH Studio Product Library (paste via Import clip).",
+  "permissions": ["activeTab", "scripting", "clipboardWrite"],
+  "action": {
+    "default_title": "CCH Clipper",
+    "default_popup": "popup.html"
+  },
+  "host_permissions": ["http://*/*", "https://*/*"]
+}

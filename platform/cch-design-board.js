@@ -308,7 +308,7 @@
       var title = d.title || 'Untitled';
       var vendor = d.vendor || '';
       if (f && title.toLowerCase().indexOf(f) < 0 && vendor.toLowerCase().indexOf(f) < 0) return;
-      var img = d.imageUrl || (d.images && d.images[0]) || '';
+      var img = _resolveImgSrc(String(d.imageUrl || '').trim()) || _firstCoercedGalleryUrl(d) || '';
       var cost = parseFloat(d.cost) || 0;
       var sell = parseFloat(d.clientPrice) || parseFloat(d.sellingPrice) || 0;
       html += '<div class="db-clip-item" draggable="true" data-clipid="' + clip.id + '" ' +
@@ -316,7 +316,7 @@
         'style="display:flex;gap:8px;padding:6px;margin-bottom:4px;border-radius:6px;cursor:grab;border:1px solid transparent;transition:all 0.15s;" ' +
         'onmouseover="this.style.background=\'#f0ede5\';this.style.borderColor=\'var(--gray-200)\'" ' +
         'onmouseout="this.style.background=\'transparent\';this.style.borderColor=\'transparent\'">' +
-        (img ? '<img src="' + esc(img) + '" style="width:44px;height:44px;border-radius:4px;object-fit:cover;flex-shrink:0;" onerror="this.style.display=\'none\'">' : '<div style="width:44px;height:44px;background:var(--gray-100);border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--gray-300);">📷</div>') +
+        (img ? '<img src="' + _escImgSrcAttr(img) + '" style="width:44px;height:44px;border-radius:4px;object-fit:cover;flex-shrink:0;" onerror="this.style.display=\'none\'">' : '<div style="width:44px;height:44px;background:var(--gray-100);border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--gray-300);">📷</div>') +
         '<div style="overflow:hidden;flex:1;min-width:0;">' +
           '<div style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(title) + '</div>' +
           '<div style="font-size:10px;color:var(--gray-400);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(vendor) + '</div>' +
@@ -352,7 +352,7 @@
       if (el.type === 'product') {
         var showPrice = dbEditor.showPricing && !dbEditor.clientView && el.showPrice !== false;
         html += '<div class="db-el" data-id="' + el.id + '" style="position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;width:' + (el.w || 180) + 'px;' + outline + 'cursor:move;z-index:' + (sel ? 100 : 10) + ';" onmousedown="elMouseDown(event,\'' + el.id + '\')">' +
-          (el.imageUrl ? '<img src="' + esc(el.imageUrl) + '" style="width:100%;height:' + (el.h || 180) + 'px;object-fit:cover;border-radius:4px;display:block;pointer-events:none;" draggable="false" onerror="this.onerror=null;this.style.display=\'none\';this.insertAdjacentHTML(\'afterend\',\'<div style=&quot;width:100%;height:' + (el.h || 180) + 'px;background:var(--gray-100);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--gray-300);font-size:24px;&quot;>📷</div>\')">' : '<div style="width:100%;height:' + (el.h || 180) + 'px;background:var(--gray-100);border-radius:4px;display:flex;align-items:center;justify-content:center;">📷</div>') +
+          (el.imageUrl ? '<img src="' + _escImgSrcAttr(el.imageUrl) + '" style="width:100%;height:' + (el.h || 180) + 'px;object-fit:cover;border-radius:4px;display:block;pointer-events:none;" draggable="false" onerror="this.onerror=null;this.style.display=\'none\';this.insertAdjacentHTML(\'afterend\',\'<div style=&quot;width:100%;height:' + (el.h || 180) + 'px;background:var(--gray-100);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--gray-300);font-size:24px;&quot;>📷</div>\')">' : '<div style="width:100%;height:' + (el.h || 180) + 'px;background:var(--gray-100);border-radius:4px;display:flex;align-items:center;justify-content:center;">📷</div>') +
           '<div style="margin-top:4px;font-size:11px;font-weight:600;color:#333;text-align:center;pointer-events:none;">' + esc(el.title || '') + '</div>' +
           (showPrice && el.sellPrice ? '<div style="font-size:10px;color:var(--green);font-weight:600;text-align:center;pointer-events:none;">' + fmt$(el.sellPrice) + '</div>' : '') +
           (el.annotation ? '<div style="font-size:10px;color:#666;text-align:center;font-style:italic;margin-top:2px;pointer-events:none;white-space:pre-line;">' + esc(el.annotation) + '</div>' : '') +
@@ -800,7 +800,7 @@
         y: Math.max(0, my - 90),
         w: 180,
         h: 180,
-        imageUrl: d.imageUrl || (d.images && d.images[0]) || '',
+        imageUrl: _resolveImgSrc(String(d.imageUrl || '').trim()) || _firstCoercedGalleryUrl(d) || '',
         title: d.title || 'Untitled',
         vendor: d.vendor || '',
         cost: parseFloat(d.cost) || 0,

@@ -261,6 +261,176 @@
   `;
   document.head.appendChild(style);
 
+  // --- Proposal view vs edit: enforced after every render (works even if index.html is cached old) ---
+  function cchProposalRouteIsEdit(projectId, proposalId) {
+    var r = (window.location.hash || '#/').replace('#/', '').split('/');
+    return r[0] === 'project' && r[1] === projectId && r[2] === 'proposal' && r[3] === proposalId && r[4] === 'edit';
+  }
+
+  function cchEscProposalCell(t) {
+    if (typeof window.esc === 'function') return window.esc(t);
+    var s = String(t == null ? '' : t);
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function cchApplyProposalViewOnlyDOM(wrap, projectId, proposalId) {
+    if (!wrap) return;
+    wrap.classList.add('cch-proposal-viewonly');
+    wrap.setAttribute('data-cch-pid', projectId);
+    wrap.setAttribute('data-cch-prid', proposalId);
+    wrap.querySelectorAll('tbody tr[draggable="true"]').forEach(function(tr) { tr.removeAttribute('draggable'); });
+    wrap.querySelectorAll('tbody tr.prop-group-row').forEach(function(tr) {
+      tr.querySelectorAll('button').forEach(function(b) {
+        var oc = b.getAttribute('onclick') || '';
+        if (oc.indexOf('toggleProposalGroupCollapse') < 0) b.style.display = 'none';
+      });
+      tr.querySelectorAll('input.form-input').forEach(function(inp) {
+        var sp = document.createElement('span');
+        sp.style.cssText = 'font-weight:600;font-size:14px;display:inline-block;max-width:520px;vertical-align:middle;margin-right:10px;';
+        sp.textContent = inp.value || '';
+        inp.parentNode.insertBefore(sp, inp);
+        inp.remove();
+      });
+      tr.querySelectorAll('label').forEach(function(l) { l.style.display = 'none'; });
+    });
+    wrap.querySelectorAll('tbody tr').forEach(function(tr) {
+      if (tr.classList.contains('prop-group-row')) return;
+      var tds = tr.querySelectorAll('td');
+      if (tds.length > 2) {
+        var dragOrGrab = (tds[0].textContent || '').indexOf('⋮⋮') >= 0 || (tds[0].getAttribute('title') || '').indexOf('Drag') >= 0;
+        var bulkCb = tds[1].querySelector && tds[1].querySelector('input.propBulkSelectCb[type="checkbox"]');
+        if (dragOrGrab || bulkCb) {
+          tds[0].innerHTML = '';
+          tds[1].innerHTML = '';
+        }
+      }
+      tr.querySelectorAll('td').forEach(function(td) {
+        if (td.classList.contains('prop-item-cell')) return;
+        if (td.classList.contains('prop-sticky-inv')) return;
+        if (td.classList.contains('prop-sticky-actions')) return;
+        var inp = td.querySelector('input.form-input, select.form-input');
+        if (!inp) return;
+        var raw = inp.tagName === 'SELECT'
+          ? ((inp.options[inp.selectedIndex] || {}).text || '')
+          : String(inp.value || '');
+        td.innerHTML = '<span style="font-size:12px;">' + cchEscProposalCell(raw || '—') + '</span>';
+      });
+    });
+    var tableWrap = wrap.querySelector('.proposal-table-wrap');
+    var skipHint = wrap.innerHTML.indexOf('View-only summary') >= 0 || wrap.innerHTML.indexOf('View-only —') >= 0;
+    if (tableWrap && !document.getElementById('cchProposalViewHint') && !skipHint) {
+      var hint = document.createElement('div');
+      hint.id = 'cchProposalViewHint';
+      hint.style.cssText = 'margin-bottom:12px;padding:10px 12px;background:rgba(27,51,82,0.06);border:1px solid rgba(27,51,82,0.1);border-radius:4px;font-size:12px;color:var(--gray-600);display:flex;flex-wrap:wrap;gap:10px;align-items:center;';
+      hint.innerHTML = '<span>View-only — line items are not editable here. Use <strong>Edit line items</strong> in the top bar to make changes.</span>';
+      tableWrap.parentNode.insertBefore(hint, tableWrap);
+    }
+  }
+
+  window.cchClosePropMoreDd = function() {
+    document.querySelectorAll('.cch-prop-more-dd').forEach(function(d) {
+      d.style.display = 'none';
+    });
+  };
+  if (!window._cchPropMoreDdOutside) {
+    window._cchPropMoreDdOutside = true;
+    document.addEventListener('click', function() {
+      document.querySelectorAll('.cch-prop-more-dd').forEach(function(d) {
+        if (d.style.display === 'block') d.style.display = 'none';
+      });
+    });
+  }
+
+  function cchPropMoreItem(label, jsAfterClose, danger) {
+    var col = danger ? '#B91C1C' : '#1B3352';
+    var st = 'display:block;width:100%;text-align:left;padding:9px 16px;border:none;background:#fff;cursor:pointer;font-size:13px;color:' + col + ';font-family:var(--font-body);';
+    return '<button type="button" style="' + st + '" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'#fff\'" onclick="cchClosePropMoreDd();' + jsAfterClose + '">' + label + '</button>';
+  }
+
+  function cchProposalMoreMenuWrap(projectId, proposalId, isEdit, invDis, tearJs, hasMyItems) {
+    var invBtn = '<button type="button" style="display:block;width:100%;text-align:left;padding:9px 16px;border:none;background:#fff;cursor:pointer;font-size:13px;color:#1B3352;font-family:var(--font-body);" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'#fff\'" ' + invDis + ' onclick="cchClosePropMoreDd();convertProposalToInvoice(\'' + projectId + '\',\'' + proposalId + '\')">🧾 Convert to Invoice</button>';
+    var inner = cchPropMoreItem('🕐 Timeline', "toggleDocTimeline('" + projectId + "','proposals','" + proposalId + "')") +
+      cchPropMoreItem('📋 Edit details', "editProposalMeta('" + projectId + "','" + proposalId + "')") +
+      invBtn +
+      cchPropMoreItem('📦 Generate POs by Vendor', "generatePOsFromDoc('" + projectId + "','proposals','" + proposalId + "')") +
+      cchPropMoreItem('📄 Tear Sheets', tearJs) +
+      cchPropMoreItem('🖨️ Print / PDF', "printProposal('" + projectId + "','" + proposalId + "')");
+    if (isEdit) {
+      inner = (hasMyItems ? cchPropMoreItem('📌 My Items', 'toggleMyItemsPanel()') : '') + inner +
+        cchPropMoreItem('🗑️ Delete proposal', "deleteProposal('" + projectId + "','" + proposalId + "')", true);
+    }
+    return '<div class="cch-prop-more-wrap" style="position:relative;display:inline-block;vertical-align:middle;z-index:500;">' +
+      '<button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation();var w=this.closest(\'.cch-prop-more-wrap\');var m=w&&w.querySelector(\'.cch-prop-more-dd\');if(!m)return;m.style.display=m.style.display===\'block\'?\'none\':\'block\';">More ▾</button>' +
+      '<div class="cch-prop-more-dd" onclick="event.stopPropagation()" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;min-width:240px;background:#fff;border:1px solid rgba(27,51,82,0.12);border-radius:8px;box-shadow:0 12px 36px rgba(27,51,82,0.14);z-index:600;padding:4px 0;">' + inner + '</div></div>';
+  }
+  window.cchProposalMoreMenuWrap = cchProposalMoreMenuWrap;
+
+  async function cchFinalizeProposalDetailUI(projectId, proposalId) {
+    if (typeof setTopbarActions !== 'function') return;
+    var wrap = document.getElementById('proposalPrintArea');
+    if (!wrap) return;
+
+    var isEdit = cchProposalRouteIsEdit(projectId, proposalId);
+    wrap.classList.toggle('cch-proposal-viewonly', !isEdit);
+
+    var prop = {};
+    var items = [];
+    try {
+      var snap = await db.collection('boards').doc(projectId).collection('proposals').doc(proposalId).get();
+      if (snap.exists) {
+        prop = snap.data() || {};
+        items = prop.items || [];
+      }
+    } catch (e0) { /* keep defaults */ }
+
+    var invGate = { ok: true };
+    try {
+      if (typeof proposalInvoiceGateSummary === 'function') invGate = proposalInvoiceGateSummary(prop, items);
+    } catch (e1) { invGate = { ok: true }; }
+
+    var projName = '';
+    try {
+      var pSnap = await db.collection('boards').doc(projectId).get();
+      if (pSnap.exists) projName = (pSnap.data() || {}).name || '';
+    } catch (e2) { /* */ }
+
+    var escA = typeof escAttr === 'function' ? escAttr : function(s) { return String(s || '').replace(/"/g, '&quot;'); };
+    var invOk = invGate && invGate.ok;
+    var invDis = invOk ? '' : ' disabled title="Complete client approvals first" style="opacity:0.45;pointer-events:none;"';
+
+    var addItemOnclick = typeof openDocItemsSidebar === 'function'
+      ? "openDocItemsSidebar({mode:'proposal',projectId:'" + projectId + "',proposalId:'" + proposalId + "'})"
+      : "addProposalLineItem('" + projectId + "','" + proposalId + "')";
+
+    var myItemsBtn = '';
+    if (isEdit && typeof toggleMyItemsPanel === 'function') {
+      myItemsBtn = '<button class="btn btn-secondary btn-sm" onclick="toggleMyItemsPanel()">My Items</button>';
+    }
+
+    var tearJs = "generateTearSheetsFromDoc('" + escA(projectId) + "','proposals','" + escA(proposalId) + "','" + escA(projName) + "')";
+    var moreView = cchProposalMoreMenuWrap(projectId, proposalId, false, invDis, tearJs, false);
+    var moreEdit = cchProposalMoreMenuWrap(projectId, proposalId, true, invDis, tearJs, !!myItemsBtn);
+
+    if (!isEdit) {
+      setTopbarActions(
+        '<button class="btn btn-secondary btn-sm" onclick="previewDocument(\'proposal\',\'' + projectId + '\',\'' + proposalId + '\')">👁️ Preview</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="' + tearJs + '">📄 Tear Sheets</button>' +
+        '<button class="btn btn-primary btn-sm" onclick="navigate(\'#/project/' + projectId + '/proposal/' + proposalId + '/edit\')">✏️ Edit line items</button>' +
+        '<button class="btn btn-primary btn-sm" onclick="sendProposalToClient(\'' + projectId + '\',\'' + proposalId + '\')">📧 Email client</button>' +
+        moreView
+      );
+      cchApplyProposalViewOnlyDOM(wrap, projectId, proposalId);
+    } else {
+      setTopbarActions(
+        '<button class="btn btn-secondary btn-sm" onclick="navigate(\'#/project/' + projectId + '/proposal/' + proposalId + '\')">✓ Done editing</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="previewDocument(\'proposal\',\'' + projectId + '\',\'' + proposalId + '\')">👁️ Preview</button>' +
+        '<button class="btn btn-primary btn-sm" onclick="' + addItemOnclick + '">+ Add item</button>' +
+        '<button class="btn btn-primary btn-sm" onclick="sendProposalToClient(\'' + projectId + '\',\'' + proposalId + '\')">📧 Email client</button>' +
+        '<span class="btn btn-sm" style="border:1px dashed rgba(27,51,82,0.22);color:var(--gray-500);cursor:default;pointer-events:none;font-size:11px;white-space:nowrap;" title="Line changes save to the proposal as you edit">💾 Auto-save</span>' +
+        moreEdit
+      );
+    }
+  }
 
   // ============================================================
   // 2. BUG #52 FIX — Null check on doc.data() in proposal detail
@@ -279,8 +449,15 @@
       T.innerHTML = '<div class="empty-state"><div class="empty-text">Error loading proposal: ' + (e.message||'Unknown error') + '</div></div>';
       return;
     }
-    // Safe to call original now — doc exists and data() is not null
-    return _origRenderProposalDetail.call(this, projectId, proposalId);
+    await _origRenderProposalDetail.call(this, projectId, proposalId);
+    function _runProposalFinalize() {
+      cchFinalizeProposalDetailUI(projectId, proposalId).catch(function(e2) {
+        console.warn('[CCH Fix] proposal UI finalize:', e2);
+      });
+    }
+    _runProposalFinalize();
+    setTimeout(_runProposalFinalize, 0);
+    setTimeout(_runProposalFinalize, 150);
   };
 
 
@@ -333,7 +510,7 @@
       var productLines = rawItems.filter(function(it) { return !_isGroupRow(it); });
       var gateMsgs = [];
       if (productLines.length === 0) gateMsgs.push('Add at least one line item.');
-      if ((prop.status || 'Draft') !== 'Approved') gateMsgs.push('Proposal status must be Approved (use the status badge or Edit Details).');
+      if ((prop.status || 'Draft') !== 'Approved') gateMsgs.push('Proposal status must be Approved (use the status badge or Edit details).');
       var pendingN = 0, approvedN = 0;
       productLines.forEach(function(it) {
         var st = _lineApprovalState(it);
@@ -368,7 +545,11 @@
         copied.markupPct = parseFloat(item.markupPct) || 0;
         copied.shipping = parseFloat(item.shipping) || 0;
         copied.imageUrl = item.imageUrl || item.image || item.thumbnail || '';
-        copied.images = item.images || (copied.imageUrl ? [copied.imageUrl] : []);
+        copied.images = (function() {
+          var g = _coerceImageIterable(item.images || item.photos || item.photoUrls || item.productPhotos);
+          if (g.length) return g.slice();
+          return copied.imageUrl ? [_resolveImgSrc(String(copied.imageUrl).trim())] : [];
+        })();
         copied.title = item.title || item.name || '';
         copied.vendor = item.vendor || '';
         copied.room = item.room || item.category || '';
@@ -416,6 +597,7 @@
         status: 'Draft',
         total: total,
         items: items,
+        shortDescription: (prop.shortDescription && String(prop.shortDescription).trim()) || '',
         vendor: prop.vendor || '',
         documentTags: prop.documentTags || prop.tags || prop.vendor || '',
         clientName: cName,
@@ -1003,9 +1185,17 @@
 
       var boardSnap = await db.collection('boards').doc(projectId).get();
       var boardCats = boardSnap.exists ? (boardSnap.data().categories || []) : [];
+      var roomListQe = [];
+      if (typeof _fetchProjectBoardRoomList === 'function') {
+        try { roomListQe = await _fetchProjectBoardRoomList(projectId); } catch (eRq) { roomListQe = []; }
+      }
+      var roomsForCats = roomListQe.length ? roomListQe : (boardSnap.exists ? (boardSnap.data().rooms || []) : []);
       var catOpts = typeof _piCategoryOptions === 'function'
-        ? _piCategoryOptions(item.category || '', boardCats)
+        ? _piCategoryOptions(item.category || '', boardCats, roomsForCats)
         : '<option value="">(category)</option>';
+      var roomOptsHtml = typeof _piRoomOptions === 'function'
+        ? _piRoomOptions(item.room || '', roomListQe)
+        : '<option value="">(room)</option>';
 
       var overlay = document.createElement('div');
       overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:2000;display:flex;align-items:center;justify-content:center;';
@@ -1036,7 +1226,7 @@
             '<div><label style="font-size:11px;font-weight:600;color:#7A7060;display:block;margin-bottom:4px;">Category</label>' +
               '<select class="form-input" id="qeCategory" style="font-size:13px;">' + catOpts + '</select></div>' +
             '<div><label style="font-size:11px;font-weight:600;color:#7A7060;display:block;margin-bottom:4px;">Room</label>' +
-              '<select class="form-input" id="qeRoom" style="font-size:13px;">' + _piRoomOptions(item.room || '') + '</select></div>' +
+              '<select class="form-input" id="qeRoom" style="font-size:13px;">' + roomOptsHtml + '</select></div>' +
             '<div><label style="font-size:11px;font-weight:600;color:#7A7060;display:block;margin-bottom:4px;">Ship To</label>' +
               '<select class="form-input" id="qeShipTo" style="font-size:13px;">' + _piShipToOptions(item.shipTo || '') + '</select></div>' +
           '</div>' +
@@ -1100,74 +1290,8 @@
   };
 
 
-  // ============================================================
-  // 20. Fix: Tearsheet generation — ensure button is wired correctly
-  // ============================================================
-  window.generateTearSheetsFromDoc = window.generateTearSheetsFromDoc || async function(projectId, collection, docId, projName) {
-    var items = [];
-    try {
-      var doc = await db.collection('boards').doc(projectId).collection(collection).doc(docId).get();
-      if (doc.exists) items = doc.data().items || [];
-    } catch(e) { alert('Could not load document'); return; }
-
-    if (items.length === 0) { alert('No items to generate tear sheets from'); return; }
-
-    // Ask about pricing
-    var showPricing = confirm('Include pricing on tear sheets?\n\nOK = Show prices\nCancel = No prices (client version)');
-
-    var win = window.open('', '_blank');
-    win.document.write('<html><head><title>Tear Sheets — ' + esc(projName || 'Project') + '</title>' +
-      '<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">' +
-      '<style>' +
-      'body { font-family: "DM Sans", sans-serif; padding: 0; margin: 0; color: #1B3352; background: #FAFAF7; }' +
-      '.page { page-break-after: always; padding: 48px 56px; max-width: 850px; margin: 0 auto; }' +
-      '.page:last-child { page-break-after: auto; }' +
-      '.header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; border-bottom: 3px solid #5EC6C6; padding-bottom: 16px; }' +
-      '.logo { font-family: "DM Serif Display", serif; font-size: 36px; letter-spacing: 4px; }' +
-      '.logo-sub { font-size: 10px; letter-spacing: 3px; color: #5EC6C6; text-transform: uppercase; }' +
-      '.item-img { width: 320px; height: 320px; object-fit: cover; border-radius: 4px; }' +
-      '.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }' +
-      '.detail-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #999; font-weight: 600; margin-bottom: 2px; }' +
-      '.detail-value { font-size: 14px; color: #333; }' +
-      '.price-value { font-size: 20px; font-weight: 700; color: #C9A96E; }' +
-      '.print-btn { position: fixed; top: 16px; right: 16px; background: #1B3352; color: #EDE8E0; border: 1px solid #1B3352; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 13px; z-index: 100; font-family: "DM Sans", sans-serif; }' +
-      '@media print { .print-btn { display: none !important; } }' +
-      '</style></head><body>');
-
-    win.document.write('<button class="print-btn" onclick="window.print()">Print Tear Sheets</button>');
-
-    items.forEach(function(item, idx) {
-      var qty = parseFloat(item.qty) || 1;
-      var cost = parseFloat(item.cost) || 0;
-      var amount = parseFloat(item.amount) || 0;
-      var shipping = parseFloat(item.shipping) || 0;
-
-      win.document.write('<div class="page">' +
-        '<div class="header"><div><div class="logo">CCH</div><div class="logo-sub">Design Inc</div></div>' +
-        '<div style="text-align:right;font-size:12px;color:#999;">' + esc(projName || '') + '<br>Item ' + (idx + 1) + ' of ' + items.length + '</div></div>' +
-        '<div style="display:flex;gap:32px;">' +
-          '<div>' + (item.imageUrl ? '<img class="item-img" src="' + escAttr(item.imageUrl) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div class="item-img" style="background:#f5f3ee;display:flex;align-items:center;justify-content:center;font-size:64px;">📦</div>') + '</div>' +
-          '<div style="flex:1;">' +
-            '<h2 style="font-size:22px;font-weight:700;margin:0 0 8px;">' + esc(item.title || 'Untitled') + '</h2>' +
-            (item.vendor ? '<div style="font-size:14px;color:#999;margin-bottom:12px;">' + esc(item.vendor) + '</div>' : '') +
-            (item.description ? '<div style="font-size:13px;color:#555;line-height:1.7;margin-bottom:16px;">' + esc(item.description) + '</div>' : '') +
-            '<div class="detail-grid">' +
-              '<div><div class="detail-label">Room</div><div class="detail-value">' + esc(item.room || item.category || '—') + '</div></div>' +
-              '<div><div class="detail-label">Quantity</div><div class="detail-value">' + qty + '</div></div>' +
-              (showPricing ? '<div><div class="detail-label">Unit Price</div><div class="price-value">' + formatMoney(amount / qty) + '</div></div>' : '') +
-              (showPricing ? '<div><div class="detail-label">Total</div><div class="price-value">' + formatMoney(amount) + '</div></div>' : '') +
-              (showPricing && shipping > 0 ? '<div><div class="detail-label">Shipping</div><div class="detail-value">' + formatMoney(shipping) + '</div></div>' : '') +
-              (item.shipTo ? '<div><div class="detail-label">Ship To</div><div class="detail-value">' + esc(item.shipTo) + '</div></div>' : '') +
-            '</div>' +
-          '</div>' +
-        '</div>' +
-        '<div style="margin-top:32px;padding-top:12px;border-top:1px solid #eee;font-size:10px;color:#bbb;text-align:center;">CCH Design Inc. · www.cchdesign.com · (949) 497-7979</div>' +
-      '</div>');
-    });
-
-    win.document.write('</body></html>');
-    win.document.close();
-  };
+  // Tear sheets: full multi-image implementation lives in index.html (generateTearSheetsFromDoc → _generateTearSheetsFromDocRun).
+  // Do not define a fallback here — a legacy stub used only item.imageUrl and hid gallery images.
 
 
   // ============================================================
@@ -1175,6 +1299,10 @@
   // ============================================================
   window.sendInvoiceToClient = async function(projectId, invoiceId) {
     try {
+      if (typeof _sendDocToClient === 'function') {
+        await _sendDocToClient(projectId, 'invoices', invoiceId, 'Invoice');
+        return;
+      }
       var doc = await db.collection('boards').doc(projectId).collection('invoices').doc(invoiceId).get();
       if (!doc.exists) { alert('Invoice not found'); return; }
       var inv = doc.data();
@@ -1256,6 +1384,10 @@
   // ============================================================
   window.sendProposalToClient = async function(projectId, proposalId) {
     try {
+      if (typeof _sendDocToClient === 'function') {
+        await _sendDocToClient(projectId, 'proposals', proposalId, 'Proposal');
+        return;
+      }
       var doc = await db.collection('boards').doc(projectId).collection('proposals').doc(proposalId).get();
       if (!doc.exists) { alert('Proposal not found'); return; }
       var prop = doc.data();
@@ -1661,7 +1793,7 @@
         if (type === 'invoice' && isSvcRow) {
           imgTag = '<div style="width:64px;height:64px;background:transparent;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--gray-300);border:1px dashed var(--gray-200);">—</div>';
         } else if (item.imageUrl) {
-          imgTag = '<img src="' + escAttr(item.imageUrl) + '" style="width:64px;height:64px;object-fit:cover;border-radius:4px;" onerror="this.style.display=\'none\'" referrerpolicy="no-referrer">';
+          imgTag = '<img src="' + _escImgSrcAttr(item.imageUrl) + '" style="width:64px;height:64px;object-fit:cover;border-radius:4px;" onerror="this.style.display=\'none\'" referrerpolicy="no-referrer">';
         } else {
           imgTag = '<div style="width:64px;height:64px;background:var(--gray-50);display:flex;align-items:center;justify-content:center;font-size:24px;border-radius:4px;">📦</div>';
         }
@@ -1731,6 +1863,7 @@
               esc(projName) + (docData.vendor ? ' · ' + esc(docData.vendor) : '') +
               (type !== 'invoice' && (docData.date || docData.createdAt) ? ' · ' + formatDate(docData.date || docData.createdAt) : '') +
             '</div>' +
+            ((docData.shortDescription && String(docData.shortDescription).trim()) ? '<div style="font-size:14px;color:#5C6B80;margin-top:10px;line-height:1.45;max-width:720px;">' + esc(String(docData.shortDescription).trim()) + '</div>' : '') +
             (linkedHTML ? '<div style="margin-top:8px;">' + linkedHTML + '</div>' : '') +
           '</div>' +
           '<div style="text-align:right;">' +
@@ -2177,7 +2310,7 @@
       var isSvc = it.expenseType === 'service' || it.itemType === 'service';
       var imgTag = '';
       if (_showPremiumImgCol && !isSvc && it.imageUrl) {
-        imgTag = '<img src="' + escAttr(it.imageUrl) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">';
+        imgTag = '<img src="' + _escImgSrcAttr(it.imageUrl) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">';
       }
       var imgCell = _showPremiumImgCol ? '<td class="img-cell">' + imgTag + '</td>' : '';
       var _rawNotes = (it.lineNotes || it.notes) || '';
@@ -2199,6 +2332,12 @@
         }
       }
       var notesUnder = _lineNotesHtml(_rawNotes);
+      var _poLineNote = (typeof cchLineAdditionalNotesText === 'function')
+        ? cchLineAdditionalNotesText(it)
+        : (String(it.additionalNotes || it.workroomNote || '').trim());
+      var workroomUnder = (type === 'po' && _poLineNote)
+        ? '<div class="item-desc item-desc-multiline" style="font-size:11px;color:#5C6B80;font-style:italic;margin-top:4px;">Notes: ' + esc(_poLineNote.substring(0, 400)) + '</div>'
+        : '';
       var lineLabel = typeof window.invoiceLineDisplayTitle === 'function' ? window.invoiceLineDisplayTitle(it) : (it.title || it.name || 'Item');
       var descBody = _rawDesc;
       if (descBody && lineLabel && descBody.toLowerCase().indexOf(String(lineLabel).toLowerCase()) === 0) {
@@ -2209,6 +2348,7 @@
         (descBody ? '<div class="item-desc item-desc-multiline">' + esc(descBody) + '</div>' : '') +
         periodHtml +
         notesUnder +
+        workroomUnder +
         (it.vendor && type !== 'po' ? '<div class="item-vendor">' + esc(it.vendor) + '</div>' : '') +
         '</td>' +
         (type === 'po' ? '<td class="vendor-cell">' + esc(it.vendor||'') + '</td>' : '') +
@@ -2518,7 +2658,7 @@
             '<div style="font-size:11px;color:#9E9A8F;">' + esc(proj.name||'') + ' · Item ' + (idx+1) + ' of ' + items.length + '</div>' +
           '</div>' +
           '<div class="ts-body">' +
-            '<div>' + (item.imageUrl ? '<img class="ts-img" src="' + escAttr(item.imageUrl) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div class="ts-img" style="background:#f5f3ee;display:flex;align-items:center;justify-content:center;font-size:48px;">📦</div>') + '</div>' +
+            '<div>' + (item.imageUrl ? '<img class="ts-img" src="' + _escImgSrcAttr(item.imageUrl) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div class="ts-img" style="background:#f5f3ee;display:flex;align-items:center;justify-content:center;font-size:48px;">📦</div>') + '</div>' +
             '<div style="display:flex;flex-direction:column;">' +
               '<div class="ts-title">' + esc(item.title || 'Untitled') + '</div>' +
               '<div class="ts-room">' + esc(item.room || item.category || '') + '</div>' +
@@ -2654,7 +2794,7 @@
         var realIdx = (window._myItemsProducts || []).indexOf(p);
         return '<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #F0EDE6;cursor:pointer;transition:background 0.1s;" onmouseover="this.style.background=\'#F9F8F5\'" onmouseout="this.style.background=\'#fff\'">' +
           '<button onclick="event.stopPropagation();addMyItemToDoc(' + realIdx + ')" style="width:28px;height:28px;border-radius:50%;border:2px solid var(--gold);background:none;color:var(--gold);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Add to document">+</button>' +
-          (imgUrl ? '<img src="' + escAttr(imgUrl) + '" style="width:56px;height:56px;object-fit:cover;flex-shrink:0;" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div style="width:56px;height:56px;background:#F5F3EE;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">📦</div>') +
+          (imgUrl ? '<img src="' + _escImgSrcAttr(imgUrl) + '" style="width:56px;height:56px;object-fit:cover;flex-shrink:0;" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div style="width:56px;height:56px;background:#F5F3EE;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">📦</div>') +
           '<div style="flex:1;min-width:0;">' +
             '<div style="font-size:13px;font-weight:600;color:#1B3352;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(p.title || '') + '</div>' +
             '<div style="font-size:11px;color:#7A7060;">Material</div>' +

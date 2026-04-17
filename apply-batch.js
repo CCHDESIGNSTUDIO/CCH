@@ -94,7 +94,7 @@ if (!html.includes('function generateTearSheets')) {
 
         // Generate print-ready HTML
         var pages = clips.map(function(clip) {
-          var img = clip.imageUrl || (clip.images && clip.images[0]) || '';
+          var img = _resolveImgSrc(String(clip.imageUrl || '').trim()) || _firstCoercedGalleryUrl(clip) || '';
           var cost = parseFloat(clip.cost) || 0;
           var sell = parseFloat(clip.clientPrice) || parseFloat(clip.totalSelling) || 0;
           var qty = parseInt(clip.qty) || 1;
@@ -104,7 +104,7 @@ if (!html.includes('function generateTearSheets')) {
               '<div style="font-size:28px;font-weight:300;letter-spacing:4px;color:#0E1629;">CCH</div>' +
               '<div style="font-size:12px;color:#888;">' + esc(projectName || '') + '</div>' +
             '</div>' +
-            (img ? '<div style="text-align:center;margin-bottom:24px;"><img src="' + escAttr(img) + '" style="max-width:100%;max-height:400px;object-fit:contain;" referrerpolicy="no-referrer"></div>' : '') +
+            (img ? '<div style="text-align:center;margin-bottom:24px;"><img src="' + _escImgSrcAttr(img) + '" style="max-width:100%;max-height:400px;object-fit:contain;" referrerpolicy="no-referrer"></div>' : '') +
             '<div style="font-size:22px;font-weight:600;color:#0E1629;margin-bottom:8px;">' + esc(clip.title || 'Untitled') + '</div>' +
             '<table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:16px;">' +
               (clip.vendor ? '<tr><td style="padding:8px 0;color:#888;width:140px;">Vendor</td><td style="padding:8px 0;font-weight:500;">' + esc(clip.vendor) + '</td></tr>' : '') +

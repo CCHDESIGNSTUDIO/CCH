@@ -64,11 +64,11 @@ const tileFuncCode = `
           '<div style="font-size:15px;font-weight:600;margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid var(--gold);">' + esc(rm) + ' <span style="font-size:12px;color:var(--gray-400);font-weight:400;">' + items.length + ' items</span></div>' +
           '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">' +
           items.map(function(clip) {
-            var imgSrc = clip.imageUrl || (clip.images && clip.images[0]) || '';
+            var imgSrc = _resolveImgSrc(String(clip.imageUrl || '').trim()) || _firstCoercedGalleryUrl(clip) || '';
             var sell = parseFloat(clip.clientPrice) || parseFloat(clip.totalSelling) || 0;
             var isValid = imgSrc && (imgSrc.startsWith('http') || imgSrc.startsWith('data:'));
             return '<div style="background:var(--card,white);border:1px solid var(--border,#eee);overflow:hidden;cursor:pointer;" onclick="showClipDetail(\\'' + escAttr(projId) + '\\',\\'' + escAttr(clip.id) + '\\')">' +
-              (isValid ? '<img src="' + escAttr(imgSrc) + '" style="width:100%;aspect-ratio:1;object-fit:cover;" referrerpolicy="no-referrer" onerror="this.style.display=\\'none\\'">' : '<div style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:var(--gray-100);color:var(--gray-300);font-size:32px;">📷</div>') +
+              (isValid ? '<img src="' + _escImgSrcAttr(imgSrc) + '" style="width:100%;aspect-ratio:1;object-fit:cover;" referrerpolicy="no-referrer" onerror="this.style.display=\\'none\\'">' : '<div style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:var(--gray-100);color:var(--gray-300);font-size:32px;">📷</div>') +
               '<div style="padding:10px;">' +
                 '<div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(clip.title || 'Untitled') + '</div>' +
                 '<div style="font-size:11px;color:var(--gray-400);">' + esc(clip.vendor || '') + '</div>' +
