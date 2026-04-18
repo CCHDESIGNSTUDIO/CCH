@@ -26,6 +26,10 @@
  *   #66: Markup Revenue stat on invoices page
  *   #67: Connected Docs visual cross-linking
  *
+ * Related (main app): Inspiration tiles can store libraryProductId after saving to the Product Library
+ * or adding to a proposal; proposal lines then carry the same id for catalog sync — see index.html
+ * (ibPatchIdeabookImageLibraryLink, saveProduct, ibIdeabookConfirmAddToProposal).
+ *
  * Integration: Add <script src="cch-proposals-invoices-fix.js"></script> to index.html
  * after the main app code (before </body>).
  */
@@ -504,7 +508,10 @@
     }
     try {
       var propDoc = await db.collection('boards').doc(projectId).collection('proposals').doc(proposalId).get();
-      if (!propDoc.exists || !propDoc.data()) { alert('Proposal not found'); return; }
+      if (!propDoc.exists || !propDoc.data()) {
+        if (typeof cchAlert === 'function') await cchAlert('Proposal not found', 'Convert to Invoice');
+        return;
+      }
       var prop = propDoc.data();
       var rawItems = prop.items || [];
       var productLines = rawItems.filter(function(it) { return !_isGroupRow(it); });
@@ -520,15 +527,17 @@
       if (pendingN > 0) gateMsgs.push(pendingN + ' line(s) still Pending — set each to Approved or Declined.');
       if (approvedN < 1 && productLines.length > 0) gateMsgs.push('At least one line must be Approved to invoice.');
       if (gateMsgs.length > 0) {
-        alert('Cannot create invoice yet:\n\n• ' + gateMsgs.join('\n• '));
+        if (typeof cchAlert === 'function') await cchAlert('Cannot create invoice yet:\n\n• ' + gateMsgs.join('\n• '), 'Convert to Invoice');
         return;
       }
 
       var sourceForInvoice = rawItems.filter(function(item) { return !_isGroupRow(item) && _lineApprovalState(item) === 'approved'; });
       var skipped = productLines.length - sourceForInvoice.length;
-      if (!confirm('Create a new Invoice from this proposal?\n\n• ' + sourceForInvoice.length + ' approved line(s) will be copied.\n' + (skipped > 0 ? '• ' + skipped + ' line(s) skipped (not Approved).\n' : '') + '\nImages and pricing will transfer for each copied line.')) return;
+      var _convMsg = 'Create a new Invoice from this proposal?\n\n• ' + sourceForInvoice.length + ' approved line(s) will be copied.\n' + (skipped > 0 ? '• ' + skipped + ' line(s) skipped (not Approved).\n' : '') + '\nImages and pricing will transfer for each copied line.';
+      if (typeof cchConfirm !== 'function') return;
+      if (!(await cchConfirm(_convMsg, 'Convert to Invoice', { confirmText: 'Create Invoice' }))) return;
     } catch (eGate) {
-      alert('Could not validate proposal: ' + (eGate.message || eGate));
+      if (typeof cchAlert === 'function') await cchAlert('Could not validate proposal: ' + (eGate.message || eGate), 'Convert to Invoice');
       return;
     }
     try {
@@ -636,12 +645,12 @@
         logDocActivity(projectId, 'proposals', proposalId, 'converted', 'Converted to Invoice ' + invNum);
       }
 
-      alert('Invoice ' + invNum + ' created with ' + items.length + ' items!\nImages and pricing transferred.');
+      if (typeof cchAlert === 'function') await cchAlert('Invoice ' + invNum + ' created with ' + items.length + ' items!\nImages and pricing transferred.', 'Convert to Invoice');
       if (typeof _cacheTime !== 'undefined') _cacheTime = 0;
       navigate('#/project/' + projectId + '/invoice/' + invRef.id);
     } catch(e) {
       console.error('Convert failed:', e);
-      alert('Error: ' + e.message);
+      if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Convert to Invoice');
     }
   };
 
@@ -898,7 +907,8 @@
       // From project clips
       var clipSnap = await db.collection('boards').doc(projectId).collection('clips').get();
       clipSnap.forEach(function(d) {
-        var v = d.data().vendor;
+        var cd = d.data() || {};
+        var v = cd.vendor;
         if (v) vendors.add(v.trim());
       });
     } catch(e) {}
@@ -906,7 +916,8 @@
       // From vendors collection
       var vendSnap = await db.collection('vendors').limit(500).get();
       vendSnap.forEach(function(d) {
-        var v = d.data().name || d.data().company;
+        var vd = d.data() || {};
+        var v = vd.name || vd.company;
         if (v) vendors.add(v.trim());
       });
     } catch(e) {}
@@ -914,7 +925,7 @@
       // From team contacts
       var teamSnap = await db.collection('team').get();
       teamSnap.forEach(function(d) {
-        var t = d.data();
+        var t = d.data() || {};
         if (t.role === 'vendor' && (t.name || t.company)) {
           vendors.add((t.name || t.company).trim());
         }
@@ -1285,7 +1296,7 @@
       showToast('Item updated', 2000);
     } catch(e) {
       console.error('Save quick edit error:', e);
-      alert('Error saving: ' + e.message);
+      if (typeof cchAlert === 'function') await cchAlert('Error saving: ' + e.message, 'Quick Edit');
     }
   };
 
@@ -1304,7 +1315,10 @@
         return;
       }
       var doc = await db.collection('boards').doc(projectId).collection('invoices').doc(invoiceId).get();
-      if (!doc.exists) { alert('Invoice not found'); return; }
+      if (!doc.exists) {
+        if (typeof cchAlert === 'function') await cchAlert('Invoice not found', 'Send to Client');
+        return;
+      }
       var inv = doc.data();
       var invNum = inv.invoiceNum || inv.number || invoiceId.slice(0, 8);
       var clientEmail = inv.clientEmail || '';
@@ -1329,7 +1343,8 @@
       msg += '\n\nThis will:\n• Mark status as "Sent"\n• Record today as the sent date';
       if (clientEmail) msg += '\n• Copy email to clipboard for sending';
 
-      if (!confirm(msg)) return;
+      if (typeof cchConfirm !== 'function') return;
+      if (!(await cchConfirm(msg, 'Send to Client', { confirmText: 'Send' }))) return;
 
       var now = new Date().toISOString();
       var today = now.split('T')[0];
@@ -1359,8 +1374,7 @@
         showToast('Invoice ' + invNum + ' marked as Sent', 3000);
       }
 
-      // Also open preview for printing/emailing
-      if (confirm('Open invoice preview to print or email as PDF?')) {
+      if (await cchConfirm('Open invoice preview to print or email as PDF?', 'Send to Client', { confirmText: 'Open preview' })) {
         previewDocument('invoice', projectId, invoiceId);
       }
 
@@ -1374,7 +1388,7 @@
       }
     } catch(e) {
       console.error('Send invoice error:', e);
-      alert('Error: ' + e.message);
+      if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Send to Client');
     }
   };
 
@@ -1389,7 +1403,10 @@
         return;
       }
       var doc = await db.collection('boards').doc(projectId).collection('proposals').doc(proposalId).get();
-      if (!doc.exists) { alert('Proposal not found'); return; }
+      if (!doc.exists) {
+        if (typeof cchAlert === 'function') await cchAlert('Proposal not found', 'Send to Client');
+        return;
+      }
       var prop = doc.data();
       var propNum = prop.proposalNum || prop.name || proposalId.slice(0, 8);
       var clientEmail = prop.clientEmail || '';
@@ -1405,25 +1422,36 @@
       var msg = 'Send Proposal ' + propNum + ' to client?';
       if (clientName) msg += '\n\nClient: ' + clientName;
       if (clientEmail) msg += '\nEmail: ' + clientEmail;
-      msg += '\n\nThis will:\n• Mark status as "Sent"\n• Record today as the sent date';
+      msg += '\n\nThis will:\n• Mark status as Published\n• Publish to the client portal\n• Record the sent date';
 
-      if (!confirm(msg)) return;
+      if (typeof cchConfirm !== 'function') return;
+      if (!(await cchConfirm(msg, 'Send to Client', { confirmText: 'Continue' }))) return;
 
+      var _now = new Date().toISOString();
       await db.collection('boards').doc(projectId).collection('proposals').doc(proposalId).update({
-        status: 'Sent', sentDate: new Date().toISOString().split('T')[0], sentAt: new Date().toISOString(), sentTo: clientEmail || clientName || 'client'
+        status: 'Published',
+        published: true,
+        publishedAt: _now,
+        sentDate: _now.split('T')[0],
+        sentAt: _now,
+        sentTo: clientEmail || clientName || 'client',
+        updatedAt: _now
       });
 
       if (typeof logDocActivity === 'function') logDocActivity(projectId, 'proposals', proposalId, 'sent', 'Sent to ' + (clientEmail || clientName || 'client'));
 
       if (clientEmail) { try { await navigator.clipboard.writeText(clientEmail); } catch(e) {} }
-      showToast('Proposal ' + propNum + ' marked as Sent', 3000);
+      showToast('Proposal ' + propNum + ' published to client portal', 3000);
 
-      if (confirm('Open proposal preview to print or email as PDF?')) { previewDocument('proposal', projectId, proposalId); }
+      if (await cchConfirm('Open proposal preview to print or email as PDF?', 'Send to Client', { confirmText: 'Open preview' })) { previewDocument('proposal', projectId, proposalId); }
 
       if (typeof _cacheTime !== 'undefined') _cacheTime = 0;
       if (typeof invalidateSearchCache === 'function') invalidateSearchCache();
       if (typeof renderProjectDetail === 'function') renderProjectDetail();
-    } catch(e) { console.error('Send proposal error:', e); alert('Error: ' + e.message); }
+    } catch(e) {
+      console.error('Send proposal error:', e);
+      if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Send to Client');
+    }
   };
 
 
@@ -1450,7 +1478,7 @@
       }
     } catch(e) {
       console.error('Past due error:', e);
-      alert('Error: ' + e.message);
+      if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Invoice');
     }
   };
 
@@ -1461,10 +1489,14 @@
   window.duplicateInvoice = async function(projectId, invoiceId) {
     try {
       var doc = await db.collection('boards').doc(projectId).collection('invoices').doc(invoiceId).get();
-      if (!doc.exists) { alert('Invoice not found'); return; }
+      if (!doc.exists) {
+        if (typeof cchAlert === 'function') await cchAlert('Invoice not found', 'Duplicate Invoice');
+        return;
+      }
       var inv = doc.data();
 
-      if (!confirm('Duplicate this invoice? A new draft invoice will be created with the same items.')) return;
+      if (typeof cchConfirm !== 'function') return;
+      if (!(await cchConfirm('Duplicate this invoice? A new draft invoice will be created with the same items.', 'Duplicate Invoice', { confirmText: 'Duplicate' }))) return;
 
       var newNum = await window.getNextDocNumber('INV');
       var _cUser = (currentUser && currentUser.displayName) || (currentUser && currentUser.email) || 'Unknown';
@@ -1512,7 +1544,7 @@
       navigate('#/project/' + projectId + '/invoice/' + newRef.id);
     } catch(e) {
       console.error('Duplicate invoice error:', e);
-      alert('Error: ' + e.message);
+      if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Duplicate Invoice');
     }
   };
 
@@ -1521,7 +1553,8 @@
   // 24. Archive Invoice
   // ============================================================
   window.archiveInvoice = async function(projectId, invoiceId) {
-    if (!confirm('Archive this invoice? It will be hidden from the active list.')) return;
+    if (typeof cchConfirm !== 'function') return;
+    if (!(await cchConfirm('Archive this invoice? It will be hidden from the active list.', 'Archive Invoice', { confirmText: 'Archive', danger: true }))) return;
     try {
       await db.collection('boards').doc(projectId).collection('invoices').doc(invoiceId).update({
         status: 'Archived',
@@ -1540,7 +1573,7 @@
       }
     } catch(e) {
       console.error('Archive error:', e);
-      alert('Error: ' + e.message);
+      if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Archive Invoice');
     }
   };
 
@@ -1936,7 +1969,7 @@
       if (clientAddr) msg += 'Client address: ' + clientAddr + '\n';
       msg += '\nCurrent rate: ' + current + '%\n\nCommon CA rates:\n  7.75% — Orange County\n  9.50% — Los Angeles\n  8.75% — San Diego\n  7.25% — CA minimum\n\nEnter tax rate (%):';
 
-      var rate = prompt(msg, current || '');
+      var rate = typeof cchPrompt === 'function' ? await cchPrompt(msg, String(current || ''), 'Project tax rate') : null;
       if (rate === null) return;
       var parsed = parseFloat(rate) || 0;
 
@@ -1956,7 +1989,7 @@
       }
     } catch(e) {
       console.error('Set project tax rate error:', e);
-      alert('Error: ' + e.message);
+      if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Tax rate');
     }
   };
 
@@ -1976,7 +2009,7 @@
       if (projRate > 0) msg += 'Project default: ' + projRate + '%\n';
       msg += '\nCommon CA rates:\n  7.75% — Orange County\n  9.50% — Los Angeles\n  8.75% — San Diego\n  7.25% — CA minimum\n\nEnter tax rate (%):';
 
-      var rate = prompt(msg, docRate || projRate || '');
+      var rate = typeof cchPrompt === 'function' ? await cchPrompt(msg, String(docRate || projRate || ''), 'Document tax rate') : null;
       if (rate === null) return;
       var parsed = parseFloat(rate) || 0;
 
@@ -1989,7 +2022,8 @@
 
       // If different from project rate, ask to update project
       if (parsed !== projRate) {
-        if (confirm('Also update the project default tax rate to ' + parsed + '%?\n\n(Current project rate: ' + projRate + '%. New invoices/proposals will inherit this.)')) {
+        var _updProj = typeof cchConfirm === 'function' && (await cchConfirm('Also update the project default tax rate to ' + parsed + '%?\n\n(Current project rate: ' + projRate + '%. New invoices/proposals will inherit this.)', 'Tax rate', { confirmText: 'Update project default' }));
+        if (_updProj) {
           await db.collection('boards').doc(projId).update({ taxRate: parsed });
           showToast('Project default tax rate updated to ' + parsed + '%', 2000);
         } else {
@@ -2647,7 +2681,15 @@
     // Tear sheet pages (hidden by default, toggled by button)
     win.document.write('<div id="tearSheetPages" style="display:none;">');
     items.forEach(function(item, idx) {
-      if (!item.title && !item.imageUrl) return;
+      var _heroImg = '';
+      try {
+        if (typeof _normalizeProposalItemImages === 'function') {
+          var _im = _normalizeProposalItemImages(item);
+          _heroImg = (_im.list && _im.list.length) ? (_im.list[_im.heroIdx] || _im.list[0] || '') : '';
+        }
+      } catch (eIm) {}
+      if (!_heroImg) _heroImg = String(item.imageUrl || item.image || '').trim();
+      if (!item.title && !_heroImg) return;
       var qty = parseFloat(item.qty) || 1;
       var amt = parseFloat(item.amount) || 0;
       var cost = parseFloat(item.cost) || 0;
@@ -2658,7 +2700,7 @@
             '<div style="font-size:11px;color:#9E9A8F;">' + esc(proj.name||'') + ' · Item ' + (idx+1) + ' of ' + items.length + '</div>' +
           '</div>' +
           '<div class="ts-body">' +
-            '<div>' + (item.imageUrl ? '<img class="ts-img" src="' + _escImgSrcAttr(item.imageUrl) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div class="ts-img" style="background:#f5f3ee;display:flex;align-items:center;justify-content:center;font-size:48px;">📦</div>') + '</div>' +
+            '<div>' + (_heroImg ? '<img class="ts-img" src="' + _escImgSrcAttr(_heroImg) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div class="ts-img" style="background:#f5f3ee;display:flex;align-items:center;justify-content:center;font-size:48px;">📦</div>') + '</div>' +
             '<div style="display:flex;flex-direction:column;">' +
               '<div class="ts-title">' + esc(item.title || 'Untitled') + '</div>' +
               '<div class="ts-room">' + esc(item.room || item.category || '') + '</div>' +
@@ -2834,7 +2876,10 @@
   window.scanVendorInvoice = async function(projectId, poId) {
     // Load PO data first
     var poDoc = await db.collection('boards').doc(projectId).collection('purchaseOrders').doc(poId).get();
-    if (!poDoc.exists) { alert('PO not found'); return; }
+    if (!poDoc.exists) {
+      if (typeof cchAlert === 'function') await cchAlert('PO not found', 'Vendor invoice');
+      return;
+    }
     var po = poDoc.data();
 
     // Create file picker overlay
@@ -3170,7 +3215,7 @@
       navigate('#/project/' + projectId + '/po/' + poId);
     } catch(e) {
       console.error('Apply vendor invoice error:', e);
-      alert('Error: ' + e.message);
+      if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Vendor invoice');
     }
   };
 
@@ -3197,7 +3242,7 @@
       if (overlay) overlay.remove();
     } catch(e) {
       console.error('Attach error:', e);
-      alert('Error: ' + e.message);
+      if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Vendor invoice');
     }
   };
 
@@ -3208,7 +3253,8 @@
       var tax = parseFloat(document.getElementById('viTax').value) || 0;
 
       if (shipping === 0 && tax === 0) {
-        shipping = parseFloat(prompt('Enter shipping amount to invoice client:')) || 0;
+        var _shipStr = typeof cchPrompt === 'function' ? await cchPrompt('Enter shipping amount to invoice client:', '', 'Shipping invoice') : null;
+        shipping = parseFloat(_shipStr) || 0;
         if (shipping === 0) return;
       }
 
@@ -3279,7 +3325,7 @@
       navigate('#/project/' + projectId + '/invoice/' + invRef.id);
     } catch(e) {
       console.error('Create shipping invoice error:', e);
-      alert('Error: ' + e.message);
+      if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Shipping invoice');
     }
   };
 

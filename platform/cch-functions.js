@@ -4,16 +4,17 @@ async function updateDocStatus(projectId, collection, docId, newStatus) {
   try {
     await db.collection('boards').doc(projectId).collection(collection).doc(docId)
       .update({ status: newStatus, updatedAt: new Date().toISOString() });
-  } catch(e) { alert('Error: ' + e.message); }
+  } catch(e) { if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Update status'); }
 }
 
 async function deleteFinanceDoc(projectId, collection, docId) {
   var labels = { proposals:'proposal', invoices:'invoice', purchaseOrders:'PO' };
-  if (!confirm('Delete this ' + (labels[collection]||'document') + '?')) return;
+  if (typeof cchConfirm !== 'function') return;
+  if (!(await cchConfirm('Delete this ' + (labels[collection]||'document') + '?', 'Delete document', { confirmText: 'Delete', danger: true }))) return;
   try {
     await db.collection('boards').doc(projectId).collection(collection).doc(docId).delete();
     navigate(window.location.hash);
-  } catch(e) { alert('Error: ' + e.message); }
+  } catch(e) { if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Delete document'); }
 }
 
 async function showNewInvoiceModal(projectId) {
@@ -46,7 +47,7 @@ async function saveNewInvoice(projectId) {
       items: [], createdAt: new Date().toISOString(), owner: currentUser.email
     });
     closeModal(); navigate(window.location.hash);
-  } catch(e) { alert('Error: ' + e.message); }
+  } catch(e) { if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'New invoice'); }
 }
 
 async function showEditInvoiceModal(projectId, invId) {
@@ -87,12 +88,12 @@ async function saveEditInvoice(projectId, invId) {
       updatedAt: new Date().toISOString()
     });
     closeModal(); navigate(window.location.hash);
-  } catch(e) { alert('Error: ' + e.message); }
+  } catch(e) { if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Edit invoice'); }
 }
 
 async function showEditPOModal(projectId, poId) {
   var snap = await db.collection('boards').doc(projectId).collection('purchaseOrders').doc(poId).get();
-  if (!snap.exists) { alert('PO not found'); return; }
+  if (!snap.exists) { if (typeof cchAlert === 'function') await cchAlert('PO not found', 'Edit PO'); return; }
   var po = snap.data();
   var opts = ['Draft','Sent','Ordered','Received','On Hold','Cancelled'].map(function(s){
     return '<option ' + (po.status===s?'selected':'') + ' value="' + s + '">' + s + '</option>';
@@ -138,7 +139,7 @@ async function saveEditPO(projectId, poId) {
       updatedAt: new Date().toISOString()
     });
     closeModal(); navigate(window.location.hash);
-  } catch(e) { alert('Error: ' + e.message); }
+  } catch(e) { if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Edit PO'); }
 }
 
 async function printProposal(projectId, proposalId) {
@@ -366,7 +367,7 @@ async function showNewClientModal(existingId) {
 
 async function saveClient(existingId) {
   var name = document.getElementById('clName').value.trim();
-  if (!name) { alert('Name is required.'); return; }
+  if (!name) { if (typeof cchAlert === 'function') await cchAlert('Name is required.', 'Client'); return; }
   var data = {
     name: name,
     company: document.getElementById('clCompany').value.trim(),
@@ -382,12 +383,13 @@ async function saveClient(existingId) {
     if (existingId) { await db.collection('clients').doc(existingId).update(data); }
     else { data.createdAt = new Date().toISOString(); await db.collection('clients').add(data); }
     closeModal(); renderClients();
-  } catch(e) { alert('Error: ' + e.message); }
+  } catch(e) { if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Client'); }
 }
 
 async function deleteClient(id) {
-  if (!confirm('Delete this client?')) return;
-  try { await db.collection('clients').doc(id).delete(); closeModal(); renderClients(); } catch(e) { alert('Error: ' + e.message); }
+  if (typeof cchConfirm !== 'function') return;
+  if (!(await cchConfirm('Delete this client?', 'Delete client', { confirmText: 'Delete', danger: true }))) return;
+  try { await db.collection('clients').doc(id).delete(); closeModal(); renderClients(); } catch(e) { if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Delete client'); }
 }
 
 async function renderVendors() {
@@ -504,7 +506,7 @@ async function showNewVendorModal(existingId, categoryHint) {
 async function saveVendor(existingId, category) {
   var cat = category || 'Vendor';
   var name = document.getElementById('vnName').value.trim();
-  if (!name) { alert('Name is required.'); return; }
+  if (!name) { if (typeof cchAlert === 'function') await cchAlert('Name is required.', 'Vendor'); return; }
   var data = {
     name: name,
     category: cat,
@@ -531,27 +533,29 @@ async function saveVendor(existingId, category) {
     if (cat === 'Workroom') renderWorkrooms();
     else if (cat === 'Delivery / Receiver') renderDeliveryReceivers();
     else renderVendors();
-  } catch(e) { alert('Error: ' + e.message); }
+  } catch(e) { if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Vendor'); }
 }
 
 async function deleteVendor(id, category) {
-  if (!confirm('Delete this record?')) return;
+  if (typeof cchConfirm !== 'function') return;
+  if (!(await cchConfirm('Delete this record?', 'Delete vendor', { confirmText: 'Delete', danger: true }))) return;
   try {
     await db.collection('vendors').doc(id).delete();
     closeModal();
     if (category === 'Workroom') renderWorkrooms();
     else if (category === 'Delivery / Receiver') renderDeliveryReceivers();
     else renderVendors();
-  } catch(e) { alert('Error: ' + e.message); }
+  } catch(e) { if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Delete vendor'); }
 }
 
 async function moveVendorCategory(docId, newCategory) {
-  if (!confirm('Move this record to ' + newCategory + '?')) return;
+  if (typeof cchConfirm !== 'function') return;
+  if (!(await cchConfirm('Move this record to ' + newCategory + '?', 'Move vendor', { confirmText: 'Move' }))) return;
   try {
     await db.collection('vendors').doc(docId).update({ category: newCategory, movedAt: new Date().toISOString() });
     closeModal();
     renderVendors();
-  } catch(e) { alert('Error: ' + e.message); }
+  } catch(e) { if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Move vendor'); }
 }
 
 // ==================== VENDOR DETAIL PAGE ====================
@@ -560,7 +564,7 @@ async function showVendorDetail(vendorId) {
   T.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Loading vendor...</div>';
 
   var vDoc = await db.collection('vendors').doc(vendorId).get();
-  if (!vDoc.exists) { alert('Vendor not found'); renderVendors(); return; }
+  if (!vDoc.exists) { if (typeof cchAlert === 'function') await cchAlert('Vendor not found', 'Vendors'); renderVendors(); return; }
   var v = vDoc.data();
   var vName = v.name || '';
 
@@ -1049,7 +1053,10 @@ async function showNewProposalBuilder(projectId) {
       var c = clips.find(function(x){ return x.id===id; });
       if (!c) return;
       var p = parseFloat((c.clientPrice||'').replace(/[^0-9.]/g,''))||0;
-      items.push({ type:'product', id:id, title:c.title||'Item', vendor:c.vendor||'', room:c.room||'', imageUrl:c.imageUrl||null, qty:1, unit:'ea', unitPrice:p, lineTotal:p });
+      var pack = (typeof window.cchProposalLineImagesFromSource === 'function')
+        ? window.cchProposalLineImagesFromSource(c)
+        : { images: c.imageUrl ? [c.imageUrl] : [], imageUrl: c.imageUrl || '', heroImageIndex: 0 };
+      items.push({ type:'product', id:id, title:c.title||'Item', vendor:c.vendor||'', room:c.room||'', imageUrl:pack.imageUrl||c.imageUrl||null, images:pack.images||[], heroImageIndex:pack.heroImageIndex||0, qty:1, unit:'ea', unitPrice:p, lineTotal:p });
       render();
     };
     window._addSvc = function(id) {
@@ -1059,22 +1066,29 @@ async function showNewProposalBuilder(projectId) {
       render();
     };
     window._addExp = function() {
-      var pick = prompt('Expense type:\n1. Freight\n2. Shipping\n3. Sales Tax Pre-paid\n4. Storage\n5. Misc Expense\n\nOr type your own:');
-      if (!pick) return;
-      var types = ['','Freight','Shipping','Sales Tax Pre-paid','Storage','Misc Expense'];
-      var name = types[parseInt(pick)] || pick;
-      items.push({ type:'expense', title:name, qty:1, unit:'flat', unitPrice:0, lineTotal:0 });
-      render();
+      if (typeof cchPrompt !== 'function') return;
+      cchPrompt('Expense type:\n1. Freight\n2. Shipping\n3. Sales Tax Pre-paid\n4. Storage\n5. Misc Expense\n\nOr type your own:', '', 'Expense type').then(function(pick) {
+        if (pick == null || pick === '') return;
+        var types = ['','Freight','Shipping','Sales Tax Pre-paid','Storage','Misc Expense'];
+        var name = types[parseInt(pick, 10)] || pick;
+        items.push({ type:'expense', title:name, qty:1, unit:'flat', unitPrice:0, lineTotal:0 });
+        render();
+      });
     };
     window._save = async function(pid) {
       var nm = window._pname || propName;
-      if (items.length === 0) { alert('Add at least one item.'); return; }
+      if (items.length === 0) { if (typeof cchAlert === 'function') await cchAlert('Add at least one item.', 'New proposal'); return; }
       var total = items.reduce(function(s,i){ return s+(parseFloat(i.lineTotal)||0); }, 0);
       try {
         await db.collection('boards').doc(pid).collection('proposals').add({
           name: nm,
           number: 'PROP-'+Date.now().toString().slice(-6),
-          items: items.map(function(i){ return { description:i.title, qty:i.qty||1, unitPrice:i.unitPrice||0, lineTotal:i.lineTotal||0, vendor:i.vendor||'', room:i.room||'', type:i.type||'product', unit:i.unit||'ea', imageUrl:i.imageUrl||null }; }),
+          items: items.map(function(i){
+            var row = { description:i.title, title:i.title, qty:i.qty||1, unitPrice:i.unitPrice||0, lineTotal:i.lineTotal||0, vendor:i.vendor||'', room:i.room||'', type:i.type||'product', unit:i.unit||'ea', imageUrl:i.imageUrl||null };
+            if (i.images && i.images.length) row.images = i.images.slice();
+            if (typeof i.heroImageIndex === 'number') row.heroImageIndex = i.heroImageIndex;
+            return row;
+          }),
           total: total,
           status: 'Draft',
           createdAt: new Date().toISOString(),
@@ -1082,7 +1096,7 @@ async function showNewProposalBuilder(projectId) {
         });
         closeModal();
         navigate('#/project/'+pid+'/proposals');
-      } catch(e) { alert('Error saving: ' + e.message); }
+      } catch(e) { if (typeof cchAlert === 'function') await cchAlert('Error saving: ' + e.message, 'New proposal'); }
     };
   }
   render();

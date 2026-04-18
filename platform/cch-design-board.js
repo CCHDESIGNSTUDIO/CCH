@@ -792,6 +792,10 @@
 
       pushUndo();
       var d = clip.data;
+      var imgPack = (typeof window.cchProposalLineImagesFromSource === 'function')
+        ? window.cchProposalLineImagesFromSource(d)
+        : { images: [], imageUrl: '', heroImageIndex: 0 };
+      var primaryImg = imgPack.imageUrl || _resolveImgSrc(String(d.imageUrl || '').trim()) || _firstCoercedGalleryUrl(d) || '';
       var newEl = {
         id: genId(),
         type: 'product',
@@ -800,7 +804,9 @@
         y: Math.max(0, my - 90),
         w: 180,
         h: 180,
-        imageUrl: _resolveImgSrc(String(d.imageUrl || '').trim()) || _firstCoercedGalleryUrl(d) || '',
+        imageUrl: primaryImg,
+        images: (imgPack.images && imgPack.images.length) ? imgPack.images.slice() : (primaryImg ? [primaryImg] : []),
+        heroImageIndex: imgPack.heroImageIndex || 0,
         title: d.title || 'Untitled',
         vendor: d.vendor || '',
         cost: parseFloat(d.cost) || 0,
@@ -933,8 +939,16 @@
     // Save board first
     await saveBoardToFirestore();
 
-    // Build proposal items from board products
+    // Build proposal items from board products (carry clip / element gallery into proposal lines)
     var items = products.map(function(el) {
+      var src = { imageUrl: el.imageUrl, images: el.images };
+      if (el.clipId) {
+        var clip = dbEditor.clips.find(function(c) { return c.id === el.clipId; });
+        if (clip && clip.data) src = Object.assign({}, clip.data, src);
+      }
+      var pack = (typeof window.cchProposalLineImagesFromSource === 'function')
+        ? window.cchProposalLineImagesFromSource(src)
+        : { images: el.imageUrl ? [el.imageUrl] : [], imageUrl: el.imageUrl || '', heroImageIndex: 0 };
       return {
         title: el.title || 'Untitled',
         vendor: el.vendor || '',
@@ -943,7 +957,9 @@
         clientPrice: el.sellPrice || 0,
         qty: 1,
         markupPct: el.cost > 0 ? Math.round(((el.sellPrice || 0) - el.cost) / el.cost * 100) : 0,
-        imageUrl: el.imageUrl || '',
+        imageUrl: pack.imageUrl || el.imageUrl || '',
+        images: pack.images || [],
+        heroImageIndex: pack.heroImageIndex || 0,
         clipId: el.clipId || '',
         lineApprovalStatus: 'pending'
       };

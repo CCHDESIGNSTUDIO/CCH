@@ -65,6 +65,9 @@
     cbState.items = (cbState.boardData.elements || []).filter(function(el) {
       return el.type === 'product';
     }).map(function(el, idx) {
+      var pack = (typeof window.cchProposalLineImagesFromSource === 'function')
+        ? window.cchProposalLineImagesFromSource(el)
+        : { images: el.imageUrl ? [el.imageUrl] : [], imageUrl: el.imageUrl || '', heroImageIndex: 0 };
       return {
         id: el.clipId || el.id || ('item_' + idx),
         title: el.title || 'Untitled',
@@ -72,7 +75,9 @@
         price: el.sellPrice ? fmt$(el.sellPrice) : '',
         cost: el.cost || 0,
         sellPrice: el.sellPrice || 0,
-        imageUrl: el.imageUrl || '',
+        imageUrl: pack.imageUrl || el.imageUrl || '',
+        images: pack.images || [],
+        heroImageIndex: pack.heroImageIndex || 0,
         annotation: el.annotation || ''
       };
     });
@@ -435,6 +440,9 @@
     if (!name) return;
 
     var items = starredItems.map(function(item) {
+      var pack = (typeof window.cchProposalLineImagesFromSource === 'function')
+        ? window.cchProposalLineImagesFromSource(item)
+        : { images: item.imageUrl ? [item.imageUrl] : [], imageUrl: item.imageUrl || '', heroImageIndex: 0 };
       return {
         title: item.title,
         vendor: item.vendor,
@@ -442,7 +450,9 @@
         sellingPrice: item.sellPrice || 0,
         clientPrice: item.sellPrice || 0,
         qty: 1,
-        imageUrl: item.imageUrl || '',
+        imageUrl: pack.imageUrl || item.imageUrl || '',
+        images: pack.images || [],
+        heroImageIndex: pack.heroImageIndex || 0,
         clipId: item.id || '',
         lineApprovalStatus: 'pending'
       };
