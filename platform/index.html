@@ -40877,7 +40877,10 @@ async function renderBoardsTab(T, proj) {
 
     async function renderAllInvoices() {
       setBreadcrumb([{ label: 'Invoices' }]);
-      setTopbarActions('<button class="btn btn-secondary" style="margin-right:8px;" onclick="applyHouzzQBIds()">🟢 Apply QB IDs</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="autoLinkAllDocs()">🔗 Auto-Link Docs</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="importPaymentData()">💰 Import Payments</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="bulkInvoiceCleanup()">🧹 Cleanup</button><button class="btn btn-primary" onclick="showNewInvoiceModalGlobal()">+ New Invoice</button>');
+      const _qbPaidSyncBtn = userCanPushToQB()
+        ? '<button class="btn btn-secondary" style="margin-right:8px;" onclick="batchSyncInvoiceBalancesFromQB()" title="Reads each linked invoice in QuickBooks (up to 200 per run). Updates Paid / balance when QB shows paid. Run again to cover more rows.">↻ Sync QB paid</button>'
+        : '';
+      setTopbarActions('<button class="btn btn-secondary" style="margin-right:8px;" onclick="applyHouzzQBIds()">🟢 Apply QB IDs</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="autoLinkAllDocs()">🔗 Auto-Link Docs</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="importPaymentData()">💰 Import Payments</button>' + _qbPaidSyncBtn + '<button class="btn btn-secondary" style="margin-right:8px;" onclick="bulkInvoiceCleanup()">🧹 Cleanup</button><button class="btn btn-primary" onclick="showNewInvoiceModalGlobal()">+ New Invoice</button>');
       const T = document.getElementById('contentArea');
       T.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Loading invoices...</div>';
       try {
@@ -40993,6 +40996,7 @@ async function renderBoardsTab(T, proj) {
                           <a onclick="markInvoicePastDue('${inv.projectId}','${inv.id}');closeAllMenus()">⚠️ Mark Past Due</a>
                           <div class="divider"></div>
                           ${!getQbId(inv) && _canPushQBGlobal ? '<a onclick="event.stopPropagation();pushDocToQB(\'invoice\',\'' + inv.projectId + '\',\'' + inv.id + '\');closeAllMenus()">📤 Push to QuickBooks</a>' : ''}
+                          ${getQbId(inv) && _canPushQBGlobal ? '<a onclick="event.stopPropagation();syncInvoiceBalanceFromQB(\'' + inv.projectId + '\',\'' + inv.id + '\');closeAllMenus()">↻ Refresh paid from QuickBooks</a>' : ''}
                           <a onclick="previewDocument('invoice','${inv.projectId}','${inv.id}');closeAllMenus()">📄 Preview / PDF</a>
                           <a onclick="duplicateInvoice('${inv.projectId}','${inv.id}');closeAllMenus()">📋 Duplicate Invoice</a>
                           <a onclick="generateTearSheetsFromDoc('${inv.projectId}','invoices','${inv.id}','');closeAllMenus()">📑 Tear Sheets</a>
@@ -41446,6 +41450,66 @@ async function renderBoardsTab(T, proj) {
           // Keep cloud function message (client name, line items, etc.)
         }
         await cchAlert('QB Push Error:\n' + errMsg, 'QuickBooks Sync');
+      }
+    }
+
+    /** One invoice: GET QuickBooks invoice by numeric qbDocId, update Studio status / payments / qbStatus from Balance. */
+    async function syncInvoiceBalanceFromQB(projectId, invoiceId) {
+      if (!(await cchConfirm('Refresh this invoice from QuickBooks? Paid balance and status will update from QB.', 'QuickBooks', { confirmText: 'Sync', cancelText: 'Cancel' }))) return;
+      try {
+        var user = firebase.auth && firebase.auth().currentUser;
+        if (!user) {
+          await cchAlert('Sign in to CCH Studio first.', 'QuickBooks');
+          return;
+        }
+        await user.getIdToken(true);
+        var fn = firebase.app().functions('us-central1').httpsCallable('syncInvoiceBalanceFromQB');
+        var res = await fn({ projectId: projectId, invoiceId: invoiceId });
+        var d = res && res.data;
+        showToast((d && d.success) ? ('Updated: ' + (d.status || '') + ' · QB ' + (d.qbStatus || '')) : 'Sync finished');
+        _cacheTime = 0;
+        if (typeof invalidateSearchCache === 'function') invalidateSearchCache();
+        if (window.location.hash.indexOf('allinvoices') >= 0) renderAllInvoices();
+        else if (typeof renderProjectDetail === 'function') renderProjectDetail();
+      } catch (err) {
+        var m = (err && err.message) ? err.message : String(err || 'Unknown');
+        await cchAlert('QuickBooks sync failed:\n' + m, 'QuickBooks');
+      }
+    }
+
+    /** Batch: up to 200 invoices with numeric qbDocId — GET each from QB and patch Firestore. Re-run to scan more projects. */
+    async function batchSyncInvoiceBalancesFromQB() {
+      if (!(await cchConfirm(
+        'Sync paid status from QuickBooks?\n\nThis loads up to 200 invoices that have a numeric QuickBooks id (qbDocId), reads Balance from QuickBooks, and updates Studio (Paid / balance / QB badge).\n\nPayments recorded only in QB are why Studio still shows Draft — run this after batch pay in QB, or configure the QB webhook for automatic updates.\n\nRun again to process the next batch.',
+        'Sync QB paid',
+        { confirmText: 'Start sync', cancelText: 'Cancel' }
+      ))) return;
+      try {
+        var user = firebase.auth && firebase.auth().currentUser;
+        if (!user) {
+          await cchAlert('Sign in to CCH Studio first.', 'QuickBooks');
+          return;
+        }
+        await user.getIdToken(true);
+        showToast('QuickBooks: syncing up to 200 invoices…');
+        var fn = firebase.app().functions('us-central1').httpsCallable('batchSyncInvoiceBalancesFromQB');
+        var res = await fn({ maxInvoices: 200 });
+        var d = res && res.data;
+        var msg = (d && d.success)
+          ? ('QB sync: updated ' + (d.updated || 0) + ' / scanned ' + (d.scanned || 0) + (d.errors ? (' · errors ' + d.errors) : ''))
+          : 'QB batch sync finished';
+        showToast(msg, 6000);
+        if (d && d.sampleErrors && d.sampleErrors.length) console.warn('[batchSyncInvoiceBalancesFromQB]', d.sampleErrors);
+        _cacheTime = 0;
+        if (typeof invalidateSearchCache === 'function') invalidateSearchCache();
+        if (window.location.hash.indexOf('allinvoices') >= 0) renderAllInvoices();
+        else if (typeof renderProjectDetail === 'function') renderProjectDetail();
+      } catch (err) {
+        var m = (err && err.message) ? err.message : String(err || 'Unknown');
+        if (m.indexOf('not-found') >= 0 || m.indexOf('NOT_FOUND') >= 0) {
+          m += '\n\nDeploy Cloud Functions: firebase deploy --only functions:syncInvoiceBalanceFromQB,batchSyncInvoiceBalancesFromQB';
+        }
+        await cchAlert('QuickBooks batch sync failed:\n' + m, 'QuickBooks');
       }
     }
 
