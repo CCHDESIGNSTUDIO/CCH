@@ -671,6 +671,183 @@ exports.pushInvoiceToQB = functions.https.onCall(
   }
 );
 
+/** Numeric QuickBooks entity id from Firestore (not DocNumber like INV-6012). */
+function _qbInvoiceEntityId(data) {
+  if (!data) return "";
+  const raw = data.qbDocId || data.qbInvoiceId || data.qbId;
+  if (raw == null || String(raw).trim() === "") return "";
+  const s = String(raw).trim();
+  if (/^\d+$/.test(s)) return s;
+  return "";
+}
+
+/**
+ * Build Firestore patch from QB Invoice GET (TotalAmt, Balance).
+ * When Balance is ~0, marks Studio invoice Paid + qbStatus paid and aligns payments if needed.
+ */
+function buildFirestorePatchFromQBInvoice(existing, qbInv) {
+  const totalAmt = parseFloat(qbInv.TotalAmt) || 0;
+  let balance = qbInv.Balance;
+  if (balance == null || balance === "") balance = totalAmt;
+  balance = parseFloat(balance);
+  if (!Number.isFinite(balance)) balance = totalAmt;
+  const paidFromQb = Math.max(0, totalAmt - balance);
+  const studioTotal = parseFloat(existing.total) || 0;
+  const refTotal = studioTotal > 0.01 ? studioTotal : totalAmt;
+
+  const updates = {
+    qbBalanceSyncedAt: admin.firestore.FieldValue.serverTimestamp(),
+    qbApiTotalAmt: totalAmt,
+    qbApiBalance: balance,
+    updatedAt: new Date().toISOString()
+  };
+
+  const payLines = Array.isArray(existing.payments) ? existing.payments.slice() : [];
+  const paidSum = payLines.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+
+  if (refTotal <= 0.01) {
+    updates.qbStatus = balance <= 0.02 ? "paid" : "sent";
+    return updates;
+  }
+
+  if (balance <= 0.02) {
+    updates.status = "Paid";
+    updates.qbStatus = "paid";
+    updates.paidAmount = refTotal;
+    if (!existing.datePaid) {
+      updates.datePaid = (qbInv.TxnDate && String(qbInv.TxnDate).slice(0, 10)) || new Date().toISOString().slice(0, 10);
+    }
+    if (Math.abs(paidSum - refTotal) > 0.05) {
+      if (payLines.length === 0) {
+        updates.payments = [{
+          amount: refTotal,
+          date: updates.datePaid || new Date().toISOString().slice(0, 10),
+          method: "QuickBooks",
+          note: "Paid in QuickBooks (balance sync from CCH Studio)"
+        }];
+      } else {
+        const gap = refTotal - paidSum;
+        if (gap > 0.02) {
+          payLines.push({
+            amount: gap,
+            date: new Date().toISOString().slice(0, 10),
+            method: "QuickBooks",
+            note: "Additional amount per QuickBooks balance sync"
+          });
+          updates.payments = payLines;
+        }
+      }
+    }
+  } else if (paidFromQb > 0.02) {
+    updates.status = "Partially Paid";
+    updates.qbStatus = "partial";
+    updates.paidAmount = paidFromQb;
+    if (Math.abs(paidSum - paidFromQb) > 0.05 && paidFromQb > paidSum + 0.02) {
+      payLines.push({
+        amount: paidFromQb - paidSum,
+        date: new Date().toISOString().slice(0, 10),
+        method: "QuickBooks",
+        note: "Partial payment per QuickBooks balance sync"
+      });
+      updates.payments = payLines;
+    }
+  } else {
+    updates.qbStatus = "sent";
+  }
+
+  return updates;
+}
+
+/** Pull one invoice from QuickBooks by qbDocId and update paid status / balance fields in Firestore. */
+exports.syncInvoiceBalanceFromQB = functions.https.onCall(
+  { invoker: "public" },
+  async (request) => {
+    assertQbPushAllowed(request);
+    const { projectId, invoiceId } = request.data || {};
+    if (!projectId || !invoiceId) {
+      throw new functions.https.HttpsError("invalid-argument", "projectId and invoiceId required");
+    }
+    const docRef = db.collection("boards").doc(projectId).collection("invoices").doc(invoiceId);
+    const snap = await docRef.get();
+    if (!snap.exists) throw new functions.https.HttpsError("not-found", "Invoice not found");
+    const existing = snap.data();
+    const qbId = _qbInvoiceEntityId(existing);
+    if (!qbId) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Invoice has no numeric QuickBooks id (qbDocId). Push to QB or paste the Id from QuickBooks first."
+      );
+    }
+    const { accessToken, realmId } = await getQBAccessToken();
+    const invResp = await qbApiCall("GET", "invoice/" + encodeURIComponent(qbId), accessToken, realmId, null);
+    const qbInv = invResp && invResp.Invoice;
+    if (!qbInv) throw new functions.https.HttpsError("internal", "QuickBooks returned no invoice for id " + qbId);
+    const patch = buildFirestorePatchFromQBInvoice(existing, qbInv);
+    await docRef.update(patch);
+    return {
+      success: true,
+      qbId,
+      totalAmt: patch.qbApiTotalAmt,
+      balance: patch.qbApiBalance,
+      status: patch.status || existing.status,
+      qbStatus: patch.qbStatus || existing.qbStatus
+    };
+  }
+);
+
+/**
+ * Scan boards/*/invoices with qbDocId and refresh paid status from QuickBooks (GET invoice per row).
+ * Run from Studio when payments were recorded in QB but webhook did not update Firestore.
+ */
+exports.batchSyncInvoiceBalancesFromQB = functions
+  .runWith({ timeoutSeconds: 300, memory: "512MB" })
+  .https.onCall({ invoker: "public" }, async (request) => {
+    assertQbPushAllowed(request);
+    const rawMax = request.data && request.data.maxInvoices;
+    const maxInvoices = Math.min(Math.max(parseInt(String(rawMax != null ? rawMax : 200), 10) || 200, 1), 500);
+    const { accessToken, realmId } = await getQBAccessToken();
+    const boardsSnap = await db.collection("boards").get();
+    let scanned = 0;
+    let updated = 0;
+    let errors = 0;
+    const sampleErrors = [];
+
+    outer: for (const boardDoc of boardsSnap.docs) {
+      const projectId = boardDoc.id;
+      let invSnap;
+      try {
+        invSnap = await db.collection("boards").doc(projectId).collection("invoices").get();
+      } catch (e) {
+        continue;
+      }
+      for (const invDoc of invSnap.docs) {
+        if (scanned >= maxInvoices) break outer;
+        const data = invDoc.data();
+        const qbId = _qbInvoiceEntityId(data);
+        if (!qbId) continue;
+        scanned++;
+        try {
+          const invResp = await qbApiCall("GET", "invoice/" + encodeURIComponent(qbId), accessToken, realmId, null);
+          const qbInv = invResp && invResp.Invoice;
+          if (!qbInv) {
+            errors++;
+            if (sampleErrors.length < 10) sampleErrors.push(invDoc.id + ": empty QB Invoice");
+            continue;
+          }
+          const patch = buildFirestorePatchFromQBInvoice(data, qbInv);
+          await invDoc.ref.update(patch);
+          updated++;
+        } catch (e) {
+          errors++;
+          const msg = (e && e.message) ? e.message : String(e);
+          if (sampleErrors.length < 10) sampleErrors.push(invDoc.id + ": " + msg);
+        }
+      }
+    }
+
+    return { success: true, scanned, updated, errors, sampleErrors };
+  });
+
 /**
  * Same push as pushInvoiceToQB without Firebase user — for Zapier/n8n/cron.
  * Set QB_AUTOMATION_SECRET in Functions environment, redeploy, then:
@@ -1033,8 +1210,15 @@ exports.qbWebhook = functions.https.onRequest(async (req, res) => {
                 const total = parseFloat(existing.total) || 0;
                 const newStatus = totalPaid >= total ? "Paid" : "Partially Paid";
                 const qbStatus = totalPaid >= total ? "paid" : "partial";
+                const patch = { payments, status: newStatus, qbStatus };
+                if (newStatus === "Paid" && total > 0) {
+                  patch.paidAmount = total;
+                  if (!existing.datePaid) patch.datePaid = paymentData.TxnDate || new Date().toISOString().slice(0, 10);
+                } else if (newStatus === "Partially Paid") {
+                  patch.paidAmount = totalPaid;
+                }
 
-                await invDoc.ref.update({ payments, status: newStatus, qbStatus });
+                await invDoc.ref.update(patch);
               }
             }
           }
