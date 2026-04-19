@@ -26,9 +26,9 @@ if %ERRORLEVEL% NEQ 0 (
     echo.
 )
 
-echo Deploying to cch-platform.web.app...
+echo Deploying production hosting: platform (cch-platform.web.app)...
 echo.
-firebase deploy --only hosting
+firebase deploy --only hosting:platform
 echo.
 echo ============================================
 echo   Deploy complete!

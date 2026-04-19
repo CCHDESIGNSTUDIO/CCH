@@ -37,6 +37,16 @@ Summary of shipped work in this push (Inspiration / Product Library / clipper UX
 - **`platform/index.html`**: Large cumulative update (ideabooks, tear sheets, activity panel, CSS, etc. — see `git log` / diff for full detail).
 - **`platform/cch-client-board.js`**, **`cch-design-board.js`**, **`cch-functions.js`**: Included in the same deployment batch; review `git diff` for line-level changes.
 
+## Design Boards (`cch-design-board.js`) — 2026-04-17 follow-up
+
+Aligned with studio dialog patterns (see `CURSOR_INSPIRATION_BOARDS_BRIEFING` UX rules: no native `prompt` / `confirm` / `alert` where `cchPrompt` / `cchConfirm` / `cchAlert` exist):
+
+- **Board list**: Sort in memory after `.get()` (avoids missing `updatedAt` on older docs). Cards use **#E2E2E2** border, **zero radius**, **4:3** cover area, DM Sans title **#0A1F3D**, meta **11px #9CA3AF**, hover lift via **`.db-board-card:hover`**.
+- **Empty state**: Playfair headline *“Compose your first client board”* plus short DM Sans body copy.
+- **Create / rename / delete / add image / edit text / export / proposal from board**: Use **`cchPrompt`**, **`cchConfirm`**, **`cchAlert`** instead of browser dialogs.
+- **`name` ⇄ `title`**: Boards created from **`index.html`** use **`name`**; canvas editor used **`title`**. **`_dbBoardDisplayName`**, open-board merge, **`updateBoardMeta`**, **`saveBoardToFirestore`**, and create/rename now keep **both** fields in sync; new boards set **`type: 'Design Board'`**.
+- **`index.html`**: Bumped **`cch-design-board.js`** cache param to **`?v=1775900000000`**.
+
 ---
 
 *Generated for internal release tracking. Commit on branch `master` in `cch-deploy`.*

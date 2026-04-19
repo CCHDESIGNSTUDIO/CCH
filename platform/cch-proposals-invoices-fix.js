@@ -279,6 +279,8 @@
 
   function cchApplyProposalViewOnlyDOM(wrap, projectId, proposalId) {
     if (!wrap) return;
+    /* Phase 2: designer Manage landing keeps row controls; do not strip drag/checkbox/pills. */
+    if (wrap.getAttribute('data-cch-proposal-manage') === '1') return;
     wrap.classList.add('cch-proposal-viewonly');
     wrap.setAttribute('data-cch-pid', projectId);
     wrap.setAttribute('data-cch-prid', proposalId);
@@ -321,7 +323,9 @@
       });
     });
     var tableWrap = wrap.querySelector('.proposal-table-wrap');
-    var skipHint = wrap.innerHTML.indexOf('View-only summary') >= 0 || wrap.innerHTML.indexOf('View-only —') >= 0;
+    /* Phase 1 landing: index removed inline "View-only summary"; do not inject duplicate hint (brief: no redundant view-only line). */
+    var skipHint = wrap.getAttribute('data-cch-proposal-landing') === '1' ||
+      wrap.innerHTML.indexOf('View-only summary') >= 0 || wrap.innerHTML.indexOf('View-only —') >= 0;
     if (tableWrap && !document.getElementById('cchProposalViewHint') && !skipHint) {
       var hint = document.createElement('div');
       hint.id = 'cchProposalViewHint';
@@ -352,15 +356,25 @@
   }
 
   function cchProposalMoreMenuWrap(projectId, proposalId, isEdit, invDis, tearJs, hasMyItems) {
-    var invBtn = '<button type="button" style="display:block;width:100%;text-align:left;padding:9px 16px;border:none;background:#fff;cursor:pointer;font-size:13px;color:#1B3352;font-family:var(--font-body);" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'#fff\'" ' + invDis + ' onclick="cchClosePropMoreDd();convertProposalToInvoice(\'' + projectId + '\',\'' + proposalId + '\')">🧾 Convert to Invoice</button>';
-    var inner = cchPropMoreItem('🕐 Timeline', "toggleDocTimeline('" + projectId + "','proposals','" + proposalId + "')") +
-      cchPropMoreItem('📋 Edit details', "editProposalMeta('" + projectId + "','" + proposalId + "')") +
-      invBtn +
-      cchPropMoreItem('📦 Generate POs by Vendor', "generatePOsFromDoc('" + projectId + "','proposals','" + proposalId + "')") +
-      cchPropMoreItem('📄 Tear Sheets', tearJs) +
-      cchPropMoreItem('🖨️ Print / PDF', "printProposal('" + projectId + "','" + proposalId + "')");
+    var invBtn = '<button type="button" style="display:block;width:100%;text-align:left;padding:9px 16px;border:none;background:#fff;cursor:pointer;font-size:13px;color:#1B3352;font-family:var(--font-body);" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'#fff\'" ' + invDis + ' onclick="cchClosePropMoreDd();convertProposalToInvoice(\'' + projectId + '\',\'' + proposalId + '\')">🧾 Start Invoice</button>';
+    var inner = '';
     if (isEdit) {
+      inner = cchPropMoreItem('🕐 Timeline', "toggleDocTimeline('" + projectId + "','proposals','" + proposalId + "')") +
+        cchPropMoreItem('📋 Edit details', "editProposalMeta('" + projectId + "','" + proposalId + "')") +
+        invBtn +
+        cchPropMoreItem('📦 Generate POs by Vendor', "generatePOsFromDoc('" + projectId + "','proposals','" + proposalId + "')") +
+        cchPropMoreItem('📄 Tear Sheets', tearJs) +
+        cchPropMoreItem('🖨️ Print / PDF', "printProposal('" + projectId + "','" + proposalId + "')");
       inner = (hasMyItems ? cchPropMoreItem('📌 My Items', 'toggleMyItemsPanel()') : '') + inner +
+        cchPropMoreItem('🗑️ Delete proposal', "deleteProposal('" + projectId + "','" + proposalId + "')", true);
+    } else {
+      inner = invBtn +
+        cchPropMoreItem('📦 Create Purchase Orders', "generatePOsFromDoc('" + projectId + "','proposals','" + proposalId + "')") +
+        cchPropMoreItem('📄 View Tear Sheets', tearJs) +
+        cchPropMoreItem('📥 Download PDF', "printProposal('" + projectId + "','" + proposalId + "')") +
+        cchPropMoreItem('🕐 View document timeline', "toggleDocTimeline('" + projectId + "','proposals','" + proposalId + "')") +
+        cchPropMoreItem('📤 Unpublish', "togglePublished('" + projectId + "','" + proposalId + "',false)") +
+        cchPropMoreItem('📋 Duplicate proposal', "duplicateProposalAsCopy('" + projectId + "','" + proposalId + "')") +
         cchPropMoreItem('🗑️ Delete proposal', "deleteProposal('" + projectId + "','" + proposalId + "')", true);
     }
     return '<div class="cch-prop-more-wrap" style="position:relative;display:inline-block;vertical-align:middle;z-index:500;">' +
@@ -415,12 +429,17 @@
     var moreView = cchProposalMoreMenuWrap(projectId, proposalId, false, invDis, tearJs, false);
     var moreEdit = cchProposalMoreMenuWrap(projectId, proposalId, true, invDis, tearJs, !!myItemsBtn);
 
+    var invMsgs = (invGate && invGate.msgs && invGate.msgs.length) ? invGate.msgs.join(' ') : 'Complete client approvals before converting.';
+    var invTitleAttr = invOk ? '' : (' title="' + escA(invMsgs) + '"');
+    var convertGold = '<button type="button" class="btn btn-sm" style="font-size:13px;font-weight:700;padding:8px 18px;border-radius:0;background:linear-gradient(180deg,#E8C97A,#C9A227);color:#1a1508;border:1px solid #A88420;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-right:8px;' + (invOk ? '' : 'opacity:0.55;pointer-events:none;') + '"' + invTitleAttr + ' onclick="convertProposalToInvoice(\'' + projectId + '\',\'' + proposalId + '\')">Convert to Invoice</button>';
+
     if (!isEdit) {
       setTopbarActions(
         '<button class="btn btn-secondary btn-sm" onclick="previewDocument(\'proposal\',\'' + projectId + '\',\'' + proposalId + '\')">👁️ Preview</button>' +
         '<button class="btn btn-secondary btn-sm" onclick="' + tearJs + '">📄 Tear Sheets</button>' +
         '<button class="btn btn-primary btn-sm" onclick="navigate(\'#/project/' + projectId + '/proposal/' + proposalId + '/edit\')">✏️ Edit line items</button>' +
         '<button class="btn btn-primary btn-sm" onclick="sendProposalToClient(\'' + projectId + '\',\'' + proposalId + '\')">📧 Email client</button>' +
+        convertGold +
         moreView
       );
       cchApplyProposalViewOnlyDOM(wrap, projectId, proposalId);
@@ -606,9 +625,9 @@
         status: 'Draft',
         total: total,
         items: items,
-        shortDescription: (prop.shortDescription && String(prop.shortDescription).trim()) || '',
+        shortDescription: (typeof proposalDocumentTagText === 'function' ? proposalDocumentTagText(prop) : (prop.shortDescription && String(prop.shortDescription).trim()) || ''),
         vendor: prop.vendor || '',
-        documentTags: prop.documentTags || prop.tags || prop.vendor || '',
+        documentTags: (prop.documentTags && String(prop.documentTags).trim()) || (typeof proposalDocumentTagText === 'function' ? proposalDocumentTagText(prop) : (prop.shortDescription && String(prop.shortDescription).trim()) || '') || prop.tags || prop.vendor || '',
         clientName: cName,
         clientEmail: cEmail,
         clientPhone: cPhone,
@@ -728,7 +747,7 @@
 
     var weekTotal = 0, monthTotal = 0, ytdTotal = 0, allTotal = 0;
     var weekCount = 0, monthCount = 0, ytdCount = 0;
-    var approvedCount = 0, pendingCount = 0;
+    var lineAppr = 0, linePend = 0;
 
     proposals.forEach(function(p) {
       var amt = parseFloat(p.total) || 0;
@@ -739,9 +758,9 @@
         if (created >= startOfMonth) { monthTotal += amt; monthCount++; }
         if (created >= startOfYear) { ytdTotal += amt; ytdCount++; }
       }
-      var status = (p.status || '').toLowerCase();
-      if (status === 'approved' || status === 'invoiced') approvedCount++;
-      else if (status === 'sent' || status === 'draft') pendingCount++;
+      var c = typeof getProposalLineApprovalCounts === 'function' ? getProposalLineApprovalCounts(p) : { appr: 0, pend: 0, dec: 0, n: 0 };
+      lineAppr += c.appr;
+      linePend += c.pend;
     });
 
     var summaryHTML = '<div class="doc-summary-band">' +
@@ -758,8 +777,8 @@
         '<div class="value" style="color:var(--text-primary);">' + formatMoney(allTotal) + '</div>' +
         '<div class="label">All Time (' + proposals.length + ')</div></div>' +
       '<div class="doc-summary-card" style="background:linear-gradient(135deg,rgba(200,169,110,0.06),rgba(200,169,110,0.02));">' +
-        '<div class="value" style="color:var(--gold);">' + approvedCount + ' <span style="font-size:12px;color:var(--gray-400);">/ ' + pendingCount + '</span></div>' +
-        '<div class="label">Approved / Pending</div></div>' +
+        '<div class="value" style="color:var(--gold);">' + lineAppr + ' <span style="font-size:12px;color:var(--gray-400);">/ ' + linePend + '</span></div>' +
+        '<div class="label" title="Totals across this project: product lines marked approved vs still pending (Manage view; section headers excluded).">Lines approved / pending</div></div>' +
     '</div>';
 
     // Insert after the header (first child with flex layout)

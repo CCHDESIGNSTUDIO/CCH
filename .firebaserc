@@ -7,6 +7,9 @@
       "hosting": {
         "platform": [
           "cch-platform"
+        ],
+        "platform-staging": [
+          "cch-platform-staging"
         ]
       }
     }

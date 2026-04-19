@@ -12,6 +12,8 @@
     boardData: null,
     elements: [],
     clips: [],
+    clipCategory: 'All',
+    clipListFilter: '',
     selectedId: null,
     tool: 'select', // select, text, arrow, note, heading
     isDragging: false,
@@ -31,6 +33,9 @@
   // ---- Utility ----
   function genId() { return 'el_' + (dbEditor.nextId++); }
   function esc(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+  function escAttr(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/'/g, '&#39;');
+  }
   function escJsStr(s) {
     return String(s || '')
       .replace(/\\/g, '\\\\')
@@ -38,6 +43,13 @@
       .replace(/\r?\n/g, ' ');
   }
   function fmt$(n) { return '$' + (parseFloat(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+
+  /** Studio stores some boards as `name` (index.html) and canvas editor as `title` — keep both in sync. */
+  function _dbBoardDisplayName(d) {
+    d = d || {};
+    var t = String(d.title || d.name || '').trim();
+    return t || 'Untitled Board';
+  }
 
   // ---- Save state for undo ----
   var _autoSaveTimer = null;
@@ -66,45 +78,65 @@
   window.renderDesignBoardsTab = async function(T, proj) {
     var boards = [];
     try {
-      var s = await db.collection('boards').doc(proj.id).collection('designBoards').orderBy('updatedAt', 'desc').get();
+      var s = await db.collection('boards').doc(proj.id).collection('designBoards').get();
       s.forEach(function(d) { boards.push({ id: d.id, data: d.data() }); });
+      boards.sort(function(a, b) {
+        var ta = String((a.data && (a.data.updatedAt || a.data.createdAt)) || '');
+        var tb = String((b.data && (b.data.updatedAt || b.data.createdAt)) || '');
+        return tb.localeCompare(ta);
+      });
     } catch(e) {}
 
     T.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">' +
         '<div class="section-title" style="margin:0;">' + boards.length + ' Design Board' + (boards.length !== 1 ? 's' : '') + '</div>' +
-        '<button class="btn btn-primary" onclick="createDesignBoard(\'' + proj.id + '\')">+ New Design Board</button>' +
+        '<button class="btn btn-primary" onclick="void createDesignBoard(\'' + proj.id + '\')">+ New Design Board</button>' +
       '</div>' +
       (boards.length === 0 ?
-        '<div class="empty-state"><div class="empty-icon">🎨</div><div class="empty-text">No design boards yet.<br>Create one to start building visual presentations for your clients.</div></div>'
+        '<div style="text-align:center;padding:72px 24px;border:1px solid #E2E2E2;background:#FAFBFC;border-radius:0;">' +
+          '<div style="font-family:\'Playfair Display\',Georgia,serif;font-size:26px;color:#0A1F3D;font-weight:600;margin-bottom:12px;line-height:1.35;">Compose your first client board</div>' +
+          '<div style="font-family:\'DM Sans\',system-ui,sans-serif;font-size:14px;color:#6B7280;max-width:460px;margin:0 auto 8px;line-height:1.55;">A freeform canvas for presentations — drag room-board products, add headings and notes, export or send to proposals.</div>' +
+          '<div style="font-family:\'DM Sans\',system-ui,sans-serif;font-size:12px;color:#9CA3AF;">Use <strong>New Design Board</strong> above to begin.</div>' +
+        '</div>'
       :
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;">' +
         boards.map(function(b) {
           var d = b.data;
           var elCount = (d.elements || []).length;
-          var thumb = '';
-          (d.elements || []).forEach(function(el) { if (!thumb && el.type === 'product' && el.imageUrl) thumb = el.imageUrl; });
-          return '<div class="card" style="overflow:hidden;transition:transform 0.15s;" onmouseover="this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.transform=\'none\'">' +
-            '<div style="cursor:pointer;height:160px;background:' + (thumb ? 'url(' + esc(thumb) + ') center/cover' : 'linear-gradient(135deg,#f5f0e8,#e8e0d0)') + ';display:flex;align-items:center;justify-content:center;" onclick="openDesignBoard(\'' + proj.id + '\',\'' + b.id + '\')">' +
+          var thumb = String(d.coverImageUrl || '').trim();
+          if (!thumb && d.coverElementId) {
+            (d.elements || []).forEach(function(el) {
+              if (!thumb && el && el.id === d.coverElementId) thumb = el.imageUrl || el.img || thumb;
+            });
+          }
+          if (!thumb) {
+            (d.elements || []).forEach(function(el) {
+              if (!thumb && el && el.type === 'product' && el.imageUrl) thumb = el.imageUrl;
+              if (!thumb && el && el.type === 'image' && el.img) thumb = el.img;
+            });
+          }
+          var nm = _dbBoardDisplayName(d);
+          return '<div class="card db-board-card" style="overflow:hidden;border:1px solid #E2E2E2;border-radius:0;transition:transform 0.2s,box-shadow 0.2s;box-shadow:none;">' +
+            '<div style="cursor:pointer;aspect-ratio:4/3;width:100%;background:' + (thumb ? 'url(' + esc(thumb) + ') center/cover' : 'linear-gradient(135deg,#f5f0e8,#e8e0d0)') + ';display:flex;align-items:center;justify-content:center;" onclick="openDesignBoard(\'' + proj.id + '\',\'' + b.id + '\')">' +
             (thumb ? '' : '<span style="font-size:48px;opacity:0.3;">🎨</span>') +
             '</div>' +
             '<div class="card-body" style="padding:14px 16px;">' +
               '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
                 '<div style="cursor:pointer;flex:1;" onclick="openDesignBoard(\'' + proj.id + '\',\'' + b.id + '\')">' +
-                  '<div style="font-weight:600;font-size:14px;">' + esc(d.title || 'Untitled Board') + '</div>' +
-                  '<div style="font-size:12px;color:var(--gray-400);margin-top:4px;">' +
+                  '<div style="font-weight:600;font-size:14px;color:#0A1F3D;font-family:\'DM Sans\',system-ui,sans-serif;">' + esc(nm) + '</div>' +
+                  '<div style="font-size:11px;color:#9CA3AF;margin-top:6px;line-height:1.4;font-family:\'DM Sans\',system-ui,sans-serif;">' +
                     (d.room ? esc(d.room) + ' · ' : '') + elCount + ' element' + (elCount !== 1 ? 's' : '') +
                     (d.updatedAt ? ' · ' + new Date(d.updatedAt).toLocaleDateString() : '') +
                   '</div>' +
                 '</div>' +
                 '<div style="display:flex;gap:4px;flex-shrink:0;">' +
-                  '<button class="btn btn-secondary btn-sm" style="padding:4px 8px;font-size:11px;" onclick="event.stopPropagation();editBoardMeta(\'' + proj.id + '\',\'' + b.id + '\',\'' + escJsStr(d.title || '') + '\',\'' + escJsStr(d.room || '') + '\')">✏️</button>' +
-                  '<button class="btn btn-sm" style="padding:4px 8px;font-size:11px;background:#fee;color:var(--red);" onclick="event.stopPropagation();deleteDesignBoard(\'' + proj.id + '\',\'' + b.id + '\',\'' + escJsStr(d.title || 'this board') + '\')">🗑️</button>' +
+                  '<button class="btn btn-secondary btn-sm" style="padding:4px 8px;font-size:11px;border-radius:0;" onclick="event.stopPropagation();void editBoardMeta(\'' + proj.id + '\',\'' + b.id + '\',\'' + escJsStr(nm) + '\',\'' + escJsStr(d.room || '') + '\')">✏️</button>' +
+                  '<button class="btn btn-sm" style="padding:4px 8px;font-size:11px;background:#fee;color:var(--red);border-radius:0;" onclick="event.stopPropagation();void deleteDesignBoard(\'' + proj.id + '\',\'' + b.id + '\',\'' + escJsStr(nm) + '\')">🗑️</button>' +
                 '</div>' +
               '</div>' +
               '<div style="display:flex;gap:6px;margin-top:8px;">' +
-                '<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 10px;" onclick="event.stopPropagation();openDesignBoard(\'' + proj.id + '\',\'' + b.id + '\')">✏️ Edit</button>' +
-                '<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 10px;" onclick="event.stopPropagation();window.location.hash=\'#/clientboard/' + proj.id + '/' + b.id + '\'">🖤 Client View</button>' +
+                '<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 10px;border-radius:0;" onclick="event.stopPropagation();openDesignBoard(\'' + proj.id + '\',\'' + b.id + '\')">✏️ Edit</button>' +
+                '<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 10px;border-radius:0;" onclick="event.stopPropagation();window.location.hash=\'#/clientboard/' + proj.id + '/' + b.id + '\'">🖤 Client View</button>' +
               '</div>' +
             '</div>' +
           '</div>';
@@ -114,48 +146,49 @@
   };
 
   window.editBoardMeta = async function(projectId, boardId, currentTitle, currentRoom) {
-    var newTitle = prompt('Board name:', currentTitle);
+    if (typeof cchPrompt !== 'function') return;
+    var newTitle = await cchPrompt('Board name:', currentTitle || '', 'Design board');
     if (newTitle === null) return;
-    var newRoom = prompt('Room:', currentRoom);
-    if (newRoom === null) newRoom = currentRoom;
+    newTitle = String(newTitle).trim();
+    if (!newTitle) return;
+    var newRoom = await cchPrompt('Room (optional):', currentRoom || '', 'Room');
+    if (newRoom === null) return;
+    newRoom = String(newRoom || '').trim();
     try {
       await db.collection('boards').doc(projectId).collection('designBoards').doc(boardId).update({
         title: newTitle,
+        name: newTitle,
         room: newRoom,
         updatedAt: new Date().toISOString()
       });
       renderProjectDetail();
-    } catch(e) { alert('Error: ' + e.message); }
+    } catch(e) {
+      if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Design board');
+      else alert('Error: ' + e.message);
+    }
   };
 
   window.deleteDesignBoard = async function(projectId, boardId, title) {
-    if (!confirm('Delete "' + title + '"? This cannot be undone.')) return;
+    if (typeof cchConfirm !== 'function') return;
+    if (!(await cchConfirm('Delete "' + title + '"? This cannot be undone.', 'Delete design board', { confirmText: 'Delete', danger: true }))) return;
     try {
       await db.collection('boards').doc(projectId).collection('designBoards').doc(boardId).delete();
       renderProjectDetail();
-    } catch(e) { alert('Error: ' + e.message); }
+    } catch(e) {
+      if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Design board');
+      else alert('Error: ' + e.message);
+    }
   };
 
-  window.createDesignBoard = async function(projectId) {
-    var title = prompt('Design Board Name:', 'Master Bathroom');
-    if (!title) return;
-    var room = prompt('Room (optional):', '');
-    var doc = await db.collection('boards').doc(projectId).collection('designBoards').add({
-      title: title,
-      room: room || '',
-      elements: [],
-      canvasWidth: 1400,
-      canvasHeight: 1000,
-      showPricing: true,
-      branding: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    });
-    openDesignBoard(projectId, doc.id);
-  };
+  // createDesignBoard lives in index.html (loads before this file) — do not assign window.createDesignBoard here or the project tab "+ New Design Board" breaks.
 
   // ==================== OPEN BOARD EDITOR ====================
   window.openDesignBoard = async function(projectId, boardId) {
+    dbUnbindDocPointerListeners();
+    dbEditor.isDragging = false;
+    dbEditor.isResizing = false;
+    _arrowDragEl = null;
+    _arrowDragEnd = null;
     dbEditor.projectId = projectId;
     dbEditor.boardId = boardId;
     dbEditor.selectedId = null;
@@ -173,10 +206,14 @@
       return;
     }
     dbEditor.boardData = doc.data() || {};
+    if (!dbEditor.boardData.title && dbEditor.boardData.name) dbEditor.boardData.title = dbEditor.boardData.name;
+    if (!dbEditor.boardData.name && dbEditor.boardData.title) dbEditor.boardData.name = dbEditor.boardData.title;
     dbEditor.elements = (dbEditor.boardData.elements || []).map(function(el) { return Object.assign({}, el); });
     dbEditor.showPricing = dbEditor.boardData.showPricing !== false;
     dbEditor.clientView = false;
     dbEditor.nextId = dbEditor.elements.length + 1;
+    dbEditor.clipCategory = 'All';
+    dbEditor.clipListFilter = '';
 
     // Load clips
     dbEditor.clips = [];
@@ -185,30 +222,78 @@
       cs.forEach(function(d) { dbEditor.clips.push({ id: d.id, data: d.data() }); });
     } catch(e) {}
 
+    // Fix in-memory tiles that still point at app-root junk (e.g. …/68.jpeg 404s) using clip + gallery pickers
+    try {
+      if (hydrateProductTileUrlsFromClips()) {
+        dbEditor.dirty = true;
+        if (typeof showToast === 'function') {
+          showToast('Product image links were corrected from clips — click Save to update the client portal.', 6000);
+        }
+      }
+    } catch (_hydrErr) { console.warn('[design board] hydrate tiles:', _hydrErr); }
+
     // Render full editor
     renderBoardEditor();
   };
 
+  /** Replace weak imageUrl on product tiles (same-origin single-segment 404s) using cchPickPreferredProductImageUrl + clip merge. */
+  function hydrateProductTileUrlsFromClips() {
+    if (!dbEditor.elements || !dbEditor.elements.length || typeof window.cchPickPreferredProductImageUrl !== 'function') return false;
+    var byId = {};
+    (dbEditor.clips || []).forEach(function(c) { if (c && c.id) byId[c.id] = c.data || {}; });
+    var changed = false;
+    dbEditor.elements.forEach(function(el) {
+      if (!el || el.type !== 'product') return;
+      var merged = (el.clipId && byId[el.clipId]) ? Object.assign({}, byId[el.clipId], el) : el;
+      var best = String(window.cchPickPreferredProductImageUrl(merged) || '').trim();
+      if (!best) return;
+      var cur = (typeof _resolveImgSrc === 'function')
+        ? _resolveImgSrc(String(el.imageUrl || '').trim())
+        : String(el.imageUrl || '').trim();
+      if (String(cur).toLowerCase() === String(best).toLowerCase()) return;
+      var needs = true;
+      if (typeof window.cchProductBoardImageIsLikelyValid === 'function' && window.cchProductBoardImageIsLikelyValid(cur)) needs = false;
+      if (!needs) return;
+      el.imageUrl = best;
+      changed = true;
+    });
+    return changed;
+  }
+
   // ==================== RENDER BOARD EDITOR ====================
   function renderBoardEditor() {
     var C = document.getElementById('contentArea');
+    if (!C) return;
+    dbUnbindDocPointerListeners();
+    dbEditor.isDragging = false;
+    dbEditor.isResizing = false;
+    _arrowDragEl = null;
+    _arrowDragEnd = null;
     var bd = dbEditor.boardData;
     var cw = bd.canvasWidth || 1400;
     var ch = bd.canvasHeight || 1000;
 
     C.innerHTML =
+      '<style>' +
+      '#dbToolbar .db-tool-btn{font-family:DM Sans,system-ui,sans-serif!important;font-size:12px!important;font-weight:600!important;padding:8px 12px!important;border-radius:6px!important;cursor:pointer!important;letter-spacing:0.02em!important;border:1px solid rgba(27,51,82,0.32)!important;background:#fff!important;color:#0a1628!important;box-shadow:0 1px 2px rgba(27,51,82,0.08)!important;line-height:1.2!important;}' +
+      '#dbToolbar .db-tool-btn:hover{border-color:#C4A464!important;color:#1B3352!important;background:#fffdf6!important;}' +
+      '#dbToolbar .db-tool-btn--active{background:linear-gradient(180deg,#d4b76e,#c4a464)!important;color:#1a1204!important;border-color:#8a7030!important;box-shadow:inset 0 1px 0 rgba(255,255,255,0.35),0 1px 2px rgba(0,0,0,0.08)!important;}' +
+      '#dbToolbar .db-toolbar-hint{font-size:11px!important;color:#2c3d5e!important;font-weight:500!important;max-width:240px!important;line-height:1.4!important;}' +
+      '#dbToolbar .db-toolbar-hint strong{color:#0a1628!important;font-weight:700!important;}' +
+      '</style>' +
       // Top toolbar
       '<div id="dbToolbar" style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--gray-200);margin-bottom:0;flex-wrap:wrap;">' +
         '<button class="btn btn-secondary btn-sm" onclick="closeBoardEditor()" style="margin-right:8px;">← Back</button>' +
-        '<span style="font-weight:700;font-size:15px;margin-right:16px;" id="dbTitle">' + esc(bd.title) + '</span>' +
-        '<div style="display:flex;gap:4px;padding:2px;background:var(--gray-100);border-radius:6px;">' +
+        '<span style="font-weight:700;font-size:15px;margin-right:16px;color:#1B3352;" id="dbTitle">' + esc(_dbBoardDisplayName(bd)) + '</span>' +
+        '<div style="display:flex;gap:6px;padding:6px;background:#eef2f7;border-radius:8px;flex-wrap:wrap;align-items:center;border:1px solid rgba(27,51,82,0.1);">' +
           toolBtn('select', '↖', 'Select') +
           toolBtn('text', 'T', 'Text') +
           toolBtn('heading', 'H', 'Heading') +
           toolBtn('arrow', '→', 'Arrow') +
           toolBtn('note', '📝', 'Note') +
         '</div>' +
-        '<button class="btn btn-secondary btn-sm" onclick="addImageToBoard()">🖼️ Add Image</button>' +
+        '<span class="db-toolbar-hint">Choose <strong>Text</strong> or <strong>Heading</strong>, then click on the board to place.</span>' +
+        '<button class="btn btn-secondary btn-sm" onclick="void addImageToBoard()">🖼️ Add Image</button>' +
         '<div style="flex:1;"></div>' +
         '<label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" ' + (dbEditor.showPricing ? 'checked' : '') + ' onchange="toggleBoardPricing(this.checked)"> Show Pricing</label>' +
         '<button class="btn btn-secondary btn-sm" onclick="toggleClientView()">' + (dbEditor.clientView ? '🔧 Designer' : '👁 Client View') + '</button>' +
@@ -224,12 +309,14 @@
         // Left: Clips panel
         '<div id="dbClipsPanel" style="width:220px;min-width:220px;border-right:1px solid var(--gray-200);overflow-y:auto;padding:12px;background:#fafaf8;">' +
           '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--gray-400);font-weight:600;margin-bottom:8px;">Project Items</div>' +
-          '<input type="text" placeholder="Filter clips..." style="width:100%;padding:6px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:12px;margin-bottom:8px;" oninput="filterBoardClips(this.value)">' +
+          '<label style="font-size:10px;color:var(--gray-500);display:block;margin-bottom:4px;">Category</label>' +
+          '<select id="dbClipCatSel" style="width:100%;padding:6px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:12px;margin-bottom:8px;background:#fff;box-sizing:border-box;" onchange="setBoardClipCategory(this.value)"></select>' +
+          '<input id="dbClipFilterInput" type="text" placeholder="Filter clips..." style="width:100%;padding:6px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:12px;margin-bottom:8px;box-sizing:border-box;" oninput="filterBoardClips(this.value)">' +
           '<div id="dbClipsList"></div>' +
         '</div>' +
 
         // Center: Canvas
-        '<div id="dbCanvasWrap" style="flex:1;overflow:auto;background:#e8e4dc;position:relative;cursor:default;" onmousedown="canvasMouseDown(event)" onmousemove="canvasMouseMove(event)" onmouseup="canvasMouseUp(event)">' +
+        '<div id="dbCanvasWrap" style="flex:1;overflow:auto;background:#e8e4dc;position:relative;cursor:default;" onmousedown="canvasMouseDown(event)">' +
           '<div id="dbCanvas" style="position:relative;width:' + cw + 'px;height:' + ch + 'px;background:#ffffff;margin:30px auto;box-shadow:0 4px 24px rgba(0,0,0,0.12);overflow:hidden;">' +
             '<svg id="dbArrowSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:500;"></svg>' +
             '<div id="dbElements"></div>' +
@@ -250,7 +337,10 @@
         '</div>' +
       '</div>';
 
-    renderClipsList();
+    populateClipCategorySelect();
+    var _fi = document.getElementById('dbClipFilterInput');
+    if (_fi) _fi.value = dbEditor.clipListFilter || '';
+    renderClipsList(dbEditor.clipListFilter || '');
     renderCanvas();
     renderProps();
 
@@ -265,9 +355,8 @@
 
   function toolBtn(tool, icon, label) {
     var active = dbEditor.tool === tool;
-    return '<button class="btn btn-sm" style="min-width:32px;font-size:14px;padding:4px 8px;' +
-      (active ? 'background:var(--gold);color:#fff;' : 'background:transparent;color:var(--gray-600);') +
-      '" onclick="setDBTool(\'' + tool + '\')" title="' + label + '">' + icon + '</button>';
+    return '<button type="button" class="db-tool-btn' + (active ? ' db-tool-btn--active' : '') + '" onclick="setDBTool(\'' + tool + '\')" title="' + escAttr(label) + '">' +
+      '<span style="font-weight:800;font-size:13px;margin-right:5px;opacity:0.95;">' + esc(icon) + '</span><span>' + esc(label) + '</span></button>';
   }
 
   function updateToolbar() {
@@ -297,14 +386,65 @@
     navigate('#/project/' + dbEditor.projectId + '/designboards');
   };
 
+  function clipCategoryOptions() {
+    var s = new Set();
+    dbEditor.clips.forEach(function(c) {
+      var cat = String((c.data && c.data.category) || '').trim();
+      if (cat) s.add(cat);
+    });
+    return ['All'].concat(Array.from(s).sort(function(a, b) { return a.localeCompare(b, undefined, { sensitivity: 'base' }); }));
+  }
+
+  function populateClipCategorySelect() {
+    var sel = document.getElementById('dbClipCatSel');
+    if (!sel) return;
+    var cats = clipCategoryOptions();
+    var cur = dbEditor.clipCategory || 'All';
+    sel.innerHTML = cats.map(function(c) {
+      return '<option value="' + escAttr(c) + '"' + (cur === c ? ' selected' : '') + '>' + esc(c === 'All' ? 'All categories' : c) + '</option>';
+    }).join('');
+  }
+
+  window.setBoardClipCategory = function(val) {
+    dbEditor.clipCategory = val || 'All';
+    var inp = document.getElementById('dbClipFilterInput');
+    renderClipsList(inp ? inp.value : '');
+  };
+
+  /** Nudge x,y so a new w×h product box avoids overlapping other products (reduces stacked drops). */
+  function findFreeCanvasDropPosition(w, h, preferX, preferY) {
+    var rects = dbEditor.elements.filter(function(e) {
+      return e && e.type === 'product' && e.w != null && e.h != null;
+    });
+    var x = Math.max(0, preferX - w / 2);
+    var y = Math.max(0, preferY - h / 2);
+    function hits(ex, ey) {
+      return rects.some(function(o) {
+        return !(ex + w < o.x - 2 || ex > o.x + o.w + 2 || ey + h < o.y - 2 || ey > o.y + o.h + 2);
+      });
+    }
+    for (var step = 0; step < 80; step++) {
+      if (!hits(x, y)) return { x: x, y: y };
+      y += 28;
+      if (y > 920) { y = 20; x += 36; }
+    }
+    return { x: Math.max(0, preferX - w / 2), y: Math.max(0, preferY - h / 2) };
+  }
+
   // ==================== CLIPS SIDEBAR ====================
   function renderClipsList(filter) {
     var el = document.getElementById('dbClipsList');
     if (!el) return;
-    var f = (filter || '').toLowerCase();
+    if (filter !== undefined && filter !== null) dbEditor.clipListFilter = filter;
+    var f = String(dbEditor.clipListFilter || '').toLowerCase();
+    var catF = dbEditor.clipCategory || 'All';
     var html = '';
     dbEditor.clips.forEach(function(clip) {
       var d = clip.data;
+      if (catF !== 'All') {
+        var cc = String(d.category || '').trim();
+        if (cc.toLowerCase() !== String(catF).toLowerCase()) return;
+      }
       var title = d.title || 'Untitled';
       var vendor = d.vendor || '';
       if (f && title.toLowerCase().indexOf(f) < 0 && vendor.toLowerCase().indexOf(f) < 0) return;
@@ -329,6 +469,37 @@
   }
 
   window.filterBoardClips = function(val) { renderClipsList(val); };
+
+  window.bringSelectedToFront = function() {
+    if (!dbEditor.selectedId) return;
+    var idx = dbEditor.elements.findIndex(function(e) { return e.id === dbEditor.selectedId; });
+    if (idx < 0) return;
+    pushUndo();
+    var lifted = dbEditor.elements.splice(idx, 1)[0];
+    dbEditor.elements.push(lifted);
+    renderCanvas();
+    renderProps();
+  };
+
+  window.setBoardCoverFromProduct = async function() {
+    var el = dbEditor.elements.find(function(e) { return e.id === dbEditor.selectedId; });
+    if (!el || el.type !== 'product' || !el.imageUrl) {
+      if (typeof cchAlert === 'function') await cchAlert('Select a product tile on the board (with an image), then set cover.', 'Board cover');
+      return;
+    }
+    try {
+      await db.collection('boards').doc(dbEditor.projectId).collection('designBoards').doc(dbEditor.boardId).update({
+        coverImageUrl: el.imageUrl,
+        coverElementId: el.id,
+        updatedAt: new Date().toISOString()
+      });
+      dbEditor.boardData.coverImageUrl = el.imageUrl;
+      dbEditor.boardData.coverElementId = el.id;
+      if (typeof showToast === 'function') showToast('Cover saved — this image is used on the Design Boards grid.', 3500);
+    } catch (err) {
+      if (typeof cchAlert === 'function') await cchAlert((err && err.message) || 'Could not save cover', 'Board cover');
+    }
+  };
 
   // ---- Drag from clips panel ----
   window.clipDragStart = function(e, clipId) {
@@ -361,19 +532,19 @@
       }
 
       else if (el.type === 'text') {
-        html += '<div class="db-el" data-id="' + el.id + '" style="position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;' + outline + 'cursor:move;z-index:' + (sel ? 100 : 20) + ';max-width:300px;" onmousedown="elMouseDown(event,\'' + el.id + '\')" ondblclick="editTextEl(\'' + el.id + '\')">' +
+        html += '<div class="db-el" data-id="' + el.id + '" style="position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;' + outline + 'cursor:move;z-index:' + (sel ? 100 : 20) + ';max-width:300px;" onmousedown="elMouseDown(event,\'' + el.id + '\')" ondblclick="void editTextEl(\'' + el.id + '\')">' +
           '<div style="font-size:' + (el.fontSize || 13) + 'px;color:' + (el.color || '#333') + ';font-weight:' + (el.fontWeight || 'normal') + ';white-space:pre-wrap;pointer-events:none;font-family:' + (el.fontFamily || 'inherit') + ';">' + esc(el.text || 'Text') + '</div>' +
         '</div>';
       }
 
       else if (el.type === 'heading') {
-        html += '<div class="db-el" data-id="' + el.id + '" style="position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;' + outline + 'cursor:move;z-index:' + (sel ? 100 : 20) + ';" onmousedown="elMouseDown(event,\'' + el.id + '\')" ondblclick="editTextEl(\'' + el.id + '\')">' +
+        html += '<div class="db-el" data-id="' + el.id + '" style="position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;' + outline + 'cursor:move;z-index:' + (sel ? 100 : 20) + ';" onmousedown="elMouseDown(event,\'' + el.id + '\')" ondblclick="void editTextEl(\'' + el.id + '\')">' +
           '<div style="font-size:' + (el.fontSize || 24) + 'px;color:' + (el.color || '#333') + ';font-weight:700;letter-spacing:2px;text-transform:uppercase;pointer-events:none;">' + esc(el.text || 'HEADING') + '</div>' +
         '</div>';
       }
 
       else if (el.type === 'note') {
-        html += '<div class="db-el" data-id="' + el.id + '" style="position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;width:' + (el.w || 200) + 'px;padding:10px 12px;background:#FFFDE7;border:1px solid #FFF9C4;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,0.08);' + outline + 'cursor:move;z-index:' + (sel ? 100 : 15) + ';" onmousedown="elMouseDown(event,\'' + el.id + '\')" ondblclick="editTextEl(\'' + el.id + '\')">' +
+        html += '<div class="db-el" data-id="' + el.id + '" style="position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;width:' + (el.w || 200) + 'px;padding:10px 12px;background:#FFFDE7;border:1px solid #FFF9C4;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,0.08);' + outline + 'cursor:move;z-index:' + (sel ? 100 : 15) + ';" onmousedown="elMouseDown(event,\'' + el.id + '\')" ondblclick="void editTextEl(\'' + el.id + '\')">' +
           '<div style="font-size:12px;color:#666;white-space:pre-wrap;pointer-events:none;font-style:italic;">' + esc(el.text || 'Designer notes...') + '</div>' +
           (sel ? resizeHandles() : '') +
         '</div>';
@@ -395,7 +566,7 @@
       else if (el.type === 'pricetag') {
         var showP = dbEditor.showPricing && !dbEditor.clientView;
         if (showP) {
-          html += '<div class="db-el" data-id="' + el.id + '" style="position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;background:#fff;border:1px solid #ddd;border-radius:4px;padding:4px 8px;font-size:11px;' + outline + 'cursor:move;z-index:' + (sel ? 100 : 25) + ';" onmousedown="elMouseDown(event,\'' + el.id + '\')" ondblclick="editTextEl(\'' + el.id + '\')">' +
+          html += '<div class="db-el" data-id="' + el.id + '" style="position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;background:#fff;border:1px solid #ddd;border-radius:4px;padding:4px 8px;font-size:11px;' + outline + 'cursor:move;z-index:' + (sel ? 100 : 25) + ';" onmousedown="elMouseDown(event,\'' + el.id + '\')" ondblclick="void editTextEl(\'' + el.id + '\')">' +
             '<div style="pointer-events:none;">' + esc(el.text || '') + '</div>' +
           '</div>';
         }
@@ -451,6 +622,10 @@
       html += propRow('Sell $', '<input class="db-prop-input" type="number" value="' + (el.sellPrice || 0) + '" onchange="updateElProp(\'' + el.id + '\',\'sellPrice\',+this.value)" style="width:80px;">');
       html += propRow('Show $', '<input type="checkbox" ' + (el.showPrice !== false ? 'checked' : '') + ' onchange="updateElProp(\'' + el.id + '\',\'showPrice\',this.checked)">');
       html += propRow('Note', '<textarea class="db-prop-input" rows="3" onchange="updateElProp(\'' + el.id + '\',\'annotation\',this.value)" style="resize:vertical;">' + esc(el.annotation || '') + '</textarea>');
+      html += '<div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;">' +
+        '<button type="button" class="btn btn-sm" onclick="void setBoardCoverFromProduct()">Use as board cover (grid thumbnail)</button>' +
+        '<button type="button" class="btn btn-secondary btn-sm" onclick="bringSelectedToFront()">Bring to front (stacking)</button>' +
+      '</div>';
       html += '</div>';
     }
 
@@ -498,6 +673,7 @@
 
   window.updateBoardMeta = function(prop, value) {
     dbEditor.boardData[prop] = value;
+    if (prop === 'title') dbEditor.boardData.name = value;
     dbEditor.dirty = true;
     if (prop === 'title') {
       var tEl = document.getElementById('dbTitle');
@@ -556,27 +732,50 @@
     renderCanvas();
   };
 
-  window.editTextEl = function(id) {
+  window.editTextEl = async function(id) {
     var el = dbEditor.elements.find(function(e) { return e.id === id; });
-    if (!el) return;
-    var newText = prompt('Edit text:', el.text || '');
-    if (newText !== null) {
-      pushUndo();
-      el.text = newText;
-      renderCanvas();
-      renderProps();
-    }
+    if (!el || typeof cchPrompt !== 'function') return;
+    var newText = await cchPrompt('Edit text:', el.text || '', 'Edit text');
+    if (newText === null) return;
+    pushUndo();
+    el.text = newText;
+    renderCanvas();
+    renderProps();
   };
 
   // ==================== MOUSE HANDLING ====================
   var _arrowDragEl = null;
   var _arrowDragEnd = null;
+  /** Full innerHTML refresh on mousedown destroyed the node under the cursor; overlapping tiles felt "sticky". Capture on document keeps move/up reliable. */
+  var _dbDocPointerBound = false;
+  function dbUnbindDocPointerListeners() {
+    if (!_dbDocPointerBound) return;
+    _dbDocPointerBound = false;
+    document.removeEventListener('mousemove', dbDocPointerMove, true);
+    document.removeEventListener('mouseup', dbDocPointerUp, true);
+  }
+  function dbDocPointerMove(e) {
+    if (!dbEditor.isDragging && !dbEditor.isResizing && !_arrowDragEl) return;
+    if (typeof window.canvasMouseMove === 'function') window.canvasMouseMove(e);
+  }
+  function dbDocPointerUp(e) {
+    if (typeof window.canvasMouseUp === 'function') window.canvasMouseUp(e);
+  }
+  function dbBindDocPointerListeners() {
+    if (_dbDocPointerBound) return;
+    _dbDocPointerBound = true;
+    document.addEventListener('mousemove', dbDocPointerMove, true);
+    document.addEventListener('mouseup', dbDocPointerUp, true);
+  }
 
   window.arrowHandleDown = function(e, id, end) {
     e.stopPropagation();
     _arrowDragEl = id;
     _arrowDragEnd = end;
     dbEditor.selectedId = id;
+    dbEditor._arrowDragUndoPushed = false;
+    dbEditor._dragStartScreen = { x: e.clientX, y: e.clientY };
+    dbBindDocPointerListeners();
     renderProps();
   };
 
@@ -588,27 +787,41 @@
     var el = dbEditor.elements.find(function(e2) { return e2.id === id; });
     if (!el) return;
 
+    if (el.type !== 'arrow') {
+      var bi = dbEditor.elements.findIndex(function(e2) { return e2.id === id; });
+      if (bi >= 0) {
+        var lifted = dbEditor.elements.splice(bi, 1)[0];
+        dbEditor.elements.push(lifted);
+      }
+    }
+
     var canvas = document.getElementById('dbCanvas');
     var rect = canvas.getBoundingClientRect();
     var mx = e.clientX - rect.left;
     var my = e.clientY - rect.top;
 
     dbEditor.isDragging = true;
+    dbEditor._dragUndoPushed = false;
+    dbEditor._dragStartScreen = { x: e.clientX, y: e.clientY };
     if (el.type === 'arrow') {
       dbEditor.dragOffset = { x: mx, y: my, ox1: el.x1, oy1: el.y1, ox2: el.x2, oy2: el.y2 };
     } else {
       dbEditor.dragOffset = { x: mx - (el.x || 0), y: my - (el.y || 0) };
     }
 
-    pushUndo();
-    renderCanvas();
-    renderProps();
+    dbBindDocPointerListeners();
+    requestAnimationFrame(function() {
+      renderCanvas();
+      renderProps();
+    });
   };
 
   window.resizeMouseDown = function(e, dir) {
     e.stopPropagation();
+    pushUndo();
     dbEditor.isResizing = true;
     dbEditor.resizeDir = dir;
+    dbBindDocPointerListeners();
 
     var el = dbEditor.elements.find(function(e2) { return e2.id === dbEditor.selectedId; });
     if (!el) return;
@@ -628,8 +841,20 @@
     var mx = e.clientX - rect.left;
     var my = e.clientY - rect.top;
 
-    // Check if click is on canvas (not on an element)
-    if (mx < 0 || my < 0 || mx > canvas.offsetWidth || my > canvas.offsetHeight) return;
+    // Click on scroll padding / gray area around the white board: clear selection (was returning early → "sticky" selection)
+    if (mx < 0 || my < 0 || mx > canvas.offsetWidth || my > canvas.offsetHeight) {
+      if (dbEditor.tool === 'select') {
+        dbEditor.selectedId = null;
+        dbEditor.isDragging = false;
+        dbEditor.isResizing = false;
+        _arrowDragEl = null;
+        _arrowDragEnd = null;
+        dbUnbindDocPointerListeners();
+        renderCanvas();
+        renderProps();
+      }
+      return;
+    }
 
     if (dbEditor.tool === 'text') {
       pushUndo();
@@ -702,6 +927,13 @@
     if (_arrowDragEl) {
       var ael = dbEditor.elements.find(function(e2) { return e2.id === _arrowDragEl; });
       if (ael) {
+        if (!dbEditor._arrowDragUndoPushed) {
+          var dsA = dbEditor._dragStartScreen;
+          if (dsA && (Math.abs(e.clientX - dsA.x) > 2 || Math.abs(e.clientY - dsA.y) > 2)) {
+            dbEditor._arrowDragUndoPushed = true;
+            pushUndo();
+          }
+        }
         if (_arrowDragEnd === 'start') { ael.x1 = mx; ael.y1 = my; }
         else { ael.x2 = mx; ael.y2 = my; }
         renderCanvas();
@@ -738,6 +970,14 @@
       var el2 = dbEditor.elements.find(function(e2) { return e2.id === dbEditor.selectedId; });
       if (!el2) return;
 
+      if (!dbEditor._dragUndoPushed) {
+        var ds = dbEditor._dragStartScreen;
+        if (ds && (Math.abs(e.clientX - ds.x) > 2 || Math.abs(e.clientY - ds.y) > 2)) {
+          dbEditor._dragUndoPushed = true;
+          pushUndo();
+        }
+      }
+
       if (el2.type === 'arrow') {
         var ddx = mx - dbEditor.dragOffset.x;
         var ddy = my - dbEditor.dragOffset.y;
@@ -754,11 +994,24 @@
   };
 
   window.canvasMouseUp = function(e) {
+    dbUnbindDocPointerListeners();
     dbEditor.isDragging = false;
     dbEditor.isResizing = false;
     _arrowDragEl = null;
     _arrowDragEnd = null;
   };
+
+  if (!window._dbDesignBoardBlurBound) {
+    window._dbDesignBoardBlurBound = true;
+    window.addEventListener('blur', function() {
+      if (!dbEditor || !dbEditor.boardId) return;
+      dbUnbindDocPointerListeners();
+      dbEditor.isDragging = false;
+      dbEditor.isResizing = false;
+      _arrowDragEl = null;
+      _arrowDragEnd = null;
+    });
+  }
 
   // ==================== DROP FROM CLIPS ====================
   // Handle drop on canvas wrap
@@ -795,15 +1048,20 @@
       var imgPack = (typeof window.cchProposalLineImagesFromSource === 'function')
         ? window.cchProposalLineImagesFromSource(d)
         : { images: [], imageUrl: '', heroImageIndex: 0 };
-      var primaryImg = imgPack.imageUrl || _resolveImgSrc(String(d.imageUrl || '').trim()) || _firstCoercedGalleryUrl(d) || '';
+      var primaryImg = (typeof window.cchPickPreferredProductImageUrl === 'function')
+        ? String(window.cchPickPreferredProductImageUrl(d) || '').trim()
+        : '';
+      if (!primaryImg) primaryImg = imgPack.imageUrl || _resolveImgSrc(String(d.imageUrl || '').trim()) || _firstCoercedGalleryUrl(d) || '';
+      var w = 180, h = 180;
+      var pos = findFreeCanvasDropPosition(w, h, mx, my);
       var newEl = {
         id: genId(),
         type: 'product',
         clipId: clipId,
-        x: Math.max(0, mx - 90),
-        y: Math.max(0, my - 90),
-        w: 180,
-        h: 180,
+        x: pos.x,
+        y: pos.y,
+        w: w,
+        h: h,
         imageUrl: primaryImg,
         images: (imgPack.images && imgPack.images.length) ? imgPack.images.slice() : (primaryImg ? [primaryImg] : []),
         heroImageIndex: imgPack.heroImageIndex || 0,
@@ -837,11 +1095,39 @@
     renderBoardEditor();
   };
 
+  /** Persist imageUrl/images on product tiles from clips so client board does not depend on a second fetch. */
+  function enrichProductElementsFromClipsForSave() {
+    if (!dbEditor.clips || !dbEditor.elements) return;
+    dbEditor.elements.forEach(function(el) {
+      if (!el || el.type !== 'product' || !el.clipId) return;
+      var u = String(el.imageUrl || '').trim();
+      if (typeof window.cchProductBoardImageIsLikelyValid === 'function' && window.cchProductBoardImageIsLikelyValid(u)) return;
+      var clip = dbEditor.clips.find(function(c) { return c.id === el.clipId; });
+      if (!clip || !clip.data) return;
+      var d = clip.data;
+      var imgPack = (typeof window.cchProposalLineImagesFromSource === 'function')
+        ? window.cchProposalLineImagesFromSource(d)
+        : { images: [], imageUrl: '', heroImageIndex: 0 };
+      var primary = (typeof window.cchPickPreferredProductImageUrl === 'function')
+        ? String(window.cchPickPreferredProductImageUrl(d) || '').trim()
+        : '';
+      if (!primary) primary = imgPack.imageUrl || _resolveImgSrc(String(d.imageUrl || '').trim()) || _firstCoercedGalleryUrl(d) || '';
+      if (primary) {
+        el.imageUrl = primary;
+        if (imgPack.images && imgPack.images.length) el.images = imgPack.images.slice();
+        else if (!el.images || !el.images.length) el.images = [primary];
+        if (el.heroImageIndex == null && imgPack.heroImageIndex != null) el.heroImageIndex = imgPack.heroImageIndex;
+      }
+    });
+  }
+
   // ==================== SAVE & EXPORT ====================
   window.saveBoardToFirestore = async function() {
     try {
-      await db.collection('boards').doc(dbEditor.projectId).collection('designBoards').doc(dbEditor.boardId).update({
+      enrichProductElementsFromClipsForSave();
+      var patch = {
         title: dbEditor.boardData.title || 'Untitled',
+        name: dbEditor.boardData.title || dbEditor.boardData.name || 'Untitled',
         room: dbEditor.boardData.room || '',
         elements: dbEditor.elements,
         canvasWidth: dbEditor.boardData.canvasWidth || 1400,
@@ -849,7 +1135,10 @@
         showPricing: dbEditor.showPricing,
         branding: dbEditor.boardData.branding !== false,
         updatedAt: new Date().toISOString()
-      });
+      };
+      if (dbEditor.boardData.coverImageUrl) patch.coverImageUrl = dbEditor.boardData.coverImageUrl;
+      if (dbEditor.boardData.coverElementId) patch.coverElementId = dbEditor.boardData.coverElementId;
+      await db.collection('boards').doc(dbEditor.projectId).collection('designBoards').doc(dbEditor.boardId).update(patch);
       dbEditor.dirty = false;
       // Flash save confirmation
       var btn = document.querySelector('[onclick="saveBoardToFirestore()"]');
@@ -893,7 +1182,8 @@
       link.href = c.toDataURL('image/png');
       link.click();
     } catch(e) {
-      alert('Export error: ' + e.message + '\nTry right-clicking the board and using "Save as Image" instead.');
+      if (typeof cchAlert === 'function') await cchAlert('Export error: ' + e.message + '\nTry right-clicking the board and using "Save as Image" instead.', 'Export');
+      else alert('Export error: ' + e.message);
     }
   };
 
@@ -904,9 +1194,14 @@
     window.location.hash = '#/clientboard/' + dbEditor.projectId + '/' + dbEditor.boardId;
   };
 
-  window.addImageToBoard = function() {
-    var url = prompt('Image URL (paste from browser or right-click > copy image address):');
+  window.addImageToBoard = async function() {
+    if (typeof cchPrompt !== 'function') return;
+    var url = await cchPrompt('Image URL (paste from browser or right-click > copy image address):', '', 'Add image');
+    if (url === null) return;
+    url = String(url || '').trim();
     if (!url) return;
+    var titleOpt = await cchPrompt('Title (optional):', '', 'Image title');
+    if (titleOpt === null) return;
     pushUndo();
     var newEl = {
       id: genId(),
@@ -916,7 +1211,7 @@
       w: 250,
       h: 250,
       imageUrl: url,
-      title: prompt('Title (optional):', '') || '',
+      title: String(titleOpt || '').trim(),
       vendor: '',
       cost: 0,
       sellPrice: 0,
@@ -931,9 +1226,16 @@
 
   window.createProposalFromBoard = async function() {
     var products = dbEditor.elements.filter(function(el) { return el.type === 'product'; });
-    if (products.length === 0) { alert('No product items on this board yet.'); return; }
-
-    var name = prompt('Proposal name:', dbEditor.boardData.title + ' - Proposal');
+    if (products.length === 0) {
+      if (typeof cchAlert === 'function') await cchAlert('No product items on this board yet.', 'Proposal');
+      else alert('No product items on this board yet.');
+      return;
+    }
+    if (typeof cchPrompt !== 'function') return;
+    var defName = (dbEditor.boardData.title || dbEditor.boardData.name || 'Board') + ' - Proposal';
+    var name = await cchPrompt('Proposal name:', defName, 'New proposal');
+    if (name === null) return;
+    name = String(name || '').trim();
     if (!name) return;
 
     // Save board first
@@ -976,16 +1278,19 @@
         designBoardId: dbEditor.boardId,
         createdAt: new Date().toISOString()
       });
-      alert('Proposal created with ' + items.length + ' items ($' + total.toLocaleString() + ')');
+      if (typeof cchAlert === 'function') await cchAlert('Proposal created with ' + items.length + ' items ($' + total.toLocaleString() + ').', 'Proposal');
+      else alert('Proposal created with ' + items.length + ' items ($' + total.toLocaleString() + ')');
       navigate('#/project/' + dbEditor.projectId + '/proposal/' + doc.id);
     } catch(e) {
-      alert('Error creating proposal: ' + e.message);
+      if (typeof cchAlert === 'function') await cchAlert('Error creating proposal: ' + e.message, 'Proposal');
+      else alert('Error creating proposal: ' + e.message);
     }
   };
 
   // ==================== CSS for editor ============================
   var style = document.createElement('style');
   style.textContent =
+    '.db-board-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(10,31,61,0.08);}' +
     '.db-prop-input{width:100%;padding:4px 6px;border:1px solid var(--gray-200);border-radius:4px;font-size:12px;font-family:inherit;}' +
     '.db-prop-input:focus{border-color:var(--gold);outline:none;}' +
     '.db-el{transition:box-shadow 0.1s;}' +
