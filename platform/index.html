@@ -6605,7 +6605,7 @@
       return [];
     }
 
-    function _resolveImgSrc(url) {
+    function _resolveImgSrc(url, baseUrl) {
       if (url == null || url === '') return '';
       url = String(url).trim();
       if (!url) return '';
@@ -6634,6 +6634,32 @@
       // HTTPS app + http:// image = mixed content (blocked). Prefer https for remote hosts.
       if (/^http:\/\//i.test(url) && !/^http:\/\/(localhost|127\.0\.0\.1)(\b|:)/i.test(url)) {
         url = 'https://' + url.slice(7);
+      }
+      // Site-root-relative image paths: clipper / pasted HTML often stores src="/media/..." without host.
+      // Without this, the browser resolves against cch-platform.web.app → 404.
+      if (url.charAt(0) === '/' && url.charAt(1) !== '/' && !/^https?:\/\//i.test(url)) {
+        var _base = String(baseUrl == null ? '' : baseUrl).trim();
+        if (_base && /^https?:\/\//i.test(_base)) {
+          try {
+            var _absRel = new URL(url, _base).href;
+            if (_absRel) return _absRel;
+          } catch (_eRel) {}
+        }
+        // Magento-style catalog paths when no source URL was saved (still better than wrong host)
+        if (/^\/format-auto\//i.test(url) || /^\/media\/catalog\//i.test(url) || /^\/is\/image\//i.test(url)) {
+          var _pathBases = [
+            'https://www.restorationhardware.com/',
+            'https://restorationhardware.com/',
+            'https://www.rh.com/',
+            'https://rh.com/'
+          ];
+          for (var _pb = 0; _pb < _pathBases.length; _pb++) {
+            try {
+              var _absPb = new URL(url, _pathBases[_pb]).href;
+              if (_absPb) return _absPb;
+            } catch (_ePb) {}
+          }
+        }
       }
       return url;
     }
@@ -24540,8 +24566,8 @@ async function renderBoardsTab(T, proj) {
         img.image || img.photo || img.photoUrl || img.link || img.href || img.originalUrl || ''
       ).trim();
     }
-    function _ibNormalizeImgSrc(u) {
-      return _resolveImgSrc(String(u == null ? '' : u));
+    function _ibNormalizeImgSrc(u, baseUrl) {
+      return _resolveImgSrc(String(u == null ? '' : u), baseUrl);
     }
     function _ibIsRenderableHttpUrl(u) {
       if (!u || typeof u !== 'string') return false;
@@ -24557,8 +24583,10 @@ async function renderBoardsTab(T, proj) {
       var urls = [];
       var arr = _coerceImageIterable(images);
       for (var i = 0; i < arr.length && urls.length < max; i++) {
-        var raw = _ibImageUrlFromEntry(arr[i]);
-        var norm = _ibNormalizeImgSrc(raw);
+        var entry = arr[i];
+        var raw = _ibImageUrlFromEntry(entry);
+        var pageBase = (entry && typeof entry === 'object') ? _ibResolveIdeabookProductPageUrl(entry) : '';
+        var norm = _resolveImgSrc(raw, pageBase);
         if (_ibIsRenderableHttpUrl(norm)) urls.push(norm);
       }
       return urls;
@@ -42757,11 +42785,11 @@ async function renderBoardsTab(T, proj) {
       var u = String(ib.coverImageUrl || ib.coverUrl || ib.heroImageUrl || ib.thumbnailUrl || ib.thumbUrl || ib.previewUrl ||
         ib.imageUrl || ib.thumbnail || ib.photo || '').trim();
       if (u) {
-        u = _resolveImgSrc(u);
+        u = _resolveImgSrc(u, '');
         if (u) return u;
       }
       u = _firstCoercedGalleryUrl(ib);
-      if (u) return u;
+      if (u) return _resolveImgSrc(String(u).trim(), '');
       try {
         if (typeof _ibCollectCoverUrlsFromImages === 'function') {
           var _ibCov = _ibCollectCoverUrlsFromImages(ib.images, 1);
@@ -42774,7 +42802,8 @@ async function renderBoardsTab(T, proj) {
         var one = typeof x === 'string' ? x : (x && (x.imageUrl || x.url || x.src || x.thumb || x.photo || x.image || x.originalUrl || x.photoUrl || x.href || x.link || x.thumbnail));
         one = one && String(one).trim();
         if (!one) continue;
-        one = _resolveImgSrc(one);
+        var xBase = (x && typeof x === 'object') ? _ibResolveIdeabookProductPageUrl(x) : '';
+        one = _resolveImgSrc(one, xBase);
         if (one) {
           if (one.indexOf('data:') === 0) return one;
           if (one.indexOf('http://') === 0 || one.indexOf('https://') === 0) return one;
@@ -42786,9 +42815,9 @@ async function renderBoardsTab(T, proj) {
           var it = ib.items[ti];
           if (!it) continue;
           var iu = String(it.imageUrl || it.url || it.image || it.img || it.src || '').trim();
-          if (iu) return _resolveImgSrc(iu);
+          if (iu) return _resolveImgSrc(iu, _ibResolveIdeabookProductPageUrl(it));
           var fg = _firstCoercedGalleryUrl(it);
-          if (fg) return fg;
+          if (fg) return _resolveImgSrc(String(fg).trim(), _ibResolveIdeabookProductPageUrl(it));
         }
       }
       var slideKeys = ['slides', 'pages', 'files'];
@@ -42797,16 +42826,17 @@ async function renderBoardsTab(T, proj) {
         for (var si = 0; si < sl.length; si++) {
           var slItem = sl[si];
           if (!slItem) continue;
-          if (typeof slItem === 'string' && String(slItem).trim()) return _ibNormalizeImgSrc(String(slItem).trim());
+          var slItemBase = (slItem && typeof slItem === 'object') ? _ibResolveIdeabookProductPageUrl(slItem) : '';
+          if (typeof slItem === 'string' && String(slItem).trim()) return _ibNormalizeImgSrc(String(slItem).trim(), slItemBase);
           var su = String(slItem.imageUrl || slItem.url || slItem.src || slItem.backgroundUrl || '').trim();
-          if (su) return _ibNormalizeImgSrc(su);
+          if (su) return _ibNormalizeImgSrc(su, slItemBase);
           var els = slItem.elements || slItem.items;
           var elArr = Array.isArray(els) ? els : (els && typeof els === 'object' ? _coerceImageIterable(els) : []);
           for (var ei = 0; ei < elArr.length; ei++) {
             var el = elArr[ei];
             if (!el) continue;
             var eu = String(el.imageUrl || el.url || el.src || el.img || '').trim();
-            if (eu) return eu;
+            if (eu) return _resolveImgSrc(eu, slItemBase || (el && typeof el === 'object' ? _ibResolveIdeabookProductPageUrl(el) : ''));
           }
         }
       }
@@ -42829,10 +42859,10 @@ async function renderBoardsTab(T, proj) {
       var out = [];
       if (!ib) return out;
       var seen = {};
-      function add(u) {
+      function add(u, pageBase) {
         u = String(u || '').trim();
         if (!u) return;
-        if (typeof _resolveImgSrc === 'function') u = _resolveImgSrc(u);
+        if (typeof _resolveImgSrc === 'function') u = _resolveImgSrc(u, pageBase);
         u = String(u || '').trim();
         if (!u) return;
         var k = u.split('?')[0].toLowerCase();
@@ -42844,14 +42874,16 @@ async function renderBoardsTab(T, proj) {
       for (var i = 0; i < arr.length; i++) {
         var x = arr[i];
         var one = typeof x === 'string' ? x : (x && (x.imageUrl || x.url || x.src || x.thumbnail || x.photo || x.image || x.originalUrl || x.photoUrl || x.href || x.link));
-        add(one);
+        var rowBase = (x && typeof x === 'object') ? _ibResolveIdeabookProductPageUrl(x) : '';
+        add(one, rowBase);
       }
       if (Array.isArray(ib.items)) {
         for (var ti = 0; ti < ib.items.length; ti++) {
           var it = ib.items[ti];
           if (!it) continue;
-          add(it.imageUrl || it.url || it.image || it.img || it.src);
-          if (typeof _firstCoercedGalleryUrl === 'function') add(_firstCoercedGalleryUrl(it));
+          var itBase = _ibResolveIdeabookProductPageUrl(it);
+          add(it.imageUrl || it.url || it.image || it.img || it.src, itBase);
+          if (typeof _firstCoercedGalleryUrl === 'function') add(_firstCoercedGalleryUrl(it), itBase);
         }
       }
       var slideKeys = ['slides', 'pages', 'files'];
@@ -42860,8 +42892,9 @@ async function renderBoardsTab(T, proj) {
         for (var si = 0; si < sl.length; si++) {
           var slItem = sl[si];
           if (!slItem) continue;
-          if (typeof slItem === 'string') add(slItem);
-          else add(slItem.imageUrl || slItem.url || slItem.src || slItem.backgroundUrl);
+          var slBase = (slItem && typeof slItem === 'object') ? _ibResolveIdeabookProductPageUrl(slItem) : '';
+          if (typeof slItem === 'string') add(slItem, slBase);
+          else add(slItem.imageUrl || slItem.url || slItem.src || slItem.backgroundUrl, slBase);
         }
       }
       var gl = typeof _coerceGalleryUrlList === 'function' ? _coerceGalleryUrlList(ib) : [];
