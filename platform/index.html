@@ -42776,6 +42776,28 @@ async function renderBoardsTab(T, proj) {
       return out;
     }
 
+    /** Same URL choice as studio Inspiration masonry (`cchPickPreferredProductImageUrl` + string rows). */
+    function _cpIdeabookRowImageUrl(row) {
+      if (row == null) return '';
+      if (typeof row === 'string') {
+        var s0 = String(row).trim();
+        if (!s0) return '';
+        if (typeof cchPickPreferredProductImageUrl === 'function') {
+          var p0 = String(cchPickPreferredProductImageUrl({ imageUrl: s0 }) || '').trim();
+          if (p0) return p0;
+        }
+        return s0;
+      }
+      if (typeof row === 'object') {
+        if (typeof cchPickPreferredProductImageUrl === 'function') {
+          var pk = String(cchPickPreferredProductImageUrl(row) || '').trim();
+          if (pk) return pk;
+        }
+        return String(row.imageUrl || row.url || row.src || row.thumbnail || row.photo || row.image || row.originalUrl || row.photoUrl || row.href || row.link || '').trim();
+      }
+      return '';
+    }
+
     function cpIdeabookCoverUrl(ib) {
       if (!ib) return '';
       if (typeof _ibSectionCoverUrl === 'function') {
@@ -42799,8 +42821,7 @@ async function renderBoardsTab(T, proj) {
       var co = _coerceImageIterable(ib.images);
       for (var ci = 0; ci < co.length; ci++) {
         var x = co[ci];
-        var one = typeof x === 'string' ? x : (x && (x.imageUrl || x.url || x.src || x.thumb || x.photo || x.image || x.originalUrl || x.photoUrl || x.href || x.link || x.thumbnail));
-        one = one && String(one).trim();
+        var one = _cpIdeabookRowImageUrl(x);
         if (!one) continue;
         var xBase = (x && typeof x === 'object') ? _ibResolveIdeabookProductPageUrl(x) : '';
         one = _resolveImgSrc(one, xBase);
@@ -42814,10 +42835,8 @@ async function renderBoardsTab(T, proj) {
         for (var ti = 0; ti < ib.items.length; ti++) {
           var it = ib.items[ti];
           if (!it) continue;
-          var iu = String(it.imageUrl || it.url || it.image || it.img || it.src || '').trim();
+          var iu = _cpIdeabookRowImageUrl(it);
           if (iu) return _resolveImgSrc(iu, _ibResolveIdeabookProductPageUrl(it));
-          var fg = _firstCoercedGalleryUrl(it);
-          if (fg) return _resolveImgSrc(String(fg).trim(), _ibResolveIdeabookProductPageUrl(it));
         }
       }
       var slideKeys = ['slides', 'pages', 'files'];
@@ -42827,15 +42846,15 @@ async function renderBoardsTab(T, proj) {
           var slItem = sl[si];
           if (!slItem) continue;
           var slItemBase = (slItem && typeof slItem === 'object') ? _ibResolveIdeabookProductPageUrl(slItem) : '';
-          if (typeof slItem === 'string' && String(slItem).trim()) return _ibNormalizeImgSrc(String(slItem).trim(), slItemBase);
-          var su = String(slItem.imageUrl || slItem.url || slItem.src || slItem.backgroundUrl || '').trim();
+          if (typeof slItem === 'string' && String(slItem).trim()) return _ibNormalizeImgSrc(String(_cpIdeabookRowImageUrl(slItem) || slItem).trim(), slItemBase);
+          var su = String(_cpIdeabookRowImageUrl(slItem) || slItem.imageUrl || slItem.url || slItem.src || slItem.backgroundUrl || '').trim();
           if (su) return _ibNormalizeImgSrc(su, slItemBase);
           var els = slItem.elements || slItem.items;
           var elArr = Array.isArray(els) ? els : (els && typeof els === 'object' ? _coerceImageIterable(els) : []);
           for (var ei = 0; ei < elArr.length; ei++) {
             var el = elArr[ei];
             if (!el) continue;
-            var eu = String(el.imageUrl || el.url || el.src || el.img || '').trim();
+            var eu = String(_cpIdeabookRowImageUrl(el) || (el.imageUrl || el.url || el.src || el.img || '')).trim();
             if (eu) return _resolveImgSrc(eu, slItemBase || (el && typeof el === 'object' ? _ibResolveIdeabookProductPageUrl(el) : ''));
           }
         }
@@ -42873,7 +42892,7 @@ async function renderBoardsTab(T, proj) {
       var arr = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(ib.images) : [];
       for (var i = 0; i < arr.length; i++) {
         var x = arr[i];
-        var one = typeof x === 'string' ? x : (x && (x.imageUrl || x.url || x.src || x.thumbnail || x.photo || x.image || x.originalUrl || x.photoUrl || x.href || x.link));
+        var one = _cpIdeabookRowImageUrl(x);
         var rowBase = (x && typeof x === 'object') ? _ibResolveIdeabookProductPageUrl(x) : '';
         add(one, rowBase);
       }
@@ -42882,8 +42901,7 @@ async function renderBoardsTab(T, proj) {
           var it = ib.items[ti];
           if (!it) continue;
           var itBase = _ibResolveIdeabookProductPageUrl(it);
-          add(it.imageUrl || it.url || it.image || it.img || it.src, itBase);
-          if (typeof _firstCoercedGalleryUrl === 'function') add(_firstCoercedGalleryUrl(it), itBase);
+          add(_cpIdeabookRowImageUrl(it), itBase);
         }
       }
       var slideKeys = ['slides', 'pages', 'files'];
@@ -42893,12 +42911,14 @@ async function renderBoardsTab(T, proj) {
           var slItem = sl[si];
           if (!slItem) continue;
           var slBase = (slItem && typeof slItem === 'object') ? _ibResolveIdeabookProductPageUrl(slItem) : '';
-          if (typeof slItem === 'string') add(slItem, slBase);
-          else add(slItem.imageUrl || slItem.url || slItem.src || slItem.backgroundUrl, slBase);
+          add(_cpIdeabookRowImageUrl(slItem), slBase);
         }
       }
       var gl = typeof _coerceGalleryUrlList === 'function' ? _coerceGalleryUrlList(ib) : [];
-      for (var gi = 0; gi < gl.length; gi++) add(gl[gi]);
+      for (var gi = 0; gi < gl.length; gi++) {
+        var gCell = gl[gi];
+        add(typeof gCell === 'string' ? gCell : _cpIdeabookRowImageUrl(gCell) || String(gCell || '').trim(), '');
+      }
       return out;
     }
     /**
