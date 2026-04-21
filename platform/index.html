@@ -2779,6 +2779,8 @@
       'vanessaholliday@cchdesign.com',
       'vholliday@cchdesign.com'
     ]);
+    /** Must be declared before `auth.onAuthStateChanged` — that callback can run synchronously on client routes and would hit the TDZ if this lived later in the file. */
+    const USE_NEW_PORTAL = true;
     function userCanPushToQB() {
       if (!currentUser || !currentUser.email) return false;
       var e = (currentUser.email || '').toLowerCase().trim();
@@ -42701,7 +42703,7 @@ async function renderBoardsTab(T, proj) {
     }
 
     // ==================== CLIENT PORTAL (Programa-style: navy / gold, square geometry) ====================
-    const USE_NEW_PORTAL = true;
+    // USE_NEW_PORTAL is declared with ADMIN_EMAILS (early) so auth.onAuthStateChanged never hits TDZ.
 
     /** Client document folder tabs (Share modal + portal Documents page). */
     const CP_CLIENT_DOCUMENT_FOLDERS = ['Selections', 'Drawings', 'Schedules', 'Specifications', 'Renderings', 'Proposals', 'Contracts', 'General'];
