@@ -43656,6 +43656,199 @@ async function renderBoardsTab(T, proj) {
     }
     window.cpPortalToggleInspirationStar = cpPortalToggleInspirationStar;
 
+    async function cpPortalLogInspirationActivity(projectId, secData, item, idx, action, description) {
+      try {
+        var ident = window._cpClientIdentity || {};
+        var now = new Date().toISOString();
+        var projName = projectId;
+        try {
+          var pDoc = await db.collection('boards').doc(projectId).get();
+          if (pDoc.exists) projName = (pDoc.data().name || pDoc.data().projectName || projectId);
+        } catch (_eP) {}
+        await db.collection('activity').add({
+          type: 'inspiration',
+          action: action,
+          description: description,
+          projectId: projectId,
+          projectName: projName,
+          user: String(ident.clientEmail || '').trim(),
+          timestamp: now,
+          createdAt: now,
+          read: false,
+          meta: {
+            sectionId: String(secData && secData.id || ''),
+            imageIndex: idx,
+            imageUrl: (item && item.imageUrl) || '',
+            boardSectionName: (secData && (secData.name || secData.title)) || 'Inspiration',
+            clientName: String(ident.clientName || '').trim(),
+            source: 'client_portal'
+          }
+        });
+      } catch (eAct) {
+        console.warn('[client portal] inspiration activity log failed:', (eAct && eAct.message) || eAct);
+      }
+    }
+
+    async function cpPortalOpenInspirationComments(projectId, sectionId, imageIndex) {
+      var ident = window._cpClientIdentity || {};
+      if (!ident.clientEmail) {
+        if (typeof showToast === 'function') showToast('Please complete your identity first.', 'warning');
+        return;
+      }
+      var idx = parseInt(imageIndex, 10);
+      if (isNaN(idx) || idx < 0) return;
+      var docRef = db.collection('boards').doc(projectId).collection('ideabooks').doc(sectionId);
+      var doc = await docRef.get();
+      if (!doc.exists) return;
+      var secData = doc.data() || {};
+      secData.id = sectionId;
+      var images = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(secData.images) : [];
+      var item = images[idx];
+      if (!item) return;
+      if (typeof item === 'string') item = { imageUrl: item, stars: 0, comments: [] };
+      var comments = Array.isArray(item.comments) ? item.comments.slice() : [];
+      var modal = document.getElementById('modalContainer');
+      if (!modal) return;
+      var pidEsc = escAttr(String(projectId || ''));
+      var sidEsc = escAttr(String(sectionId || ''));
+      var rows = comments.length
+        ? comments.map(function(c, ci) {
+            var dTxt = '';
+            try { dTxt = c && c.date ? new Date(c.date).toLocaleString() : ''; } catch (_eD) {}
+            return '<div class="cp-cmt-row">' +
+              '<div class="cp-cmt-meta"><span>' + esc((c && c.author) || 'Client') + '</span><span>' + esc(dTxt) + '</span></div>' +
+              '<div style="font-size:13px;color:#0A1F3D;line-height:1.45;">' + esc((c && c.text) || '') + '</div>' +
+              '<div class="cp-cmt-actions" style="margin-top:6px;">' +
+                '<button type="button" onclick="event.stopPropagation();void window.cpPortalEditInspirationComment(\'' + pidEsc + '\',\'' + sidEsc + '\',' + idx + ',' + ci + ')">Edit</button>' +
+                '<button type="button" onclick="event.stopPropagation();void window.cpPortalDeleteInspirationComment(\'' + pidEsc + '\',\'' + sidEsc + '\',' + idx + ',' + ci + ')">Delete</button>' +
+              '</div>' +
+            '</div>';
+          }).join('')
+        : '<div style="text-align:center;color:#9CA3AF;padding:18px 0;">No comments yet</div>';
+      modal.innerHTML =
+        '<div class="modal-overlay cp-insp-comments-modal" onclick="if(event.target===this)closeModal()">' +
+          '<div class="modal" style="max-width:560px;width:min(560px,92vw);border-radius:0;">' +
+            '<div class="modal-header"><div class="modal-title">Comments</div><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+            '<div class="modal-body" style="max-height:65vh;overflow:auto;">' +
+              '<div style="margin-bottom:12px;"><img src="' + _escImgSrcAttr(item.imageUrl || '') + '" alt="" style="width:100%;max-height:220px;object-fit:contain;background:#FAFAFA;border:1px solid #ECECEC;" referrerpolicy="no-referrer"></div>' +
+              rows +
+            '</div>' +
+            '<div class="modal-footer" style="display:flex;gap:8px;align-items:center;">' +
+              '<input id="cpInspCommentInput" class="form-input" style="flex:1;" placeholder="Add a comment..." onkeydown="if(event.key===\'Enter\'){event.preventDefault();void window.cpPortalPostInspirationComment(\'' + pidEsc + '\',\'' + sidEsc + '\',' + idx + ');}">' +
+              '<button class="btn btn-primary btn-sm" onclick="void window.cpPortalPostInspirationComment(\'' + pidEsc + '\',\'' + sidEsc + '\',' + idx + ')">Post</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      setTimeout(function() {
+        var input = document.getElementById('cpInspCommentInput');
+        if (input) input.focus();
+      }, 50);
+    }
+    window.cpPortalOpenInspirationComments = cpPortalOpenInspirationComments;
+
+    async function cpPortalPostInspirationComment(projectId, sectionId, imageIndex) {
+      var input = document.getElementById('cpInspCommentInput');
+      var text = input ? String(input.value || '').trim() : '';
+      if (!text) return;
+      var ident = window._cpClientIdentity || {};
+      if (!ident.clientEmail) return;
+      var idx = parseInt(imageIndex, 10);
+      if (isNaN(idx) || idx < 0) return;
+      var docRef = db.collection('boards').doc(projectId).collection('ideabooks').doc(sectionId);
+      var doc = await docRef.get();
+      if (!doc.exists) return;
+      var secData = doc.data() || {};
+      secData.id = sectionId;
+      var images = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(secData.images) : [];
+      var item = images[idx];
+      if (!item) return;
+      if (typeof item === 'string') item = { imageUrl: item, stars: 0, comments: [] };
+      else item = Object.assign({}, item);
+      var comments = Array.isArray(item.comments) ? item.comments.slice() : [];
+      var now = new Date().toISOString();
+      var authorName = String(ident.clientName || ident.clientEmail || 'Client').trim();
+      comments.push({ text: text, author: authorName, date: now, source: 'client_portal' });
+      item.comments = comments;
+      images[idx] = item;
+      await docRef.update({ images: images });
+      var cap = item.caption || item.title || 'image';
+      var secName = secData.name || secData.title || 'Inspiration';
+      await cpPortalLogInspirationActivity(projectId, secData, item, idx, 'client_comment_post', authorName + ' commented on "' + cap + '" · ' + secName + ' — "' + text.slice(0, 80) + '"');
+      if (typeof showToast === 'function') showToast('Comment posted', 'success');
+      await cpPortalOpenInspirationComments(projectId, sectionId, idx);
+      await renderClientPortal(projectId, null, 'inspirationBoard');
+    }
+    window.cpPortalPostInspirationComment = cpPortalPostInspirationComment;
+
+    async function cpPortalEditInspirationComment(projectId, sectionId, imageIndex, commentIndex) {
+      var idx = parseInt(imageIndex, 10);
+      var ci = parseInt(commentIndex, 10);
+      if (isNaN(idx) || idx < 0 || isNaN(ci) || ci < 0) return;
+      var docRef = db.collection('boards').doc(projectId).collection('ideabooks').doc(sectionId);
+      var doc = await docRef.get();
+      if (!doc.exists) return;
+      var secData = doc.data() || {};
+      secData.id = sectionId;
+      var images = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(secData.images) : [];
+      var item = images[idx];
+      if (!item) return;
+      if (typeof item === 'string') item = { imageUrl: item, stars: 0, comments: [] };
+      else item = Object.assign({}, item);
+      var comments = Array.isArray(item.comments) ? item.comments.slice() : [];
+      if (ci >= comments.length) return;
+      var currentText = String((comments[ci] && comments[ci].text) || '');
+      var next = await cchPrompt('Edit comment:', currentText, 'Edit Comment');
+      if (next == null) return;
+      next = String(next || '').trim();
+      if (!next) return;
+      comments[ci] = Object.assign({}, comments[ci] || {}, { text: next, editedAt: new Date().toISOString() });
+      item.comments = comments;
+      images[idx] = item;
+      await docRef.update({ images: images });
+      var ident = window._cpClientIdentity || {};
+      var nm = String(ident.clientName || ident.clientEmail || 'Client').trim();
+      var cap = item.caption || item.title || 'image';
+      var secName = secData.name || secData.title || 'Inspiration';
+      await cpPortalLogInspirationActivity(projectId, secData, item, idx, 'client_comment_edit', nm + ' edited a comment on "' + cap + '" · ' + secName);
+      if (typeof showToast === 'function') showToast('Comment updated', 'success');
+      await cpPortalOpenInspirationComments(projectId, sectionId, idx);
+      await renderClientPortal(projectId, null, 'inspirationBoard');
+    }
+    window.cpPortalEditInspirationComment = cpPortalEditInspirationComment;
+
+    async function cpPortalDeleteInspirationComment(projectId, sectionId, imageIndex, commentIndex) {
+      var ok = await cchConfirm('Delete this comment?', 'Delete Comment', { confirmText: 'Delete' });
+      if (!ok) return;
+      var idx = parseInt(imageIndex, 10);
+      var ci = parseInt(commentIndex, 10);
+      if (isNaN(idx) || idx < 0 || isNaN(ci) || ci < 0) return;
+      var docRef = db.collection('boards').doc(projectId).collection('ideabooks').doc(sectionId);
+      var doc = await docRef.get();
+      if (!doc.exists) return;
+      var secData = doc.data() || {};
+      secData.id = sectionId;
+      var images = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(secData.images) : [];
+      var item = images[idx];
+      if (!item) return;
+      if (typeof item === 'string') item = { imageUrl: item, stars: 0, comments: [] };
+      else item = Object.assign({}, item);
+      var comments = Array.isArray(item.comments) ? item.comments.slice() : [];
+      if (ci >= comments.length) return;
+      comments.splice(ci, 1);
+      item.comments = comments;
+      images[idx] = item;
+      await docRef.update({ images: images });
+      var ident = window._cpClientIdentity || {};
+      var nm = String(ident.clientName || ident.clientEmail || 'Client').trim();
+      var cap = item.caption || item.title || 'image';
+      var secName = secData.name || secData.title || 'Inspiration';
+      await cpPortalLogInspirationActivity(projectId, secData, item, idx, 'client_comment_delete', nm + ' deleted a comment on "' + cap + '" · ' + secName);
+      if (typeof showToast === 'function') showToast('Comment deleted', 'success');
+      await cpPortalOpenInspirationComments(projectId, sectionId, idx);
+      await renderClientPortal(projectId, null, 'inspirationBoard');
+    }
+    window.cpPortalDeleteInspirationComment = cpPortalDeleteInspirationComment;
+
     async function renderClientPortal(projectId, focusProposalId, forcedPage) {
       var sidebar = document.querySelector('.sidebar');
       var topbar = document.querySelector('.topbar');
@@ -44100,6 +44293,12 @@ async function renderBoardsTab(T, proj) {
         '.cp-insp-board-tile .cp-insp-star-btn { position:absolute; bottom:8px; right:8px; z-index:2; width:38px; height:38px; border:none; border-radius:50%; background:rgba(255,255,255,0.95); box-shadow:0 2px 8px rgba(10,31,61,0.18); cursor:pointer; font-size:18px; line-height:1; color:#C4A464; display:flex; align-items:center; justify-content:center; font-family:inherit; padding:0; }' +
         '.cp-insp-board-tile .cp-insp-star-btn:hover { background:#fff; color:#0A1F3D; }' +
         '.cp-insp-board-tile .cp-insp-star-badge { position:absolute; bottom:8px; right:8px; z-index:2; width:34px; height:34px; border-radius:50%; background:rgba(255,255,255,0.92); display:flex; align-items:center; justify-content:center; font-size:16px; color:#C4A464; pointer-events:none; box-shadow:0 2px 6px rgba(10,31,61,0.12); }' +
+        '.cp-insp-board-tile .cp-insp-comment-btn { position:absolute; bottom:8px; left:8px; z-index:2; min-width:38px; height:34px; border:none; border-radius:17px; background:rgba(255,255,255,0.95); box-shadow:0 2px 8px rgba(10,31,61,0.18); cursor:pointer; font-size:12px; font-weight:700; color:#0A1F3D; display:flex; align-items:center; justify-content:center; font-family:inherit; padding:0 10px; gap:4px; }' +
+        '.cp-insp-board-tile .cp-insp-comment-btn:hover { background:#fff; color:#C4A464; }' +
+        '.cp-insp-comments-modal .cp-cmt-row { border-bottom:1px solid #ECECEC; padding:10px 0; }' +
+        '.cp-insp-comments-modal .cp-cmt-meta { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11px; color:#9CA3AF; margin-bottom:4px; }' +
+        '.cp-insp-comments-modal .cp-cmt-actions button { border:none; background:none; color:#6B7280; font-size:11px; cursor:pointer; padding:0 4px; }' +
+        '.cp-insp-comments-modal .cp-cmt-actions button:hover { color:#0A1F3D; }' +
         '.cp-dy-story-card-body { padding:12px 14px; }' +
         '.cp-dy-story-card-title { font-size:13px;font-weight:600;color:#0A1F3D; }' +
         '.cp-dy-story-card-meta { font-size:11px;color:#9CA3AF;margin-top:4px; }' +
@@ -44360,7 +44559,13 @@ async function renderBoardsTab(T, proj) {
             _uPix = String(_uPix || '').trim();
             if (!_uPix) continue;
             var _objR = typeof _rr === 'string' ? {} : (_rr || {});
-            _visInsp.push({ imageIndex: _rix, url: _uPix, stars: _objR.stars || 0, caption: _objR.caption || _objR.title || '' });
+            _visInsp.push({
+              imageIndex: _rix,
+              url: _uPix,
+              stars: _objR.stars || 0,
+              comments: Array.isArray(_objR.comments) ? _objR.comments : [],
+              caption: _objR.caption || _objR.title || ''
+            });
           }
           var _encPayLb = '';
           if (_visInsp.length) {
@@ -44378,7 +44583,9 @@ async function renderBoardsTab(T, proj) {
               var _cell = _visInsp[_vj];
               var iuB2 = _cell.url;
               var _stOn = (_cell.stars || 0) > 0;
+              var _cmCount = (_cell.comments || []).length;
               var _starBt = '';
+              var _commentBt = '<button type="button" class="cp-insp-comment-btn" title="Comments" aria-label="Comments" onclick="event.preventDefault();event.stopPropagation();void window.cpPortalOpenInspirationComments(\'' + pidEsc2 + '\',\'' + secIdEsc + '\',' + _cell.imageIndex + ')">\uD83D\uDCAC' + (_cmCount ? (' ' + _cmCount) : '') + '</button>';
               if (_canClientStarIb) {
                 _starBt = '<button type="button" class="cp-insp-star-btn" title="' + (_stOn ? 'Remove star' : 'Star this image') + '" aria-label="' + (_stOn ? 'Remove star' : 'Star') + '" onclick="event.preventDefault();event.stopPropagation();void window.cpPortalToggleInspirationStar(\'' + pidEsc2 + '\',\'' + secIdEsc + '\',' + _cell.imageIndex + ')">' + (_stOn ? '\u2605' : '\u2606') + '</button>';
               } else if (_stOn) {
@@ -44386,6 +44593,7 @@ async function renderBoardsTab(T, proj) {
               }
               html += '<div class="cp-insp-board-tile" role="button" tabindex="0" onclick="cpProposalLineLightboxOpenFromEncoded(\'' + encEsc2 + '\',' + _vj + ')">' +
                 '<img src="' + _escImgSrcAttr(iuB2) + '" alt="" referrerpolicy="no-referrer" onerror="this.style.opacity=\'0.2\'">' +
+                _commentBt +
                 _starBt +
                 '</div>';
             }
@@ -48669,7 +48877,7 @@ async function renderBoardsTab(T, proj) {
         catch(e) { timeStr = ''; }
       }
 
-      var actionColors = { created:'var(--green)', updated:'var(--blue)', deleted:'var(--red)', published:'var(--gold)', approved:'var(--green)', sent:'var(--blue)', completed:'var(--green)', image_replace_cascade:'var(--gold)', bulk_image_update:'var(--gold)', starred:'var(--gold)', commented:'var(--gold)', client_star:'var(--gold)', client_unstar:'var(--gold)', client_first_visit:'var(--gold)' };
+      var actionColors = { created:'var(--green)', updated:'var(--blue)', deleted:'var(--red)', published:'var(--gold)', approved:'var(--green)', sent:'var(--blue)', completed:'var(--green)', image_replace_cascade:'var(--gold)', bulk_image_update:'var(--gold)', starred:'var(--gold)', commented:'var(--gold)', client_star:'var(--gold)', client_unstar:'var(--gold)', client_first_visit:'var(--gold)', client_comment_post:'var(--gold)', client_comment_edit:'var(--gold)', client_comment_delete:'var(--gold)' };
       var m = a.meta || {};
       if (a.type === 'library' && m.libraryImageReplace) {
         var rel = _plRelativeTimeShort(a.timestamp);
