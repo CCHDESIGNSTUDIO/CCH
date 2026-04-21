@@ -44505,9 +44505,9 @@ async function renderBoardsTab(T, proj) {
             var cover = _rbCovers[rm];
             var n = (_rbBy[rm] || []).length;
             var _emptyRb = portalGridMode === 'categories' ? '\uD83C\uDFF7' : '\uD83C\uDFE0';
-            html += '<div style="cursor:pointer;" onclick="navigate(\'' + escAttr(_baseHash) + '\');setTimeout(function(){var el=document.getElementById(\\\'cp-anchor-rooms\\\');if(el)el.scrollIntoView({behavior:\\\'smooth\\\'});},200);">' +
+            html += '<div style="cursor:pointer;" onclick="navigate(\'' + escAttr(_baseHash) + '\');setTimeout(function(){var el=document.getElementById(\'cp-anchor-rooms\');if(el)el.scrollIntoView({behavior:\'smooth\'});},200);">' +
               '<div style="overflow:hidden;aspect-ratio:16/10;margin-bottom:12px;border:1px solid #E2E2E2;">' +
-              (cover ? '<img src="' + _escImgSrcAttr(cover) + '" style="width:100%;height:100%;object-fit:cover;display:block;" referrerpolicy="no-referrer" onerror="this.style.display=\\\'none\\\'">' : '<div style="width:100%;height:100%;min-height:140px;background:#FAFAFA;display:flex;align-items:center;justify-content:center;font-size:36px;color:#C4A464;">' + _emptyRb + '</div>') +
+              (cover ? '<img src="' + _escImgSrcAttr(cover) + '" style="width:100%;height:100%;object-fit:cover;display:block;" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div style="width:100%;height:100%;min-height:140px;background:#FAFAFA;display:flex;align-items:center;justify-content:center;font-size:36px;color:#C4A464;">' + _emptyRb + '</div>') +
               '</div><div style="font-size:13px;font-weight:500;color:#0A1F3D;font-family:\'DM Sans\',sans-serif;">' + esc(rm) + '</div>' +
               '<div style="font-size:11px;color:#9CA3AF;margin-top:3px;font-family:\'DM Sans\',sans-serif;">' + n + ' item' + (n !== 1 ? 's' : '') + '</div></div>';
           });
@@ -44701,7 +44701,7 @@ async function renderBoardsTab(T, proj) {
             var _dbc = Array.isArray(dbB.elements) ? dbB.elements.length : 0;
             html += '<div class="cp-board-list-item" style="cursor:pointer;" onclick="navigate(\'' + escAttr(_dbh) + '\')">' +
               '<div style="overflow:hidden;aspect-ratio:4/3;border:1px solid #E2E2E2;">' +
-              (iu ? '<img src="' + _escImgSrcAttr(iu) + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" referrerpolicy="no-referrer" onerror="this.style.display=\\\'none\\\'">' : '<div style="width:100%;height:100%;min-height:140px;background:#FAFAFA;display:flex;align-items:center;justify-content:center;color:#C4A464;font-size:28px;">\u25C6</div>') +
+              (iu ? '<img src="' + _escImgSrcAttr(iu) + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div style="width:100%;height:100%;min-height:140px;background:#FAFAFA;display:flex;align-items:center;justify-content:center;color:#C4A464;font-size:28px;">\u25C6</div>') +
               '</div>' +
               '<div class="cp-board-list-title">' + esc(tit) + '</div>' +
               '<div class="cp-board-list-count">' + _dbc + ' item' + (_dbc !== 1 ? 's' : '') + '</div></div>';
