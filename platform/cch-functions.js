@@ -38,8 +38,13 @@ async function showNewInvoiceModal(projectId) {
 
 async function saveNewInvoice(projectId) {
   try {
+    var niNum = document.getElementById('niNumber').value.trim();
+    if (!niNum && typeof getNextDocNumber === 'function') {
+      try { niNum = await getNextDocNumber('INV'); } catch (e0) { niNum = ''; }
+    }
+    if (!niNum) niNum = 'INV-TEMP-' + String(Date.now());
     await db.collection('boards').doc(projectId).collection('invoices').add({
-      number: document.getElementById('niNumber').value.trim() || ('INV-' + Date.now().toString().slice(-6)),
+      number: niNum,
       total: parseFloat(document.getElementById('niTotal').value)||0,
       status: document.getElementById('niStatus').value,
       dueDate: document.getElementById('niDue').value,

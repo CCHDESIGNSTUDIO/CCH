@@ -37,6 +37,12 @@
 (function() {
   'use strict';
 
+  /** Safe inside HTML onclick="fn('…')" — never use JSON.stringify (breaks the attribute). */
+  function cchEscJsStr(t) {
+    if (t == null) return '';
+    return String(t).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, ' ');
+  }
+
   // ============================================================
   // 1. CSS FIXES — inject styles for visual bugs
   // ============================================================
@@ -498,7 +504,7 @@
         invNumEl.value = autoNum;
       } catch(e) {
         console.warn('Auto-generate inv# failed:', e);
-        invNumEl.value = 'INV-' + Date.now();
+        invNumEl.value = 'INV-TEMP-' + String(Date.now());
       }
     }
     // Ensure status defaults to Draft (not blank)
@@ -1801,13 +1807,24 @@
       { label: typeLabel + ' ' + docNum }
     ]);
 
+    var _delViewOnclick = type === 'invoice'
+      ? 'void deleteInvoice(\'' + cchEscJsStr(projectId) + '\',\'' + cchEscJsStr(docId) + '\')'
+      : type === 'po'
+        ? 'void deletePurchaseOrder(\'' + cchEscJsStr(projectId) + '\',\'' + cchEscJsStr(docId) + '\')'
+        : 'void deleteProposal(\'' + cchEscJsStr(projectId) + '\',\'' + cchEscJsStr(docId) + '\')';
+    var _delViewBtn = '<button type="button" class="btn btn-secondary btn-sm" style="color:var(--red);border-color:rgba(198,40,40,0.35);" onclick="' + _delViewOnclick + '">🗑️ Delete</button>';
+
+    var _nextPublished = !docData.published;
+    var _pubLabel = docData.published ? '🔒 Unpublish from Dashboard' : '🌐 Publish to Client Dashboard';
+
     setTopbarActions(
       '<button class="btn btn-secondary btn-sm" onclick="toggleDocTimeline(\'' + projectId + '\',\'' + collection + '\',\'' + docId + '\')">🕐 Timeline</button>' +
       '<button class="btn btn-secondary btn-sm" onclick="navigate(\'#/project/' + projectId + '/' + backTab + '\')">← Back</button>' +
       '<button class="btn btn-secondary btn-sm" onclick="previewDocument(\'' + type + '\',\'' + projectId + '\',\'' + docId + '\')">👁️ Preview</button>' +
       (type === 'invoice' ? '<button class="btn btn-secondary btn-sm" onclick="sendInvoiceToClient(\'' + projectId + '\',\'' + docId + '\')">📧 Send</button>' : '') +
-      '<button class="btn btn-secondary btn-sm" onclick="togglePublished(\'' + projectId + '\',\'' + docId + '\',true,\'' + collection + '\')">🌐 Publish</button>' +
+      '<button class="btn btn-secondary btn-sm" onclick="togglePublished(\'' + cchEscJsStr(projectId) + '\',\'' + cchEscJsStr(docId) + '\',' + (_nextPublished ? 'true' : 'false') + ',\'' + cchEscJsStr(collection) + '\')">' + _pubLabel + '</button>' +
       qbViewTopBtn +
+      _delViewBtn +
       '<button class="btn btn-primary btn-sm" onclick="window._forceEditMode=true;navigate(window.location.hash)" style="background:#1B3352;color:#EDE8E0;">✏️ Edit ' + typeLabel + '</button>'
     );
 

@@ -1,4 +1,5 @@
-const functions = require("firebase-functions");
+/** v1 API (runWith, classic https.onCall/onRequest). Default firebase-functions v7+ export is v2-only — no runWith. */
+const functions = require("firebase-functions/v1");
 const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
 admin.initializeApp();
@@ -681,6 +682,99 @@ function _qbInvoiceEntityId(data) {
   return "";
 }
 
+/** DocNumber strings to try in QB SQL when qbDocId is missing or non-numeric. */
+function _studioInvoiceDocNumberCandidates(existing) {
+  if (!existing) return [];
+  const out = [];
+  const seen = new Set();
+  function add(raw) {
+    if (raw == null) return;
+    let t = String(raw).trim();
+    if (!t) return;
+    t = t.replace(/%20/gi, " ").replace(/\s+/g, " ").trim();
+    t = t.replace(/\s*-\s*Paid$/i, "").replace(/\s*-\s*Partially\s*Paid$/i, "").trim();
+    if (!t) return;
+    const variants = new Set([t]);
+    const core = t.replace(/^INV-?/i, "").trim();
+    if (core) {
+      variants.add("INV-" + core);
+      variants.add("INV-" + core.replace(/^0+/, "") || core);
+      variants.add(core);
+    }
+    for (const v of variants) {
+      const k = v.toLowerCase();
+      if (v && !seen.has(k)) {
+        seen.add(k);
+        out.push(v);
+      }
+    }
+  }
+  add(existing.invoiceNum);
+  add(existing.number);
+  add(existing.displayNumber);
+  add(existing.invoiceNumber);
+  const qraw = existing.qbDocId || existing.qbInvoiceId || existing.qbId;
+  if (qraw != null && String(qraw).trim() && !/^\d+$/.test(String(qraw).trim())) {
+    add(String(qraw).trim());
+  }
+  return out;
+}
+
+/**
+ * GET invoice by numeric id, or query QB by DocNumber when Studio only has INV-xxxx / wrong qbDocId.
+ * @returns {{ qbInv: object, canonicalQbId: string }}
+ */
+async function fetchQBInvoiceForStudio(accessToken, realmId, existing) {
+  const numeric = _qbInvoiceEntityId(existing);
+  const minor = "minorversion=65";
+  if (numeric) {
+    const invResp = await qbApiCall(
+      "GET",
+      "invoice/" + encodeURIComponent(numeric) + "?" + minor,
+      accessToken,
+      realmId,
+      null
+    );
+    const qbInv = invResp && invResp.Invoice;
+    if (!qbInv) {
+      throw new functions.https.HttpsError("internal", "QuickBooks returned no invoice for id " + numeric);
+    }
+    return { qbInv, canonicalQbId: String(qbInv.Id || numeric) };
+  }
+
+  const candidates = _studioInvoiceDocNumberCandidates(existing);
+  if (!candidates.length) {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "No way to find this invoice in QuickBooks: add the numeric Id (open the invoice in QB → copy Id from the URL), or ensure Studio invoice # matches QB DocNumber, then retry."
+    );
+  }
+
+  for (const docNum of candidates) {
+    const safe = String(docNum).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    const q = "select * from Invoice where DocNumber = '" + safe + "'";
+    const endpoint = "query?query=" + encodeURIComponent(q) + "&" + minor;
+    const res = await qbApiCall("GET", endpoint, accessToken, realmId, null);
+    const fr = (res.QueryResponse && res.QueryResponse.Invoice) || [];
+    const list = Array.isArray(fr) ? fr : (fr ? [fr] : []);
+    if (list.length === 1) {
+      const qbInv = list[0];
+      return { qbInv, canonicalQbId: String(qbInv.Id) };
+    }
+    if (list.length > 1) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Multiple QuickBooks invoices match DocNumber '" + docNum + "'. In QB, remove duplicates or set qbDocId to the numeric Id of the correct invoice."
+      );
+    }
+  }
+
+  throw new functions.https.HttpsError(
+    "not-found",
+    "No QuickBooks invoice found for DocNumber tries: " + candidates.slice(0, 6).join(", ")
+  );
+}
+
 /**
  * Build Firestore patch from QB Invoice GET (TotalAmt, Balance).
  * When Balance is ~0, marks Studio invoice Paid + qbStatus paid and aligns payments if needed.
@@ -771,22 +865,17 @@ exports.syncInvoiceBalanceFromQB = functions.https.onCall(
     const snap = await docRef.get();
     if (!snap.exists) throw new functions.https.HttpsError("not-found", "Invoice not found");
     const existing = snap.data();
-    const qbId = _qbInvoiceEntityId(existing);
-    if (!qbId) {
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        "Invoice has no numeric QuickBooks id (qbDocId). Push to QB or paste the Id from QuickBooks first."
-      );
-    }
     const { accessToken, realmId } = await getQBAccessToken();
-    const invResp = await qbApiCall("GET", "invoice/" + encodeURIComponent(qbId), accessToken, realmId, null);
-    const qbInv = invResp && invResp.Invoice;
-    if (!qbInv) throw new functions.https.HttpsError("internal", "QuickBooks returned no invoice for id " + qbId);
+    const { qbInv, canonicalQbId } = await fetchQBInvoiceForStudio(accessToken, realmId, existing);
     const patch = buildFirestorePatchFromQBInvoice(existing, qbInv);
+    const prevQb = String(existing.qbDocId || existing.qbInvoiceId || "").trim();
+    if (canonicalQbId && prevQb !== canonicalQbId) {
+      patch.qbDocId = canonicalQbId;
+    }
     await docRef.update(patch);
     return {
       success: true,
-      qbId,
+      qbId: canonicalQbId,
       totalAmt: patch.qbApiTotalAmt,
       balance: patch.qbApiBalance,
       status: patch.status || existing.status,
@@ -796,7 +885,7 @@ exports.syncInvoiceBalanceFromQB = functions.https.onCall(
 );
 
 /**
- * Scan boards/*/invoices with qbDocId and refresh paid status from QuickBooks (GET invoice per row).
+ * Scan all boards' invoice subcollections and refresh paid status from QuickBooks (GET per row).
  * Run from Studio when payments were recorded in QB but webhook did not update Firestore.
  */
 exports.batchSyncInvoiceBalancesFromQB = functions
@@ -824,17 +913,16 @@ exports.batchSyncInvoiceBalancesFromQB = functions
         if (scanned >= maxInvoices) break outer;
         const data = invDoc.data();
         const qbId = _qbInvoiceEntityId(data);
-        if (!qbId) continue;
+        const docNumCandidates = _studioInvoiceDocNumberCandidates(data);
+        if (!qbId && !docNumCandidates.length) continue;
         scanned++;
         try {
-          const invResp = await qbApiCall("GET", "invoice/" + encodeURIComponent(qbId), accessToken, realmId, null);
-          const qbInv = invResp && invResp.Invoice;
-          if (!qbInv) {
-            errors++;
-            if (sampleErrors.length < 10) sampleErrors.push(invDoc.id + ": empty QB Invoice");
-            continue;
-          }
+          const { qbInv, canonicalQbId } = await fetchQBInvoiceForStudio(accessToken, realmId, data);
           const patch = buildFirestorePatchFromQBInvoice(data, qbInv);
+          const prevQb = String(data.qbDocId || data.qbInvoiceId || "").trim();
+          if (canonicalQbId && prevQb !== canonicalQbId) {
+            patch.qbDocId = canonicalQbId;
+          }
           await invDoc.ref.update(patch);
           updated++;
         } catch (e) {

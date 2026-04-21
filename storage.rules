@@ -11,6 +11,8 @@ service firebase.storage {
         && (
           request.resource.contentType.matches('image/.*')
           || request.resource.contentType == 'application/pdf'
+          || request.resource.contentType == 'text/html'
+          || request.resource.contentType == 'application/octet-stream'
           || request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.*')
           || request.resource.contentType == 'application/msword'
         );
@@ -19,6 +21,17 @@ service firebase.storage {
       return signedIn()
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
+    }
+    /** boards/ path: images plus PDF/HTML shared to client portal (legacy uploads used boards/.../clientDocuments/). */
+    function allowedBoardsMediaWrite() {
+      return signedIn()
+        && request.resource.size < 32 * 1024 * 1024
+        && (
+          request.resource.contentType.matches('image/.*')
+          || request.resource.contentType == 'application/pdf'
+          || request.resource.contentType == 'text/html'
+          || request.resource.contentType == 'application/octet-stream'
+        );
     }
 
     // Project files (clips, hero, room covers under projects/{id}/..., documents, etc.)
@@ -32,7 +45,7 @@ service firebase.storage {
     // Legacy / alternate paths used by admin hero, What's New, client documents (index.html uploads to boards/...)
     match /boards/{allPaths=**} {
       allow read: if true;
-      allow create, update: if allowedImageWrite();
+      allow create, update: if allowedBoardsMediaWrite();
       allow delete: if signedIn();
     }
 

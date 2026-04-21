@@ -1,5 +1,8 @@
 // ============================================================
-// CCH Studio — Cloud Functions for Smart Time Integrations
+// NOT DEPLOYED — Firebase loads ONLY index.js (see package.json "main").
+// Edit index.js for QuickBooks / Timely / all live Cloud Functions.
+// ============================================================
+// CCH Studio — Cloud Functions for Smart Time Integrations (legacy / backup copy)
 // ============================================================
 // YOUR STACK:
 //   Teams + Outlook + Calendar  → Office 365 (Microsoft Graph)
