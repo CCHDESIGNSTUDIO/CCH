@@ -6661,6 +6661,31 @@
           }
         }
       }
+      // Full URL on our app origin but path is a vendor CDN pattern (saved after resolving img src in browser on wrong base).
+      if (/^https?:\/\//i.test(url) && typeof location !== 'undefined' && location.hostname) {
+        try {
+          var _aHost = document.createElement('a');
+          _aHost.href = url;
+          if (String(_aHost.hostname || '').toLowerCase() === String(location.hostname).toLowerCase()) {
+            var _pHost = String(_aHost.pathname || '').toLowerCase();
+            if (_pHost.indexOf('/format-auto/') === 0 || _pHost.indexOf('/media/catalog/') === 0 || _pHost.indexOf('/is/image/') === 0) {
+              var _rb = [
+                'https://www.restorationhardware.com/',
+                'https://restorationhardware.com/',
+                'https://www.rh.com/',
+                'https://rh.com/'
+              ];
+              var _tailH = String(_aHost.pathname || '') + String(_aHost.search || '') + String(_aHost.hash || '');
+              for (var _ri = 0; _ri < _rb.length; _ri++) {
+                try {
+                  var _uOut = new URL(_tailH.charAt(0) === '/' ? _tailH : '/' + _tailH, _rb[_ri]).href;
+                  if (_uOut) return _uOut;
+                } catch (_eRh) {}
+              }
+            }
+          }
+        } catch (_eHost) {}
+      }
       return url;
     }
 
@@ -35477,6 +35502,9 @@ async function renderBoardsTab(T, proj) {
           var a = document.createElement('a');
           a.href = u;
           if (String(a.hostname || '').toLowerCase() === String(location.hostname).toLowerCase()) {
+            var _pW = String(a.pathname || '').toLowerCase();
+            // Vendor catalog paths saved with our SPA host (clipper / copy-paste) — not real app assets; 404 here.
+            if (_pW.indexOf('/format-auto/') === 0 || _pW.indexOf('/media/catalog/') === 0 || _pW.indexOf('/is/image/') === 0) return true;
             return cchBoardImagePathSegmentCount(u) < 2;
           }
         }
