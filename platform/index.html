@@ -6628,7 +6628,6 @@
       if (url.indexOf('\\') >= 0 && !/^https?:\/\//i.test(url)) return '';
       if (!/^https?:\/\//i.test(url) && /[/\\]users[/\\]/i.test(url)) return '';
       if (url.startsWith('/s/files/') || url.startsWith('/s/t/')) url = 'https://cdn.shopify.com' + url;
-      if (/^\/format=(auto|pjpg|webp)/i.test(url)) return '';
       if (url.startsWith('www.')) return 'https://' + url;
       if (url.startsWith('//')) return 'https:' + url;
       // HTTPS app + http:// image = mixed content (blocked). Prefer https for remote hosts.
@@ -6645,8 +6644,8 @@
             if (_absRel) return _absRel;
           } catch (_eRel) {}
         }
-        // Magento-style catalog paths when no source URL was saved (still better than wrong host)
-        if (/^\/format-auto\//i.test(url) || /^\/media\/catalog\//i.test(url) || /^\/is\/image\//i.test(url)) {
+        // Magento / RH-style paths: `/format=auto/` (equals) and `/format-auto/` (hyphen) — not on our host.
+        if (/^\/format-auto\//i.test(url) || /^\/format=(auto|pjpg|webp)\//i.test(url) || /^\/media\/catalog\//i.test(url) || /^\/is\/image\//i.test(url)) {
           var _pathBases = [
             'https://www.restorationhardware.com/',
             'https://restorationhardware.com/',
@@ -6668,7 +6667,8 @@
           _aHost.href = url;
           if (String(_aHost.hostname || '').toLowerCase() === String(location.hostname).toLowerCase()) {
             var _pHost = String(_aHost.pathname || '').toLowerCase();
-            if (_pHost.indexOf('/format-auto/') === 0 || _pHost.indexOf('/media/catalog/') === 0 || _pHost.indexOf('/is/image/') === 0) {
+            if (_pHost.indexOf('/format-auto/') === 0 || _pHost.indexOf('/format=auto/') === 0 || /^\/format=(auto|pjpg|webp)\//i.test(_pHost) ||
+                _pHost.indexOf('/media/catalog/') === 0 || _pHost.indexOf('/is/image/') === 0) {
               var _rb = [
                 'https://www.restorationhardware.com/',
                 'https://restorationhardware.com/',
@@ -35504,7 +35504,8 @@ async function renderBoardsTab(T, proj) {
           if (String(a.hostname || '').toLowerCase() === String(location.hostname).toLowerCase()) {
             var _pW = String(a.pathname || '').toLowerCase();
             // Vendor catalog paths saved with our SPA host (clipper / copy-paste) — not real app assets; 404 here.
-            if (_pW.indexOf('/format-auto/') === 0 || _pW.indexOf('/media/catalog/') === 0 || _pW.indexOf('/is/image/') === 0) return true;
+            if (_pW.indexOf('/format-auto/') === 0 || _pW.indexOf('/format=auto/') === 0 || /^\/format=(auto|pjpg|webp)\//i.test(_pW) ||
+                _pW.indexOf('/media/catalog/') === 0 || _pW.indexOf('/is/image/') === 0) return true;
             return cchBoardImagePathSegmentCount(u) < 2;
           }
         }
@@ -44107,6 +44108,22 @@ async function renderBoardsTab(T, proj) {
             '<div style="text-align:center;padding:12px 0 20px;"><div style="font-family:\'Playfair Display\',serif;font-size:26px;font-weight:400;color:#0A1F3D;letter-spacing:0.06em;text-transform:uppercase;">CCH Design</div></div>' +
             '<div style="text-align:center;padding:12px 0 24px;border-top:1px solid #E2E2E2;border-bottom:1px solid #E2E2E2;margin-bottom:24px;">' +
             '<div style="font-family:\'Playfair Display\',Georgia,serif;font-size:22px;font-weight:500;color:#0A1F3D;">' + esc(ibTit) + '</div></div>';
+          try {
+            var _ibRowsCp = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(ibDetail.images) : [];
+            var _nStarImgCp = 0, _nComTotCp = 0;
+            for (var _sic = 0; _sic < _ibRowsCp.length; _sic++) {
+              var _rwCp = _ibRowsCp[_sic];
+              var _obCp = typeof _rwCp === 'string' ? {} : (_rwCp || {});
+              if ((_obCp.stars || 0) > 0) _nStarImgCp++;
+              _nComTotCp += ((_obCp.comments) || []).length;
+            }
+            if (_nStarImgCp || _nComTotCp) {
+              html += '<div style="font-size:12px;color:#6B7280;margin:-8px 0 18px;text-align:center;font-family:\'DM Sans\',sans-serif;line-height:1.6;">' +
+                (_nStarImgCp ? '<span style="margin:0 10px;">\u2605 ' + _nStarImgCp + ' starred image' + (_nStarImgCp !== 1 ? 's' : '') + '</span>' : '') +
+                (_nComTotCp ? '<span style="margin:0 10px;">\u2764 ' + _nComTotCp + ' image comment' + (_nComTotCp !== 1 ? 's' : '') + '</span>' : '') +
+                '<span style="display:block;margin-top:8px;font-size:11px;color:#9CA3AF;">Project timeline and announcements: <strong>Home</strong> and <strong>Messages</strong> in this portal.</span></div>';
+            }
+          } catch (_eSummCp) {}
           if (!ibUrls.length) {
             html += '<div style="font-size:13px;color:#6B7280;font-family:\'DM Sans\',sans-serif;">No images on this board yet.</div>';
           } else if (!encPayload) {
