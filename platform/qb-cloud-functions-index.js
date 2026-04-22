@@ -323,35 +323,46 @@ exports.qbWebhook = functions.https.onRequest(async (req, res) => {
           const payment = await qbApiCall("GET", "payment/" + entity.id, accessToken);
           const paymentData = payment.Payment;
 
-          // Find which invoice this payment is for
-          for (const line of (paymentData.Line || [])) {
-            if (line.LinkedTxn) {
-              for (const txn of line.LinkedTxn) {
-                if (txn.TxnType === "Invoice") {
-                  // Find our invoice by qbDocId
-                  const invoiceQuery = await db.collectionGroup("invoices")
-                    .where("qbDocId", "==", txn.TxnId).limit(1).get();
+          // Each Payment Line carries the portion applied to that invoice (Amount), not the full TotalAmt.
+          // Pushing TotalAmt once per LinkedTxn row re-applies the whole payment for every line — inflating Paid.
+          const lineList = paymentData.Line || [];
+          for (const line of lineList) {
+            if (!line || !line.LinkedTxn) continue;
+            const lineAmtRaw = parseFloat(line.Amount);
+            const lineAmt = Number.isFinite(lineAmtRaw) && lineAmtRaw > 0
+              ? lineAmtRaw
+              : (lineList.length === 1 ? parseFloat(paymentData.TotalAmt) || 0 : 0);
+            if (!lineAmt) continue;
 
-                  if (!invoiceQuery.empty) {
-                    const invDoc = invoiceQuery.docs[0];
-                    const existing = invDoc.data();
-                    const payments = existing.payments || [];
-                    payments.push({
-                      amount: paymentData.TotalAmt,
-                      date: paymentData.TxnDate,
-                      method: paymentData.PaymentMethodRef ? paymentData.PaymentMethodRef.name : "QB Payment",
-                      note: "Auto-synced from QuickBooks",
-                      qbPaymentId: entity.id
-                    });
+            for (const txn of line.LinkedTxn) {
+              if (txn.TxnType !== "Invoice") continue;
 
-                    const totalPaid = payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
-                    const total = parseFloat(existing.total) || 0;
-                    const newStatus = totalPaid >= total ? "Paid" : "Partially Paid";
+              const invoiceQuery = await db.collectionGroup("invoices")
+                .where("qbDocId", "==", txn.TxnId).limit(1).get();
 
-                    await invDoc.ref.update({ payments, status: newStatus });
-                  }
-                }
-              }
+              if (invoiceQuery.empty) continue;
+
+              const invDoc = invoiceQuery.docs[0];
+              const existing = invDoc.data();
+              const payments = Array.isArray(existing.payments) ? existing.payments.slice() : [];
+              const qbPid = String(entity.id || "");
+              const lineFingerprint = qbPid + "|" + String(txn.TxnId || "") + "|" + String(Math.round(lineAmt * 100) / 100);
+              if (payments.some((p) => String(p.qbPaymentLineKey || "") === lineFingerprint)) continue;
+
+              payments.push({
+                amount: lineAmt,
+                date: paymentData.TxnDate,
+                method: paymentData.PaymentMethodRef ? paymentData.PaymentMethodRef.name : "QB Payment",
+                note: "Auto-synced from QuickBooks",
+                qbPaymentId: entity.id,
+                qbPaymentLineKey: lineFingerprint
+              });
+
+              const totalPaid = payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+              const total = parseFloat(existing.total) || 0;
+              const newStatus = totalPaid >= total ? "Paid" : "Partially Paid";
+
+              await invDoc.ref.update({ payments, status: newStatus, paidAmount: totalPaid, paymentCount: payments.length });
             }
           }
         } catch (e) {

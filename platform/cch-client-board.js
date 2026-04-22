@@ -1,5 +1,5 @@
 // ==================== CCH CLIENT BOARD VIEWER ====================
-// Client-facing design board: full canvas (designer layout) + dashboard (stars/comments on items).
+// Client-facing design board: full canvas (designer layout), presentation-first — no starring workflow from the main board UI.
 
 (function() {
   'use strict';
@@ -96,7 +96,6 @@
   var commentSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>';
   var chevronLeft = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 18l-6-6 6-6"/></svg>';
   var chevronRight = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 18l6-6-6-6"/></svg>';
-  var dashSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>';
 
   /** Effective libraryProductId: design-board element, or linked project clip. */
   function cbItemLibraryProductId(it, clipById) {
@@ -555,6 +554,11 @@
       C.innerHTML = renderWelcome(boardTitle);
       return;
     }
+    // Dashboard (starring / selection workflow) is not offered on design boards — visuals only.
+    if (cbState.view === 'dashboard') {
+      cbState.view = 'board';
+      cbState.selectedItem = null;
+    }
     if (cbState.view === 'detail' && cbState.selectedItem) {
       C.innerHTML = renderDetail();
       return;
@@ -573,24 +577,23 @@
       '<div id="cbClientBoardRoot" style="width:100%;min-height:100vh;background:' + PARCHMENT + ';font-family:\'Cormorant Garamond\',Garamond,Georgia,serif;color:' + INK_MUTED + ';">' +
 
         // Top bar — ivory + gold (aligned with welcome typography)
-        '<div style="padding:16px 28px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(196,164,82,0.28);position:sticky;top:0;background:' + IVORY + ';z-index:10;box-shadow:0 6px 32px rgba(26,23,20,0.06);">' +
+        '<div class="cb-client-board-topbar" style="padding:16px 28px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(196,164,82,0.28);position:sticky;top:0;background:' + IVORY + ';z-index:10;box-shadow:0 6px 32px rgba(26,23,20,0.06);">' +
           '<div style="display:flex;align-items:baseline;gap:10px;">' +
-            '<span style="font-family:Playfair Display,Georgia,serif;font-size:22px;font-weight:700;color:#C4A052;letter-spacing:0.12em;">CCH</span>' +
+            '<span class="cb-client-brand-mark" style="font-family:Playfair Display,Georgia,serif;font-size:22px;font-weight:700;color:#C4A052;letter-spacing:0.12em;">CCH</span>' +
             '<span style="font-family:Cormorant Garamond,Georgia,serif;font-size:11px;letter-spacing:0.28em;color:' + INK_MUTED + ';text-transform:uppercase;font-weight:600;">Design Inc.</span>' +
           '</div>' +
           '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end;">' +
-            '<button type="button" onclick="cbSetView(\'dashboard\')" style="' + btnLite + 'display:inline-flex;align-items:center;gap:8px;">' + dashSvg + ' Dashboard</button>' +
             '<button type="button" onclick="closeCB()" style="' + btnLite + '">← Back to Project</button>' +
           '</div>' +
         '</div>' +
 
         // Hero — centered, gold caps + Playfair title (entry-page rhythm)
-        '<div style="padding:44px 28px 32px;max-width:900px;margin:0 auto;text-align:center;">' +
-          '<div style="font-size:10px;letter-spacing:0.38em;color:#C4A052;text-transform:uppercase;margin-bottom:18px;font-weight:600;">Prepared for ' + esc(cbState.clientName) + '</div>' +
+        '<div class="cb-client-board-hero" style="padding:44px 28px 32px;max-width:900px;margin:0 auto;text-align:center;">' +
+          '<div class="cb-hero-kicker" style="font-size:10px;letter-spacing:0.38em;color:#C4A052;text-transform:uppercase;margin-bottom:18px;font-weight:600;">Prepared for ' + esc(cbState.clientName) + '</div>' +
           '<h1 style="font-size:clamp(34px,5vw,52px);font-weight:400;margin:0 0 8px;font-family:\'Playfair Display\',Georgia,serif;letter-spacing:0.02em;color:' + INK + ';line-height:1.15;">' + esc(boardTitle) + '</h1>' +
-          (boardRoom ? '<div style="font-size:13px;color:#B8975C;letter-spacing:0.2em;text-transform:uppercase;margin-top:4px;font-weight:600;">' + esc(boardRoom) + '</div>' : '') +
+          (boardRoom ? '<div class="cb-hero-room" style="font-size:13px;color:#B8975C;letter-spacing:0.2em;text-transform:uppercase;margin-top:4px;font-weight:600;">' + esc(boardRoom) + '</div>' : '') +
           '<div style="width:56px;height:1px;background:linear-gradient(90deg,transparent,rgba(196,164,82,0.85),transparent);margin:22px auto 22px;"></div>' +
-          '<p style="font-size:15px;color:' + INK_MUTED + ';max-width:520px;margin:0 auto;line-height:1.65;">Scroll horizontally on smaller screens to see the full board. Use <strong style="color:#8A7346;font-weight:600;">Dashboard</strong> to star pieces and leave comments.</p>' +
+          '<p style="font-size:15px;color:' + INK_MUTED + ';max-width:520px;margin:0 auto;line-height:1.65;">This board is a visual presentation of the designer layout. Scroll horizontally on smaller screens to view the full canvas.</p>' +
         '</div>' +
 
         canvasHtml +
@@ -599,14 +602,13 @@
         '<div style="padding:36px 24px 48px;text-align:center;border-top:1px solid rgba(196,164,82,0.22);background:' + IVORY + ';">' +
           '<div style="font-size:18px;font-family:Playfair Display,Georgia,serif;font-weight:700;color:#C4A052;letter-spacing:0.1em;">CCH</div>' +
           '<div style="font-family:Cormorant Garamond,Georgia,serif;font-size:11px;letter-spacing:0.32em;color:' + INK_MUTED + ';text-transform:uppercase;margin-top:6px;font-weight:600;">Design Inc. · Est. 2004</div>' +
-          '<div style="font-size:12px;color:' + DIM + ';margin-top:14px;max-width:480px;margin-left:auto;margin-right:auto;line-height:1.5;">Open the Dashboard to star favorites and add comments on individual items.</div>' +
         '</div>' +
       '</div>';
   }
 
   // ==================== WELCOME SCREEN ====================
   function renderWelcome(boardTitle) {
-    return '<div id="cbClientBoardRoot" style="width:100%;height:100vh;display:flex;align-items:center;justify-content:center;background:' + DARK + ';font-family:\'Playfair Display\',Georgia,serif;cursor:pointer;" onclick="cbEnterBoardFromWelcome()">' +
+    return '<div id="cbClientBoardRoot" class="cb-client-welcome" style="width:100%;height:100vh;display:flex;align-items:center;justify-content:center;background:' + DARK + ';font-family:\'Playfair Display\',Georgia,serif;cursor:pointer;" onclick="cbEnterBoardFromWelcome()">' +
       '<div style="text-align:center;animation:cbFadeIn 1s ease;">' +
         '<div style="font-size:11px;letter-spacing:6px;color:' + GOLD + ';margin-bottom:24px;text-transform:uppercase;font-family:\'Cormorant Garamond\',Garamond,Georgia,serif;">Curated for you by</div>' +
         '<div style="display:inline-flex;align-items:center;gap:2px;margin-bottom:4px;">' +
@@ -628,10 +630,10 @@
 
     var btnGhost = 'background:transparent;border:1px solid rgba(196,164,82,0.45);border-radius:2px;padding:10px 16px;color:' + INK_MUTED + ';cursor:pointer;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;font-family:\'Cormorant Garamond\',Georgia,serif;';
     return '<div id="cbClientBoardRoot" style="width:100%;min-height:100vh;background:' + PARCHMENT + ';font-family:\'Cormorant Garamond\',Garamond,Georgia,serif;color:' + INK_MUTED + ';">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;padding:16px 28px;border-bottom:1px solid rgba(196,164,82,0.28);background:' + IVORY + ';box-shadow:0 6px 32px rgba(26,23,20,0.05);">' +
+      '<div class="cb-client-board-topbar" style="display:flex;justify-content:space-between;align-items:center;padding:16px 28px;border-bottom:1px solid rgba(196,164,82,0.28);background:' + IVORY + ';box-shadow:0 6px 32px rgba(26,23,20,0.05);">' +
         '<button type="button" onclick="cbSetView(\'board\')" style="' + btnGhost + 'display:inline-flex;align-items:center;gap:8px;">' + chevronLeft + ' Back to Board</button>' +
         '<div style="display:flex;align-items:baseline;gap:8px;">' +
-          '<span style="font-family:Playfair Display,Georgia,serif;font-size:20px;font-weight:700;color:#C4A052;letter-spacing:0.1em;">CCH</span>' +
+          '<span class="cb-client-brand-mark" style="font-family:Playfair Display,Georgia,serif;font-size:20px;font-weight:700;color:#C4A052;letter-spacing:0.1em;">CCH</span>' +
           '<span style="font-size:10px;letter-spacing:0.28em;color:' + INK_MUTED + ';text-transform:uppercase;font-weight:600;">Design Inc.</span>' +
         '</div>' +
       '</div>' +
@@ -696,9 +698,9 @@
 
     var btnDash = 'background:transparent;border:1px solid rgba(196,164,82,0.45);border-radius:2px;padding:10px 16px;color:' + INK_MUTED + ';cursor:pointer;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;font-family:\'Cormorant Garamond\',Georgia,serif;display:inline-flex;align-items:center;gap:8px;';
     return '<div id="cbClientBoardRoot" style="width:100%;min-height:100vh;background:' + PARCHMENT + ';font-family:\'Cormorant Garamond\',Garamond,Georgia,serif;color:' + INK_MUTED + ';">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;padding:16px 28px;border-bottom:1px solid rgba(196,164,82,0.28);background:' + IVORY + ';box-shadow:0 6px 32px rgba(26,23,20,0.05);">' +
+      '<div class="cb-client-board-topbar" style="display:flex;justify-content:space-between;align-items:center;padding:16px 28px;border-bottom:1px solid rgba(196,164,82,0.28);background:' + IVORY + ';box-shadow:0 6px 32px rgba(26,23,20,0.05);">' +
         '<button type="button" onclick="cbSetView(\'board\')" style="' + btnDash + '">' + chevronLeft + ' Back to Board</button>' +
-        '<div style="font-size:10px;letter-spacing:0.32em;color:#C4A052;text-transform:uppercase;font-weight:700;">Designer Dashboard</div>' +
+        '<div class="cb-client-brand-mark" style="font-size:10px;letter-spacing:0.32em;color:#C4A052;text-transform:uppercase;font-weight:700;">Designer Dashboard</div>' +
       '</div>' +
 
       '<div style="max-width:900px;margin:0 auto;padding:48px 32px;">' +
