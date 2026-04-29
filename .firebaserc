@@ -1,14 +1,21 @@
 {
   "projects": {
-    "default": "cch-design-boards"
+    "default": "cch-design-boards",
+    "production": "cch-design-boards",
+    "prod": "cch-design-boards",
+    "staging": "cch-studio-staging"
   },
   "targets": {
     "cch-design-boards": {
       "hosting": {
         "platform": [
           "cch-platform"
-        ],
-        "platform-staging": [
+        ]
+      }
+    },
+    "cch-studio-staging": {
+      "hosting": {
+        "platform": [
           "cch-platform-staging"
         ]
       }

@@ -37,6 +37,38 @@
 (function() {
   'use strict';
 
+  // Fallback: allow staff to mark final proposal approval when index helper is unavailable.
+  if (typeof window.approveProposalTotalForClient !== 'function') {
+    window.approveProposalTotalForClient = async function(projectId, proposalId) {
+      try {
+        var docRef = db.collection('boards').doc(projectId).collection('proposals').doc(proposalId);
+        var snap = await docRef.get();
+        if (!snap.exists) { if (typeof cchAlert === 'function') await cchAlert('Proposal not found.', 'Approve for Client'); return; }
+        var prop = snap.data() || {};
+        var gate = (typeof proposalInvoiceGateSummary === 'function')
+          ? proposalInvoiceGateSummary(prop, prop.items || [])
+          : { pendingCount: 0, approvedCount: 1 };
+        if ((gate.pendingCount || 0) > 0) { if (typeof cchAlert === 'function') await cchAlert('Please resolve pending line decisions first.', 'Approve for Client'); return; }
+        if ((gate.approvedCount || 0) < 1) { if (typeof cchAlert === 'function') await cchAlert('At least one line must be approved.', 'Approve for Client'); return; }
+        if (!(await cchConfirm('Mark this proposal as approved for the client?', 'Approve for Client', { confirmText: 'Approve Total' }))) return;
+        var nowIso = new Date().toISOString();
+        var userEmail = (window.currentUser && window.currentUser.email) || '';
+        await docRef.update({
+          status: 'Approved',
+          clientApprovedTotalAt: nowIso,
+          clientApprovedTotalBy: userEmail ? ('staff:' + userEmail) : 'staff',
+          approvedAt: prop.approvedAt || nowIso,
+          approvedBy: prop.approvedBy || userEmail || 'Designer',
+          updatedAt: nowIso
+        });
+        if (typeof showToast === 'function') showToast('Proposal marked approved for client.');
+        if (typeof renderProjectDetail === 'function') renderProjectDetail();
+      } catch (e) {
+        if (typeof cchAlert === 'function') await cchAlert('Could not approve proposal total: ' + (e.message || e), 'Approve for Client');
+      }
+    };
+  }
+
   /** Safe inside HTML onclick="fn('…')" — never use JSON.stringify (breaks the attribute). */
   function cchEscJsStr(t) {
     if (t == null) return '';
@@ -438,12 +470,17 @@
     var invMsgs = (invGate && invGate.msgs && invGate.msgs.length) ? invGate.msgs.join(' ') : 'Complete client approvals before converting.';
     var invTitleAttr = invOk ? '' : (' title="' + escA(invMsgs) + '"');
     var convertGold = '<button type="button" class="btn btn-sm" style="font-size:13px;font-weight:700;padding:8px 18px;border-radius:0;background:linear-gradient(180deg,#E8C97A,#C9A227);color:#1a1508;border:1px solid #A88420;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-right:8px;' + (invOk ? '' : 'opacity:0.55;pointer-events:none;') + '"' + invTitleAttr + ' onclick="convertProposalToInvoice(\'' + projectId + '\',\'' + proposalId + '\')">Convert to Invoice</button>';
+    var canStaffApproveClientTotal = !prop.clientApprovedTotalAt && String(prop.status || '') !== 'Invoiced';
+    var approveForClientBtn = canStaffApproveClientTotal
+      ? '<button class="btn btn-secondary btn-sm" onclick="approveProposalTotalForClient(\'' + projectId + '\',\'' + proposalId + '\')">✅ Approve for Client</button>'
+      : '';
 
     if (!isEdit) {
       setTopbarActions(
         '<button class="btn btn-secondary btn-sm" onclick="previewDocument(\'proposal\',\'' + projectId + '\',\'' + proposalId + '\')">👁️ Preview</button>' +
         '<button class="btn btn-secondary btn-sm" onclick="' + tearJs + '">📄 Tear Sheets</button>' +
         '<button class="btn btn-primary btn-sm" onclick="navigate(\'#/project/' + projectId + '/proposal/' + proposalId + '/edit\')">✏️ Edit line items</button>' +
+        approveForClientBtn +
         '<button class="btn btn-primary btn-sm" onclick="sendProposalToClient(\'' + projectId + '\',\'' + proposalId + '\')">📧 Email client</button>' +
         convertGold +
         moreView
@@ -454,6 +491,7 @@
         '<button class="btn btn-secondary btn-sm" onclick="navigate(\'#/project/' + projectId + '/proposal/' + proposalId + '\')">✓ Done editing</button>' +
         '<button class="btn btn-secondary btn-sm" onclick="previewDocument(\'proposal\',\'' + projectId + '\',\'' + proposalId + '\')">👁️ Preview</button>' +
         '<button class="btn btn-primary btn-sm" onclick="' + addItemOnclick + '">+ Add item</button>' +
+        approveForClientBtn +
         '<button class="btn btn-primary btn-sm" onclick="sendProposalToClient(\'' + projectId + '\',\'' + proposalId + '\')">📧 Email client</button>' +
         '<span class="btn btn-sm" style="border:1px dashed rgba(27,51,82,0.22);color:var(--gray-500);cursor:default;pointer-events:none;font-size:11px;white-space:nowrap;" title="Line changes save to the proposal as you edit">💾 Auto-save</span>' +
         moreEdit
@@ -915,6 +953,55 @@
     // Re-render proposal detail
     if (typeof renderProposalDetail === 'function') {
       renderProposalDetail(projectId, proposalId);
+    }
+  };
+
+  /** Per-document grouping mode used by proposal/invoice views + previews. */
+  window.cchDocGroupModeForData = function(docData, type) {
+    var raw = String((docData && (docData.groupByView || docData.groupMode)) || '').toLowerCase().trim();
+    if (raw === 'room' || raw === 'category') return raw;
+    // Default to room-first grouping for proposal/invoice output.
+    return (type === 'invoice' || type === 'proposal') ? 'room' : 'category';
+  };
+
+  window.cchGroupDocumentItems = function(items, type, mode) {
+    var grouped = {};
+    var m = (mode === 'category') ? 'category' : 'room';
+    function add(key, row) {
+      var k = String(key || '').trim() || 'General';
+      if (!grouped[k]) grouped[k] = [];
+      grouped[k].push(row);
+    }
+    (items || []).forEach(function(it, idx) {
+      if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it)) return;
+      var row = Object.assign({}, it);
+      if (row._idx == null) row._idx = idx;
+      var et = String(row.expenseType || '').toLowerCase();
+      if (type === 'invoice' && (et === 'shipping' || et === 'sales_tax' || et === 'discount' || et === 'handling')) {
+        add('Shipping & adjustments', row);
+        return;
+      }
+      var room = String(row.room || '').trim();
+      var category = String(row.category || '').trim();
+      var key = (m === 'category') ? (category || room || 'General') : (room || category || 'General');
+      add(key, row);
+    });
+    return grouped;
+  };
+
+  window.setDocGroupView = async function(type, projectId, docId, mode) {
+    var m = String(mode || '').toLowerCase();
+    if (m !== 'room' && m !== 'category') return;
+    var collection = type === 'invoice' ? 'invoices' : type === 'proposal' ? 'proposals' : 'purchaseOrders';
+    try {
+      await db.collection('boards').doc(projectId).collection(collection).doc(docId).update({
+        groupByView: m,
+        updatedAt: new Date().toISOString()
+      });
+      if (typeof showToast === 'function') showToast('Grouped by ' + (m === 'room' ? 'room' : 'category'));
+      if (typeof navigate === 'function') navigate(window.location.hash);
+    } catch (e) {
+      if (typeof showToast === 'function') showToast('Could not update grouping: ' + (e.message || e), 'error');
     }
   };
 
@@ -1750,23 +1837,13 @@
     var totalPaid = payments.reduce(function(s,p) { return s + (parseFloat(p.amount) || 0); }, 0);
     var balance = grandTotal - totalPaid;
 
-    // Group items — invoices: Design Services + rooms (matches PDF preview)
-    var grouped = {};
-    if (type === 'invoice' && typeof window.buildInvoicePreviewGroupedByDesignServices === 'function') {
-      var forInv = [];
-      items.forEach(function(item, idx) {
-        if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(item)) return;
-        forInv.push(Object.assign({}, item, { _idx: idx }));
-      });
-      grouped = window.buildInvoicePreviewGroupedByDesignServices(forInv);
-    } else {
-      items.forEach(function(item, idx) {
-        if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(item)) return;
-        var cat = item.room || item.category || 'General';
-        if (!grouped[cat]) grouped[cat] = [];
-        grouped[cat].push(Object.assign({}, item, { _idx: idx }));
-      });
-    }
+    // Group items by user-selected view mode (room/category) for proposals + invoices.
+    var docGroupMode = (typeof window.cchDocGroupModeForData === 'function')
+      ? window.cchDocGroupModeForData(docData, type)
+      : 'room';
+    var grouped = (typeof window.cchGroupDocumentItems === 'function')
+      ? window.cchGroupDocumentItems(items, type, docGroupMode)
+      : {};
 
     var statusBadge = docData.status ? '<span class="badge badge-' + (docData.status || 'draft').toLowerCase().replace(/\s+/g, '-') + '" style="font-size:13px;padding:6px 14px;">' + esc(docData.status) + '</span>' : '';
 
@@ -1820,6 +1897,10 @@
     setTopbarActions(
       '<button class="btn btn-secondary btn-sm" onclick="toggleDocTimeline(\'' + projectId + '\',\'' + collection + '\',\'' + docId + '\')">🕐 Timeline</button>' +
       '<button class="btn btn-secondary btn-sm" onclick="navigate(\'#/project/' + projectId + '/' + backTab + '\')">← Back</button>' +
+      ((type === 'invoice' || type === 'proposal') ? (
+        '<button class="btn btn-secondary btn-sm" style="' + (docGroupMode === 'room' ? 'background:#1B3352;color:#EDE8E0;border-color:#1B3352;' : '') + '" onclick="setDocGroupView(\'' + type + '\',\'' + projectId + '\',\'' + docId + '\',\'room\')">By Room</button>' +
+        '<button class="btn btn-secondary btn-sm" style="' + (docGroupMode === 'category' ? 'background:#1B3352;color:#EDE8E0;border-color:#1B3352;' : '') + '" onclick="setDocGroupView(\'' + type + '\',\'' + projectId + '\',\'' + docId + '\',\'category\')">By Category</button>'
+      ) : '') +
       '<button class="btn btn-secondary btn-sm" onclick="previewDocument(\'' + type + '\',\'' + projectId + '\',\'' + docId + '\')">👁️ Preview</button>' +
       (type === 'invoice' ? '<button class="btn btn-secondary btn-sm" onclick="sendInvoiceToClient(\'' + projectId + '\',\'' + docId + '\')">📧 Send</button>' : '') +
       '<button class="btn btn-secondary btn-sm" onclick="togglePublished(\'' + cchEscJsStr(projectId) + '\',\'' + cchEscJsStr(docId) + '\',' + (_nextPublished ? 'true' : 'false') + ',\'' + cchEscJsStr(collection) + '\')">' + _pubLabel + '</button>' +
@@ -2122,6 +2203,21 @@
       var et = (it.expenseType || '').toLowerCase();
       return et === 'shipping' || et === 'sales_tax' || et === 'discount' || et === 'handling';
     }
+    function _invIsLaborLikeLine(it) {
+      if (!it) return false;
+      var et = String(it.expenseType || '').toLowerCase();
+      var itype = String(it.itemType || '').toLowerCase();
+      if (et === 'labor' || et === 'installation') return true;
+      if (itype === 'labor' || itype === 'installation') return true;
+      var txt = (
+        String(it.service || '') + ' ' +
+        String(it.billingCategory || '') + ' ' +
+        String(it.title || it.name || '') + ' ' +
+        String(it.description || '') + ' ' +
+        String(it.category || '')
+      ).toLowerCase();
+      return /\b(labor|labour|install|installation|wallpaper installation|tile installation|mounting|site install)\b/.test(txt);
+    }
     function _sanitizeProductGroupKey(it) {
       var r = String(it.room || '').trim();
       var c = String(it.category || '').trim();
@@ -2133,6 +2229,10 @@
     function _invLineIsDesignServicesBucket(it) {
       if (_invIsExplicitProduct(it)) return false;
       if (_invIsFeeOrAdjustmentLine(it)) return false;
+      if (_invIsLaborLikeLine(it)) return false;
+      var room = String((it && it.room) || '').trim().toLowerCase();
+      // If a line is assigned to a real room, keep it in room grouping (unless it's explicit time-billing room).
+      if (room && room !== 'time billing' && room !== 'time-billing' && room !== 'time track' && room !== 'time tracking') return false;
       return true;
     }
     window.buildInvoicePreviewGroupedByDesignServices = function(items) {
@@ -2144,7 +2244,9 @@
           design.push(it);
           return;
         }
-        var k = _invIsExplicitProduct(it) ? _sanitizeProductGroupKey(it) : FEES_SECTION;
+        var k = (_invIsExplicitProduct(it) || _invIsLaborLikeLine(it))
+          ? _sanitizeProductGroupKey(it)
+          : FEES_SECTION;
         if (!other[k]) other[k] = [];
         other[k].push(it);
       });
@@ -2311,27 +2413,25 @@
     var payments = docData.payments || [];
     var totalPaid = payments.reduce(function(s,p) { return s + (parseFloat(p.amount)||0); }, 0);
 
-    // Group items: invoices → Design Services + product rooms; proposals/POs by room/category
-    var grouped = {};
-    if (type === 'invoice' && typeof window.buildInvoicePreviewGroupedByDesignServices === 'function') {
-      grouped = window.buildInvoicePreviewGroupedByDesignServices(items);
-    } else {
-      items.forEach(function(it) {
-        if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it)) return;
-        var cat = it.room || it.category || 'General'; if (!grouped[cat]) grouped[cat]=[]; grouped[cat].push(it);
-      });
-    }
+    // Group items by per-document mode (room/category) to match on-screen view + output generation.
+    var docGroupMode = (typeof window.cchDocGroupModeForData === 'function')
+      ? window.cchDocGroupModeForData(docData, type)
+      : 'room';
+    var grouped = (typeof window.cchGroupDocumentItems === 'function')
+      ? window.cchGroupDocumentItems(items, type, docGroupMode)
+      : {};
 
     // Build items table with taxable column
     var itemsHtml = '';
     var subtotal = 0, taxableSubtotal = 0, totalShipping = 0;
-    var _showPremiumImgCol = type !== 'invoice';
+    // Show thumbnails on invoices too when product images exist (Houzz-style printouts).
+    var _showPremiumImgCol = true;
     var _premiumGroupColSpan = type === 'po' ? 8 : type === 'invoice' ? 6 : 7;
     var _hasProposalSectionGroups = type === 'proposal' && items.some(function(it) { return it && it.lineKind === 'group'; });
     /** Colgroup keeps thead/body columns aligned (fixed layout + width only on tbody broke alignment). */
     var _premiumColgroup = '';
     if (type === 'invoice') {
-      _premiumColgroup = '<colgroup><col class="pc-item"><col class="pc-qty"><col class="pc-money"><col class="pc-money"><col class="pc-tax"><col class="pc-money"></colgroup>';
+      _premiumColgroup = '<colgroup><col class="pc-thumb"><col class="pc-item"><col class="pc-qty"><col class="pc-money"><col class="pc-money"><col class="pc-tax"><col class="pc-money"></colgroup>';
     } else if (type === 'po') {
       _premiumColgroup = '<colgroup><col class="pc-thumb"><col class="pc-item"><col class="pc-vendor"><col class="pc-qty"><col class="pc-money"><col class="pc-money"><col class="pc-tax"><col class="pc-money"></colgroup>';
     } else {
@@ -2379,8 +2479,20 @@
 
       var isSvc = it.expenseType === 'service' || it.itemType === 'service';
       var imgTag = '';
-      if (_showPremiumImgCol && !isSvc && it.imageUrl) {
-        imgTag = '<img src="' + _escImgSrcAttr(it.imageUrl) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">';
+      if (_showPremiumImgCol && !isSvc) {
+        var imgSrc = '';
+        if (it.imageUrl) imgSrc = String(it.imageUrl).trim();
+        if (!imgSrc && typeof _firstCoercedGalleryUrl === 'function') {
+          imgSrc = String(_firstCoercedGalleryUrl(it) || '').trim();
+        }
+        if (!imgSrc && Array.isArray(it.images) && it.images.length) {
+          var g0 = it.images[0];
+          if (typeof g0 === 'string') imgSrc = g0.trim();
+          else if (g0 && (g0.imageUrl || g0.url)) imgSrc = String(g0.imageUrl || g0.url || '').trim();
+        }
+        if (imgSrc) {
+          imgTag = '<img src="' + _escImgSrcAttr(imgSrc) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">';
+        }
       }
       var imgCell = _showPremiumImgCol ? '<td class="img-cell">' + imgTag + '</td>' : '';
       var _rawNotes = (it.lineNotes || it.notes) || '';

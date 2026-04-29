@@ -194,9 +194,9 @@ exports.timelyWebhook = functions.https.onRequest(async (req, res) => {
 // QUICKBOOKS INTEGRATION
 // ══════════════════════════════════════════════════════════
 
-// QuickBooks — client id/secret must match Intuit app + qbauth.html; realm defaults until OAuth stores real id.
-const QB_CLIENT_ID = "ABANZD7ynJxIwmujoEXbztoyHJHO3AHpoRNBGD0J4AJq7pwL33";
-const QB_CLIENT_SECRET = "p6ebqg4HUwBKcuxALaGhvN0BFkWl5xqKCXJCvLUJ";
+// QuickBooks credentials are loaded from Firebase Functions secrets.
+const QB_CLIENT_ID = process.env.QB_CLIENT_ID || "";
+const QB_CLIENT_SECRET = process.env.QB_CLIENT_SECRET || "";
 const QB_REALM_ID = "1389735275";
 // Sandbox (only if qbauth.html uses sandbox client id instead):
 // const QB_CLIENT_ID = "ABIdgpUOB12gSW5FUrfixcQRQXtLNlRr4SXf0kkpxUSpe35qFR";
@@ -231,9 +231,21 @@ const QB_OAUTH_REDIRECTS = new Set([
 ]);
 
 const QB_REDIRECT_URI_DEFAULT = "https://cch-platform.web.app/qbauth.html";
+const QB_SECRET_NAMES = ["QB_CLIENT_ID", "QB_CLIENT_SECRET"];
+const qbRuntime = functions.runWith({ secrets: QB_SECRET_NAMES });
+
+function ensureQbSecrets() {
+  if (!QB_CLIENT_ID || !QB_CLIENT_SECRET) {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "QuickBooks secrets missing. Set QB_CLIENT_ID and QB_CLIENT_SECRET in Firebase Functions secrets."
+    );
+  }
+}
 
 // ─── QB OAUTH: Start authorization flow ─────────────────────────
-exports.qbAuthStart = functions.https.onRequest(async (req, res) => {
+exports.qbAuthStart = qbRuntime.https.onRequest(async (req, res) => {
+  ensureQbSecrets();
   const state = Math.random().toString(36).substring(2, 15);
   await db.collection("admin").doc("qb_oauth_state").set({ state, createdAt: new Date().toISOString() });
 
@@ -249,10 +261,11 @@ exports.qbAuthStart = functions.https.onRequest(async (req, res) => {
 });
 
 // ─── QB OAUTH: Exchange code for tokens (callable from frontend) ──
-exports.qbAuthCallback = functions.https.onCall(
+exports.qbAuthCallback = qbRuntime.https.onCall(
   { invoker: "public" },
   async (request) => {
   assertQbAdmin(request);
+  ensureQbSecrets();
 
   const { code, realmId, redirectUri } = request.data || {};
   if (!code) throw new functions.https.HttpsError("invalid-argument", "Authorization code required");
@@ -298,6 +311,7 @@ exports.qbAuthCallback = functions.https.onCall(
 
 // ─── TOKEN MANAGEMENT ────────────────────────────────────────────
 async function getQBAccessToken() {
+  ensureQbSecrets();
   const qbDoc = await db.collection("admin").doc("qb").get();
   const config = qbDoc.data();
   if (!config || !config.refreshToken) {
@@ -658,7 +672,7 @@ async function findOrCreateCustomer(accessToken, realmId, clientName, clientEmai
 }
 
 // ─── PUSH INVOICE → QB (callable: requires CCH Firebase sign-in on allow-list) ──
-exports.pushInvoiceToQB = functions.https.onCall(
+exports.pushInvoiceToQB = qbRuntime.https.onCall(
   { invoker: "public" },
   async (request) => {
   assertQbPushAllowed(request);
@@ -853,7 +867,7 @@ function buildFirestorePatchFromQBInvoice(existing, qbInv) {
 }
 
 /** Pull one invoice from QuickBooks by qbDocId and update paid status / balance fields in Firestore. */
-exports.syncInvoiceBalanceFromQB = functions.https.onCall(
+exports.syncInvoiceBalanceFromQB = qbRuntime.https.onCall(
   { invoker: "public" },
   async (request) => {
     assertQbPushAllowed(request);
@@ -889,7 +903,7 @@ exports.syncInvoiceBalanceFromQB = functions.https.onCall(
  * Run from Studio when payments were recorded in QB but webhook did not update Firestore.
  */
 exports.batchSyncInvoiceBalancesFromQB = functions
-  .runWith({ timeoutSeconds: 300, memory: "512MB" })
+  .runWith({ timeoutSeconds: 300, memory: "512MB", secrets: QB_SECRET_NAMES })
   .https.onCall({ invoker: "public" }, async (request) => {
     assertQbPushAllowed(request);
     const rawMax = request.data && request.data.maxInvoices;
@@ -945,7 +959,7 @@ exports.batchSyncInvoiceBalancesFromQB = functions
  *
  * QuickBooks OAuth still uses admin/qb refresh token (fully automatic; no Intuit login per request).
  */
-exports.pushInvoiceToQBAutomated = functions.https.onRequest(async (req, res) => {
+exports.pushInvoiceToQBAutomated = qbRuntime.https.onRequest(async (req, res) => {
   res.set("Access-Control-Allow-Origin", "*");
   res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -993,7 +1007,8 @@ exports.pushInvoiceToQBAutomated = functions.https.onRequest(async (req, res) =>
 exports.processInvoiceQBPushPending = onDocumentWritten(
   {
     document: "boards/{projectId}/invoices/{invoiceId}",
-    region: "us-central1"
+    region: "us-central1",
+    secrets: QB_SECRET_NAMES
   },
   async (event) => {
     const snap = event.data.after;
@@ -1030,7 +1045,7 @@ exports.processInvoiceQBPushPending = onDocumentWritten(
 );
 
 // ─── PUSH PO → QB (as Purchase Order) ───────────────────────────
-exports.pushPOToQB = functions.https.onCall(
+exports.pushPOToQB = qbRuntime.https.onCall(
   { invoker: "public" },
   async (request) => {
   assertQbPushAllowed(request);
@@ -1163,7 +1178,7 @@ exports.pushPOToQB = functions.https.onCall(
 );
 
 // ─── DELETE FROM QB (when deleted in Studio) ─────────────────────
-exports.deleteFromQB = functions.https.onCall(
+exports.deleteFromQB = qbRuntime.https.onCall(
   { invoker: "public" },
   async (request) => {
   assertQbAdmin(request);
@@ -1196,7 +1211,7 @@ exports.deleteFromQB = functions.https.onCall(
 );
 
 // ─── SETUP STUDIO ACCOUNTS IN QB ─────────────────────────────────
-exports.qbSetupAccounts = functions.https.onCall(
+exports.qbSetupAccounts = qbRuntime.https.onCall(
   { invoker: "public" },
   async (request) => {
   assertQbAdmin(request);
@@ -1247,7 +1262,7 @@ exports.qbSetupAccounts = functions.https.onCall(
 );
 
 // ─── QB WEBHOOK (receives payment notifications) ─────────────────
-exports.qbWebhook = functions.https.onRequest(async (req, res) => {
+exports.qbWebhook = qbRuntime.https.onRequest(async (req, res) => {
   if (req.method !== "POST") { res.status(200).send("OK"); return; }
 
   const body = req.body;

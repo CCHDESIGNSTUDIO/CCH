@@ -1392,6 +1392,32 @@
     .room-card-meta { font-size: 10px; color: var(--gray-400); margin-top: 2px; }
     .room-card-budget { font-size: 11px; color: var(--gold); margin-top: 2px; font-family: var(--font-mono); }
 
+    /* Staff Room Boards — Houzz-style room tiles (fixed size; works on light theme) */
+    .rb-room-tile.room-card {
+      background: #fff;
+      border: 1px solid var(--gray-200);
+      box-shadow: 0 2px 10px rgba(27, 51, 82, 0.06);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0;
+    }
+    .rb-room-tile .room-card-cover {
+      flex: 0 0 auto;
+      aspect-ratio: 4 / 3;
+      background: #F4F6FA;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    .rb-room-tile .room-card-info {
+      flex: 1 1 auto;
+      min-height: 72px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+    }
+    .rb-room-tile .room-card-name { color: #1B3352; text-transform: none; letter-spacing: 0; }
+    .rb-room-tile .room-card-meta { color: var(--gray-500); }
+
     .clips-grid {
       display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px;
     }
@@ -2461,6 +2487,9 @@
     .btn-sm { padding: 5px 12px; font-size: 12px; }
     /* Topbar buttons */
     .topbar .btn, .topbar button { color: var(--text, #1B3352) !important; }
+    /* Primary/dark in header: must stay light-on-navy — .topbar .btn above uses !important and would otherwise force navy text on navy .btn-primary (unreadable). */
+    .topbar-actions .btn.btn-primary,
+    .topbar-actions .btn.btn-dark { color: #FFFFFF !important; }
 
   
     /* ROOM BOARD TABLE ALIGNMENT */
@@ -2669,7 +2698,24 @@
 
   <script>
     // ==================== CONFIG ====================
-    const firebaseConfig = {
+    // Environment detection — staging vs production based on hostname.
+    // Staging uses a completely separate Firebase project (cch-studio-staging)
+    // with its own Firestore, Auth, Storage. No data shared with production.
+    const CCH_ENV = (function() {
+      var h = location.hostname || '';
+      if (h.indexOf('staging') >= 0 || h === 'localhost' || h === '127.0.0.1') return 'staging';
+      return 'production';
+    })();
+    window._cchEnv = CCH_ENV;
+
+    const firebaseConfig = CCH_ENV === 'staging' ? {
+      apiKey: "AIzaSyBIwwo7uRij6Q0FZg-qmIS1LC8t2AjXrYo",
+      authDomain: "cch-studio-staging.firebaseapp.com",
+      projectId: "cch-studio-staging",
+      storageBucket: "cch-studio-staging.firebasestorage.app",
+      messagingSenderId: "210388013080",
+      appId: "1:210388013080:web:fcd520b30c0d50b149736d"
+    } : {
       apiKey: "AIzaSyAd24U5ArVGrA24IxNcYD2NYiTVycyF4og",
       authDomain: "cch-design-boards.firebaseapp.com",
       projectId: "cch-design-boards",
@@ -2682,6 +2728,19 @@
     try {
       auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
     } catch (e) { console.warn('[Auth] persistence', e); }
+
+    // ── Staging banner — never show on production ──
+    if (CCH_ENV === 'staging') {
+      document.addEventListener('DOMContentLoaded', function() {
+        var b = document.createElement('div');
+        b.id = 'cchStagingBanner';
+        b.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#D4A574;color:#0A1F3D;padding:6px 12px;font-weight:700;text-align:center;z-index:99999;font-family:\'DM Sans\',sans-serif;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+        b.textContent = '⚠ STAGING ENVIRONMENT — NOT PRODUCTION — CHANGES HERE DO NOT AFFECT CLIENTS ⚠';
+        document.body.appendChild(b);
+        document.body.style.paddingTop = '30px';
+      });
+      console.log('%c⚠ CCH STUDIO — STAGING ENVIRONMENT ⚠', 'background:#D4A574;color:#0A1F3D;font-size:14px;font-weight:700;padding:4px 12px;');
+    }
 
     // ── Theme Manager ──
     function setTheme(theme) {
@@ -6153,6 +6212,65 @@
       return { ok: msgs.length === 0, msgs: msgs, approvedCount: appr, pendingCount: pending };
     }
 
+    /** Staff override: mark final proposal approval when client approved offline/verbally. */
+    async function approveProposalTotalForClient(projectId, proposalId) {
+      try {
+        var docRef = db.collection('boards').doc(projectId).collection('proposals').doc(proposalId);
+        var doc = await docRef.get();
+        if (!doc.exists) { await cchAlert('Proposal not found.', 'Approve for Client'); return; }
+        var prop = doc.data() || {};
+        var gate = proposalInvoiceGateSummary(prop, prop.items || []);
+        if (gate.pendingCount > 0) {
+          await cchAlert('Finish line decisions first. ' + gate.pendingCount + ' line(s) are still pending.', 'Approve for Client');
+          return;
+        }
+        if ((gate.approvedCount || 0) < 1) {
+          await cchAlert('At least one line must be approved before final proposal approval.', 'Approve for Client');
+          return;
+        }
+        if (prop.clientApprovedTotalAt) {
+          showToast('Proposal total is already approved.');
+          return;
+        }
+        if (String(prop.status || '') === 'Invoiced') {
+          await cchAlert('This proposal is already invoiced.', 'Approve for Client');
+          return;
+        }
+        if (!(await cchConfirm(
+          'Mark this proposal total as client-approved? Use this only when the client already approved outside the portal.',
+          'Approve for Client',
+          { confirmText: 'Approve Total' }
+        ))) return;
+
+        var nowIso = new Date().toISOString();
+        var userEmail = (currentUser && currentUser.email) || '';
+        var userName = (currentUser && currentUser.displayName) || userEmail || 'Designer';
+        await docRef.update({
+          status: 'Approved',
+          clientApprovedTotalAt: nowIso,
+          clientApprovedTotalBy: userEmail ? ('staff:' + userEmail) : 'staff',
+          approvedAt: prop.approvedAt || nowIso,
+          approvedBy: prop.approvedBy || userName,
+          updatedAt: nowIso
+        });
+
+        try {
+          await appendClientProposalActivity(projectId, proposalId, 'client_proposal_total_approved', 'Proposal total approved by design team on client behalf');
+        } catch (e1) {}
+        try {
+          var propNum = prop.proposalNum || prop.number || prop.name || proposalId.slice(0, 8);
+          await logDocActivity(projectId, 'proposals', proposalId, 'client_proposal_total_approved', 'Marked approved for client: ' + propNum);
+        } catch (e2) {}
+
+        showToast('Proposal marked approved for client.');
+        _cacheTime = 0;
+        renderProjectDetail();
+      } catch (e) {
+        console.error('approveProposalTotalForClient failed', e);
+        await cchAlert('Could not approve proposal total: ' + (e.message || e), 'Approve for Client');
+      }
+    }
+
     async function markAllProposalLinesApproval(projectId, proposalId, status) {
       if (status !== 'approved' && status !== 'pending' && status !== 'declined') return;
       try {
@@ -9346,6 +9464,9 @@
         // Filter by category name (catches Time Billing, CCH services, etc.)
         var cat = (item.category || '').toLowerCase();
         if (cat === 'time billing' || cat === 'time track' || cat === 'time tracking' || cat === 'service' || cat === 'services') return false;
+        var titleAndDesc = ((item.title || '') + ' ' + (item.description || '') + ' ' + (item.notes || '') + ' ' + (item.vendorDescription || '')).toLowerCase();
+        if (/\b(time billing|time track|time tracking|freight|shipping|delivery|handling|tax|service fee|design fee|consultation|retainer|install(?:ation)?|labor|labour)\b/.test(titleAndDesc)) return false;
+        if (typeof boardClipIsTimeBillingRow === 'function' && boardClipIsTimeBillingRow(item)) return false;
         // Filter by isRealProduct (catches design fees, services by title)
         return isRealProduct({ title: item.title, category: item.category, room: item.room, vendor: item.vendor, manufacturer: '', sku: item.sku || '', cost: item.cost, clientPrice: item.sell });
       });
@@ -12024,7 +12145,22 @@
       if (!window._rbCollapsed) window._rbCollapsed = {};
       var keys = window._rbSectionKeysLast || [];
       keys.forEach(function(k) { window._rbCollapsed[k] = collapse; });
+      window._rbGridFocusRoom = '';
       renderBoardsTab(document.getElementById('projectTabContent'), { id: projectId, name: projectName });
+    }
+
+    function rbGridFocusRoom(projectId, projectName, roomKey) {
+      window._rbGridFocusRoom = String(roomKey || '');
+      window._boardDisplayMode = 'tile';
+      var pn = String(projectName || '').trim() || (window._currentProject && window._currentProject.name) || '';
+      renderBoardsTab(document.getElementById('projectTabContent'), { id: projectId, name: pn });
+    }
+
+    function rbGridClearRoomFocus(projectId, projectName) {
+      window._rbGridFocusRoom = '';
+      window._boardDisplayMode = 'tile';
+      var pn = String(projectName || '').trim() || (window._currentProject && window._currentProject.name) || '';
+      renderBoardsTab(document.getElementById('projectTabContent'), { id: projectId, name: pn });
     }
 
     function boardSectionSort(a, b) {
@@ -12033,8 +12169,80 @@
       return String(a).localeCompare(String(b), undefined, { sensitivity: 'base' });
     }
 
-    function renderBoardTileView(groupedData, projId, sectionKeys) {
+    function renderBoardTileView(groupedData, projId, sectionKeys, roomMeta, projectName) {
       var keys = (sectionKeys && sectionKeys.length) ? sectionKeys : Object.keys(groupedData || {}).sort(boardSectionSort);
+      if ((window._boardViewMode || 'room') === 'room') {
+        var focusRm = String(window._rbGridFocusRoom || '').trim();
+        if (focusRm && keys.indexOf(focusRm) >= 0) {
+          var focusItems = groupedData[focusRm] || [];
+          var focusTotal = focusItems.reduce(function(s, c) {
+            var q = parseFloat(c.qty || c.quantity) || 1;
+            var p = parseMoney(c.clientPrice) || parseFloat(c.sellPrice) || parseMoney(c.totalSelling) || parseFloat(c.price) || 0;
+            return s + (p * q);
+          }, 0);
+          return '<div style="margin-bottom:16px;">' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 14px;">' +
+              '<button type="button" class="btn btn-secondary btn-sm" onclick="rbGridClearRoomFocus(\'' + escJsStr(projId) + '\',\'' + escJsStr(projectName || '') + '\')">\u2190 All rooms</button>' +
+              '<div style="font-size:15px;font-weight:700;color:#1B3352;letter-spacing:0.02em;">' + esc(focusRm) + '</div>' +
+              '<div style="font-size:12px;color:var(--gray-500);">' + focusItems.length + ' item' + (focusItems.length === 1 ? '' : 's') + (focusTotal > 0 ? ' \u00b7 ' + formatMoney(focusTotal) : '') + '</div>' +
+            '</div>' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;">' +
+            focusItems.map(function(clip) {
+              var imgSrc = clip.imageUrl || _firstCoercedGalleryUrl(clip) || '';
+              var qty = parseFloat(clip.qty || clip.quantity) || 1;
+              var sell = parseMoney(clip.clientPrice) || parseFloat(clip.sellPrice) || parseFloat(clip.unitSellingPrice) || (parseMoney(clip.totalSelling) ? parseMoney(clip.totalSelling) / qty : 0) || parseFloat(clip.totalSell) || parseFloat(clip.price) || parseFloat(clip.retailPrice) || 0;
+              var isValid = imgSrc && (imgSrc.startsWith('http') || imgSrc.startsWith('data:') || imgSrc.startsWith('//') || (imgSrc.charAt(0) === '/' && imgSrc.length > 1));
+              return '<div onclick="showClipDetail(\'' + escAttr(projId) + '\',\'' + escAttr(clip.id) + '\')" style="background:white;border:1px solid var(--gray-200);border-radius:6px;overflow:hidden;cursor:pointer;transition:box-shadow 0.2s,transform 0.15s;"' +
+                ' onmouseenter="this.style.boxShadow=\'0 4px 16px rgba(0,0,0,0.1)\';this.style.transform=\'translateY(-1px)\'" onmouseleave="this.style.boxShadow=\'none\';this.style.transform=\'none\'">' +
+                '<div style="position:relative;">' +
+                  '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:rgba(245,243,238,0.5);border-bottom:1px solid var(--gray-100);">' +
+                    '<div style="display:flex;gap:6px;">' +
+                      (clip.pageUrl ? '<a href="' + escAttr(clip.pageUrl) + '" target="_blank" onclick="event.stopPropagation()" title="View source" style="color:var(--gray-400);font-size:13px;text-decoration:none;padding:2px;">🔗</a>' : '') +
+                    '</div>' +
+                    '<div style="display:flex;gap:6px;align-items:center;">' +
+                      (sell > 0 ? '<span style="font-size:11px;font-weight:600;color:var(--gold);">$</span>' : '') +
+                      '<button type="button" title="Remove from room board" aria-label="Remove from room board" onclick="event.stopPropagation();void deleteClip(\'' + escAttr(projId) + '\',\'' + escAttr(clip.id) + '\')" style="border:none;background:transparent;color:var(--gray-400);cursor:pointer;font-size:14px;padding:2px 4px;line-height:1;border-radius:4px;" onmouseenter="this.style.color=\'var(--red)\'" onmouseleave="this.style.color=\'var(--gray-400)\'">🗑</button>' +
+                    '</div>' +
+                  '</div>' +
+                  (isValid ? '<img src="' + _escImgSrcAttr(imgSrc) + '" style="width:100%;aspect-ratio:1;object-fit:cover;display:block;" referrerpolicy="no-referrer" onerror="this.outerHTML=\'<div style=\\\'aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:#F4F6FA;color:var(--gray-300);font-size:40px;\\\'>📷</div>\'">' : '<div style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:#F4F6FA;color:var(--gray-300);font-size:40px;">📷</div>') +
+                '</div>' +
+                '<div style="padding:10px 12px;">' +
+                  '<div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#1B3352;">' + esc(clip.title || 'Untitled') + '</div>' +
+                  (clip.vendor ? '<div style="font-size:11px;color:var(--gray-500);margin-top:2px;">By ' + esc(clip.vendor) + '</div>' : '') +
+                  (clip.description ? '<div style="font-size:11px;color:var(--gray-400);margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + esc(clip.description).substring(0, 80) + '</div>' : '') +
+                  (sell > 0 ? '<div style="font-size:14px;font-weight:700;color:var(--gold);font-family:var(--font-mono);margin-top:6px;">' + formatMoney(sell) + (qty > 1 ? ' <span style="font-size:11px;color:var(--gray-400);font-weight:400;">x' + qty + '</span>' : '') + '</div>' : '') +
+                '</div>' +
+              '</div>';
+            }).join('') +
+            '</div></div>';
+        }
+        return '<div class="room-cards-grid">' + keys.map(function(rm) {
+          var items = groupedData[rm] || [];
+          var totalSell = items.reduce(function(s, c) {
+            var q = parseFloat(c.qty || c.quantity) || 1;
+            var p = parseMoney(c.clientPrice) || parseFloat(c.sellPrice) || parseMoney(c.totalSelling) || parseFloat(c.price) || 0;
+            return s + (p * q);
+          }, 0);
+          var firstWithImg = items.find(function(c) { return c.imageUrl || _firstCoercedGalleryUrl(c) || c.image || c.img || c.thumbnail; });
+          var cover = ((roomMeta && roomMeta[rm] && roomMeta[rm].coverImage) || (firstWithImg ? (firstWithImg.imageUrl || _firstCoercedGalleryUrl(firstWithImg) || firstWithImg.image || firstWithImg.img || firstWithImg.thumbnail) : '') || '');
+          var coverOk = cover && (cover.indexOf('http') === 0 || cover.indexOf('data:') === 0 || cover.indexOf('//') === 0 || (cover.charAt(0) === '/' && cover.length > 1));
+          var covInner = coverOk
+            ? '<img src="' + _escImgSrcAttr(cover) + '" referrerpolicy="no-referrer" onerror="this.outerHTML=\'<div class=\\\'room-card-placeholder\\\'>📷</div>\'"><div class="room-card-upload" onclick="event.stopPropagation();void openRoomCoverPicker(\'' + escAttr(projId) + '\',\'' + escAttr(rm) + '\')" title="Set room cover">📷</div>'
+            : '<div class="room-card-placeholder">📷</div><div class="room-card-upload" onclick="event.stopPropagation();void openRoomCoverPicker(\'' + escAttr(projId) + '\',\'' + escAttr(rm) + '\')" title="Set room cover">📷</div>';
+          var hint = (rm === 'Unassigned' && items.length > 200)
+            ? '<div class="room-card-meta" style="margin-top:4px;line-height:1.35;color:var(--gray-500);">Clips with no <strong>room</strong> yet (common after bulk import). Open the room to assign.</div>'
+            : '';
+          return '<div class="room-card rb-room-tile" onclick="rbGridFocusRoom(\'' + escJsStr(projId) + '\',\'' + escJsStr(projectName || '') + '\',\'' + escJsStr(rm) + '\')">' +
+            '<div class="room-card-cover">' + covInner + '</div>' +
+            '<div class="room-card-info">' +
+              '<div class="room-card-name">' + esc(rm) + '</div>' +
+              '<div class="room-card-meta">' + items.length + ' item' + (items.length === 1 ? '' : 's') + '</div>' +
+              (totalSell > 0 ? '<div class="room-card-budget">' + formatMoney(totalSell) + '</div>' : '') +
+              hint +
+            '</div>' +
+          '</div>';
+        }).join('') + '</div>';
+      }
       return keys.map(function(rm) {
         var items = groupedData[rm] || [];
         var groupTotal = items.reduce(function(s, c) {
@@ -12053,7 +12261,7 @@
             '</div>' +
             '<div style="display:flex;align-items:center;gap:12px;">' +
               (groupTotal > 0 ? '<span style="font-size:13px;font-weight:600;color:var(--gold);font-family:var(--font-mono);">' + formatMoney(groupTotal) + '</span>' : '') +
-              '<div class="action-menu-wrap" style="position:relative;"><button onclick="event.stopPropagation();toggleActionMenu(this)" style="background:none;border:1px solid var(--gray-200);color:var(--gray-400);padding:4px 8px;font-size:14px;cursor:pointer;border-radius:4px;line-height:1;">⋮</button><div class="action-dropdown" style="display:none;right:0;left:auto;min-width:160px;"><a onclick="event.stopPropagation();renameRoom(\'' + escAttr(projId) + '\',\'' + escAttr(rm) + '\');closeAllMenus()">✏️ Rename</a><a onclick="event.stopPropagation();uploadRoomCover(\'' + escAttr(projId) + '\',\'' + escAttr(rm) + '\',this);closeAllMenus()">📷 Set Cover</a><a onclick="event.stopPropagation();deleteRoom(\'' + escAttr(projId) + '\',\'' + escAttr(rm) + '\');closeAllMenus()" style="color:#E53935;">🗑️ Delete</a></div></div>' +
+              '<div class="action-menu-wrap" style="position:relative;"><button onclick="event.stopPropagation();toggleActionMenu(this)" style="background:none;border:1px solid var(--gray-200);color:var(--gray-400);padding:4px 8px;font-size:14px;cursor:pointer;border-radius:4px;line-height:1;">⋮</button><div class="action-dropdown" style="display:none;right:0;left:auto;min-width:190px;"><a onclick="event.stopPropagation();openDocItemsSidebar({mode:\'selections\',projectId:\'' + escAttr(projId) + '\',roomPrefill:\'' + escAttr(rm) + '\'});closeAllMenus()">⭐ Add item to this room</a><a onclick="event.stopPropagation();renameRoom(\'' + escAttr(projId) + '\',\'' + escAttr(rm) + '\');closeAllMenus()">✏️ Rename</a><a onclick="event.stopPropagation();uploadRoomCover(\'' + escAttr(projId) + '\',\'' + escAttr(rm) + '\',this);closeAllMenus()">📷 Set Cover</a><a onclick="event.stopPropagation();deleteRoom(\'' + escAttr(projId) + '\',\'' + escAttr(rm) + '\');closeAllMenus()" style="color:#E53935;">🗑️ Delete</a></div></div>' +
             '</div>' +
           '</div>' +
           '<div id="rb-sec-' + rmKey + '" style="' + (isCollapsed ? 'display:none;' : '') + 'padding:16px 0 24px;">' +
@@ -12070,8 +12278,9 @@
                   '<div style="display:flex;gap:6px;">' +
                     (clip.pageUrl ? '<a href="' + escAttr(clip.pageUrl) + '" target="_blank" onclick="event.stopPropagation()" title="View source" style="color:var(--gray-400);font-size:13px;text-decoration:none;padding:2px;">🔗</a>' : '') +
                   '</div>' +
-                  '<div style="display:flex;gap:6px;">' +
+                  '<div style="display:flex;gap:6px;align-items:center;">' +
                     (sell > 0 ? '<span style="font-size:11px;font-weight:600;color:var(--gold);">$</span>' : '') +
+                    '<button type="button" title="Remove from room board" aria-label="Remove from room board" onclick="event.stopPropagation();void deleteClip(\'' + escAttr(projId) + '\',\'' + escAttr(clip.id) + '\')" style="border:none;background:transparent;color:var(--gray-400);cursor:pointer;font-size:14px;padding:2px 4px;line-height:1;border-radius:4px;" onmouseenter="this.style.color=\'var(--red)\'" onmouseleave="this.style.color=\'var(--gray-400)\'">🗑</button>' +
                   '</div>' +
                 '</div>' +
                 (isValid ? '<img src="' + _escImgSrcAttr(imgSrc) + '" style="width:100%;aspect-ratio:1;object-fit:cover;display:block;" referrerpolicy="no-referrer" onerror="this.outerHTML=\'<div style=\\\'aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:#F4F6FA;color:var(--gray-300);font-size:40px;\\\'>📷</div>\'">' : '<div style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:#F4F6FA;color:var(--gray-300);font-size:40px;">📷</div>') +
@@ -12098,11 +12307,15 @@
       ]);
       window.boardClipIsTimeBillingRow = function(clip) {
         if (!clip) return false;
+        var et = (clip.expenseType || '').toLowerCase().trim();
+        if (et && ['service','shipping','sales_tax','handling','expense','discount','labor','other_expense','installation'].indexOf(et) >= 0) return true;
         var rm = (clip.room || '').toLowerCase().trim();
         var cat = (clip.category || '').toLowerCase().trim();
         var title = (clip.title || '').toLowerCase();
+        var desc = (clip.description || '').toLowerCase();
+        var svc = (clip.service || clip.billingCategory || '').toLowerCase();
         if (TIME_BILLING_CATEGORIES.has(rm) || TIME_BILLING_CATEGORIES.has(cat)) return true;
-        if (/\b(design fee|design fees|design service|time billing|hourly rate|retainer|consultation fee|blended design)\b/.test(title)) return true;
+        if (/\b(design fee|design fees|design service|time billing|hourly rate|retainer|consultation fee|blended design|freight|shipping|delivery|handling|install(?:ation)?|labor|labour|service)\b/.test(title + ' ' + desc + ' ' + svc)) return true;
         return false;
       };
     })();
@@ -12186,11 +12399,11 @@ async function renderBoardsTab(T, proj) {
           <div style="display:flex;align-items:center;gap:16px;">
             <!-- List / grid view -->
             <div class="board-view-toggle" title="Switch layout">
-              <button type="button" class="${(window._boardDisplayMode||'tile')==='table'?'bv-active':'bv-inactive'}" onclick="window._boardDisplayMode='table';renderBoardsTab(document.getElementById('projectTabContent'),{id:'${escAttr(proj.id)}',name:'${escAttr(proj.name)}'})" title="List (table) view">
+              <button type="button" class="${(window._boardDisplayMode||'tile')==='table'?'bv-active':'bv-inactive'}" onclick="window._boardDisplayMode='table';window._rbGridFocusRoom='';renderBoardsTab(document.getElementById('projectTabContent'),{id:'${escAttr(proj.id)}',name:'${escAttr(proj.name)}'})" title="List (table) view">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="1" y="2" width="14" height="2" rx="0.5"/><rect x="1" y="7" width="14" height="2" rx="0.5"/><rect x="1" y="12" width="14" height="2" rx="0.5"/></svg>
                 List
               </button>
-              <button type="button" class="${(window._boardDisplayMode||'tile')==='tile'?'bv-active':'bv-inactive'}" onclick="window._boardDisplayMode='tile';renderBoardsTab(document.getElementById('projectTabContent'),{id:'${escAttr(proj.id)}',name:'${escAttr(proj.name)}'})" title="Grid (cards) view" style="border-left:1px solid rgba(27,51,82,0.12);">
+              <button type="button" class="${(window._boardDisplayMode||'tile')==='tile'?'bv-active':'bv-inactive'}" onclick="window._boardDisplayMode='tile';window._rbGridFocusRoom='';renderBoardsTab(document.getElementById('projectTabContent'),{id:'${escAttr(proj.id)}',name:'${escAttr(proj.name)}'})" title="Grid (cards) view" style="border-left:1px solid rgba(27,51,82,0.12);">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
                 Grid
               </button>
@@ -12199,7 +12412,7 @@ async function renderBoardsTab(T, proj) {
             <!-- Show Me: Room / Category toggle -->
             <div style="display:flex;align-items:center;gap:6px;">
               <span style="font-size:12px;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.05em;font-weight:500;">Show Me</span>
-              <select onchange="window._boardViewMode=this.value;renderBoardsTab(document.getElementById('projectTabContent'),{id:'${escAttr(proj.id)}',name:'${escAttr(proj.name)}'})" style="font-size:13px;padding:5px 10px;border:1px solid var(--gray-200);border-radius:6px;background:white;color:#1B3352;cursor:pointer;">
+              <select onchange="window._boardViewMode=this.value;window._rbGridFocusRoom='';renderBoardsTab(document.getElementById('projectTabContent'),{id:'${escAttr(proj.id)}',name:'${escAttr(proj.name)}'})" style="font-size:13px;padding:5px 10px;border:1px solid var(--gray-200);border-radius:6px;background:white;color:#1B3352;cursor:pointer;">
                 <option value="room" ${window._boardViewMode!=='category'?'selected':''}>By Room</option>
                 <option value="category" ${window._boardViewMode==='category'?'selected':''}>By Category</option>
               </select>
@@ -12219,6 +12432,7 @@ async function renderBoardsTab(T, proj) {
             <div class="action-menu-wrap" style="position:relative;display:inline-block;">
               <button class="btn btn-secondary btn-sm" onclick="toggleActionMenu(this)" style="font-size:12px;">+ Add <span style="font-size:10px;">▾</span></button>
               <div class="action-dropdown" style="display:none;right:0;left:auto;min-width:180px;">
+                <a onclick="openDocItemsSidebar({mode:'selections',projectId:'${proj.id}'});closeAllMenus()">⭐ Add product item</a>
                 <a onclick="createNewRoom('${escAttr(proj.id)}');closeAllMenus()">🏠 New Room</a>
                 <a onclick="showImportTearSheetModal('${proj.id}','${escAttr(proj.name)}');closeAllMenus()">📦 Import tear sheet PDF</a>
                 <a onclick="importFFEReport('${proj.id}','${escAttr(proj.name)}');closeAllMenus()">📊 Import FFE</a>
@@ -12239,7 +12453,7 @@ async function renderBoardsTab(T, proj) {
         </div>` : ''}
 
         <!-- CONTENT: collapsible room/category sections -->
-        ${(window._boardDisplayMode || 'tile') === 'tile' ? renderBoardTileView(window._boardViewMode === 'category' ? catGrouped : roomGrouped, proj.id, window._boardViewMode === 'category' ? catNames : roomNames) : clips.length === 0 ? `
+        ${(window._boardDisplayMode || 'tile') === 'tile' ? renderBoardTileView(window._boardViewMode === 'category' ? catGrouped : roomGrouped, proj.id, window._boardViewMode === 'category' ? catNames : roomNames, roomMeta, proj.name) : clips.length === 0 ? `
           <div class="empty-state">
             <div class="empty-icon">🛋️</div>
             <div class="empty-text">No items published yet. Use the CCH Clipper extension to add products, then publish to web.</div>
@@ -12271,7 +12485,7 @@ async function renderBoardsTab(T, proj) {
                     <button class="btn btn-primary btn-sm" style="font-size:10px;padding:3px 10px;" onclick="bulkMoveClipsToRoom('${escAttr(proj.id)}', document.getElementById('bulkMoveRoomSelect').value)">Move</button>
                   </div>
                 ` : ''}
-                <div class="action-menu-wrap" style="position:relative;" onclick="event.stopPropagation()"><button onclick="toggleActionMenu(this)" style="background:none;border:1px solid var(--gray-200);color:var(--gray-400);padding:4px 8px;font-size:14px;cursor:pointer;border-radius:4px;line-height:1;">⋮</button><div class="action-dropdown" style="display:none;right:0;left:auto;min-width:160px;"><a onclick="renameRoom('${escAttr(proj.id)}','${escAttr(rm)}');closeAllMenus()">✏️ Rename</a><a onclick="uploadRoomCover('${escAttr(proj.id)}','${escAttr(rm)}',this);closeAllMenus()">📷 Set Cover</a><a onclick="deleteRoom('${escAttr(proj.id)}','${escAttr(rm)}');closeAllMenus()" style="color:#E53935;">🗑️ Delete</a></div></div>
+                <div class="action-menu-wrap" style="position:relative;" onclick="event.stopPropagation()"><button onclick="toggleActionMenu(this)" style="background:none;border:1px solid var(--gray-200);color:var(--gray-400);padding:4px 8px;font-size:14px;cursor:pointer;border-radius:4px;line-height:1;">⋮</button><div class="action-dropdown" style="display:none;right:0;left:auto;min-width:190px;"><a onclick="openDocItemsSidebar({mode:'selections',projectId:'${escAttr(proj.id)}',roomPrefill:'${escAttr(rm)}'});closeAllMenus()">⭐ Add item to this room</a><a onclick="renameRoom('${escAttr(proj.id)}','${escAttr(rm)}');closeAllMenus()">✏️ Rename</a><a onclick="uploadRoomCover('${escAttr(proj.id)}','${escAttr(rm)}',this);closeAllMenus()">📷 Set Cover</a><a onclick="deleteRoom('${escAttr(proj.id)}','${escAttr(rm)}');closeAllMenus()" style="color:#E53935;">🗑️ Delete</a></div></div>
               </div>
             </div>
             <div id="rb-sec-tbl-${rmKey}" style="${isCollapsed ? 'display:none;' : ''}">
@@ -12289,6 +12503,7 @@ async function renderBoardsTab(T, proj) {
                 ${sortHdr('qty', 'Qty')}
                 ${sortHdr('totalSelling', 'Total')}
                 <th>Status</th>
+                <th style="width:52px;text-align:center;" title="Remove item from room board"><span style="font-size:13px;">🗑</span></th>
                 ${isUnassigned && availableRooms.length > 0 ? '<th style="min-width:120px;">Assign Room</th>' : ''}
               </tr></thead>
               <tbody>
@@ -12314,6 +12529,7 @@ async function renderBoardsTab(T, proj) {
                     '<td>' + qty + '</td>' +
                     '<td style="font-weight:600;color:var(--green);">' + (total > 0 ? formatMoney(total) : '-') + '</td>' +
                     '<td><span class="badge ' + (status === 'Approved' ? 'badge-approved' : status === 'Estimated' ? 'badge-sent' : 'badge-draft') + '">' + esc(status || '-') + '</span></td>' +
+                    '<td onclick="event.stopPropagation()" style="text-align:center;vertical-align:middle;"><button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 8px;line-height:1;color:var(--red);border-color:rgba(225,106,91,0.4);" onclick="deleteClip(\'' + escAttr(proj.id) + '\',\'' + escAttr(clip.id) + '\')" title="Remove from room board">🗑</button></td>' +
                     (isUnassigned && availableRooms.length > 0 ? '<td onclick="event.stopPropagation()"><select class="form-input" style="font-size:11px;padding:2px 6px;" onchange="if(this.value)moveClipToRoom(\'' + escAttr(proj.id) + '\',\'' + escAttr(clip.id) + '\',this.value)"><option value="">—</option>' + availableRooms.map(r => '<option value="' + escAttr(r) + '">' + esc(r) + '</option>').join('') + '</select></td>' : '') +
                     '</tr>';
                 }).join('')}
@@ -12323,6 +12539,7 @@ async function renderBoardsTab(T, proj) {
                 <td style="color:var(--gray-600);">${formatMoney(sectionItems.reduce((s,c) => s + (parseMoney(c.cost) || 0) * (parseFloat(c.qty) || 1), 0))}</td>
                 <td></td><td></td><td></td>
                 <td style="color:var(--green);">${formatMoney(sectionItems.reduce((s,c) => s + (parseMoney(c.totalSelling) || parseMoney(c.clientPrice) * (parseFloat(c.qty) || 1) || 0), 0))}</td>
+                <td></td>
                 <td></td>
                 ${isUnassigned && availableRooms.length > 0 ? '<td></td>' : ''}
               </tr></tfoot>
@@ -18641,6 +18858,21 @@ async function renderBoardsTab(T, proj) {
 
       const statusColors = { Draft: 'draft', Sent: 'sent', Published: 'sent', 'In Review': 'sent', Approved: 'paid', Declined: 'overdue' };
       const invGate = proposalInvoiceGateSummary(prop, items);
+      var _proposalFullTotal = parseFloat(prop.total) || 0;
+      var _proposalApprovedTotal = 0;
+      var _proposalApprovedCount = 0;
+      items.forEach(function(it) {
+        if (isProposalGroupHeaderItem(it)) return;
+        if (getProposalLineApprovalStatus(it) === 'approved') {
+          _proposalApprovedCount++;
+          _proposalApprovedTotal += proposalLineClientTotal(it);
+        }
+      });
+      var _proposalHeaderTotal = _proposalApprovedCount > 0 ? _proposalApprovedTotal : _proposalFullTotal;
+      var _canStaffApproveClientTotal = !prop.clientApprovedTotalAt && prop.status !== 'Invoiced';
+      var _approveClientBtn = _canStaffApproveClientTotal
+        ? `<button class="btn btn-secondary btn-sm" onclick="approveProposalTotalForClient('${projectId}','${proposalId}')">✅ Approve for Client</button>`
+        : '';
       var _plLanding = !_isProposalEditMode;
       var _plManage = _plLanding && getProposalLandingViewMode(projectId, proposalId) === 'manage';
       var _bulkBarHtml = '';
@@ -18689,6 +18921,7 @@ async function renderBoardsTab(T, proj) {
           ? `<button class="btn btn-secondary btn-sm" onclick="previewDocument('proposal','${projectId}','${proposalId}')">👁️ Preview</button>
           <button class="btn btn-secondary btn-sm" onclick="generateTearSheetsFromDoc('${escAttr(projectId)}','proposals','${escAttr(proposalId)}','${escAttr(proj.name || projName)}')">📄 Tear Sheets</button>
           <button class="btn btn-primary btn-sm" onclick="navigate('#/project/${projectId}/proposal/${proposalId}/edit')">✏️ Edit line items</button>
+          ${_approveClientBtn}
           <button class="btn btn-primary btn-sm" onclick="sendProposalToClient('${projectId}','${proposalId}')">📧 Email client</button>
           ${_moreViewBar}`
           : `
@@ -18696,6 +18929,7 @@ async function renderBoardsTab(T, proj) {
           <button class="btn btn-secondary btn-sm" onclick="previewDocument('proposal','${projectId}','${proposalId}')">👁️ Preview</button>
           <button class="btn btn-primary btn-sm" onclick="navigate('#/project/${projectId}/proposal/${proposalId}/edit')">✏️ Edit line items</button>
           <button class="btn btn-secondary btn-sm" onclick="editProposalMeta('${projectId}','${proposalId}')">Edit details</button>
+          ${_approveClientBtn}
           <button class="btn btn-primary btn-sm" onclick="sendProposalToClient('${projectId}','${proposalId}')">📧 Email client</button>
           <button class="btn btn-dark btn-sm" ${invGate.ok ? '' : 'disabled title="Complete client approvals first"'} style="${invGate.ok ? '' : 'opacity:0.45;pointer-events:none;'}" onclick="convertProposalToInvoice('${projectId}','${proposalId}')">🧾 Convert to Invoice</button>
           <button class="btn btn-dark btn-sm" onclick="generatePOsFromDoc('${projectId}','proposals','${proposalId}')">📦 Generate POs by Vendor</button>
@@ -18707,6 +18941,7 @@ async function renderBoardsTab(T, proj) {
           ? `<button class="btn btn-secondary btn-sm" onclick="navigate('#/project/${projectId}/proposal/${proposalId}')">✓ Done editing</button>
           <button class="btn btn-secondary btn-sm" onclick="previewDocument('proposal','${projectId}','${proposalId}')">👁️ Preview</button>
           <button class="btn btn-primary btn-sm" onclick="openDocItemsSidebar({mode:'proposal',projectId:'${projectId}',proposalId:'${proposalId}'})">+ Add item</button>
+          ${_approveClientBtn}
           <button class="btn btn-primary btn-sm" onclick="sendProposalToClient('${projectId}','${proposalId}')">📧 Email client</button>
           <span class="btn btn-sm" style="border:1px dashed rgba(27,51,82,0.22);color:var(--gray-500);cursor:default;pointer-events:none;font-size:11px;white-space:nowrap;" title="Line changes save to the proposal as you edit">💾 Auto-save</span>
           ${_moreEditBar}`
@@ -18715,6 +18950,7 @@ async function renderBoardsTab(T, proj) {
           <button class="btn btn-secondary btn-sm" onclick="navigate('#/project/${projectId}/proposal/${proposalId}')">✓ Done editing</button>
           <button class="btn btn-secondary btn-sm" onclick="previewDocument('proposal','${projectId}','${proposalId}')">👁️ Preview</button>
           <button class="btn btn-secondary btn-sm" onclick="editProposalMeta('${projectId}','${proposalId}')">Edit details</button>
+          ${_approveClientBtn}
           <button class="btn btn-primary btn-sm" onclick="sendProposalToClient('${projectId}','${proposalId}')">📧 Email client</button>
           <button class="btn btn-primary btn-sm" onclick="openDocItemsSidebar({mode:'proposal',projectId:'${projectId}',proposalId:'${proposalId}'})">+ Add item</button>
           <span class="btn btn-sm" style="border:1px dashed rgba(27,51,82,0.25);color:var(--gray-600);cursor:default;pointer-events:none;font-size:11px;" title="Each change is written to the proposal as you edit">💾 Saves automatically</span>
@@ -18756,8 +18992,10 @@ async function renderBoardsTab(T, proj) {
                   ${getQbId(prop) ? '<span class="badge-icon">✓</span> QB' : '○ QB'}
                 </span>
               </div>
-              <div style="font-size:28px;font-weight:700;color:var(--gold);margin-top:8px;">${formatMoney(prop.total || 0)}</div>
-              <div style="font-size:11px;color:var(--gray-400);">${countProposalProductLines(items)} product lines</div>
+              <div style="font-size:28px;font-weight:700;color:var(--gold);margin-top:8px;">${formatMoney(_proposalHeaderTotal)}</div>
+              <div style="font-size:11px;color:var(--gray-400);">${_proposalApprovedCount > 0 ? ('Approved total · ' + _proposalApprovedCount + ' approved line(s)') : 'No approved lines yet · showing full proposal total'}</div>
+              ${_proposalApprovedCount > 0 ? '<div style="font-size:11px;color:var(--gray-500);margin-top:2px;">Full proposal total: ' + formatMoney(_proposalFullTotal) + '</div>' : ''}
+              <div style="font-size:11px;color:var(--gray-400);margin-top:2px;">${countProposalProductLines(items)} product lines</div>
             </div>
           </div>
 
@@ -19305,6 +19543,56 @@ async function renderBoardsTab(T, proj) {
       });
       return m.concat(more);
     }
+
+    /** True if label is almost certainly a room / space (not FFE type) — e.g. wrong data in category field. */
+    function _cchStringLooksLikePhysicalRoom(s) {
+      var t = String(s || '').trim();
+      if (!t) return false;
+      var tl = t.toLowerCase();
+      var master = (typeof CCH_PRODUCT_CATEGORIES_MASTER !== 'undefined' && CCH_PRODUCT_CATEGORIES_MASTER) || [];
+      for (var mi = 0; mi < master.length; mi++) {
+        if (tl === String(master[mi]).toLowerCase()) return false;
+      }
+      var VALID_FFE = {
+        accessories: 1, architectural: 1, art: 1, 'bedding & pillows': 1, 'fabric & trim': 1, flooring: 1,
+        furniture: 1, hardware: 1, lighting: 1, outdoor: 1, 'plumbing & appliances': 1, 'appliances & plumbing': 1,
+        'tile & stone': 1, 'wall covering': 1, 'window treatments': 1, mirror: 1, 'custom furniture': 1, 'custom upholstery': 1,
+        cabinets: 1, windows: 1, 'stone & tile': 1, 'floor covering': 1, florals: 1, tv: 1, electrical: 1,
+        'custom bedding and pillows': 1, 'custom window coverings': 1
+      };
+      if (VALID_FFE[tl]) return false;
+      var roomRe = /(\b(bedroom|bathroom|bath|kitchen|closet|pantry|laundry|mudroom|garage|office|den|nursery|suite|foyer|entry|lobby|walk-?in|powder|living|dining|game\s*room|butler|master|guest|upstairs|downstairs|hallway|hall\b|\bL\d\b|second\s+floor|first\s+floor|basement|attic|porch|patio|deck))/i;
+      if (roomRe.test(t)) return true;
+      if (/'s\s|\u2019s\s/.test(t) && /(closet|room|bedroom|bathroom|office|suite|nook)/i.test(t)) return true;
+      if (/\s-\s/.test(t) && /(guest|bedroom|bath|master|office)/i.test(t)) return true;
+      return false;
+    }
+
+    /** Category datalist for Product Library modal: canonical FFE list + extras, never room names. */
+    function _cchLibraryModalCategoryDatalistHtml() {
+      var products = libraryProducts || [];
+      var catSeen = new Set();
+      var cats = [];
+      var roomLike = [];
+      products.forEach(function(p) {
+        if (p.room != null && String(p.room).trim()) roomLike.push(String(p.room).trim());
+      });
+      products.forEach(function(p) {
+        if (p.category == null || !String(p.category).trim()) return;
+        var c = String(p.category).trim();
+        if (catSeen.has(c)) return;
+        catSeen.add(c);
+        cats.push(c);
+        if (_cchStringLooksLikePhysicalRoom(c)) roomLike.push(c);
+      });
+      var merged = (typeof _cchMergedCategoryList === 'function')
+        ? _cchMergedCategoryList(cats, roomLike)
+        : ((window.CCH_PRODUCT_CATEGORIES_MASTER || []).slice());
+      return merged.map(function(c) {
+        return '<option value="' + escAttr(c) + '">';
+      }).join('');
+    }
+
     // Cache for receivers and workrooms from team collection
     var _shipToReceivers = null;
     var _shipToWorkrooms = null;
@@ -22079,7 +22367,7 @@ async function renderBoardsTab(T, proj) {
       openDocItemsSidebar();
     }
 
-    // ── Browse & Add — 4 top-level categories (never auto-reclassify library rows) ──
+    // ── Browse & Add — 4 top-level categories (explicit fields win; otherwise safe heuristics) ──
     function _disItemIsBundle(it) {
       if (!it) return false;
       var et = (it.expenseType || '').toString().toLowerCase();
@@ -22102,15 +22390,50 @@ async function renderBoardsTab(T, proj) {
     function _cchSidebarClassifyItem(it) {
       if (!it) return 'product';
       if (_disItemIsBundle(it)) return 'bundle';
-      var k = String(it.cchLineCategory || it.libraryItemKind || it.itemKind || '').toLowerCase().replace(/\s+/g, '_');
+      var libKind = String(it.libraryItemKind || it.itemKind || '').toLowerCase().replace(/\s+/g, '_');
+      if (libKind === 'design_service' || libKind === 'designservice') return 'design_service';
+      if (libKind === 'labor') return 'labor';
+      if (libKind === 'expense' || libKind === 'reimbursable') return 'expense';
+      if (libKind === 'product' || libKind === 'material' || libKind === 'furnishing' || libKind === 'furnishings') return 'product';
+
+      var lt = String(it.lineType || '').toLowerCase().replace(/\s+/g, '_');
+      if (lt === 'design_service' || lt === 'designservice') return 'design_service';
+      if (lt === 'labor') return 'labor';
+      if (lt === 'expense') return 'expense';
+
+      var ity = String(it.itemType || '').toLowerCase();
+      if (ity === 'labor') return 'labor';
+      if (ity === 'expense') return 'expense';
+      if (ity === 'service') return 'design_service';
+
+      var k = String(it.cchLineCategory || '').toLowerCase().replace(/\s+/g, '_');
       if (k === 'design_service' || k === 'designservice') return 'design_service';
       if (k === 'labor') return 'labor';
       if (k === 'expense' || k === 'reimbursable') return 'expense';
+
       var et = String(it.expenseType || '').toLowerCase();
       if (et === 'sales_tax') return 'tax';
       if (['shipping', 'handling', 'expense', 'other_expense', 'discount'].indexOf(et) >= 0) return 'expense';
-      if (it.itemType === 'labor' || et === 'labor') return 'labor';
+      if (et === 'labor') return 'labor';
       if (et === 'service') return 'design_service';
+
+      var qb = String(it.qbCategory || it.qbLineCategory || it.qbAccount || it.category || '').toLowerCase();
+      if (qb.indexOf('design service') >= 0 || qb.indexOf('professional service') >= 0) return 'design_service';
+      if (qb.indexOf('labor') >= 0 || qb.indexOf('installation') >= 0) return 'labor';
+      if (qb.indexOf('freight') >= 0 || qb.indexOf('shipping') >= 0 || qb.indexOf('reimbursable') >= 0 || qb.indexOf('sales tax') >= 0) {
+        if (qb.indexOf('sales tax') >= 0) return 'tax';
+        return 'expense';
+      }
+
+      // Rows the Selections pipeline already treats as non-furnishing noise / CCH service templates
+      if (typeof isRealProduct === 'function' && !isRealProduct(it)) {
+        var t0 = String(it.title || it.name || '').toLowerCase();
+        var laborish = ['labor', 'labour', 'upholstery', 'fabrication', 'installation', 'install ', 'installer', 'wallpaper installation', 'site supervision', 'supervision', 'carpentry', 'drywall', 'tile installation', 'electrical work', 'plumbing work'];
+        for (var li = 0; li < laborish.length; li++) {
+          if (t0.indexOf(laborish[li]) >= 0) return 'labor';
+        }
+        return 'design_service';
+      }
       return 'product';
     }
 
@@ -22250,6 +22573,7 @@ async function renderBoardsTab(T, proj) {
       if (t.mode === 'selections') {
         return (async function() {
           try {
+            var roomPrefill = String((t && t.roomPrefill) || '').trim();
             for (var ri = 0; ri < rows.length; ri++) {
               var r = rows[ri];
               var clipRef = db.collection('boards').doc(t.projectId).collection('clips').doc();
@@ -22258,7 +22582,7 @@ async function renderBoardsTab(T, proj) {
                 description: r.description || '',
                 vendorDescription: String(r.vendorDescription || '').trim(),
                 vendor: r.vendor || '',
-                room: r.room || '',
+                room: r.room || roomPrefill || '',
                 category: r.category || '',
                 cost: parseFloat(r.cost) || 0,
                 clientPrice: parseFloat(r.amount) || 0,
@@ -22331,6 +22655,9 @@ async function renderBoardsTab(T, proj) {
       if (et && NON_PRODUCT_TYPES.indexOf(et) >= 0) return false;
       var cat = String(it.category || '').toLowerCase();
       if (cat === 'time billing' || cat === 'time track' || cat === 'time tracking' || cat === 'service' || cat === 'services') return false;
+      var titleAndDesc = (String(it.title || '') + ' ' + String(it.description || '') + ' ' + String(it.notes || '') + ' ' + String(it.vendorDescription || '')).toLowerCase();
+      if (/\b(time billing|time track|time tracking|freight|shipping|delivery|handling|tax|service fee|design fee|consultation|retainer|install(?:ation)?|labor|labour)\b/.test(titleAndDesc)) return false;
+      if (typeof boardClipIsTimeBillingRow === 'function' && boardClipIsTimeBillingRow(it)) return false;
       return isRealProduct({
         title: it.title, category: it.category, room: it.room, vendor: it.vendor, manufacturer: it.manufacturer || '',
         sku: it.sku || '', cost: it.cost || it.unitCost || it.costPrice, clientPrice: it.sellPrice || it.clientPrice || it.totalSelling
@@ -22541,10 +22868,13 @@ async function renderBoardsTab(T, proj) {
       window._libraryRailTarget = target;
 
       window._disProposalRail = null;
+      window._disSelectionRail = null;
       if (target.mode === 'proposal' && target.projectId && target.proposalId) {
         window._disProposalRail = { projectId: String(target.projectId).trim(), proposalId: String(target.proposalId).trim() };
       } else if (target.mode === 'docEdit' && _docEdit && _docEdit.type === 'proposal' && _docEdit.projectId && _docEdit.docId) {
         window._disProposalRail = { projectId: String(_docEdit.projectId).trim(), proposalId: String(_docEdit.docId).trim() };
+      } else if (target.mode === 'selections' && target.projectId) {
+        window._disSelectionRail = { projectId: String(target.projectId).trim() };
       }
 
       var docLabel = 'document';
@@ -22578,16 +22908,19 @@ async function renderBoardsTab(T, proj) {
         '<input id="disSearchInput" placeholder="Search catalog by title, vendor, or SKU…" style="width:100%;padding:9px 12px;border:1px solid #E2E2E2;border-radius:0;font-size:13px;outline:none;box-sizing:border-box;font-family:DM Sans,sans-serif;" oninput="filterDocSidebar()">' +
       '</div>';
 
-      var _prSelPill = window._disProposalRail
+      var _showProjectSelectionsPill = !!(window._disProposalRail || window._disSelectionRail);
+      var _prSelPill = _showProjectSelectionsPill
         ? '<button type="button" id="disPillProjectSel" onclick="window._disFilter=\'project_selections\';filterDocSidebar()" style="' + pillStyle(false) + 'flex:1.12;border-radius:0;border-left:none;">Project Selections</button>'
         : '';
-      var _prodPillBorder = window._disProposalRail ? '' : 'border-left:none;';
+      var _prodPillBorder = _showProjectSelectionsPill ? '' : 'border-left:none;';
+      var _isSelectionsModeRail = target.mode === 'selections';
       var pillsHtml = '<div style="padding:8px 14px;border-bottom:1px solid #E2E2E2;display:flex;gap:0;flex-wrap:wrap;align-items:stretch;">' +
         _prSelPill +
-        '<button type="button" id="disPillProducts" onclick="window._disFilter=\'products\';filterDocSidebar()" style="' + pillStyle(false) + 'flex:1;' + _prodPillBorder + 'border-radius:0;">Products</button>' +
-        '<button type="button" id="disPillDesign" onclick="window._disFilter=\'design_service\';filterDocSidebar()" style="' + pillStyle(false) + 'flex:1;border-radius:0;">Design</button>' +
-        '<button type="button" id="disPillLabor" onclick="window._disFilter=\'labor\';filterDocSidebar()" style="' + pillStyle(false) + 'flex:1;border-radius:0;">Labor</button>' +
-        '<button type="button" id="disPillExpenses" onclick="window._disFilter=\'expenses\';filterDocSidebar()" style="' + pillStyle(false) + 'flex:1;border-radius:0;">Expenses</button>' +
+        '<button type="button" id="disPillProducts" onclick="window._disFilter=\'products\';filterDocSidebar()" style="' + pillStyle(false) + 'flex:1;' + _prodPillBorder + 'border-radius:0;">' + (_isSelectionsModeRail ? 'All Products' : 'Products') + '</button>' +
+        (_isSelectionsModeRail ? '' :
+          '<button type="button" id="disPillDesign" onclick="window._disFilter=\'design_service\';filterDocSidebar()" style="' + pillStyle(false) + 'flex:1;border-radius:0;">Design</button>' +
+          '<button type="button" id="disPillLabor" onclick="window._disFilter=\'labor\';filterDocSidebar()" style="' + pillStyle(false) + 'flex:1;border-radius:0;">Labor</button>' +
+          '<button type="button" id="disPillExpenses" onclick="window._disFilter=\'expenses\';filterDocSidebar()" style="' + pillStyle(false) + 'flex:1;border-radius:0;">Expenses</button>') +
       '</div>';
 
       var contentHtml = '<div id="disContent" style="flex:1;overflow-y:auto;min-height:0;"></div>';
@@ -22602,7 +22935,7 @@ async function renderBoardsTab(T, proj) {
       panel.innerHTML = headerHtml + searchHtml + pillsHtml + contentHtml + footerHtml;
       document.body.appendChild(panel);
 
-      window._disFilter = window._disProposalRail ? 'project_selections' : 'products';
+      window._disFilter = (window._disProposalRail || window._disSelectionRail) ? 'project_selections' : 'products';
       window._disProducts = [];
       window._disProposalExcludeKeys = new Set();
       window._disSelectionProducts = [];
@@ -22621,6 +22954,12 @@ async function renderBoardsTab(T, proj) {
         try {
           window._disSelectionProducts = await _loadProjectSelectionSidebarItems(window._disProposalRail.projectId);
         } catch (eSel0) {
+          window._disSelectionProducts = [];
+        }
+      } else if (window._disSelectionRail) {
+        try {
+          window._disSelectionProducts = await _loadProjectSelectionSidebarItems(window._disSelectionRail.projectId);
+        } catch (eSel1) {
           window._disSelectionProducts = [];
         }
       }
@@ -22683,7 +23022,7 @@ async function renderBoardsTab(T, proj) {
       var q = ((document.getElementById('disSearchInput') || {}).value || '').toLowerCase().trim();
       var filter = (window._disFilter || 'products').toLowerCase();
       if (filter === 'all') filter = 'products';
-      if (filter === 'project_selections' && !window._disProposalRail) filter = 'products';
+      if (filter === 'project_selections' && !window._disProposalRail && !window._disSelectionRail) filter = 'products';
       var c = document.getElementById('disContent');
       if (!c) return;
 
@@ -22706,15 +23045,16 @@ async function renderBoardsTab(T, proj) {
         btn.style.borderColor = active ? '#1B3352' : '#B8C0CC';
       });
 
-      if (filter === 'project_selections' && window._disProposalRail) {
+      if (filter === 'project_selections' && (window._disProposalRail || window._disSelectionRail)) {
         function matchQPS(title, vendor, sku, extra) {
           if (!q) return true;
           var blob = ((title || '') + ' ' + (vendor || '') + ' ' + (sku || '') + ' ' + (extra || '')).toLowerCase();
           return blob.indexOf(q) >= 0;
         }
+        var isProposalSelectionRail = !!window._disProposalRail;
         var selList = (window._disSelectionProducts || []).filter(function(i) {
           if (!matchQPS(i.title, i.vendor, i.sku, (i.description || '') + ' ' + (i.vendorDescription || ''))) return false;
-          if (_disProposalRowExcluded(i)) return false;
+          if (isProposalSelectionRail && _disProposalRowExcluded(i)) return false;
           return true;
         });
         function rowClickJsSel(id) {
@@ -22742,13 +23082,17 @@ async function renderBoardsTab(T, proj) {
             (price > 0 ? '<div style="font-size:12px;font-weight:700;color:#1B3352;font-family:monospace;flex-shrink:0;">' + formatMoney(price) + '</div>' : '') +
           '</div>';
         }
-        var htmlPS = '<div style="padding:8px 14px 6px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:#5C6B80;background:#FAFAFA;border-bottom:1px solid #E2E2E2;">Project selections — not on this proposal</div>';
+        var htmlPS = '<div style="padding:8px 14px 6px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:#5C6B80;background:#FAFAFA;border-bottom:1px solid #E2E2E2;">' + (isProposalSelectionRail ? 'Project selections — not on this proposal' : 'Project selections') + '</div>';
         if (!selList.length) {
-          htmlPS += '<div style="padding:18px 16px;font-size:12px;color:#5C6B80;line-height:1.45;">No items left to add, or nothing matches search. Open the <strong>Products</strong> tab for the full catalog, or add clips to room boards / library for this project first.</div>';
+          htmlPS += '<div style="padding:18px 16px;font-size:12px;color:#5C6B80;line-height:1.45;">' + (isProposalSelectionRail
+            ? 'No items left to add, or nothing matches search. Open the <strong>All Products</strong> tab for the full catalog, or add clips to room boards / library for this project first.'
+            : 'No matching project selections yet. Open <strong>All Products</strong> for the full catalog, or add more room-board clips to this project first.') + '</div>';
         } else {
           htmlPS += '<div style="padding:0;min-height:0;">' + selList.map(renderItemCardPS).join('') + '</div>';
         }
-        htmlPS += '<div style="padding:12px 14px;font-size:11px;color:#5C6B80;line-height:1.45;border-top:1px solid #E2E2E2;">Use <strong>Design</strong>, <strong>Labor</strong>, and <strong>Expenses</strong> tabs for service and fee lines.</div>';
+        if (isProposalSelectionRail) {
+          htmlPS += '<div style="padding:12px 14px;font-size:11px;color:#5C6B80;line-height:1.45;border-top:1px solid #E2E2E2;">Use <strong>Design</strong>, <strong>Labor</strong>, and <strong>Expenses</strong> tabs for service and fee lines.</div>';
+        }
         c.innerHTML = htmlPS;
         return;
       }
@@ -22969,7 +23313,7 @@ async function renderBoardsTab(T, proj) {
       if (cost === 0 && sell > 0) cost = sell;
       var mkup = (cost > 0 && sell > cost) ? Math.round(((sell - cost) / cost) * 100) : 0;
       var cls = _cchSidebarClassifyItem(item);
-      var kindForPersist = cls === 'bundle' ? 'product' : cls;
+      var kindForPersist;
       var expensePreset = null;
       if (cls === 'tax') {
         kindForPersist = 'expense';
@@ -22980,6 +23324,8 @@ async function renderBoardsTab(T, proj) {
         if (['shipping', 'handling', 'expense', 'other_expense', 'discount', 'sales_tax'].indexOf(expensePreset) < 0) expensePreset = 'expense';
       } else if (cls === 'bundle') {
         kindForPersist = 'product';
+      } else {
+        kindForPersist = cls;
       }
       var pf = _cchPersistedFieldsForKind(kindForPersist, expensePreset);
       var imgNorm = _normalizeClipImagesForTear(item);
@@ -36110,7 +36456,7 @@ async function renderBoardsTab(T, proj) {
 
     async function renderProductLibrary() {
       setBreadcrumb([{ label: 'Product Library' }]);
-      setTopbarActions('<button class="btn btn-secondary" style="margin-right:8px;" onclick="showImportTearSheetModal(null,null)" title="Upload RH / Houzz tear sheet PDF — update product photos">📄 Import tear sheet PDF</button><label class="btn btn-secondary" style="margin-right:8px;cursor:pointer;">📷 Upload Images<input type="file" accept="image/*" multiple style="display:none;" onchange="bulkUploadProductImages(this.files);this.value=\'\'"></label><button class="btn btn-primary" onclick="showNewProductModal()">+ New Product</button>');
+      setTopbarActions('<button type="button" class="btn btn-secondary" style="margin-right:8px;" onclick="showImportTearSheetModal(null,null)" title="Upload RH / Houzz tear sheet PDF — update product photos">📄 Import tear sheet PDF</button><label class="btn btn-secondary" style="margin-right:8px;cursor:pointer;">📷 Upload Images<input type="file" accept="image/*" multiple style="display:none;" onchange="bulkUploadProductImages(this.files);this.value=\'\'"></label><button type="button" class="btn btn-primary" onclick="showNewProductModal()">Add new product</button>');
 
       // Default library view is global catalog — do not keep a project filter from a prior session
       libraryFilter.projectId = '';
@@ -37543,7 +37889,7 @@ async function renderBoardsTab(T, proj) {
       if (filtered.length === 0) {
         content = `<div class="empty-state"><div class="empty-icon">📦</div>
           <div class="empty-text">${libraryProducts.length === 0 ? 'No products yet. Add your first product to get started.' : 'No products match your filters.'}</div>
-          ${libraryProducts.length === 0 ? '<button class="btn btn-primary" onclick="showNewProductModal()">+ New Product</button>' : ''}</div>`;
+          ${libraryProducts.length === 0 ? '<button type="button" class="btn btn-primary" onclick="showNewProductModal()">Add new product</button>' : ''}</div>`;
       } else if (libraryViewMode === 'list') {
         content = `<div class="card" style="overflow:hidden;">
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -37625,10 +37971,11 @@ async function renderBoardsTab(T, proj) {
       T.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
           <h1 class="page-title" style="margin:0;">Product Library</h1>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <button type="button" class="btn btn-primary" onclick="showNewProductModal()" style="font-size:12px;">Add new product</button>
             ${libraryViewMode === 'list' && filtered.length > 0 ? '<button type="button" class="btn btn-secondary" onclick="libraryBulkDeleteSelected()" style="font-size:12px;color:var(--red);border-color:rgba(196,80,80,0.35);" title="List view: tick rows, then delete">🗑 Delete selected</button>' : ''}
-            <button class="btn btn-secondary" onclick="dedupProductLibrary()" style="font-size:12px;">🧹 Remove Duplicates</button>
-            <button class="btn btn-secondary" onclick="importHouzzProductLibrary()" style="font-size:12px;">📦 Import Houzz Products</button>
+            <button type="button" class="btn btn-secondary" onclick="dedupProductLibrary()" style="font-size:12px;">🧹 Remove Duplicates</button>
+            <button type="button" class="btn btn-secondary" onclick="importHouzzProductLibrary()" style="font-size:12px;">📦 Import Houzz Products</button>
           </div>
         </div>
         <p style="color:var(--gray-400);margin-bottom:20px;">${hasMore ? 'Showing ' + DISPLAY_LIMIT + ' of ' + filtered.length : filtered.length} product${filtered.length !== 1 ? 's' : ''}${hasMore ? ' — <button class="btn btn-secondary btn-sm" onclick="window._libDisplayLimit+=100;renderLibraryView()">Load More</button> or use search to narrow down' : ''}</p>
@@ -37779,6 +38126,10 @@ async function renderBoardsTab(T, proj) {
         }
       }
       var _plDbgHtml = _plDbgParts.length ? ('<div class="pl-admin-id-strip" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--gray-200);max-width:min(720px,92vw);">' + _plDbgParts.join('') + '</div>') : '';
+      var _plHdrDeleteBtn = '';
+      if (p._clipProjectId && p._clipDocId) {
+        _plHdrDeleteBtn = '<button type="button" class="btn btn-sm" style="margin-top:2px;color:var(--red);border-color:rgba(225,106,91,0.45);white-space:nowrap;font-size:12px;" data-rbd-proj="' + escAttr(String(p._clipProjectId)) + '" data-rbd-clip="' + escAttr(String(p._clipDocId)) + '" onclick="deleteClip(this.getAttribute(\'data-rbd-proj\'),this.getAttribute(\'data-rbd-clip\'))" title="Remove this product from the room board">🗑 Delete</button>';
+      }
 
       document.getElementById('modalContainer').innerHTML = `
         <style>
@@ -37792,13 +38143,16 @@ async function renderBoardsTab(T, proj) {
         </style>
         <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
           <div class="modal" style="width:min(1180px,calc(100vw - 16px));max-height:96vh;display:flex;flex-direction:column;">
-            <div class="modal-header" style="flex-shrink:0;align-items:flex-start;">
+            <div class="modal-header" style="flex-shrink:0;align-items:flex-start;display:flex;justify-content:space-between;gap:12px;">
               <div style="flex:1;min-width:0;">
                 <div class="modal-title">${esc(p.__modalTitle || (_plIsEdit ? (p.id ? 'Edit library item' : 'Edit room board item') : 'Add library item'))}</div>
                 <div style="font-size:11px;color:var(--gray-400);margin-top:4px;letter-spacing:0.02em;">Image · Details · Accounting · Schedule · Project</div>
                 ${_plDbgHtml}
               </div>
-              <button type="button" class="modal-close" onclick="closeModal()">&times;</button>
+              <div style="display:flex;align-items:flex-start;gap:8px;flex-shrink:0;">
+                ${_plHdrDeleteBtn}
+                <button type="button" class="modal-close" onclick="closeModal()">&times;</button>
+              </div>
             </div>
             <div class="modal-body pl-lib-modal-body" style="overflow:hidden;flex:1;min-height:0;display:flex;padding:0;flex-direction:row;">
               <!-- Left: image (Houzz-style) -->
@@ -37877,7 +38231,7 @@ async function renderBoardsTab(T, proj) {
                       <div class="form-group">
                         <label class="form-label">Category</label>
                         <input class="form-input" id="prodCategory" value="${escAttr(p.category || '')}" placeholder="e.g. Lighting" list="catList">
-                        <datalist id="catList">${[...new Set(libraryProducts.map(x=>x.category).filter(Boolean))].map(c=>`<option value="${escAttr(c)}">`).join('')}</datalist>
+                        <datalist id="catList">${_cchLibraryModalCategoryDatalistHtml()}</datalist>
                       </div>
                       <div class="form-group">
                         <label class="form-label">SKU / model #</label>
@@ -43581,10 +43935,16 @@ async function renderBoardsTab(T, proj) {
         else if (la0 !== 'declined') sumPending += amt0;
       });
 
+      // Per CLIENT_PORTAL_PROPOSAL_VIEW_BRIEF_MH_Apr24 (Phase 1, triggers 2, 5, 6):
+      // - Proposal #/total is canonical in the dark top header bar. Do not repeat here.
+      // - Stats line on its own row, 24px gap below.
+      // - 4px progress bar (#E2E2E2) with gold (#C8A97E) fill, 24px gap below before the table.
+      // Progress bar fill uses (approved + declined) / total to show decision progress, per spec.
+      var _progressDecidedPct = visibleProducts.length > 0 ? Math.round(((appr + dec) / visibleProducts.length) * 100) : 0;
       html += '<div class="cp-card cp-proposal-card"' + (panelId ? ' id="' + escAttr(panelId) + '"' : '') + ' style="margin-bottom:12px;">' +
-        '<div class="cp-prop-header" style="padding:10px 14px;"><div class="cp-prop-name" style="font-size:14px;">' + esc(p.proposalNum || p.name || 'Proposal') + '</div><div class="cp-prop-total cp-price" style="font-size:14px;">' + formatMoney(grand) + '</div></div>' +
-        '<div class="cp-prop-progress" style="margin:0 14px;"><div class="cp-prop-progress-fill" style="width:' + pct + '%;"></div></div>' +
-        '<div style="padding:6px 14px 8px;font-size:10px;color:#5C6B80;">' + appr + ' approved · ' + dec + ' declined · ' + pend + ' pending</div>';
+        '<div style="padding:18px 16px 0;font-size:13px;color:#0A1F3D;font-family:\'DM Sans\',sans-serif;">' + appr + ' approved · ' + dec + ' declined · ' + pend + ' pending</div>' +
+        '<div style="margin:24px 16px 0;height:4px;background:#E2E2E2;"><div style="height:100%;background:#C8A97E;width:' + _progressDecidedPct + '%;transition:width 0.2s;"></div></div>' +
+        '<div style="height:24px;"></div>';
 
       if (visibleProducts.length > 0) {
         html += '<table class="cp-prop-items" style="font-size:12px;"><thead><tr><th style="padding:10px 14px;border-bottom:1px solid #E2E2E2;">Item</th><th style="padding:10px 14px;border-bottom:1px solid #E2E2E2;">Room</th><th class="cp-price" style="padding:10px 14px;border-bottom:1px solid #E2E2E2;">Amount</th><th style="min-width:120px;padding:10px 14px;border-bottom:1px solid #E2E2E2;">Decision</th></tr></thead><tbody>';
@@ -44985,10 +45345,16 @@ async function renderBoardsTab(T, proj) {
           '<div style="font-size:12px;color:#6B7280;margin-top:4px;">The link may be wrong or the document may not be shared with the portal yet.</div>' +
           '<button type="button" class="cp-btn cp-btn-outline" style="margin-top:10px;padding:6px 12px;font-size:12px;" onclick="navigate(\'#/clientview/' + escAttr(projectId) + '/proposals\')">← All proposals</button></div>';
       } else if (isProposalRoute) {
+        // Welcome bar per CLIENT_PORTAL_PROPOSAL_VIEW_BRIEF_MH_Apr24_v1.0 (Phase 1, triggers 1 & 4).
+        // Eyebrow + Playfair title + single "All proposals" back link. No duplicate back button in content area below.
+        var _propWelcomeTitle = esc(focusP.proposalNum || focusP.name || 'Proposal');
+        var _propWelcomeClient = clientName ? ' · Welcome, ' + esc(clientFirst) : '';
         html += '<div class="cp-welcome-strip">' +
-          '<div style="font-size:13px;font-weight:600;color:#0A1F3D;font-family:\'DM Sans\',sans-serif;">Welcome' + (clientName ? ', ' + esc(clientFirst) : '') + '</div>' +
-          '<div style="font-size:12px;color:#6B7280;margin-top:4px;">' +
-          '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 10px;font-size:12px;border-color:#E2E2E2;color:#0A1F3D;" onclick="navigate(\'#/clientview/' + escAttr(projectId) + '/proposals\')">← All proposals</button></div></div>';
+          '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.15em;color:#0A1F3D;font-weight:500;font-family:\'DM Sans\',sans-serif;">Proposal Review</div>' +
+          '<div style="font-family:\'Playfair Display\',serif;font-size:26px;color:#0A1F3D;font-weight:500;line-height:1.2;margin-top:8px;">' + _propWelcomeTitle + _propWelcomeClient + '</div>' +
+          '<div style="margin-top:14px;">' +
+          '<a href="#" onclick="event.preventDefault();navigate(\'#/clientview/' + escAttr(projectId) + '/proposals\');return false;" style="font-family:\'DM Sans\',sans-serif;font-size:13px;color:#0A1F3D;text-decoration:underline;">← All proposals</a>' +
+          '</div></div>';
       } else if (activePage === 'home') {
         html += '<section class="cp-home-hero">' +
           (_heroUrl ? '<img src="' + _escImgSrcAttr(_heroUrl) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '') +
@@ -45045,10 +45411,9 @@ async function renderBoardsTab(T, proj) {
           '<p style="font-size:14px;color:#5C6B80;margin:0;">Open your dashboard to browse shared proposals and invoices.</p>' +
           '<button type="button" class="cp-btn cp-btn-primary" style="margin-top:14px;" onclick="navigate(\'#/clientview/' + escAttr(projectId) + '\')">Open dashboard</button></div></div>';
       } else if (isProposalRoute) {
-        var _propListHash = '#/clientview/' + projectId + '/proposals';
+        // Per brief trigger 1: duplicate "← All proposals" button removed from here.
+        // Welcome bar above is the single canonical back link.
         html += '<div class="cp-page-pad">' +
-          '<div style="margin-bottom:18px;"><button type="button" class="cp-btn cp-btn-outline" style="padding:6px 12px;font-size:12px;border-color:#E2E2E2;color:#0A1F3D;" onclick="navigate(\'' + escAttr(_propListHash) + '\')">\u2190 All proposals</button></div>' +
-          '<div class="cp-sec-label-jx" style="margin-bottom:18px;">Proposal \u2014 review &amp; approve</div>' +
           cpBuildSingleProposalReviewHtml(projectId, focusP, { panelId: 'cp-proposal-panel', showBanner: true }) +
           cpPortalMessagesHtml(projectId, messages, {}) +
           '</div>';
@@ -53097,31 +53462,75 @@ ${pages}
     }
 
 
+    function _isServiceOrTimeBillingClip(clip) {
+      clip = clip || {};
+      var serviceCategories = [
+        'design fees','design fee','design services','design service',
+        'blended design fees','blended design fee','blended design services','blended design service',
+        'consultation','project management','pass-through',
+        'freight','shipping','delivery','handling',
+        'client admin','client project services',
+        'expense','time track','time tracking','time billing',
+        'service','services','labor','labour'
+      ];
+      var room = String(clip.room || '').toLowerCase().trim();
+      var cat = String(clip.category || '').toLowerCase().trim();
+      if (serviceCategories.indexOf(room) >= 0 || serviceCategories.indexOf(cat) >= 0) return true;
+      if (typeof boardClipIsTimeBillingRow === 'function' && boardClipIsTimeBillingRow(clip)) return true;
+      return false;
+    }
+
+    async function _removeServiceTimeBillingClipsForBoard(projectId) {
+      var clips = await db.collection('boards').doc(projectId).collection('clips').get();
+      var batch = db.batch();
+      var count = 0;
+      clips.forEach(function(d) {
+        if (_isServiceOrTimeBillingClip(d.data())) {
+          batch.delete(d.ref);
+          count++;
+        }
+      });
+      if (count > 0) await batch.commit();
+      return count;
+    }
+
+    // Remove service/time-billing clips from one project first (e.g. "Rolling Hills")
+    async function removeTimeBillingBoardsForProject(projectNameOrId) {
+      var raw = String(projectNameOrId || '').trim();
+      if (!raw) {
+        raw = prompt('Project name or ID to clean (e.g. "Rolling Hills"):', 'Rolling Hills') || '';
+        raw = String(raw || '').trim();
+      }
+      if (!raw) return;
+      showToast('Scanning for "' + raw + '"...');
+      var snap = await getCachedBoards();
+      var target = null;
+      snap.forEach(function(d) {
+        var nm = String((d.data() && d.data().name) || '').trim();
+        if (d.id === raw || nm.toLowerCase() === raw.toLowerCase()) target = d;
+      });
+      if (!target) {
+        await cchAlert('Project not found: ' + raw, 'Clean Room Board services');
+        return;
+      }
+      var p = target.data() || {};
+      var pName = String(p.name || target.id || 'Project');
+      if (!(await cchConfirm('Delete all service/time-billing clips from Room Boards for "' + pName + '"?', 'Clean ' + pName, { confirmText: 'Delete services', danger: true }))) return;
+      var deleted = await _removeServiceTimeBillingClipsForBoard(target.id);
+      showToast('Removed ' + deleted + ' service/billing item(s) from ' + pName, 'success');
+      await cchAlert('Done. Removed ' + deleted + ' service/time-billing Room Board item(s) from "' + pName + '".', 'Cleanup complete');
+      try { if (window._currentProject && window._currentProject.id === target.id) await renderProjectDetail(); } catch (_e) {}
+    }
+
     // Remove time billing boards from all projects
     async function removeTimeBillingBoards() {
       if (!confirm('Remove all Design Fees / Time Billing / Service items from Room Boards across ALL projects? This removes clips with categories like Design Fees, Design Services, Blended Design, Consultation, Project Management, Pass-Through, Freight, Client Admin etc.')) return;
       showToast('Scanning projects...');
       var snap = await getCachedBoards();
       var totalDeleted = 0;
-      var serviceCategories = ['design fees','design services','blended design fees','blended design services','consultation','project management','pass-through','freight','shipping','client admin','client project services','expense','time track','time tracking','time billing'];
       for (var doc of snap.docs) {
         try {
-          var clips = await db.collection('boards').doc(doc.id).collection('clips').get();
-          var batch = db.batch();
-          var count = 0;
-          clips.forEach(function(d) {
-            var c = d.data();
-            var room = (c.room || '').toLowerCase().trim();
-            var cat = (c.category || '').toLowerCase().trim();
-            if (serviceCategories.includes(room) || serviceCategories.includes(cat)) {
-              batch.delete(d.ref);
-              count++;
-            }
-          });
-          if (count > 0) {
-            await batch.commit();
-            totalDeleted += count;
-          }
+          totalDeleted += await _removeServiceTimeBillingClipsForBoard(doc.id);
         } catch(e) {}
       }
       showToast('Removed ' + totalDeleted + ' service/billing items from Room Boards');
