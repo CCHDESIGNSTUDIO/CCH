@@ -24654,6 +24654,13 @@ async function renderBoardsTab(T, proj) {
       if (_docEdit) renderDocEditPage(_docEdit.type, _docEdit.projectId, _docEdit.docId, _docEdit.docData, _docEdit.items, window._docEditProjData || {});
     };
 
+    /** Invoice read-only view: jump to edit and open the Add Item catalog rail. */
+    window.cchOpenInvoiceAddItemSidebar = function(projectId, docId) {
+      window._pendingOpenDocItemsSidebar = true;
+      window._forceEditMode = true;
+      navigate('#/project/' + projectId + '/invoice/' + docId);
+    };
+
     function renderDocEditPage(type, projectId, docId, docData, items, projData) {
       const T = document.getElementById('contentArea');
       const projName = projData.name || projectId;
@@ -24781,7 +24788,7 @@ async function renderBoardsTab(T, proj) {
           </div>
           <div id="docEditItemsArea"></div>
           <div class="doc-edit-add" style="display:flex;gap:12px;align-items:center;">
-            <button onclick="openDocItemsSidebar()" style="background:#1B3352;color:#FFFFFF;border:none;padding:10px 20px;font-size:14px;cursor:pointer;font-weight:600;">Add item</button>
+            <button type="button" onclick="openDocItemsSidebar({ mode: 'docEdit' })" style="background:#1B3352;color:#FFFFFF;border:none;padding:10px 20px;font-size:14px;cursor:pointer;font-weight:600;">Add item</button>
           </div>
         </div>`;
 
@@ -24944,6 +24951,14 @@ async function renderBoardsTab(T, proj) {
         setTimeout(function() {
           if (_docEdit && _docEdit.type === 'invoice' && _docEdit.docId === docId) docEditSave();
         }, 700);
+      }
+      if (window._pendingOpenDocItemsSidebar && (type === 'invoice' || type === 'po')) {
+        window._pendingOpenDocItemsSidebar = false;
+        setTimeout(function() {
+          try {
+            if (typeof openDocItemsSidebar === 'function') openDocItemsSidebar({ mode: 'docEdit' });
+          } catch (e) { console.warn('[docEdit] open sidebar', e); }
+        }, 350);
       }
     }
 
@@ -37900,6 +37915,7 @@ async function renderBoardsTab(T, proj) {
               <th style="padding:10px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;cursor:pointer;user-select:none;" onclick="librarySortField='vendor';librarySortDir=librarySortDir==='asc'?'desc':'asc';renderLibraryView()">Vendor${sortArrow('vendor')}</th>
               <th style="padding:10px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;cursor:pointer;user-select:none;" onclick="librarySortField='category';librarySortDir=librarySortDir==='asc'?'desc':'asc';renderLibraryView()">Category${sortArrow('category')}</th>
               <th style="padding:10px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;cursor:pointer;user-select:none;white-space:nowrap;" onclick="librarySortField='createdAt';librarySortDir=librarySortDir==='asc'?'desc':'asc';renderLibraryView()">Date added${sortArrow('createdAt')}</th>
+              <th style="padding:10px;text-align:center;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;width:80px;" title="Linked proposals, invoices, POs (from Houzz)">Linked</th>
               <th style="padding:10px;text-align:right;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;cursor:pointer;user-select:none;" onclick="librarySortField='cost';librarySortDir=librarySortDir==='asc'?'desc':'asc';renderLibraryView()">Cost${sortArrow('cost')}</th>
               <th style="padding:10px;text-align:right;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;cursor:pointer;user-select:none;" onclick="librarySortField='sell';librarySortDir=librarySortDir==='asc'?'desc':'asc';renderLibraryView()">Sell Price${sortArrow('sell')}</th>
               <th style="padding:10px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;cursor:pointer;user-select:none;" onclick="librarySortField='sku';librarySortDir=librarySortDir==='asc'?'desc':'asc';renderLibraryView()">SKU${sortArrow('sku')}</th>
@@ -37925,6 +37941,9 @@ async function renderBoardsTab(T, proj) {
                 '<td style="padding:8px 10px;font-size:12px;">' + esc(p.vendor || p.manufacturer || '') + '</td>' +
                 '<td style="padding:8px 10px;font-size:12px;">' + esc(p.category || '') + '</td>' +
                 '<td style="padding:8px 10px;font-size:12px;color:var(--gray-500);white-space:nowrap;">' + esc(formatLibraryDateAdded(p)) + '</td>' +
+                '<td style="padding:8px;text-align:center;" onclick="event.stopPropagation()">' +
+                  (p.houzzId ? '<button type="button" title="Show linked proposals, invoices, POs" data-libid="' + _lid + '" onclick="event.stopPropagation();_pdShowLinkedPopover(this,this.getAttribute(\'data-libid\'))" style="border:1px solid var(--gray-200);background:#fff;cursor:pointer;padding:4px 8px;font-size:14px;border-radius:0;">🔗</button>' : '<span style="color:var(--gray-300);font-size:11px;">—</span>') +
+                '</td>' +
                 '<td style="padding:8px 10px;text-align:right;font-family:var(--font-mono);font-size:13px;">' + (cost ? '$' + cost.toLocaleString('en-US', {minimumFractionDigits:2}) : '-') + '</td>' +
                 '<td style="padding:8px 10px;text-align:right;font-family:var(--font-mono);font-size:13px;color:var(--green);">' + (sell ? '$' + sell.toLocaleString('en-US', {minimumFractionDigits:2}) : '-') + '</td>' +
                 '<td style="padding:8px 10px;font-size:11px;color:var(--gray-400);">' + esc(p.sku || '') + '</td>' +
@@ -38114,9 +38133,10 @@ async function renderBoardsTab(T, proj) {
         } else if (fsKind === 'clip' && p._clipProjectId) {
           fs = '<a href="' + escAttr('https://console.firebase.google.com/project/' + _fbPid + '/firestore/databases/-default-/data/~2Fboards~2F' + encodeURIComponent(String(p._clipProjectId)) + '~2Fclips~2F' + encodeURIComponent(val)) + '" target="_blank" rel="noopener noreferrer" style="margin-left:6px;font-size:10px;color:var(--gray-500);letter-spacing:0;text-transform:none;font-weight:600;">Firestore</a>';
         }
-        _plDbgParts.push('<div style="font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:var(--gray-500);margin-top:6px;line-height:1.45;"><span style="font-weight:700;">' + esc(label) + '</span> <span style="font-weight:400;letter-spacing:0;text-transform:none;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:var(--gray-700);">' + esc(val) + '</span>' + copyB + fs + '</div>');
+        _plDbgParts.push('<div style="font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:var(--gray-500);margin-top:6px;line-height:1.45;"><span style="font-weight:700;">' + esc(label) + '</span> <span style="font-weight:600;letter-spacing:0;text-transform:none;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;color:#0A1F3D;">' + esc(val) + '</span>' + copyB + fs + '</div>');
       }
       _plDbgRow('Library ID', _plLibDocId, 'product');
+      _plDbgRow('Houzz ID', String(p.houzzId || ''), null);
       _plDbgRow('Clip ID', _plClipDocId, 'clip');
       if (_plClipDocId) {
         if (_plLibFromClip) {
@@ -38340,14 +38360,18 @@ async function renderBoardsTab(T, proj) {
                     ${p.id ? `
                     <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--gray-200);">
                       <div style="font-size:11px;font-weight:700;color:var(--gray-500);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.06em;">Linked</div>
-                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">
                         <div>
-                          <div style="font-weight:600;font-size:12px;margin-bottom:6px;color:var(--gray-500);">📦 Purchase orders</div>
-                          <div id="peProductPOs" style="font-size:12px;color:var(--gray-400);">Loading…</div>
+                          <div style="font-weight:600;font-size:12px;margin-bottom:6px;color:var(--gray-500);">📋 Proposals</div>
+                          <div id="peProductProposals" style="font-size:12px;color:var(--gray-400);">Loading…</div>
                         </div>
                         <div>
                           <div style="font-weight:600;font-size:12px;margin-bottom:6px;color:var(--gray-500);">📄 Invoices</div>
                           <div id="peProductInvoices" style="font-size:12px;color:var(--gray-400);">Loading…</div>
+                        </div>
+                        <div>
+                          <div style="font-weight:600;font-size:12px;margin-bottom:6px;color:var(--gray-500);">📦 Purchase orders</div>
+                          <div id="peProductPOs" style="font-size:12px;color:var(--gray-400);">Loading…</div>
                         </div>
                       </div>
                     </div>` : ''}
@@ -39748,81 +39772,432 @@ async function renderBoardsTab(T, proj) {
     };
 
     // ── Edit modal: load linked POs & Invoices ──
+    // Scans boards/*/clips for clips matching this product (by houzzId, sku, or title),
+    // surfaces their houzzPO/houzzInvoice/houzzProposal references, then fetches the
+    // actual doc totals from the matched projects' subcollections.
     async function _peLoadLinkedDocs(productId) {
       var prod = libraryProducts.find(function(x) { return x.id === productId; });
       if (!prod) return;
-      var title = (prod.title || '').toLowerCase();
-      var vendor = (prod.vendor || '').toLowerCase();
-      var sku = (prod.sku || '').toLowerCase();
+      var title = (prod.title || '').toLowerCase().trim();
+      var sku = (prod.sku || '').toLowerCase().trim();
+      var houzzId = String(prod.houzzId || '').trim();
 
-      // Load POs
       var poEl = document.getElementById('peProductPOs');
-      if (poEl) {
-        try {
-          var poHtml = '';
-          var projSnap = await db.collection('boards').limit(100).get();
-          var poCount = 0;
-          for (var pi = 0; pi < projSnap.docs.length && poCount < 10; pi++) {
-            var projDoc = projSnap.docs[pi];
-            var projName = projDoc.data().name || projDoc.id;
-            var poSnap = await db.collection('boards').doc(projDoc.id).collection('purchaseOrders').limit(50).get();
-            poSnap.forEach(function(poDoc) {
-              var po = poDoc.data();
-              var items = po.items || po.lineItems || [];
-              var matched = items.some(function(item) {
-                var iTitle = (item.title || item.name || item.description || '').toLowerCase();
-                return (title && iTitle.includes(title)) || (sku && iTitle.includes(sku));
+      var invEl = document.getElementById('peProductInvoices');
+
+      var poRefs = new Map();
+      var invRefs = new Map();
+      var proposalRefs = new Map();
+      var matchedProjects = new Set();
+
+      function parseHouzzRef(ref, prefix) {
+        if (!ref) return null;
+        var s = String(ref).trim();
+        var re = new RegExp('^(' + prefix + ')[\\s-]?(\\d+)', 'i');
+        var m = s.match(re);
+        if (!m) return null;
+        var num = m[1].toUpperCase() + '-' + m[2];
+        var status = '';
+        var sm = s.match(/-\s*([A-Za-z][A-Za-z\s]*[A-Za-z])\s*$/);
+        if (sm) status = sm[1].trim();
+        return { num: num, status: status };
+      }
+
+      function normRef(s, prefix) {
+        if (!s) return null;
+        var t = String(s).trim().toUpperCase().replace(/^PR-?DRAFT[-\s]/i, '');
+        var m = t.match(new RegExp('(' + prefix + ')[\\s-]?(\\d+)', 'i'));
+        if (!m) return null;
+        return m[1].toUpperCase() + '-' + m[2];
+      }
+      function parseConnectedDocs(s, pName, projId) {
+        if (!s) return;
+        // "PO-12592, PO-12918, IN-12455, PR-12937"
+        String(s).split(/[,;\n]+/).forEach(function(part) {
+          var t = part.trim();
+          if (!t) return;
+          var po = normRef(t, 'PO'); if (po) { poRefs.set(po, { project: pName, status: '', projectId: projId }); matchedProjects.add(projId); }
+          var inv = normRef(t, 'IN'); if (inv) { invRefs.set(inv, { project: pName, status: '', projectId: projId }); matchedProjects.add(projId); }
+          var pr = normRef(t, 'PR'); if (pr) { proposalRefs.set(pr, { project: pName, status: '', projectId: projId }); matchedProjects.add(projId); }
+        });
+      }
+
+      try {
+        var projSnap = await db.collection('boards').limit(200).get();
+        for (var bi = 0; bi < projSnap.docs.length; bi++) {
+          var pd = projSnap.docs[bi];
+          var pName = pd.data().name || pd.id;
+          // Pass A: clips
+          try {
+            var clips = await pd.ref.collection('clips').limit(500).get();
+            clips.forEach(function(cd) {
+              var c = cd.data();
+              var cTitle = (c.title || '').toLowerCase().trim();
+              var cSku = (c.sku || '').toLowerCase().trim();
+              var cHouzzId = String(c.houzzId || c.houzzProductId || '').trim();
+              var match = false;
+              if (houzzId && cHouzzId && cHouzzId === houzzId) match = true;
+              else if (sku && cSku && cSku === sku) match = true;
+              else if (title && title.length >= 4 && cTitle && (cTitle === title || cTitle.includes(title) || title.includes(cTitle))) match = true;
+              if (!match) return;
+              var poR = parseHouzzRef(c.houzzPO, 'PO');
+              if (poR) { poRefs.set(poR.num, { project: pName, status: poR.status, projectId: pd.id }); matchedProjects.add(pd.id); }
+              var invR = parseHouzzRef(c.houzzInvoice, 'IN');
+              if (invR) { invRefs.set(invR.num, { project: pName, status: invR.status, projectId: pd.id }); matchedProjects.add(pd.id); }
+              var prR = parseHouzzRef(c.houzzProposal, 'PR');
+              if (prR) { proposalRefs.set(prR.num, { project: pName, status: prR.status, projectId: pd.id }); matchedProjects.add(pd.id); }
+              var npo = normRef(c.poNum, 'PO');
+              if (npo) { poRefs.set(npo, { project: pName, status: c.poStatus || '', projectId: pd.id }); matchedProjects.add(pd.id); }
+              var ninv = normRef(c.invoiceNum, 'IN');
+              if (ninv) { invRefs.set(ninv, { project: pName, status: c.invoiceStatus || '', projectId: pd.id }); matchedProjects.add(pd.id); }
+              var npr = normRef(c.proposalNum, 'PR');
+              if (npr) { proposalRefs.set(npr, { project: pName, status: c.proposalStatus || '', projectId: pd.id }); matchedProjects.add(pd.id); }
+              parseConnectedDocs(c.connectedDocs, pName, pd.id);
+            });
+          } catch (_e) {}
+          // Pass B: scan proposals/invoices/POs items[] directly (catches products that are on docs but not on a clip)
+          var subDefs = [
+            { sub: 'proposals', refs: proposalRefs, prefix: 'PR', numField: 'proposalNum' },
+            { sub: 'invoices', refs: invRefs, prefix: 'IN', numField: 'invoiceNum' },
+            { sub: 'purchaseOrders', refs: poRefs, prefix: 'PO', numField: 'poNumber' },
+          ];
+          for (var sdi = 0; sdi < subDefs.length; sdi++) {
+            var sdef = subDefs[sdi];
+            try {
+              var docs = await pd.ref.collection(sdef.sub).limit(500).get();
+              docs.forEach(function(d) {
+                var x = d.data();
+                var items = x.items || x.lineItems || [];
+                if (!Array.isArray(items) || items.length === 0) return;
+                var hit = items.some(function(it) {
+                  var iT = (it.title || it.name || it.description || '').toLowerCase().trim();
+                  var iS = (it.sku || '').toLowerCase().trim();
+                  var iHId = String(it.houzzId || it.houzzProductId || '').trim();
+                  if (houzzId && iHId && iHId === houzzId) return true;
+                  if (sku && iS && iS === sku) return true;
+                  if (title && title.length >= 4 && iT && (iT === title || iT.includes(title) || title.includes(iT))) return true;
+                  return false;
+                });
+                if (!hit) return;
+                var rawNum = x[sdef.numField] || x.proposalNum || x.invoiceNum || x.poNumber || x.number || d.id;
+                var num = normRef(rawNum, sdef.prefix);
+                if (!num) return;
+                if (!sdef.refs.has(num)) {
+                  sdef.refs.set(num, { project: pName, status: x.status || '', projectId: pd.id });
+                }
+                matchedProjects.add(pd.id);
               });
-              var vendorMatch = vendor && (po.vendor || po.vendorName || '').toLowerCase().includes(vendor);
-              if (matched || (vendorMatch && items.length > 0)) {
-                var poTotal = po.total || items.reduce(function(s, it) { return s + (parseFloat(it.total || it.amount) || 0); }, 0);
-                var status = po.status || 'draft';
-                poHtml += '<div style="padding:4px 0;border-bottom:1px solid var(--gray-100);display:flex;justify-content:space-between;align-items:center;">' +
-                  '<div><span style="font-weight:600;">' + esc(po.poNumber || poDoc.id.substring(0,8)) + '</span>' +
-                  '<span style="font-size:10px;color:var(--gray-400);margin-left:6px;">' + esc(projName) + '</span></div>' +
-                  '<div style="display:flex;align-items:center;gap:6px;">' +
-                    '<span style="font-size:10px;padding:2px 6px;border-radius:3px;background:' + (status==='sent'||status==='approved'?'rgba(56,142,60,0.1);color:#388E3C':'rgba(0,0,0,0.05);color:var(--gray-400)') + ';">' + esc(status) + '</span>' +
-                    '<span style="font-weight:600;">' + formatMoney(poTotal) + '</span>' +
-                  '</div>' +
-                '</div>';
-                poCount++;
+            } catch (_e) {}
+          }
+        }
+      } catch (e) {
+        if (poEl) poEl.innerHTML = '<span style="color:var(--gray-300);">Could not load POs</span>';
+        if (invEl) invEl.innerHTML = '<span style="color:var(--gray-300);">Could not load invoices</span>';
+        return;
+      }
+
+      // Fetch totals + capture actual Firestore docIds for clickable links
+      var totalsMap = new Map();
+      var docIdMap = new Map(); // refNum -> { docId, projectId } for building Studio URLs
+      var matchedProjectsArr = Array.from(matchedProjects);
+      for (var mpi = 0; mpi < matchedProjectsArr.length; mpi++) {
+        var projId = matchedProjectsArr[mpi];
+        var pName2 = '';
+        try {
+          var bDoc = projSnap.docs.find(function(d) { return d.id === projId; });
+          if (bDoc) pName2 = bDoc.data().name || projId;
+        } catch (_e) { pName2 = projId; }
+        var subs = [
+          { sub: 'invoices', kind: 'IN', refs: invRefs, numField: 'invoiceNum', urlPath: 'invoice' },
+          { sub: 'proposals', kind: 'PR', refs: proposalRefs, numField: 'proposalNum', urlPath: 'proposal' },
+          { sub: 'purchaseOrders', kind: 'PO', refs: poRefs, numField: 'poNumber', urlPath: 'po' }
+        ];
+        for (var si = 0; si < subs.length; si++) {
+          try {
+            var ssnap = await db.collection('boards').doc(projId).collection(subs[si].sub).limit(500).get();
+            ssnap.forEach(function(d) {
+              var x = d.data();
+              var rawNum = x[subs[si].numField] || x.proposalNum || x.invoiceNum || x.poNumber || x.number || d.id;
+              var s = String(rawNum).trim();
+              var m = s.match(/(PO|IN|PR)[\s-]?(\d+)/i);
+              if (!m) return;
+              var normNum = m[1].toUpperCase() + '-' + m[2];
+              var total = parseFloat(x.total || x.totalPaid || x.totalPayment || 0) || 0;
+              if (total > 0) totalsMap.set(normNum, total);
+              docIdMap.set(normNum, { docId: d.id, projectId: projId, urlPath: subs[si].urlPath });
+              var items = x.items || x.lineItems || [];
+              if (Array.isArray(items) && items.length > 0) {
+                var itemHit = items.some(function(it) {
+                  var iT = (it.title || it.name || it.description || '').toLowerCase().trim();
+                  var iS = (it.sku || '').toLowerCase().trim();
+                  if (sku && iS && iS === sku) return true;
+                  if (title && title.length >= 4 && iT && (iT === title || iT.includes(title) || title.includes(iT))) return true;
+                  return false;
+                });
+                if (itemHit && !subs[si].refs.has(normNum)) {
+                  subs[si].refs.set(normNum, { project: pName2, status: x.status || '', projectId: projId });
+                }
               }
             });
-          }
-          poEl.innerHTML = poHtml || '<span style="color:var(--gray-300);">No linked POs found</span>';
-        } catch(e) { poEl.innerHTML = '<span style="color:var(--gray-300);">Could not load POs</span>'; }
+          } catch (_e) {}
+        }
       }
 
-      // Load Invoices
-      var invEl = document.getElementById('peProductInvoices');
-      if (invEl) {
-        try {
-          var invSnap = await db.collection('invoices').limit(200).get();
-          var invHtml = '';
-          invSnap.forEach(function(d) {
-            var inv = d.data();
-            var items = inv.items || inv.lineItems || [];
-            var matched = items.some(function(item) {
-              var iTitle = (item.title || item.name || item.description || '').toLowerCase();
-              return (title && iTitle.includes(title)) || (sku && iTitle.includes(sku));
-            });
-            var descMatch = title && (inv.description || '').toLowerCase().includes(title);
-            if (matched || descMatch) {
-              var invTotal = inv.total || items.reduce(function(s, it) { return s + (parseFloat(it.total || it.amount) || 0); }, 0);
-              var status = inv.status || 'draft';
-              invHtml += '<div style="padding:4px 0;border-bottom:1px solid var(--gray-100);display:flex;justify-content:space-between;align-items:center;">' +
-                '<div><span style="font-weight:600;">' + esc(inv.invoiceNumber || d.id.substring(0,8)) + '</span>' +
-                '<span style="font-size:10px;color:var(--gray-400);margin-left:6px;">' + esc(inv.vendor || inv.client || '') + '</span></div>' +
-                '<div style="display:flex;align-items:center;gap:6px;">' +
-                  '<span style="font-size:10px;padding:2px 6px;border-radius:3px;background:' + (status==='paid'?'rgba(56,142,60,0.1);color:#388E3C':'rgba(0,0,0,0.05);color:var(--gray-400)') + ';">' + esc(status) + '</span>' +
-                  '<span style="font-weight:600;">' + formatMoney(invTotal) + '</span>' +
-                '</div>' +
-              '</div>';
-            }
-          });
-          invEl.innerHTML = invHtml || '<span style="color:var(--gray-300);">No linked invoices found</span>';
-        } catch(e) { invEl.innerHTML = '<span style="color:var(--gray-300);">Could not load invoices</span>'; }
+      function renderRefs(refs) {
+        var html = '';
+        refs.forEach(function(v, k) {
+          var statusOk = /paid|approved|sent|invoiced/i.test(v.status || '');
+          var bg = statusOk ? 'rgba(56,142,60,0.1);color:#388E3C' : 'rgba(0,0,0,0.05);color:var(--gray-400)';
+          var total = totalsMap.get(k);
+          var info = docIdMap.get(k);
+          var docLink;
+          if (info && info.projectId && info.docId) {
+            var href = '#/project/' + encodeURIComponent(info.projectId) + '/' + info.urlPath + '/' + encodeURIComponent(info.docId);
+            docLink = '<a href="' + escAttr(href) + '" style="font-weight:600;color:#0A1F3D;text-decoration:underline;">' + esc(k) + '</a>';
+          } else {
+            docLink = '<span style="font-weight:600;">' + esc(k) + '</span>';
+          }
+          html += '<div style="padding:4px 0;border-bottom:1px solid var(--gray-100);display:flex;justify-content:space-between;align-items:center;">' +
+            '<div>' + docLink +
+            '<span style="font-size:10px;color:var(--gray-400);margin-left:6px;">' + esc(v.project) + '</span></div>' +
+            '<div style="display:flex;align-items:center;gap:6px;">' +
+              (v.status ? '<span style="font-size:10px;padding:2px 6px;border-radius:3px;background:' + bg + ';">' + esc(v.status) + '</span>' : '') +
+              (total ? '<span style="font-weight:600;">' + formatMoney(total) + '</span>' : '') +
+            '</div>' +
+          '</div>';
+        });
+        return html;
       }
+
+      var propEl = document.getElementById('peProductProposals');
+      if (propEl) {
+        propEl.innerHTML = proposalRefs.size > 0 ? renderRefs(proposalRefs) : '<span style="color:var(--gray-300);">No linked proposals found</span>';
+      }
+      if (invEl) {
+        invEl.innerHTML = invRefs.size > 0 ? renderRefs(invRefs) : '<span style="color:var(--gray-300);">No linked invoices found</span>';
+      }
+      if (poEl) {
+        poEl.innerHTML = poRefs.size > 0 ? renderRefs(poRefs) : '<span style="color:var(--gray-300);">No linked POs found</span>';
+      }
+    }
+
+    // ── Product Library list: chain-icon click popover with linked docs ──
+    // Shows a small floating panel near the clicked row with the same data
+    // _peLoadLinkedDocs surfaces — no need to open the Edit dialog.
+    async function _pdShowLinkedPopover(btnEl, productId) {
+      // Close any existing popover first
+      var existing = document.getElementById('_pdLinkedPopover');
+      if (existing) { existing.remove(); if (existing.dataset.forId === productId) return; }
+
+      var prod = (libraryProducts || []).find(function(x) { return x.id === productId; });
+      if (!prod) return;
+      var title = (prod.title || '').toLowerCase().trim();
+      var sku = (prod.sku || '').toLowerCase().trim();
+      var houzzId = String(prod.houzzId || '').trim();
+
+      // Build popover skeleton
+      var pop = document.createElement('div');
+      pop.id = '_pdLinkedPopover';
+      pop.dataset.forId = productId;
+      pop.style.cssText = 'position:absolute;z-index:9999;background:#fff;border:1px solid var(--gray-200);box-shadow:0 8px 24px rgba(10,31,61,0.18);padding:12px 14px;min-width:320px;max-width:420px;font-family:\'DM Sans\',sans-serif;';
+      var rect = btnEl.getBoundingClientRect();
+      pop.style.top = (window.scrollY + rect.bottom + 6) + 'px';
+      pop.style.left = Math.max(8, window.scrollX + rect.left - 200) + 'px';
+      pop.innerHTML = '<div style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#0A1F3D;font-weight:700;margin-bottom:8px;">Connected Docs</div>' +
+        '<div id="_pdLinkedPopoverBody" style="font-size:12px;color:#0A1F3D;">Loading…</div>' +
+        '<div style="margin-top:10px;text-align:right;"><button type="button" onclick="document.getElementById(\'_pdLinkedPopover\').remove()" style="font-size:11px;padding:2px 8px;background:none;border:1px solid var(--gray-200);cursor:pointer;">Close</button></div>';
+      document.body.appendChild(pop);
+
+      // Click outside to close
+      setTimeout(function() {
+        document.addEventListener('click', function _pdClose(ev) {
+          var p = document.getElementById('_pdLinkedPopover');
+          if (!p) { document.removeEventListener('click', _pdClose); return; }
+          if (!p.contains(ev.target) && ev.target !== btnEl) {
+            p.remove();
+            document.removeEventListener('click', _pdClose);
+          }
+        });
+      }, 0);
+
+      function parseHouzzRef(ref, prefix) {
+        if (!ref) return null;
+        var s = String(ref).trim();
+        var re = new RegExp('^(' + prefix + ')[\\s-]?(\\d+)', 'i');
+        var m = s.match(re);
+        if (!m) return null;
+        var num = m[1].toUpperCase() + '-' + m[2];
+        var status = '';
+        var sm = s.match(/-\s*([A-Za-z][A-Za-z\s]*[A-Za-z])\s*$/);
+        if (sm) status = sm[1].trim();
+        return { num: num, status: status };
+      }
+
+      var poRefs = new Map(), invRefs = new Map(), proposalRefs = new Map(), matchedProjects = new Set();
+      function normRef(s, prefix) {
+        if (!s) return null;
+        var t = String(s).trim().toUpperCase();
+        var m = t.match(new RegExp('(' + prefix + ')[\\s-]?(\\d+)', 'i'));
+        return m ? (m[1].toUpperCase() + '-' + m[2]) : null;
+      }
+      function parseConnectedDocs(s, pName, projId) {
+        if (!s) return;
+        String(s).split(/[,;\n]+/).forEach(function(part) {
+          var t = part.trim(); if (!t) return;
+          var po = normRef(t, 'PO'); if (po) { poRefs.set(po, { project: pName, status: '' }); matchedProjects.add(projId); }
+          var inv = normRef(t, 'IN'); if (inv) { invRefs.set(inv, { project: pName, status: '' }); matchedProjects.add(projId); }
+          var pr = normRef(t, 'PR'); if (pr) { proposalRefs.set(pr, { project: pName, status: '' }); matchedProjects.add(projId); }
+        });
+      }
+      try {
+        var projSnap = await db.collection('boards').limit(200).get();
+        for (var bi = 0; bi < projSnap.docs.length; bi++) {
+          var pd = projSnap.docs[bi];
+          var pName = pd.data().name || pd.id;
+          try {
+            var clips = await pd.ref.collection('clips').limit(500).get();
+            clips.forEach(function(cd) {
+              var c = cd.data();
+              var cTitle = (c.title || '').toLowerCase().trim();
+              var cSku = (c.sku || '').toLowerCase().trim();
+              var cHouzzId = String(c.houzzId || c.houzzProductId || '').trim();
+              var match = false;
+              if (houzzId && cHouzzId && cHouzzId === houzzId) match = true;
+              else if (sku && cSku && cSku === sku) match = true;
+              else if (title && title.length >= 4 && cTitle && (cTitle === title || cTitle.includes(title) || title.includes(cTitle))) match = true;
+              if (!match) return;
+              var poR = parseHouzzRef(c.houzzPO, 'PO');
+              if (poR) { poRefs.set(poR.num, { project: pName, status: poR.status }); matchedProjects.add(pd.id); }
+              var invR = parseHouzzRef(c.houzzInvoice, 'IN');
+              if (invR) { invRefs.set(invR.num, { project: pName, status: invR.status }); matchedProjects.add(pd.id); }
+              var prR = parseHouzzRef(c.houzzProposal, 'PR');
+              if (prR) { proposalRefs.set(prR.num, { project: pName, status: prR.status }); matchedProjects.add(pd.id); }
+              var npo = normRef(c.poNum, 'PO');
+              if (npo) { poRefs.set(npo, { project: pName, status: c.poStatus || '' }); matchedProjects.add(pd.id); }
+              var ninv = normRef(c.invoiceNum, 'IN');
+              if (ninv) { invRefs.set(ninv, { project: pName, status: c.invoiceStatus || '' }); matchedProjects.add(pd.id); }
+              var npr = normRef(c.proposalNum, 'PR');
+              if (npr) { proposalRefs.set(npr, { project: pName, status: c.proposalStatus || '' }); matchedProjects.add(pd.id); }
+              parseConnectedDocs(c.connectedDocs, pName, pd.id);
+            });
+          } catch (_e) {}
+          // Pass B: scan proposals/invoices/POs items[] directly
+          var subDefs = [
+            { sub: 'proposals', refs: proposalRefs, prefix: 'PR', numField: 'proposalNum' },
+            { sub: 'invoices', refs: invRefs, prefix: 'IN', numField: 'invoiceNum' },
+            { sub: 'purchaseOrders', refs: poRefs, prefix: 'PO', numField: 'poNumber' },
+          ];
+          for (var sdi = 0; sdi < subDefs.length; sdi++) {
+            var sdef = subDefs[sdi];
+            try {
+              var subDocs = await pd.ref.collection(sdef.sub).limit(500).get();
+              subDocs.forEach(function(d) {
+                var x = d.data();
+                var items = x.items || x.lineItems || [];
+                if (!Array.isArray(items) || items.length === 0) return;
+                var hit = items.some(function(it) {
+                  var iT = (it.title || it.name || it.description || '').toLowerCase().trim();
+                  var iS = (it.sku || '').toLowerCase().trim();
+                  var iHId = String(it.houzzId || it.houzzProductId || '').trim();
+                  if (houzzId && iHId && iHId === houzzId) return true;
+                  if (sku && iS && iS === sku) return true;
+                  if (title && title.length >= 4 && iT && (iT === title || iT.includes(title) || title.includes(iT))) return true;
+                  return false;
+                });
+                if (!hit) return;
+                var rawNum = x[sdef.numField] || x.proposalNum || x.invoiceNum || x.poNumber || x.number || d.id;
+                var num = normRef(rawNum, sdef.prefix);
+                if (!num) return;
+                if (!sdef.refs.has(num)) {
+                  sdef.refs.set(num, { project: pName, status: x.status || '' });
+                }
+                matchedProjects.add(pd.id);
+              });
+            } catch (_e) {}
+          }
+        }
+      } catch (e) {
+        var b = document.getElementById('_pdLinkedPopoverBody');
+        if (b) b.innerHTML = '<span style="color:var(--red);">Could not load.</span>';
+        return;
+      }
+
+      var totalsMap = new Map();
+      var docIdMap = new Map();
+      var matchedProjectsArr = Array.from(matchedProjects);
+      for (var mpi = 0; mpi < matchedProjectsArr.length; mpi++) {
+        var projId = matchedProjectsArr[mpi];
+        var pName2 = '';
+        try {
+          var bDoc = projSnap.docs.find(function(d) { return d.id === projId; });
+          if (bDoc) pName2 = bDoc.data().name || projId;
+        } catch (_e) { pName2 = projId; }
+        var subs = [
+          { sub: 'invoices', refs: invRefs, numField: 'invoiceNum', urlPath: 'invoice' },
+          { sub: 'proposals', refs: proposalRefs, numField: 'proposalNum', urlPath: 'proposal' },
+          { sub: 'purchaseOrders', refs: poRefs, numField: 'poNumber', urlPath: 'po' }
+        ];
+        for (var si = 0; si < subs.length; si++) {
+          try {
+            var ssnap = await db.collection('boards').doc(projId).collection(subs[si].sub).limit(500).get();
+            ssnap.forEach(function(d) {
+              var x = d.data();
+              var rawNum = x[subs[si].numField] || x.proposalNum || x.invoiceNum || x.poNumber || x.number || d.id;
+              var s = String(rawNum).trim();
+              var m = s.match(/(PO|IN|PR)[\s-]?(\d+)/i);
+              if (!m) return;
+              var normNum = m[1].toUpperCase() + '-' + m[2];
+              var total = parseFloat(x.total || x.totalPaid || x.totalPayment || 0) || 0;
+              if (total > 0) totalsMap.set(normNum, total);
+              docIdMap.set(normNum, { docId: d.id, projectId: projId, urlPath: subs[si].urlPath });
+              var items = x.items || x.lineItems || [];
+              if (Array.isArray(items) && items.length > 0) {
+                var itemHit = items.some(function(it) {
+                  var iT = (it.title || it.name || it.description || '').toLowerCase().trim();
+                  var iS = (it.sku || '').toLowerCase().trim();
+                  if (sku && iS && iS === sku) return true;
+                  if (title && title.length >= 4 && iT && (iT === title || iT.includes(title) || title.includes(iT))) return true;
+                  return false;
+                });
+                if (itemHit && !subs[si].refs.has(normNum)) {
+                  subs[si].refs.set(normNum, { project: pName2, status: x.status || '' });
+                }
+              }
+            });
+          } catch (_e) {}
+        }
+      }
+
+      function renderGroup(label, refs) {
+        if (refs.size === 0) return '';
+        var html = '<div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.08em;font-weight:700;margin-top:8px;margin-bottom:4px;">' + label + '</div>';
+        refs.forEach(function(v, k) {
+          var statusOk = /paid|approved|sent|invoiced/i.test(v.status || '');
+          var bg = statusOk ? 'rgba(56,142,60,0.1);color:#388E3C' : 'rgba(0,0,0,0.05);color:var(--gray-400)';
+          var total = totalsMap.get(k);
+          var info = docIdMap.get(k);
+          var docLink;
+          if (info && info.projectId && info.docId) {
+            var href = '#/project/' + encodeURIComponent(info.projectId) + '/' + info.urlPath + '/' + encodeURIComponent(info.docId);
+            docLink = '<a href="' + escAttr(href) + '" style="font-weight:700;color:#0A1F3D;text-decoration:underline;">' + esc(k) + '</a>';
+          } else {
+            docLink = '<span style="font-weight:700;color:#0A1F3D;">' + esc(k) + '</span>';
+          }
+          html += '<div style="padding:4px 0;display:flex;justify-content:space-between;align-items:center;font-size:12px;">' +
+            '<div>' + docLink +
+            ' <span style="font-size:10px;color:var(--gray-500);">' + esc(v.project) + '</span></div>' +
+            '<div style="display:flex;align-items:center;gap:6px;">' +
+              (v.status ? '<span style="font-size:9px;padding:2px 6px;border-radius:3px;background:' + bg + ';">' + esc(v.status) + '</span>' : '') +
+              (total ? '<span style="font-weight:600;font-family:var(--font-mono);font-size:11px;">$' + total.toLocaleString('en-US', {minimumFractionDigits: 2}) + '</span>' : '') +
+            '</div></div>';
+        });
+        return html;
+      }
+
+      var body = document.getElementById('_pdLinkedPopoverBody');
+      if (!body) return;
+      var anyHtml = renderGroup('Proposals', proposalRefs) + renderGroup('Invoices', invRefs) + renderGroup('Purchase Orders', poRefs);
+      body.innerHTML = anyHtml || '<span style="color:var(--gray-400);font-style:italic;">No linked docs found.</span>';
     }
 
     function showProductDetail(id) {
@@ -47271,7 +47646,14 @@ async function renderBoardsTab(T, proj) {
         showToast('Hero image saved');
         var ov = document.getElementById('cpHeroOverlay');
         if (ov) ov.remove();
-        renderProjectDetail();
+        var rawHash = (window.location.hash || '').replace(/^#\/?/, '');
+        var segs = rawHash.split('/').filter(function(s) { return !!s; });
+        var onClientPortal = segs[0] && String(segs[0]).toLowerCase() === 'clientview' && segs[1] === projectId;
+        if (onClientPortal && typeof renderClientPortal === 'function') {
+          void renderClientPortal(projectId);
+        } else if (typeof renderProjectDetail === 'function') {
+          void renderProjectDetail();
+        }
       } catch (e) {
         var msg = (e && e.message) ? e.message : String(e);
         console.error('Hero save failed:', e);

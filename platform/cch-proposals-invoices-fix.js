@@ -1906,6 +1906,7 @@
       '<button class="btn btn-secondary btn-sm" onclick="togglePublished(\'' + cchEscJsStr(projectId) + '\',\'' + cchEscJsStr(docId) + '\',' + (_nextPublished ? 'true' : 'false') + ',\'' + cchEscJsStr(collection) + '\')">' + _pubLabel + '</button>' +
       qbViewTopBtn +
       _delViewBtn +
+      (type === 'invoice' ? '<button type="button" class="btn btn-primary btn-sm" onclick="window.cchOpenInvoiceAddItemSidebar(\'' + cchEscJsStr(projectId) + '\',\'' + cchEscJsStr(docId) + '\')" style="background:#1B3352;color:#EDE8E0;">+ Add item</button>' : '') +
       '<button class="btn btn-primary btn-sm" onclick="window._forceEditMode=true;navigate(window.location.hash)" style="background:#1B3352;color:#EDE8E0;">✏️ Edit ' + typeLabel + '</button>'
     );
 
