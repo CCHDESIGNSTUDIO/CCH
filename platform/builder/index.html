@@ -1,0 +1,2596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CCH Custom Order Builder</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://cdn.jsdelivr.net/gh/gitbrent/PptxGenJS@v3.12.0/dist/pptxgen.bundle.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+<style>
+  :root{
+    --ink:#1A1A1A; --body:#333; --muted:#888; --rule:#999; --hairline:#DDD;
+    --accent:#8B6F47; --bg:#F8F6F2; --field:#FAF7F2; --border:#D9D2C5;
+    --flag:#B8782F; --selected:#1A1A1A;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;font-family:Calibri,Arial,sans-serif;color:var(--body);background:#F2EFE9}
+  button{font-family:inherit;cursor:pointer}
+  header{background:#fff;border-bottom:1px solid var(--hairline);padding:14px 24px;display:flex;align-items:center;gap:24px}
+  header h1{margin:0;font-family:Georgia,serif;font-size:22px;color:var(--ink);font-weight:700}
+  header .sub{font-size:11px;letter-spacing:3px;color:var(--muted);text-transform:uppercase}
+  .auth-note{margin-left:auto;font-size:11px;color:#555}
+  nav.tabs{display:flex;gap:0}
+  nav.tabs button{background:transparent;border:none;padding:10px 18px;font-size:11px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;border-bottom:2px solid transparent}
+  nav.tabs button.active{color:var(--ink);border-bottom-color:var(--accent);font-weight:700}
+  .builder-shell{display:grid;grid-template-columns:280px minmax(0,1fr);width:100%;min-height:calc(100vh - 64px);align-items:stretch;background:var(--bg)}
+  .builder-shell .library-rail{align-self:stretch}
+  main#app.builder-main{display:grid;grid-template-columns:minmax(300px,1.1fr) minmax(240px,0.9fr);gap:0;min-width:0;min-height:calc(100vh - 64px)}
+  .library-rail{background:#D8D0C4;border-right:3px solid #6B5344;overflow-y:auto;overflow-x:hidden;padding:12px 10px 80px;display:flex;flex-direction:column;gap:8px;width:280px;min-width:280px;max-width:280px;box-sizing:border-box;flex-shrink:0}
+  .library-rail-boot h3{margin:0 0 6px;font-size:12px;letter-spacing:2px;color:#1A1A1A}
+  .library-rail h3{margin:0;font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:var(--ink);font-weight:700}
+  .library-rail .sub{font-size:10px;color:var(--muted);line-height:1.35;margin-bottom:4px}
+  .lib-rail-select,.lib-rail-filter{width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);background:#fff;font-family:inherit}
+  .lib-rail-filter{margin-top:2px}
+  .lib-rail-label{font-size:9px;letter-spacing:1.2px;font-weight:700;color:var(--ink);text-transform:uppercase;margin-top:4px}
+  .lib-rail-crumb{font-size:10px;color:var(--muted);word-break:break-word;line-height:1.35;padding:4px 0}
+  .lib-rail-folders{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px}
+  .lib-rail-folders .folder-tile{font-size:10px;padding:8px 6px;border:1px solid var(--border);background:#fff;cursor:pointer;text-align:center;line-height:1.2}
+  .lib-rail-folders .folder-tile:hover{border-color:var(--ink)}
+  .lib-rail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:6px}
+  .library-rail .pick-card{border:2px solid transparent;background:#fff;cursor:pointer;display:flex;flex-direction:column;min-width:0}
+  .library-rail .pick-card:hover{border-color:var(--accent)}
+  .library-rail .pick-card img{width:100%;height:68px;object-fit:cover;background:#eee}
+  .library-rail .pick-card .label{font-size:8.5px;padding:3px 4px;line-height:1.15;color:var(--body);min-height:28px}
+  .lib-rail-actions{display:flex;flex-direction:column;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--hairline)}
+  .lib-rail-actions .btn-upload{font-size:10px;letter-spacing:1px;padding:8px 10px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;width:100%}
+  .lib-rail-actions .btn-mini{font-size:10px;padding:6px 8px;border:1px solid var(--border);background:#fff;cursor:pointer;width:100%}
+  .lib-rail-empty{font-size:11px;color:var(--muted);font-style:italic;padding:8px 4px}
+  .form-pane{background:#fff;overflow-y:auto;padding:20px 24px 120px;border-right:1px solid var(--hairline);min-width:0}
+  .preview-pane{overflow-y:auto;padding:24px;background:#E8E4DD;min-width:0}
+  .toolbar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:16px}
+  .toolbar .field{margin:0}
+  .form-section{margin-bottom:24px;padding-bottom:18px;border-bottom:1px solid var(--hairline)}
+  .form-section:last-child{border-bottom:none}
+  .form-section h2{font-size:11px;letter-spacing:3px;color:var(--ink);font-weight:700;text-transform:uppercase;margin:0 0 12px;padding-bottom:6px;border-bottom:1px solid var(--accent)}
+  .field{margin-bottom:10px;display:flex;flex-direction:column;gap:4px}
+  .field label{font-size:10px;letter-spacing:1.5px;color:var(--ink);font-weight:700;text-transform:uppercase}
+  .field input[type=text],.field textarea,.field select{
+    border:1px solid var(--border);background:#fff;padding:7px 10px;font-family:inherit;font-size:13px;color:var(--ink);
+    border-radius:0;outline:none;transition:border-color .15s
+  }
+  .field textarea{resize:vertical;min-height:54px}
+  .field select[multiple]{min-height:120px;padding:6px}
+  .spec-attach-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .spec-attach-bar .spec-thumb{width:48px;height:48px;object-fit:cover;border:1px solid var(--border);background:var(--field)}
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .field-row.three{grid-template-columns:1fr 1fr 1fr}
+  .chip-group{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);padding:5px 10px;font-size:12px;background:#fff;cursor:pointer}
+  .chip input{display:none}
+  .chip.checked{border-color:var(--ink);background:var(--ink);color:#fff;font-weight:700}
+  .picker{margin:8px 0}
+  .picker-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .picker-head .picker-meta{font-size:11px;color:var(--muted)}
+  .picker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;max-height:230px;overflow-y:auto;padding:6px;border:1px solid var(--hairline);background:var(--field)}
+  .pick-card{background:#fff;border:2px solid transparent;cursor:pointer;display:flex;flex-direction:column}
+  .pick-card.selected{border-color:var(--ink)}
+  .pick-card img{width:100%;height:80px;object-fit:cover;background:#eee}
+  .pick-card .label{font-size:9.5px;color:var(--body);padding:4px 5px;line-height:1.2;min-height:26px}
+  .picker-actions{display:flex;gap:6px;align-items:center}
+  .picker-actions .btn-mini{border:1px solid var(--border);background:#fff;color:var(--ink);font-size:10px;letter-spacing:1px;padding:5px 8px}
+  .picker-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center}
+  .picker-modal{width:min(960px,92vw);max-height:86vh;background:#fff;border:1px solid var(--hairline);padding:14px;display:flex;flex-direction:column}
+  .picker-modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .picker-modal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;overflow:auto}
+  .upload-box{border:2px dashed var(--border);background:var(--field);padding:18px;text-align:center;cursor:pointer;font-size:11px;color:var(--muted);letter-spacing:1px}
+  .upload-box.has-img{padding:0;border-style:solid;border-color:var(--ink)}
+  .upload-box img{display:block;width:100%;max-height:180px;object-fit:cover}
+  .upload-box .clear{font-size:10px;color:var(--flag);margin-top:6px;display:inline-block}
+  .actions{position:sticky;bottom:-20px;margin-top:24px;padding:12px 0;background:#fff;border-top:1px solid var(--hairline);display:flex;gap:8px;flex-wrap:wrap}
+  .btn{border:1px solid var(--ink);background:var(--ink);color:#fff;padding:10px 16px;font-size:11px;letter-spacing:2px;font-weight:700;text-transform:uppercase}
+  .btn.secondary{background:#fff;color:var(--ink)}
+  .notice{padding:10px 12px;background:#FFF8E1;border:1px solid #E0CCA0;color:#7A5C20;font-size:12px;margin:8px 0}
+  .error{background:#FFF0F0;border-color:#e8b6b6;color:#8e3434}
+  .preview-page{width:1067px;height:600px;background:#fff;margin:0 auto 24px;box-shadow:0 4px 18px rgba(0,0,0,.12);position:relative;overflow:hidden}
+  .preview-shrink{transform:scale(0.78);transform-origin:top left;margin-bottom:-130px}
+  .preview-page .pp-header{display:flex;justify-content:space-between;padding:24px 32px 8px;color:var(--ink)}
+  .preview-page .pp-title{font-size:22px;letter-spacing:1px}
+  .preview-page .pp-title .num{color:var(--flag);font-style:italic;font-weight:700;margin-left:8px}
+  .preview-page .pp-page{font-size:11px;letter-spacing:3px;color:var(--muted);text-transform:uppercase}
+  .preview-page .pp-loc{padding:0 32px 14px;font-size:14px;color:var(--ink);letter-spacing:1px;border-bottom:1px solid var(--rule);position:relative}
+  .preview-page .pp-treatment{position:absolute;right:32px;top:52px;font-size:10px;letter-spacing:3px;font-weight:700;color:var(--ink);text-transform:uppercase}
+  .preview-body{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:14px;padding:16px 32px 12px}
+  .preview-body.preview-bedding{grid-template-columns:0.7fr 1.22fr 1.38fr}
+  .pp-section{font-size:11px;letter-spacing:3px;font-weight:700;color:var(--ink);text-transform:uppercase;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--hairline)}
+  .pp-intent{font-size:11px;font-style:italic;color:var(--body);line-height:1.4;margin-bottom:12px}
+  .pp-intent.pp-intent--compact{font-size:9px;line-height:1.25;margin-bottom:8px;max-height:3.75em;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3}
+  .pp-specs{font-size:11px;color:var(--body);line-height:1.5}
+  .pp-rendering{background:var(--field);border:1px dashed var(--border);min-height:240px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-style:italic;font-size:11px;overflow:hidden}
+  .preview-body.preview-bedding .pp-rendering{min-height:200px}
+  .pp-rendering img{width:100%;height:100%;object-fit:cover}
+  .pp-fabric{margin-bottom:10px;display:grid;grid-template-columns:18px 64px 1fr;gap:6px}
+  .pp-fabric.pp-fabric--compact{margin-bottom:8px;grid-template-columns:16px 58px 1fr;gap:5px}
+  .pp-fabric .lt{font-family:Georgia;font-size:14px;font-weight:700;color:var(--ink)}
+  .pp-fabric.pp-fabric--compact .lt{font-size:13px}
+  .pp-fabric .sw{width:64px;height:64px;background:var(--field);border:1px solid var(--border);overflow:hidden}
+  .pp-fabric.pp-fabric--compact .sw{width:58px;height:58px}
+  .pp-fabric .sw img{width:100%;height:100%;object-fit:cover}
+  .preview-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:0 32px 14px}
+  .strip-cell .ttl{font-size:10px;letter-spacing:2px;font-weight:700;color:var(--ink);text-transform:uppercase;margin-bottom:4px;padding-bottom:3px;border-bottom:1px solid var(--hairline)}
+  .strip-cell .img{height:90px;background:var(--field);border:1px dashed var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:9.5px;font-style:italic}
+  .strip-cell .img img{width:100%;height:100%;object-fit:cover}
+  .pp-meas{font-size:10px;color:var(--body);padding:0 32px;display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}
+  .pp-meas .row{display:flex;justify-content:space-between;border-bottom:1px solid var(--rule);padding:2px 0}
+  .preview-foot{padding:0 32px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+  .pp-notes-blk{font-size:10px;color:var(--body);line-height:1.4}
+  .pp-notes-blk h4{font-size:9.5px;letter-spacing:2px;font-weight:700;margin:0 0 4px;color:var(--ink);text-transform:uppercase;padding-bottom:3px;border-bottom:1px solid var(--hairline)}
+  .pp-notes-blk ul{margin:0;padding-left:14px}
+  .pp-cch{position:absolute;right:24px;bottom:18px;text-align:right}
+  .pp-cch .b1{font-family:Georgia;font-size:18px;font-weight:700;color:var(--ink)}
+  .pp-cch .b2{font-size:8px;color:var(--muted);letter-spacing:3px}
+  @media (max-width:1200px){
+    .builder-shell{grid-template-columns:260px minmax(0,1fr)}
+    .library-rail{width:260px;min-width:260px;max-width:260px}
+  }
+  @media (max-width:1100px){
+    .builder-shell{grid-template-columns:1fr;grid-template-rows:minmax(130px,30vh) auto}
+    main#app.builder-main{grid-template-columns:1fr;min-height:0}
+    .library-rail{width:100%;min-width:0;max-width:none;border-right:none;border-bottom:3px solid #6B5344;max-height:30vh}
+    .form-pane{border-right:none}
+    .preview-pane{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div><h1>CCH Custom Order Builder</h1><div class="sub">Designing Your Story</div></div>
+  <nav class="tabs" id="tabs">
+    <button data-group="windows" class="active">Windows</button>
+    <button data-group="upholstery">Upholstery</button>
+    <button data-group="bedding">Bedding</button>
+    <button data-cat="pillows">Pillows</button>
+  </nav>
+  <div class="auth-note" id="authNote">Checking sign-in...</div>
+</header>
+
+<div id="builderShell" class="builder-shell" style="display:none">
+  <aside class="library-rail" id="libraryRail" aria-label="Image library">
+    <div class="library-rail-inner library-rail-boot" id="libraryRailBoot">
+      <h3>IMAGE LIBRARY</h3>
+      <p style="margin:0;font-size:11px;line-height:1.45;color:#444">Pick a Storage folder and thumbnails appear here. If this stays blank after load, check you are signed in and Storage rules allow <code style="font-size:10px">library/</code> reads.</p>
+    </div>
+  </aside>
+  <main id="app" class="builder-main" style="display:grid">
+    <section class="form-pane" id="formPane"></section>
+    <section class="preview-pane">
+      <div class="preview-shrink"><div class="preview-page" id="preview"></div></div>
+      <div style="text-align:center;color:#777;font-size:11px;letter-spacing:2px">PREVIEW · 1 OF 1</div>
+    </section>
+  </main>
+</div>
+
+<section id="blocked" style="display:none;padding:40px;max-width:680px;margin:0 auto;">
+  <div class="notice error">Builder is admin-only. Sign in with an approved CCH account in Studio and refresh.</div>
+</section>
+
+<script>
+const CCH_ENV = (function() {
+  var h = location.hostname || "";
+  if (h.indexOf("staging") >= 0 || h === "localhost" || h === "127.0.0.1") return "staging";
+  return "production";
+})();
+const firebaseConfig = CCH_ENV === "staging" ? {
+  apiKey: "AIzaSyBIwwo7uRij6Q0FZg-qmIS1LC8t2AjXrYo",
+  authDomain: "cch-studio-staging.firebaseapp.com",
+  projectId: "cch-studio-staging",
+  storageBucket: "cch-studio-staging.firebasestorage.app",
+  messagingSenderId: "210388013080",
+  appId: "1:210388013080:web:fcd520b30c0d50b149736d"
+} : {
+  apiKey: "AIzaSyAd24U5ArVGrA24IxNcYD2NYiTVycyF4og",
+  authDomain: "cch-design-boards.firebaseapp.com",
+  projectId: "cch-design-boards",
+  storageBucket: "cch-design-boards.firebasestorage.app"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+const storage = firebase.storage();
+const ADMIN_EMAILS = ["cindy@cchdesign.com", "cynthia@cchdesign.com", "cynthiacbh@gmail.com"];
+
+const LIBRARY = {
+  windows: { label: "Windows", folder: "windows" },
+  pleats: { label: "Pleats", folder: "pleats" },
+  welts_stitches: { label: "Welts & Stitch details", folder: "welts_stitches" },
+  tufting: { label: "Tufting", folder: "tufting" },
+  nailheads: { label: "Nailheads", folder: "nailheads" },
+  legs_feet: { label: "Legs & Feet", folder: "legs_feet" },
+  pillows_bedding: { label: "Pillows & Bedding", folder: "pillows_bedding" },
+  design_styles: { label: "Design Style Images", folder: "design_styles" },
+  chairs: { label: "Chairs", folder: "chairs" },
+  sofas: { label: "Sofas", folder: "sofas" },
+  beds: { label: "Beds", folder: "beds" },
+  benches: { label: "Benches", folder: "benches" }
+};
+
+/** Drapery pleat style chip → subfolder under library/pleats/ (create matching folders in Storage). */
+const DRAPERY_PLEAT_STYLE_FOLDER = {
+  "Inverted pleat": "inverted_pleat",
+  "Pinch pleat - French": "pinch_pleat_french",
+  "Pinch pleat - Euro": "pinch_pleat_euro",
+  "Ripplefold": "ripplefold",
+  "Goblet": "goblet",
+  "Box pleat": "box_pleat"
+};
+function pleatStyleToSubfolder(optionLabel) {
+  if (!optionLabel) return "";
+  if (DRAPERY_PLEAT_STYLE_FOLDER[optionLabel]) return DRAPERY_PLEAT_STYLE_FOLDER[optionLabel];
+  return String(optionLabel).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "general";
+}
+
+const state = {
+  category: "drapery",
+  data: {},
+  pickers: {},
+  uploads: {},
+  uploadFiles: {},
+  workOrdersByProject: [],
+  currentWorkOrderId: "",
+  libraryCache: {},
+  currentUser: null,
+  projects: [],
+  workrooms: [],
+  productLibrary: [],
+  projectRooms: [],
+  inspirationItems: [],
+  uiGroup: "windows",
+  /** Left rail: browse library/* folders and apply images to pickers */
+  libraryRail: { libKey: "windows", segments: [], q: "", targetPickerId: "" }
+};
+
+const CAT_CODE = { style: "W", drapery: "W", roman: "W", flatfold: "W", upholstery: "U", bedding: "B", pillows: "P" };
+const WINDOW_TYPES = [
+  { id: "style", label: "Style" },
+  { id: "flatfold", label: "Flat Fold Shade" },
+  { id: "drapery", label: "Drapery Panels" },
+  { id: "roman", label: "Roman Shade" }
+];
+const FABRIC_IDS = ["A", "B", "C", "D"];
+const LAYER_OPTIONS = [
+  "Valance",
+  "Blackout Roller",
+  "Sheers",
+  "Double Rod",
+  "Banding",
+  "Trim Options"
+];
+const INTENT_PRESETS = {
+  style: [
+    { label: "Classic Drapery Direction", text: "Establish a classic drapery-forward direction with coordinated hardware and trim." },
+    { label: "Roman Focus Direction", text: "Establish a roman-shade-forward direction emphasizing clean fold rhythm and mount alignment." },
+    { label: "Flat Fold Minimal Direction", text: "Establish a flat-fold-forward direction with minimal profile and crisp visual lines." }
+  ],
+  drapery: [
+    { label: "Tailored Frame", text: "Tailored drapery panels framing the window with clean stack-back and coordinated hardware." },
+    { label: "Layered Light Control", text: "Layered treatment with decorative panels and privacy shade for flexible light control." },
+    { label: "Formal Blackout", text: "Formal drapery package with structured pleats and blackout lining for primary suite." }
+  ],
+  roman: [
+    { label: "Everyday Soft Roman", text: "Soft roman shade with balanced folds and discreet operation for daily use." },
+    { label: "Trim Statement Roman", text: "Decorative roman treatment with trim/banding to highlight architectural opening." },
+    { label: "Clean Blackout Roman", text: "Blackout roman shade with clean inside mount and minimal visual clutter." }
+  ],
+  flatfold: [
+    { label: "Architectural Minimal", text: "Architectural flat-fold shade with crisp stack and minimal profile." },
+    { label: "Pattern Forward", text: "Pattern-forward flat fold with centered motif and precise fold spacing." },
+    { label: "Inside Mount Tailored", text: "Inside-mount flat fold for tailored, clean-lined contemporary look." }
+  ],
+  upholstery: [
+    { label: "Comfort Daily Use", text: "Custom upholstery balancing comfort, proportion, and durable detailing for daily use." },
+    { label: "Formal Contrast Trim", text: "Tailored upholstery with contrast trim and refined silhouette for formal seating." },
+    { label: "Performance High-Traffic", text: "Performance-upholstered piece with easy maintenance and high-traffic durability." },
+    { label: "Statement Dining Table", text: "Custom dining table with proportional top, refined edge/apron, and base detailing coordinated to adjacent upholstery." }
+  ],
+  bedding: [
+    { label: "Layered Soft Mix", text: "Layered bedding package with coordinated solids and pattern for depth and softness." },
+    { label: "Hotel Tailored", text: "Hotel-inspired bedding set with crisp tailoring and subtle trim detailing." },
+    { label: "Kravet Duvet Program", text: "Custom duvet/bed skirt program with size-specific tailoring, edge finishes, and trim options." }
+  ],
+  pillows: [
+    { label: "Layered Styling", text: "Custom pillow package balancing scale, texture, and trim for layered styling." },
+    { label: "Performance Mix", text: "Performance-focused pillow mix with durable inserts and easy maintenance closures." },
+    { label: "Kravet Decorative Mix", text: "Decorative pillow mix with edge finish, face finish, and tufting options per silhouette." }
+  ]
+};
+function currentGroupFromCategory(cat) {
+  if (cat === "style" || cat === "drapery" || cat === "roman" || cat === "flatfold") return "windows";
+  if (cat === "upholstery") return "upholstery";
+  if (cat === "bedding") return "bedding";
+  return "pillows";
+}
+function templateTitle(cat) {
+  const cfg = CATS[cat];
+  if (!cfg) return "WORK ORDER";
+  // Make the switched template obvious in header/preview/export.
+  return cfg.title || String(cat || "").toUpperCase();
+}
+function templatePlaceholder(cat) {
+  const code = CAT_CODE[cat] || "W";
+  return "[" + code + "##]";
+}
+
+const CATS = {
+  style: {
+    title: "STYLE",
+    intentDefault: "Select and document the preferred treatment style direction before final detailing.",
+    pickers: [
+      { id:"style", label:"Style Reference", category:"windows", filter:["style","drapery","roman","flat","shade"] },
+      { id:"hardware", label:"Hardware", category:"windows", filter:["rod","track","hardware","chain"] },
+      { id:"welt", label:"Welt / Stitch Detail", category:"welts_stitches" }
+    ],
+    fabricRoles: [{ id:"A", role:"PRIMARY FABRIC", required:true }],
+    specBullets: [
+      { id:"styleType", label:"Style Type", options:["Drapery","Roman Shade","Flat Fold Shade","Layered"] },
+      { id:"operation", label:"Operation", options:["Decorative","Operable","Motorized","Manual chain"] },
+      { id:"lining", label:"Lining", options:["None","Privacy","Blackout"] },
+      { id:"mount", label:"Mount", options:["Wall","Ceiling","Inside","Outside"] }
+    ],
+    measurements: ["OPENING W","OPENING H","TARGET STACK","NOTES"],
+    notesDefault: ["Use this template to lock style direction before final workroom specs."],
+    fabNotesDefault: ["Finalize exact fabrication notes after style approval."]
+  },
+  drapery: {
+    title: "DRAPERY PANELS",
+    intentDefault: "Tailored drapery panels framing the window. Specify pleat style, fullness, lining, and mount detail.",
+    pickers: [
+      { id:"pleat", label:"Pleat Style", category:"pleats", filter:["pleat","drapery","panel"] },
+      { id:"hardware", label:"Hardware", category:"windows", filter:["rod","track","hardware"] },
+      { id:"welt", label:"Welt / Edge", category:"welts_stitches" }
+    ],
+    fabricRoles: [{ id:"A", role:"DRAPERY PANELS", required:true }, { id:"B", role:"ROLLER / SHEER (optional)", required:false }],
+    specBullets: [
+      { id:"function", label:"Function", options:["Operable","Decorative non-op","Stationary","Dual function"] },
+      { id:"pleat", label:"Pleat style", options:["Inverted pleat","Pinch pleat - French","Pinch pleat - Euro","Ripplefold","Goblet","Box pleat"] },
+      { id:"fullness", label:"Fullness", options:["2x","2.5x","3x","Custom"] },
+      { id:"lining", label:"Lining", options:["Sheer lining","Privacy liner","Dimout","Blackout","Interlining + blackout","Self-lined","No lining"] },
+      { id:"mount", label:"Mount", options:["Ceiling track recessed","Wall rod","Inside soffit pocket","Wall-to-wall track"] }
+    ],
+    measurements: ["WINDOW W","WINDOW H","PANEL START","FINISHED L","STACK BACK"],
+    notesDefault: ["Align head heights across windows.","Panels stack off glass.","Pattern centered on panels."],
+    fabNotesDefault: ["Pattern centered and aligned.","Pleats uniform.","Workroom to confirm yardage."]
+  },
+  roman: {
+    title: "ROMAN SHADE",
+    intentDefault: "Tailored roman shade for soft, structured window treatment.",
+    pickers: [
+      { id:"fold", label:"Fold Style", category:"windows", filter:["roman","shade","fold","valance"] },
+      { id:"hardware", label:"Lift / Mount", category:"windows", filter:["chain","cord","lift"] },
+      { id:"welt", label:"Trim / Banding", category:"welts_stitches" }
+    ],
+    fabricRoles: [{ id:"A", role:"SHADE FACE", required:true }, { id:"B", role:"TRIM / BANDING (optional)", required:false }],
+    specBullets: [
+      { id:"style", label:"Style", options:["Flat fold","Hobbled","Relaxed / swag","London","Balloon"] },
+      { id:"function", label:"Function", options:["Operable","Decorative non-op","Stationary"] },
+      { id:"operation", label:"Operation", options:["Continuous loop chain - RH","Continuous loop chain - LH","Cordless","Motorized"] },
+      { id:"lining", label:"Lining", options:["Light-filtering","Privacy","Blackout","Unlined"] },
+      { id:"mount", label:"Mount", options:["Inside","Outside","Ceiling recess","Window-frame"] }
+    ],
+    measurements: ["OPENING W","OPENING H","FINISHED W","FINISHED L","PROJECTION"],
+    notesDefault: ["Shade clears trim and runs smoothly.","Folds even across width."],
+    fabNotesDefault: ["Pattern centered on shade face.","Folds evenly spaced.","Workroom to confirm yardage."]
+  },
+  flatfold: {
+    title: "FLAT FOLD SHADE",
+    intentDefault: "Architectural flat-fold shade with clean silhouette.",
+    pickers: [
+      { id:"fold", label:"Flat Fold Detail", category:"windows", filter:["flat","fold","shade"] },
+      { id:"hardware", label:"Lift / Mount", category:"windows", filter:["chain","cord","lift","mount"] }
+    ],
+    fabricRoles: [{ id:"A", role:"FACE FABRIC", required:true }],
+    specBullets: [
+      { id:"function", label:"Function", options:["Operable","Decorative non-op"] },
+      { id:"operation", label:"Operation", options:["Continuous loop chain - RH","Continuous loop chain - LH","Cordless","Motorized"] },
+      { id:"lining", label:"Lining", options:["Light-filtering","Blackout","Privacy","Unlined"] },
+      { id:"mount", label:"Mount", options:["Inside","Outside","Recessed in soffit"] },
+      { id:"stack", label:"Stack height", options:["Flush head","Drop 8in","Drop 10in","Drop 12in","Custom"] }
+    ],
+    measurements: ["OPENING W","OPENING H","FINISHED W","FINISHED L","STACK HEIGHT"],
+    notesDefault: ["Flat-fold with clean stack.","Align head height with adjacent treatments."],
+    fabNotesDefault: ["Pattern centered on shade face.","Folds structured and crisp."]
+  },
+  upholstery: {
+    title: "UPHOLSTERY",
+    intentDefault: "Custom upholstery or furniture specification for tailored comfort, proportion, durability, and finish detailing.",
+    pickers: [
+      { id:"style", label:"Style", category:"design_styles" },
+      { id:"welt", label:"Welt / Stitch Detail", category:"welts_stitches" },
+      { id:"legs", label:"Legs / Feet", category:"legs_feet" },
+      { id:"nailhead", label:"Nailhead", category:"nailheads" }
+    ],
+    fabricRoles: [{ id:"A", role:"MAIN FABRIC", required:true }, { id:"B", role:"ACCENT/TRIM", required:false }],
+    specBullets: [
+      { id:"piece", label:"Piece", options:["Chair","Sofa","Sectional","Bench","Ottoman","Headboard","Dining Table","Console Table","Coffee Table","Side Table","Desk"] },
+      { id:"bodyConstruction", label:"Body Construction", multi:true, options:["Upholstered","Slip cover","Tight back","Tufted back","Channel back","Exposed frame"] },
+      { id:"bodyDetails", label:"Body Details", multi:true, options:["Nail heads","Stitch details","Self welt","Contrast welt","Top stitch","Flange"] },
+      { id:"cushionStyle", label:"Cushion Style", multi:true, options:["Loose seat","Tight seat","Bench seat","Boxed seat","Knife-edge back","Loose back"] },
+      { id:"cushionFill", label:"Cushion Fill", multi:true, options:["Down blend","Foam core","Spring down","Feather/down","Poly wrap"] },
+      { id:"cushionDetails", label:"Cushion Details", multi:true, options:["Self welt","Contrast welt","Top stitch","Flange","Button tuft"] },
+      { id:"tableTop", label:"Table Top", multi:true, options:["Wood","Stone","Glass","Metal","Laminate","COM upholstery","Leather wrap"] },
+      { id:"tableBase", label:"Base / Leg Style", multi:true, options:["Pedestal","Trestle","Four leg","Apartment leg","Waterfall","Metal frame","Open frame","Cabinet base"] },
+      { id:"tableEdge", label:"Edge / Apron", multi:true, options:["Square edge","Beveled edge","Ogee edge","Live edge","Apron detail","No apron"] },
+      { id:"tableExtension", label:"Extension / Leaves", multi:true, options:["Fixed top","Drop leaf","Butterfly leaf","Center leaf","Self-storing leaf","No extension"] },
+      { id:"finish", label:"Finish", options:["Natural","Walnut","Espresso","Black","Custom"] }
+    ],
+    measurements: ["OVERALL W","OVERALL D","OVERALL H","TOP W","TOP D","TOP THK","APRON H","CLEARANCE H","BASE SPAN W","BASE SPAN D","LEAF W","INSIDE W","INSIDE D","SEAT W","SEAT D","SEAT H","ARM H","BACK H","SKIRT H","COM"],
+    notesDefault: ["Confirm frame dimensions on site before fabrication."],
+    fabNotesDefault: ["Confirm COM and placement before cutting."]
+  },
+  bedding: {
+    title: "BEDDING",
+    intentDefault: "Custom bedding package with coordinated fabric, trim, and construction details.",
+    pickers: [
+      { id:"style", label:"Bedding Style", category:"pillows_bedding" },
+      { id:"welt", label:"Welt / Stitch Detail", category:"welts_stitches" }
+    ],
+    fabricRoles: [{ id:"A", role:"PRIMARY FABRIC", required:true }, { id:"B", role:"ACCENT/TRIM", required:false }],
+    specBullets: [
+      { id:"productType", label:"Product Type", multi:true, options:["Duvet Cover","Bed Skirt","Decorative Pillow","Bed Pillow"] },
+      { id:"duvetStyle", label:"Duvet Style", multi:true, options:["Solid Up Bolt","Solid Railroaded","Mitered Insert","Mitered Edge"] },
+      { id:"bedSkirtStyle", label:"Bed Skirt Style", multi:true, options:["Straight","Pleated","Ruffled","Box Pleat"] },
+      { id:"duvetSize", label:"Duvet Size", multi:true, options:["Daybed 99x52","Twin 63x88","Full 78x88","Queen 88x90","Super Queen 96x98","King 102x90","Super King 114x98","Cal King 104x100"] },
+      { id:"bedSkirtSize", label:"Bed Skirt Size", multi:true, options:["Daybed 75x39","Twin 39x75","Full 54x79","Queen 60x80","King 78x80","Cal King 72x84"] },
+      { id:"fill", label:"Fill / Insert", multi:true, options:["Down insert","Down alternative","Poly fill","Insert sold separately"] },
+      { id:"edgeFinish", label:"Edge Finish", multi:true, options:["Add Trimming to Edge","Small Welt (.25)","Medium Welt (.5)","1.5 Self Flange","3 Self Flange","3.5 Banding"] },
+      { id:"faceFinish", label:"Face Finish", multi:true, options:["Add Trimming to Face","Add Cuff","Add Ribbon/Gimp","Frame Design","Geometric Design"] },
+      { id:"closure", label:"Closure", multi:true, options:["Fabric covered buttons","Top closure","Face closure","Zipper","Envelope","Tie corners"] },
+      { id:"lining", label:"Lining", multi:true, options:["No lining","Cotton lining","Lightweight lining required"] }
+    ],
+    measurements: ["BED WIDTH","BED LENGTH","MATTRESS HEIGHT","DUVET WIDTH","DUVET LENGTH","SKIRT DROP (5-30)","BOX SPRING W","BOX SPRING L","SHAM SIZE","EURO SIZE","FINISHED W","FINISHED H","REPEAT V","REPEAT H"],
+    notesDefault: ["Coordinate bedding layers with room palette and furniture finishes.","Confirm up-bolt vs railroad direction before finalizing cuts."],
+    fabNotesDefault: ["Fabric minimum width 39 inches.","Large repeats may require extra yardage.","Use lining on silk/lightweight fabrics when needed."]
+  },
+  pillows: {
+    title: "PILLOWS",
+    intentDefault: "",
+    pickers: [
+      { id:"style", label:"Pillow Style", category:"pillows_bedding", filter:["pillow"] },
+      { id:"welt", label:"Welt / Trim", category:"welts_stitches" }
+    ],
+    fabricRoles: [{ id:"A", role:"FACE / FRONT", required:true }, { id:"B", role:"BACK (or Trim)", required:false }],
+    specBullets: [
+      { id:"style", label:"Pillow Style", multi:true, options:["Square","Rectangular","Boxed","Bolster"] },
+      { id:"size", label:"Size", multi:true, options:["16x16","18x18","20x20","22x22","27x27 Euro","13x19","15x26","20x27","21x37","18x18x3 Boxed","11x17x3 Boxed","26x26x5 Boxed","6d x 22 Bolster","9d x 24 Bolster","Custom"] },
+      { id:"qty", label:"QTY", options:["1","2","3","4","5","6","Custom"] },
+      { id:"insert", label:"Insert / Fill", multi:true, options:["Down insert","Poly fill","Insert sold separately"] },
+      { id:"edgeFinish", label:"Edge Finish", multi:true, options:["Add Trimming to Edge","Small Self Welt (.25)","Medium Self Welt (.5)","1.5 Self Flange","3 Self Flange","Tassels to Corners"] },
+      { id:"faceFinish", label:"Face Finish", multi:true, options:["Frame Design","Geometric Design","No face trim"] },
+      { id:"tufting", label:"Tufting", multi:true, options:["1 Button","2 Buttons","4 Buttons","No tufting"] },
+      { id:"closure", label:"Closure", multi:true, options:["Zipper closure","Envelope","Slip stitch","Open"] },
+      { id:"lining", label:"Lining", multi:true, options:["Fully lined","No lining"] }
+    ],
+    measurements: ["FINISHED W","FINISHED H","BOX DEPTH","BOLSTER DIAMETER","WELT SIZE","FLANGE SIZE","REPEAT V","REPEAT H","FABRIC WIDTH MIN (39)","INSERT TYPE"],
+    notesDefault: ["Inserts to be high quality feather/down blend.","Filled full and fluffed on install.","Style mix to include square, lumbar, and accent forms as needed."],
+    fabNotesDefault: ["Pattern centered on face.","Fully lined with zipper closure unless noted otherwise.","Trim/tufting placement to match approved detail sketch."]
+  }
+};
+
+/** Bedding: show only specs/measurements relevant to selected product type(s). */
+const BEDDING_TYPE_SPECS = {
+  "Duvet Cover": ["duvetStyle", "duvetSize", "fill", "edgeFinish", "faceFinish", "closure", "lining"],
+  "Bed Skirt": ["bedSkirtStyle", "bedSkirtSize", "edgeFinish", "lining"],
+  "Decorative Pillow": ["fill", "edgeFinish", "faceFinish", "closure", "lining"],
+  "Bed Pillow": ["fill", "edgeFinish", "closure", "lining"]
+};
+const BEDDING_TYPE_MEASUREMENTS = {
+  "Duvet Cover": ["BED WIDTH", "BED LENGTH", "MATTRESS HEIGHT", "DUVET WIDTH", "DUVET LENGTH", "REPEAT V", "REPEAT H"],
+  "Bed Skirt": ["BED WIDTH", "BED LENGTH", "MATTRESS HEIGHT", "SKIRT DROP (5-30)", "BOX SPRING W", "BOX SPRING L", "REPEAT V", "REPEAT H"],
+  "Decorative Pillow": ["FINISHED W", "FINISHED H", "SHAM SIZE", "EURO SIZE", "REPEAT V", "REPEAT H"],
+  "Bed Pillow": ["BED WIDTH", "BED LENGTH", "SHAM SIZE", "EURO SIZE", "REPEAT V", "REPEAT H"]
+};
+function selectedBeddingProductTypes(d) {
+  const raw = d.specs && d.specs.productType;
+  const arr = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+  return arr.map(x => String(x || "").trim()).filter(Boolean);
+}
+function beddingVisibleSpecIds(d) {
+  const types = selectedBeddingProductTypes(d);
+  const ids = new Set(["productType"]);
+  types.forEach(t => {
+    (BEDDING_TYPE_SPECS[t] || []).forEach(id => ids.add(id));
+  });
+  return ids;
+}
+function beddingVisibleMeasurementKeys(d) {
+  const types = selectedBeddingProductTypes(d);
+  const keys = new Set();
+  types.forEach(t => {
+    (BEDDING_TYPE_MEASUREMENTS[t] || []).forEach(k => keys.add(k));
+  });
+  return keys;
+}
+function visibleSpecBulletsForCat(cat, cfg, d) {
+  if (cat !== "bedding") return cfg.specBullets;
+  const allow = beddingVisibleSpecIds(d);
+  return cfg.specBullets.filter(s => allow.has(s.id));
+}
+function visibleMeasurementsForCat(cat, cfg, d) {
+  if (cat !== "bedding") return cfg.measurements;
+  const types = selectedBeddingProductTypes(d);
+  if (!types.length) return [];
+  const keys = beddingVisibleMeasurementKeys(d);
+  return cfg.measurements.filter(m => keys.has(m));
+}
+
+/** Coerce Firestore / legacy spec shapes so chip UI and .includes() never break. */
+function normalizeSpecsForCategory(cat, d) {
+  const cfg = CATS[cat];
+  if (!d.specAttachments) d.specAttachments = {};
+  if (!cfg || !d.specs) return;
+  cfg.specBullets.forEach(s => {
+    const v = d.specs[s.id];
+    if (s.multi) {
+      if (v == null || v === "") d.specs[s.id] = [];
+      else if (Array.isArray(v)) d.specs[s.id] = v.map(x => String(x));
+      else d.specs[s.id] = [String(v)];
+    } else {
+      if (Array.isArray(v)) d.specs[s.id] = v.length ? String(v[0]) : "";
+      else if (v != null && v !== "") d.specs[s.id] = String(v);
+      else d.specs[s.id] = "";
+    }
+  });
+}
+function composePillowIntentSummary(d) {
+  const sp = d.specs || {};
+  const parts = [];
+  const addMulti = (id, label) => {
+    const arr = Array.isArray(sp[id]) ? sp[id] : [];
+    if (arr.length) parts.push(label + ": " + arr.join(", "));
+  };
+  addMulti("style", "Style");
+  addMulti("size", "Size");
+  if (String(sp.qty || "").trim()) parts.push("QTY: " + String(sp.qty).trim());
+  addMulti("insert", "Insert / fill");
+  addMulti("edgeFinish", "Edge finish");
+  addMulti("faceFinish", "Face finish");
+  addMulti("tufting", "Tufting");
+  addMulti("closure", "Closure");
+  addMulti("lining", "Lining");
+  return parts.join(" • ");
+}
+function syncPillowIntentFromSpecs(d) {
+  d.designIntent = composePillowIntentSummary(d);
+}
+
+function defaultData(catId) {
+  const c = CATS[catId];
+  return {
+    projectId: "",
+    project: "",
+    address: "",
+    workroomId: "",
+    workroomName: "",
+    workOrder: "",
+    location: "",
+    date: new Date().toLocaleDateString("en-US"),
+    revision: 1,
+    designIntent: c.intentDefault,
+    treatmentOptions: [],
+    trimOptions: [],
+    detailSelections: {
+      nailheads: null,
+      feet: null,
+      finish: ""
+    },
+    extraFabricRoles: [],
+    specs: Object.fromEntries(c.specBullets.map(s => [s.id, s.multi ? [] : ""])),
+    fabrics: Object.fromEntries(c.fabricRoles.map(f => [f.id, { vendor:"", sku:"", color:"", width:"", content:"", repeat:"" }])),
+    measurements: Object.fromEntries(c.measurements.map(m => [m, ""])),
+    notes: c.notesDefault.slice(),
+    fabNotes: c.fabNotesDefault.slice(),
+    renderingUrl: "",
+    detailSketchUrl: "",
+    specAttachments: {},
+    swatchUrls: {}
+  };
+}
+function upsertChipSelection(arr, value, enabled) {
+  const cur = Array.isArray(arr) ? arr.slice() : [];
+  if (enabled) {
+    if (!cur.includes(value)) cur.push(value);
+  } else {
+    return cur.filter(x => x !== value);
+  }
+  return cur;
+}
+function getFabricRoleDefs(cat, d) {
+  const cfg = CATS[cat];
+  const base = (cfg.fabricRoles || []).map(r => ({ id: r.id, role: r.role, required: !!r.required, extra: false }));
+  const extras = (d.extraFabricRoles || []).map(r => ({ id: r.id, role: r.role || ("FABRIC " + r.id), required: false, extra: true }));
+  return [...base, ...extras].slice(0, 4);
+}
+function pickProjectAddress(x) {
+  if (!x || typeof x !== "object") return "";
+  const parts = [];
+  const line1 = x.projectAddress || x.address || x.siteAddress || x.jobAddress || x.locationAddress || "";
+  const city = x.city || x.projectCity || "";
+  const state = x.state || x.projectState || "";
+  const zip = x.zip || x.zipCode || x.postalCode || "";
+  if (line1) parts.push(String(line1).trim());
+  const csz = [city, state, zip].filter(Boolean).join(", ").replace(", ,", ",");
+  if (csz) parts.push(csz);
+  return parts.join(" • ");
+}
+function projectCodeFromName(name) {
+  const letters = String(name || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return (letters.slice(0, 3) || "PRJ").padEnd(3, "X");
+}
+function nextWorkOrderNumber(projectName, category, existingRows) {
+  const code = projectCodeFromName(projectName);
+  const catCode = CAT_CODE[category] || "X";
+  const prefix = code + "-" + catCode + "-";
+  let maxN = 0;
+  (existingRows || []).forEach(row => {
+    const wo = String((row && row.workOrderNumber) || "").trim().toUpperCase();
+    if (!wo.startsWith(prefix)) return;
+    const n = parseInt(wo.slice(prefix.length), 10);
+    if (!isNaN(n)) maxN = Math.max(maxN, n);
+  });
+  return prefix + String(maxN + 1).padStart(2, "0");
+}
+function el(tag, attrs = {}, ...children) {
+  const e = document.createElement(tag);
+  Object.entries(attrs).forEach(([k,v]) => {
+    if (k === "class") e.className = v;
+    else if (k === "html") e.innerHTML = v;
+    else if (k.startsWith("on") && typeof v === "function") e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v);
+  });
+  children.flat().forEach(c => { if (c != null) e.append(c.nodeType ? c : document.createTextNode(c)); });
+  return e;
+}
+function escapeHtml(s) { return String(s || "").replace(/[&<>"]/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[m])); }
+function field(label, type, value, onChange, placeholder = "") {
+  const wrap = el("div", { class:"field" });
+  if (label) wrap.append(el("label", {}, label));
+  const input = type === "textarea" ? el("textarea", { placeholder }) : el("input", { type, placeholder, value: value || "" });
+  if (type === "textarea") input.value = value || "";
+  input.addEventListener("input", e => onChange(e.target.value));
+  wrap.append(input);
+  return wrap;
+}
+function fieldRow(rows, mod = "") {
+  const wrap = el("div", { class:"field-row " + mod });
+  rows.forEach(r => wrap.append(field(r[0], r[1], r[2], r[3], r[4] || "")));
+  return wrap;
+}
+function getCatData(cat) {
+  if (!state.data[cat]) state.data[cat] = defaultData(cat);
+  if (!state.pickers[cat]) state.pickers[cat] = {};
+  if (!state.uploads[cat]) state.uploads[cat] = {};
+  if (!state.uploadFiles[cat]) state.uploadFiles[cat] = {};
+  return state.data[cat];
+}
+function applySelectedProjectToCategory(cat, projectRecord) {
+  const d = getCatData(cat);
+  const projectId = projectRecord ? projectRecord.id : "";
+  d.projectId = projectId;
+  d.project = projectRecord ? (projectRecord.name || projectRecord.id || "") : "";
+  d.address = projectRecord ? (projectRecord.address || "") : "";
+  if (!projectId) {
+    d.workOrder = "";
+    return;
+  }
+  d.workOrder = nextWorkOrderNumber(d.project, cat, state.workOrdersByProject || []);
+}
+
+const libraryFolderListCache = {};
+function clearLibraryFolderCachesFor(libKey) {
+  Object.keys(libraryFolderListCache).forEach(k => {
+    if (k.startsWith(libKey + "::")) delete libraryFolderListCache[k];
+  });
+  delete state.libraryCache[libKey];
+}
+async function listLibraryFolder(libKey, subPath) {
+  const meta = LIBRARY[libKey];
+  if (!meta) return { files: [], folders: [] };
+  const clean = String(subPath || "").replace(/^\/+|\/+$/g, "");
+  const cacheKey = libKey + "::" + clean;
+  if (libraryFolderListCache[cacheKey]) return libraryFolderListCache[cacheKey];
+  const basePath = "library/" + meta.folder + (clean ? "/" + clean : "");
+  const ref = storage.ref(basePath);
+  try {
+    const list = await ref.listAll();
+    const files = await Promise.all(list.items.map(async item => ({
+      id: item.fullPath,
+      path: item.fullPath,
+      label: item.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " "),
+      filename: item.name,
+      downloadURL: await item.getDownloadURL()
+    })));
+    const folders = (list.prefixes || []).map(pref => {
+      const fp = pref.fullPath || "";
+      const segs = fp.split("/").filter(Boolean);
+      const name = segs[segs.length - 1] || fp;
+      return { name, fullPath: fp.replace(/\/$/, "") };
+    });
+    const result = { files, folders };
+    libraryFolderListCache[cacheKey] = result;
+    return result;
+  } catch (e) {
+    console.warn("Library folder list failed", libKey, clean, e);
+    return { files: [], folders: [] };
+  }
+}
+async function ensureLibrary(category) {
+  if (state.libraryCache[category]) return state.libraryCache[category];
+  const { files } = await listLibraryFolder(category, "");
+  state.libraryCache[category] = files;
+  return files;
+}
+async function uploadImageToLibraryFolder(libKey, subPath, file) {
+  const meta = LIBRARY[libKey];
+  if (!meta || !file) return null;
+  const clean = String(subPath || "").replace(/^\/+|\/+$/g, "");
+  const basePath = "library/" + meta.folder + (clean ? "/" + clean : "");
+  const safe = Date.now() + "_" + String(file.name || "image.jpg").replace(/[^\w.\-]/g, "_");
+  const ref = storage.ref(basePath + "/" + safe);
+  await ref.put(file, { contentType: file.type || "image/jpeg" });
+  clearLibraryFolderCachesFor(libKey);
+  return {
+    path: ref.fullPath,
+    label: safe.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " "),
+    downloadURL: await ref.getDownloadURL()
+  };
+}
+function queuePickerImageFromComputer(cat, pickerId) {
+  const inp = el("input", { type:"file", accept:"image/*" });
+  inp.addEventListener("change", e => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    getCatData(cat);
+    const key = "picker_" + pickerId;
+    const r = new FileReader();
+    r.onload = ev => {
+      state.uploads[cat][key] = ev.target.result;
+      state.uploadFiles[cat][key] = f;
+      renderForm();
+    };
+    r.readAsDataURL(f);
+  });
+  inp.click();
+}
+function openLibraryFolderModal(cat, pickerConfig, startSubPath) {
+  const libKey = pickerConfig.category;
+  if (!LIBRARY[libKey]) return;
+  const meta = LIBRARY[libKey];
+  let segments = String(startSubPath || "").split("/").map(s => s.trim()).filter(Boolean);
+  const backdrop = el("div", { class:"picker-modal-backdrop" });
+  const modal = el("div", { class:"picker-modal", style:"max-width:min(960px,94vw)" });
+  const head = el("div", { class:"picker-modal-head" });
+  const titleEl = el("div", { style:"font-weight:700" });
+  const actions = el("div", { style:"display:flex;gap:8px;flex-wrap:wrap;align-items:center" });
+  actions.append(el("button", {
+    type:"button",
+    class:"btn secondary",
+    onclick: () => {
+      queuePickerImageFromComputer(cat, pickerConfig.id);
+    }
+  }, "Use image from this computer"));
+  actions.append(el("button", { type:"button", class:"btn secondary", onclick: () => backdrop.remove() }, "Close"));
+  head.append(titleEl, actions);
+  const crumbRow = el("div", { style:"font-size:11px;color:var(--muted);margin-bottom:8px" });
+  const grid = el("div", { class:"picker-modal-grid", style:"max-height:58vh;overflow:auto" });
+  const uploadSlot = el("div", { style:"margin-top:12px;padding-top:12px;border-top:1px solid var(--hairline)" });
+  modal.append(head, crumbRow, grid, uploadSlot);
+  backdrop.append(modal);
+  async function refresh() {
+    const sub = segments.join("/");
+    titleEl.textContent = meta.label + " — pick a reference image";
+    crumbRow.textContent = ["library/" + meta.folder].concat(segments).join(" / ");
+    const { files, folders } = await listLibraryFolder(libKey, sub);
+    grid.innerHTML = "";
+    uploadSlot.innerHTML = "";
+    if (segments.length) {
+      const up = el("div", { class:"pick-card", style:"min-height:72px;justify-content:center;cursor:pointer;background:var(--field)" },
+        el("div", { class:"label", style:"padding:12px" }, "↑ Up"));
+      up.addEventListener("click", () => { segments.pop(); refresh(); });
+      grid.append(up);
+    }
+    folders.forEach(fd => {
+      const card = el("div", { class:"pick-card", style:"cursor:pointer;background:var(--field)" },
+        el("div", { class:"label", style:"padding:24px 12px;text-align:center;font-weight:700" }, fd.name.replace(/_/g, " ")));
+      card.addEventListener("click", () => {
+        segments.push(fd.name);
+        refresh();
+      });
+      grid.append(card);
+    });
+    files.forEach(img => {
+      const card = el("div", { class:"pick-card", style:"cursor:pointer" },
+        el("img", { src: img.downloadURL, alt: img.label, loading:"lazy" }),
+        el("div", { class:"label" }, img.label)
+      );
+      card.addEventListener("click", () => {
+        setPickerSelection(cat, pickerConfig.id, { category: libKey, storagePath: img.path, path: img.path, label: img.label, downloadURL: img.downloadURL });
+        backdrop.remove();
+        renderForm();
+      });
+      grid.append(card);
+    });
+    if (!folders.length && !files.length) {
+      grid.append(el("div", { class:"notice", style:"grid-column:1/-1" },
+        segments.length
+          ? ("This folder is empty. Upload an image below or go Up.")
+          : ("No folders or images at library/" + meta.folder + "/ yet. Create subfolders (e.g. inverted_pleat) in Storage, or upload here.")));
+    }
+    const upLib = el("input", { type:"file", accept:"image/*", style:"display:none" });
+    upLib.addEventListener("change", async ev => {
+      const f = ev.target.files && ev.target.files[0];
+      ev.target.value = "";
+      if (!f) return;
+      try {
+        const row = await uploadImageToLibraryFolder(libKey, sub, f);
+        if (row) {
+          setPickerSelection(cat, pickerConfig.id, { category: libKey, storagePath: row.path, path: row.path, label: row.label, downloadURL: row.downloadURL });
+          backdrop.remove();
+          renderForm();
+        }
+      } catch (err) {
+        alert("Upload failed: " + (err && err.message ? err.message : err));
+      }
+    });
+    uploadSlot.append(
+      el("div", { style:"font-size:10px;letter-spacing:1px;color:var(--muted);margin-bottom:6px" }, "Add to library folder (current path above)"),
+      el("button", {
+        type:"button",
+        class:"btn secondary",
+        onclick: () => upLib.click()
+      }, "Upload image to this folder"),
+      upLib
+    );
+  }
+  refresh();
+  backdrop.addEventListener("click", e => { if (e.target === backdrop) backdrop.remove(); });
+  document.body.append(backdrop);
+}
+function maybeOpenPleatLibraryAfterSpecChange(cat, specId, d) {
+  if (cat !== "drapery" || specId !== "pleat") return;
+  const val = d.specs && d.specs.pleat;
+  if (!String(val || "").trim()) return;
+  const cfg = CATS[cat];
+  const pickerConfig = cfg.pickers.find(p => p.id === "pleat");
+  if (!pickerConfig) return;
+  const sub = pleatStyleToSubfolder(val);
+  setTimeout(() => openLibraryFolderModal(cat, pickerConfig, sub), 80);
+}
+
+function inferSpecLibraryKey(cat, specId) {
+  const id = String(specId || "").toLowerCase();
+  if (id === "pleat") return "pleats";
+  if (id === "producttype") return "pillows_bedding";
+  if (/welt|edgefinish|facefinish/.test(id)) return "welts_stitches";
+  if (/style|fold|hardware/.test(id) && (cat === "roman" || cat === "flatfold" || cat === "style")) return "windows";
+  return "windows";
+}
+function startPathForSpecAttachmentLibrary(cat, specId, d) {
+  if (cat === "drapery" && specId === "pleat" && d.specs && d.specs.pleat) return pleatStyleToSubfolder(d.specs.pleat);
+  return "";
+}
+function setSpecAttachment(cat, specId, obj) {
+  const d = getCatData(cat);
+  if (!d.specAttachments) d.specAttachments = {};
+  if (!obj || !obj.downloadURL) {
+    delete d.specAttachments[specId];
+  } else {
+    d.specAttachments[specId] = {
+      path: obj.path || "",
+      label: obj.label || "Reference",
+      downloadURL: obj.downloadURL,
+      storagePath: obj.storagePath || obj.path || ""
+    };
+  }
+}
+function queueSpecAttachmentFromComputer(cat, specId) {
+  const inp = el("input", { type:"file", accept:"image/*" });
+  inp.addEventListener("change", e => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    getCatData(cat);
+    const key = "specAttach_" + specId;
+    const r = new FileReader();
+    r.onload = () => {
+      state.uploads[cat][key] = r.result;
+      state.uploadFiles[cat][key] = f;
+      renderForm();
+    };
+    r.readAsDataURL(f);
+  });
+  inp.click();
+}
+/** Pick a reference image for one spec row from the same folder tree as the style library. */
+function openSpecAttachmentLibraryModal(cat, specId) {
+  const libKey = inferSpecLibraryKey(cat, specId);
+  if (!LIBRARY[libKey]) return;
+  const meta = LIBRARY[libKey];
+  const d = getCatData(cat);
+  const startSeg = startPathForSpecAttachmentLibrary(cat, specId, d);
+  let segments = String(startSeg || "").split("/").map(s => s.trim()).filter(Boolean);
+  const backdrop = el("div", { class:"picker-modal-backdrop" });
+  const modal = el("div", { class:"picker-modal", style:"max-width:min(960px,94vw)" });
+  const head = el("div", { class:"picker-modal-head" });
+  const titleEl = el("div", { style:"font-weight:700" }, "Reference image for this line item");
+  const actions = el("div", { style:"display:flex;gap:8px;flex-wrap:wrap" });
+  actions.append(el("button", { type:"button", class:"btn secondary", onclick: () => { queueSpecAttachmentFromComputer(cat, specId); backdrop.remove(); } }, "Upload from computer"));
+  actions.append(el("button", { type:"button", class:"btn secondary", onclick: () => backdrop.remove() }, "Close"));
+  head.append(titleEl, actions);
+  const crumbRow = el("div", { style:"font-size:11px;color:var(--muted);margin-bottom:8px" });
+  const grid = el("div", { class:"picker-modal-grid", style:"max-height:56vh;overflow:auto" });
+  const uploadSlot = el("div", { style:"margin-top:12px;padding-top:12px;border-top:1px solid var(--hairline)" });
+  modal.append(head, crumbRow, grid, uploadSlot);
+  backdrop.append(modal);
+  async function refresh() {
+    const sub = segments.join("/");
+    crumbRow.textContent = ["library/" + meta.folder].concat(segments).join(" / ");
+    const { files, folders } = await listLibraryFolder(libKey, sub);
+    grid.innerHTML = "";
+    uploadSlot.innerHTML = "";
+    if (segments.length) {
+      const up = el("div", { class:"pick-card", style:"min-height:72px;justify-content:center;cursor:pointer;background:var(--field)" },
+        el("div", { class:"label", style:"padding:12px" }, "↑ Up"));
+      up.addEventListener("click", () => { segments.pop(); refresh(); });
+      grid.append(up);
+    }
+    folders.forEach(fd => {
+      const card = el("div", { class:"pick-card", style:"cursor:pointer;background:var(--field)" },
+        el("div", { class:"label", style:"padding:24px 12px;text-align:center;font-weight:700" }, fd.name.replace(/_/g, " ")));
+      card.addEventListener("click", () => { segments.push(fd.name); refresh(); });
+      grid.append(card);
+    });
+    files.forEach(img => {
+      const card = el("div", { class:"pick-card", style:"cursor:pointer" },
+        el("img", { src: img.downloadURL, alt: img.label, loading:"lazy" }),
+        el("div", { class:"label" }, img.label)
+      );
+      card.addEventListener("click", () => {
+        setSpecAttachment(cat, specId, { path: img.path, label: img.label, downloadURL: img.downloadURL });
+        backdrop.remove();
+        renderForm();
+      });
+      grid.append(card);
+    });
+    if (!folders.length && !files.length) {
+      grid.append(el("div", { class:"notice", style:"grid-column:1/-1" },
+        segments.length ? "Empty folder — upload below or go Up." : ("Nothing here yet under library/" + meta.folder + "/")));
+    }
+    const upLib = el("input", { type:"file", accept:"image/*", style:"display:none" });
+    upLib.addEventListener("change", async ev => {
+      const f = ev.target.files && ev.target.files[0];
+      ev.target.value = "";
+      if (!f) return;
+      try {
+        const row = await uploadImageToLibraryFolder(libKey, sub, f);
+        if (row) {
+          setSpecAttachment(cat, specId, { path: row.path, label: row.label, downloadURL: row.downloadURL });
+          backdrop.remove();
+          renderForm();
+        }
+      } catch (err) {
+        alert("Upload failed: " + (err && err.message ? err.message : err));
+      }
+    });
+    uploadSlot.append(
+      el("div", { style:"font-size:10px;color:var(--muted);margin-bottom:6px" }, "Save into this library folder"),
+      el("button", { type:"button", class:"btn secondary", onclick: () => upLib.click() }, "Upload image here"),
+      upLib
+    );
+  }
+  refresh();
+  backdrop.addEventListener("click", e => { if (e.target === backdrop) backdrop.remove(); });
+  document.body.append(backdrop);
+}
+
+async function listWorkOrders(projectId) {
+  if (!projectId) return [];
+  const snap = await db.collection("boards").doc(projectId).collection("workOrders").orderBy("updatedAt", "desc").limit(50).get();
+  return snap.docs.map(d => ({ id:d.id, ...d.data() }));
+}
+async function loadProjectRooms(projectId) {
+  if (!projectId) { state.projectRooms = []; return; }
+  try {
+    const byName = new Map();
+    function addRoom(id, rawName) {
+      const name = String(rawName || "").trim();
+      if (!name) return;
+      const key = name.toLowerCase();
+      if (!byName.has(key)) byName.set(key, { id: id || key, name });
+    }
+    const roomBoardsSnap = await db.collection("boards").doc(projectId).collection("roomBoards").limit(300).get();
+    roomBoardsSnap.docs.forEach(d => {
+      const x = d.data() || {};
+      addRoom(d.id, x.name || x.room || x.roomName || x.title || x.label || d.id);
+    });
+    if (!byName.size) {
+      try {
+        const roomsSnap = await db.collection("boards").doc(projectId).collection("rooms").limit(300).get();
+        roomsSnap.docs.forEach(d => {
+          const x = d.data() || {};
+          addRoom(d.id, x.name || x.room || x.roomName || x.title || x.label || d.id);
+        });
+      } catch (e2) {}
+    }
+    if (!byName.size) {
+      try {
+        const boardDoc = await db.collection("boards").doc(projectId).get();
+        const bx = (boardDoc && boardDoc.data && boardDoc.data()) || {};
+        const fromArray = Array.isArray(bx.rooms) ? bx.rooms : [];
+        fromArray.forEach((r, idx) => {
+          if (typeof r === "string") addRoom(String(idx), r);
+          else if (r && typeof r === "object") addRoom(r.id || String(idx), r.name || r.room || r.title || r.label);
+        });
+      } catch (e3) {}
+    }
+    state.projectRooms = Array.from(byName.values()).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+  } catch (e) {
+    state.projectRooms = [];
+  }
+}
+function openRoomPickerModal(cat) {
+  const d = getCatData(cat);
+  const backdrop = el("div", { class:"picker-modal-backdrop" });
+  const modal = el("div", { class:"picker-modal" });
+  const head = el("div", { class:"picker-modal-head" },
+    el("div", { style:"font-weight:700" }, "Choose Room from Project"),
+    el("div", { style:"display:flex;gap:6px" },
+      el("button", {
+        type:"button",
+        class:"btn secondary",
+        onclick: () => {
+          const name = (window.prompt("Add room name:") || "").trim();
+          if (!name) return;
+          d.location = name;
+          backdrop.remove();
+          renderForm();
+        }
+      }, "Add New Room"),
+      el("button", { type:"button", class:"btn secondary", onclick: () => backdrop.remove() }, "Close")
+    )
+  );
+  const grid = el("div", { class:"picker-modal-grid" });
+  if (!state.projectRooms.length) {
+    grid.append(el("div", { class:"notice" }, "No rooms found for this project yet."));
+  } else {
+    state.projectRooms.forEach(r => {
+      const card = el("div", { class:"pick-card" }, el("div", { class:"label", style:"min-height:60px;padding:12px" }, r.name));
+      card.addEventListener("click", () => {
+        d.location = r.name;
+        backdrop.remove();
+        renderForm();
+      });
+      grid.append(card);
+    });
+  }
+  modal.append(head, grid);
+  backdrop.append(modal);
+  backdrop.addEventListener("click", e => { if (e.target === backdrop) backdrop.remove(); });
+  document.body.append(backdrop);
+}
+async function loadProjects() {
+  const snap = await db.collection("boards").limit(300).get();
+  state.projects = snap.docs.map(d => {
+    const x = d.data() || {};
+    return {
+      id: d.id,
+      name: x.name || x.projectName || x.title || d.id,
+      client: x.clientName || x.client || ""
+      ,
+      address: pickProjectAddress(x)
+    };
+  }).sort((a, b) => a.name.localeCompare(b.name));
+}
+function autoPickForSpec(cat, specId, specValue) {
+  const cfg = CATS[cat];
+  if (!cfg || !cfg.pickers) return;
+  const v = String(specValue || "").toLowerCase();
+  function pickBy(pickerId, keywordRegex) {
+    const picker = cfg.pickers.find(p => p.id === pickerId);
+    if (!picker) return;
+    const rows = state.libraryCache[picker.category] || [];
+    if (!rows.length) return;
+    const hit = rows.find(r => keywordRegex.test(String(r.label || "") + " " + String(r.filename || "")));
+    if (hit) {
+      if (!state.pickers[cat]) state.pickers[cat] = {};
+      state.pickers[cat][pickerId] = { category: picker.category, storagePath: hit.path, path: hit.path, label: hit.label, downloadURL: hit.downloadURL };
+    }
+  }
+  if (cat === "flatfold" && specId === "operation") {
+    if (/continuous|chain/.test(v)) {
+      pickBy("hardware", /(bronze|continuous|chain)/i);
+    }
+  }
+  if (cat === "flatfold" && (specId === "function" || specId === "operation" || specId === "mount")) {
+    pickBy("fold", /(flat\s*fold|flatfold)/i);
+  }
+}
+async function loadWorkrooms() {
+  try {
+    const byId = new Map();
+    const snap = await db.collection("workrooms").limit(300).get();
+    snap.docs.forEach(d => {
+      const x = d.data() || {};
+      const name = x.name || x.title || x.workroomName || d.id;
+      byId.set("wrk:" + d.id, { id: d.id, name, address: x.address || x.addr || "", source: "workrooms" });
+    });
+    // Also include Studio Team entries tagged as workroom so Builder sees the same group.
+    try {
+      const teamSnap = await db.collection("team").where("role", "==", "workroom").limit(300).get();
+      teamSnap.docs.forEach(d => {
+        const x = d.data() || {};
+        const name = x.name || x.company || x.title || d.id;
+        byId.set("team:" + d.id, { id: d.id, name, address: x.address || x.addr || "", source: "team" });
+      });
+    } catch (e2) {}
+    state.workrooms = Array.from(byId.values()).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+  } catch (e) {
+    state.workrooms = [];
+  }
+}
+async function addNewWorkroom() {
+  const name = (window.prompt("New workroom name:") || "").trim();
+  if (!name) return;
+  const address = (window.prompt("Workroom address (optional):") || "").trim();
+  const payload = {
+    name,
+    address,
+    createdAt: new Date().toISOString(),
+    createdBy: (state.currentUser && state.currentUser.email) || ""
+  };
+  const ref = await db.collection("workrooms").add(payload);
+  await loadWorkrooms();
+  const d = getCatData(state.category);
+  const created = state.workrooms.find(w => w.id === ref.id) || { id: ref.id, name, address };
+  d.workroomId = created.id;
+  d.workroomName = created.name;
+  renderForm();
+}
+async function loadProductLibrary() {
+  try {
+    const snap = await db.collection("products").limit(1200).get();
+    state.productLibrary = snap.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+  } catch (e) {
+    state.productLibrary = [];
+  }
+}
+async function loadInspirationItems(projectId) {
+  if (!projectId) { state.inspirationItems = []; return; }
+  try {
+    const snap = await db.collection("boards").doc(projectId).collection("clips").limit(400).get();
+    state.inspirationItems = snap.docs.map(d => {
+      const x = d.data() || {};
+      return {
+        id: d.id,
+        title: x.title || x.name || "Clip",
+        vendor: x.vendor || "",
+        imageUrl: x.imageUrl || x.heroImageUrl || x.thumbUrl || "",
+        sku: x.sku || "",
+        width: x.width || x.dimensions || "",
+        repeat: x.repeat || x.patternRepeat || "",
+        materials: x.materials || x.content || ""
+      };
+    }).filter(x => x.imageUrl);
+  } catch (e) {
+    state.inspirationItems = [];
+  }
+}
+
+async function saveWorkOrder(isNewRevision) {
+  const cat = state.category;
+  const data = getCatData(cat);
+  const projectId = (data.projectId || "").trim();
+  if (!projectId) { alert("Project ID is required."); return; }
+  if (!String(data.location || "").trim()) { alert("Room is required."); return; }
+  await uploadPendingAssets(cat, projectId);
+  const col = db.collection("boards").doc(projectId).collection("workOrders");
+  const now = firebase.firestore.FieldValue.serverTimestamp();
+  const existingId = state.currentWorkOrderId && !isNewRevision ? state.currentWorkOrderId : "";
+  const docRef = existingId ? col.doc(existingId) : col.doc();
+  if (!data.workOrder) {
+    data.workOrder = nextWorkOrderNumber(data.project, cat, state.workOrdersByProject);
+  }
+  const conflicting = (state.workOrdersByProject || []).find(x =>
+    x.id !== existingId && String(x.workOrderNumber || "").toUpperCase() === String(data.workOrder || "").toUpperCase()
+  );
+  if (conflicting) {
+    data.workOrder = nextWorkOrderNumber(data.project, cat, state.workOrdersByProject);
+  }
+  const payload = {
+    category: cat,
+    projectId,
+    projectName: data.project || "",
+    address: data.address || "",
+    workroomId: data.workroomId || "",
+    workroomName: data.workroomName || "",
+    workOrderNumber: data.workOrder || "",
+    location: data.location || "",
+    designIntent: data.designIntent || "",
+    treatmentOptions: data.treatmentOptions || [],
+    trimOptions: data.trimOptions || [],
+    detailSelections: data.detailSelections || {},
+    extraFabricRoles: data.extraFabricRoles || [],
+    specs: data.specs || {},
+    fabrics: data.fabrics || {},
+    measurements: data.measurements || {},
+    pickerSelections: state.pickers[cat] || {},
+    notes: data.notes || [],
+    fabNotes: data.fabNotes || [],
+    renderingUrl: data.renderingUrl || "",
+    detailSketchUrl: data.detailSketchUrl || "",
+    specAttachments: data.specAttachments || {},
+    swatchUrls: data.swatchUrls || {},
+    revision: Number(data.revision || 1),
+    updatedAt: now,
+    createdAt: existingId ? (data.createdAt || now) : now
+  };
+  await docRef.set(payload, { merge:true });
+  state.currentWorkOrderId = docRef.id;
+  if (!existingId) data.revision = 1;
+  if (isNewRevision) data.revision = Number(data.revision || 1) + 1;
+  state.workOrdersByProject = await listWorkOrders(projectId);
+  renderForm();
+}
+
+async function loadWorkOrderById(id) {
+  const cat = state.category;
+  const data = getCatData(cat);
+  if (!id) {
+    const keep = {
+      projectId: data.projectId || "",
+      project: data.project || "",
+      address: data.address || "",
+      workroomId: data.workroomId || "",
+      workroomName: data.workroomName || "",
+      location: data.location || ""
+    };
+    state.currentWorkOrderId = "";
+    state.data[cat] = {
+      ...defaultData(cat),
+      ...keep
+    };
+    state.pickers[cat] = {};
+    state.uploads[cat] = {};
+    state.uploadFiles[cat] = {};
+    const fresh = getCatData(cat);
+    if (fresh.projectId) fresh.workOrder = nextWorkOrderNumber(fresh.project, cat, state.workOrdersByProject);
+    renderForm();
+    return;
+  }
+  const projectId = (data.projectId || "").trim();
+  if (!projectId) return;
+  const snap = await db.collection("boards").doc(projectId).collection("workOrders").doc(id).get();
+  if (!snap.exists) return;
+  const row = snap.data();
+  state.currentWorkOrderId = id;
+  const mergedCat = row.category || cat;
+  state.data[mergedCat] = {
+    ...defaultData(mergedCat),
+    ...row
+  };
+  const dm = state.data[mergedCat];
+  if (!dm.workOrder && dm.workOrderNumber) dm.workOrder = dm.workOrderNumber;
+  state.pickers[mergedCat] = row.pickerSelections || {};
+  state.uploads[mergedCat] = {};
+  state.uploadFiles[mergedCat] = {};
+  state.category = mergedCat;
+  state.uiGroup = currentGroupFromCategory(state.category);
+  document.querySelectorAll("#tabs button").forEach(b => {
+    const grp = b.dataset.group || (b.dataset.cat ? currentGroupFromCategory(b.dataset.cat) : "windows");
+    b.classList.toggle("active", grp === state.uiGroup);
+  });
+  renderForm();
+}
+
+async function duplicateWorkOrderFromFirestore(projectId, sourceDocId) {
+  const snap = await db.collection("boards").doc(projectId).collection("workOrders").doc(sourceDocId).get();
+  if (!snap.exists) return;
+  const row = snap.data();
+  const cat = row.category || state.category;
+  state.category = cat;
+  state.uiGroup = currentGroupFromCategory(cat);
+  document.querySelectorAll("#tabs button").forEach(b => {
+    const grp = b.dataset.group || (b.dataset.cat ? currentGroupFromCategory(b.dataset.cat) : "windows");
+    b.classList.toggle("active", grp === state.uiGroup);
+  });
+  state.currentWorkOrderId = "";
+  state.data[cat] = { ...defaultData(cat), ...row };
+  const d = state.data[cat];
+  if (!d.workOrder && d.workOrderNumber) d.workOrder = d.workOrderNumber;
+  state.pickers[cat] = JSON.parse(JSON.stringify(row.pickerSelections || {}));
+  state.uploads[cat] = {};
+  state.uploadFiles[cat] = {};
+  const chosen = state.projects.find(p => p.id === projectId);
+  if (chosen) {
+    d.projectId = projectId;
+    d.project = chosen.name || chosen.id || "";
+    d.address = chosen.address || "";
+  }
+  d.revision = 1;
+  d.date = new Date().toLocaleDateString("en-US");
+  d.workOrder = nextWorkOrderNumber(d.project, cat, state.workOrdersByProject || []);
+}
+
+async function applyBuilderQueryParams() {
+  const params = new URLSearchParams(window.location.search);
+  const projectId = (params.get("projectId") || params.get("project") || "").trim();
+  const workOrderId = (params.get("workOrderId") || params.get("wo") || "").trim();
+  const duplicateFrom = (params.get("duplicateFrom") || "").trim();
+  if (!projectId) return;
+  const chosen = state.projects.find(p => p.id === projectId);
+  if (!chosen) return;
+  state.currentWorkOrderId = "";
+  Object.keys(CATS).forEach(catId => applySelectedProjectToCategory(catId, chosen));
+  state.workOrdersByProject = await listWorkOrders(projectId);
+  const d0 = getCatData(state.category);
+  d0.projectId = projectId;
+  d0.project = chosen.name || chosen.id || "";
+  d0.address = chosen.address || "";
+  await loadProjectRooms(projectId);
+  await loadInspirationItems(projectId);
+  if (duplicateFrom) {
+    await duplicateWorkOrderFromFirestore(projectId, duplicateFrom);
+  } else if (workOrderId) {
+    await loadWorkOrderById(workOrderId);
+  }
+  if (typeof history.replaceState === "function") {
+    try {
+      const u = new URL(window.location.href);
+      u.search = "";
+      history.replaceState({}, "", u.pathname + u.hash);
+    } catch (e) {}
+  }
+}
+
+function buildUpload(cat, key, hint) {
+  const wrap = el("div", { class:"upload-box" });
+  const cur = state.uploads[cat] && state.uploads[cat][key];
+  if (cur) {
+    wrap.classList.add("has-img");
+    wrap.append(el("img", { src: cur }));
+    wrap.append(el("div", { style:"padding:4px 8px;font-size:10px" }, el("a", { href:"#", class:"clear", onclick: e => {
+      e.preventDefault();
+      delete state.uploads[cat][key];
+      delete state.uploadFiles[cat][key];
+      if (key === "detail") getCatData(cat).detailSketchUrl = "";
+      renderForm();
+    }}, "Remove")));
+  } else {
+    const gd = getCatData(cat);
+    const existing = key === "rendering" ? (gd.renderingUrl || "")
+      : key === "detail" ? (gd.detailSketchUrl || "")
+      : ((gd.swatchUrls || {})[key] || "");
+    if (existing) {
+      wrap.classList.add("has-img");
+      wrap.append(el("img", { src: existing }));
+    } else {
+      wrap.append(el("div", {}, hint));
+    }
+  }
+  wrap.addEventListener("click", () => {
+    const inp = el("input", { type:"file", accept:"image/*" });
+    inp.addEventListener("change", e => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = ev => {
+        state.uploads[cat][key] = ev.target.result;
+        state.uploadFiles[cat][key] = f;
+        updatePreview();
+        renderForm();
+      };
+      r.readAsDataURL(f);
+    });
+    inp.click();
+  });
+  return wrap;
+}
+
+async function uploadPendingAssets(cat, projectId) {
+  const d = getCatData(cat);
+  const files = state.uploadFiles[cat] || {};
+  const keys = Object.keys(files);
+  for (const key of keys) {
+    const file = files[key];
+    const workOrderId = state.currentWorkOrderId || "draft";
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    let dest;
+    if (key === "rendering") {
+      dest = "boards/" + projectId + "/workOrders/" + workOrderId + "/rendering/" + Date.now() + "-" + key + "." + ext;
+    } else if (key === "detail") {
+      dest = "boards/" + projectId + "/workOrders/" + workOrderId + "/details/" + Date.now() + "-detail." + ext;
+    } else if (key.indexOf("picker_") === 0) {
+      const pid = key.slice(7);
+      dest = "boards/" + projectId + "/workOrders/" + workOrderId + "/picker_uploads/" + pid + "/" + Date.now() + "-ref." + ext;
+    } else if (key.indexOf("specAttach_") === 0) {
+      const sid = key.slice(11);
+      dest = "boards/" + projectId + "/workOrders/" + workOrderId + "/spec_refs/" + sid + "/" + Date.now() + "-img." + ext;
+    } else {
+      dest = "boards/" + projectId + "/workOrders/" + workOrderId + "/swatches/" + Date.now() + "-" + key + "." + ext;
+    }
+    const ref = storage.ref(dest);
+    await ref.put(file, { contentType: file.type || "image/jpeg" });
+    const url = await ref.getDownloadURL();
+    if (key === "rendering") d.renderingUrl = url;
+    else if (key === "detail") d.detailSketchUrl = url;
+    else if (key.indexOf("picker_") === 0) {
+      const pid = key.slice(7);
+      if (!state.pickers[cat]) state.pickers[cat] = {};
+      state.pickers[cat][pid] = {
+        category: "upload",
+        storagePath: dest,
+        path: dest,
+        label: "Uploaded reference",
+        downloadURL: url
+      };
+      delete state.uploads[cat][key];
+    } else if (key.indexOf("specAttach_") === 0) {
+      const sid = key.slice(11);
+      if (!d.specAttachments) d.specAttachments = {};
+      d.specAttachments[sid] = {
+        path: dest,
+        storagePath: dest,
+        label: "Uploaded",
+        downloadURL: url
+      };
+      delete state.uploads[cat][key];
+    } else {
+      if (!d.swatchUrls) d.swatchUrls = {};
+      d.swatchUrls[key] = url;
+    }
+  }
+  state.uploadFiles[cat] = {};
+}
+
+async function buildPicker(cat, pickerConfig) {
+  const wrap = el("div", { class:"picker" });
+  const allRows = await ensureLibrary(pickerConfig.category);
+  let images = allRows;
+  if (pickerConfig.filter && pickerConfig.filter.length) {
+    const re = new RegExp(pickerConfig.filter.join("|"), "i");
+    const filtered = allRows.filter(img => re.test(img.label) || re.test(img.filename));
+    if (filtered.length) images = filtered;
+  }
+  const selected = state.pickers[cat] && state.pickers[cat][pickerConfig.id];
+  const head = el("div", { class:"picker-head" });
+  head.append(el("div", {}, LIBRARY[pickerConfig.category].label));
+  const actions = el("div", { class:"picker-actions" });
+  actions.append(el("button", {
+    type:"button", class:"btn-mini",
+    onclick: () => openLibraryFolderModal(cat, pickerConfig, "")
+  }, "Browse library folders"));
+  actions.append(el("button", {
+    type:"button", class:"btn-mini",
+    onclick: () => queuePickerImageFromComputer(cat, pickerConfig.id)
+  }, "This computer"));
+  actions.append(el("button", {
+    type:"button", class:"btn-mini",
+    onclick: () => openPickerModal(cat, pickerConfig, "products")
+  }, "Product Library"));
+  actions.append(el("button", {
+    type:"button", class:"btn-mini",
+    onclick: () => openPickerModal(cat, pickerConfig, "inspiration")
+  }, "Inspiration"));
+  actions.append(el("div", { class:"picker-meta" }, images.length + " at library root"));
+  head.append(actions);
+  wrap.append(head);
+  const pendThumb = state.uploads[cat] && state.uploads[cat]["picker_" + pickerConfig.id];
+  const grid = el("div", { class:"picker-grid" });
+  if (!images.length) {
+    grid.append(el("div", { style:"padding:14px;color:#888;font-size:11px;font-style:italic" }, "No images at library/" + LIBRARY[pickerConfig.category].folder + " root — use Browse library folders for subfolders (e.g. pleats/inverted_pleat), or This computer."));
+  }
+  images.forEach(img => {
+    const isSel = (selected && selected.path === img.path) || false;
+    const card = el("div", { class: "pick-card" + (isSel ? " selected" : "") },
+      el("img", { src: img.downloadURL, alt: img.label, loading:"lazy" }),
+      el("div", { class:"label" }, img.label)
+    );
+    card.addEventListener("click", () => {
+      if (!state.pickers[cat]) state.pickers[cat] = {};
+      if (state.pickers[cat][pickerConfig.id] && state.pickers[cat][pickerConfig.id].path === img.path) delete state.pickers[cat][pickerConfig.id];
+      else state.pickers[cat][pickerConfig.id] = { category: pickerConfig.category, storagePath: img.path, path: img.path, label: img.label, downloadURL: img.downloadURL };
+      renderForm();
+    });
+    grid.append(card);
+  });
+  if (pendThumb) {
+    grid.append(el("div", { style:"padding:10px;font-size:11px;color:var(--flag)" }, "Pending upload — save work order to finalize."));
+  }
+  wrap.append(grid);
+  return wrap;
+}
+function setPickerSelection(cat, pickerId, item) {
+  if (!state.pickers[cat]) state.pickers[cat] = {};
+  state.pickers[cat][pickerId] = {
+    category: item.category || "",
+    storagePath: item.path || item.id || "",
+    path: item.path || item.id || "",
+    label: item.label || item.title || "Selection",
+    downloadURL: item.downloadURL || item.imageUrl || ""
+  };
+}
+function openPickerModal(cat, pickerConfig, source) {
+  let items = [];
+  const kw = new RegExp((pickerConfig.filter || []).join("|"), "i");
+  if (source === "products") {
+    items = (state.productLibrary || []).filter(p => p.imageUrl).map(p => ({
+      id: p.id,
+      title: p.title || p.name || p.sku || p.id,
+      label: p.title || p.name || p.sku || p.id,
+      imageUrl: p.imageUrl,
+      vendor: p.vendor || p.manufacturer || "",
+      sku: p.sku || "",
+      width: p.width || p.dimensions || "",
+      repeat: p.repeat || p.patternRepeat || "",
+      materials: p.materials || p.content || ""
+    }));
+  } else {
+    items = (state.inspirationItems || []).map(i => ({
+      id: i.id, title: i.title, label: i.title, imageUrl: i.imageUrl, vendor: i.vendor, sku: i.sku, width: i.width, repeat: i.repeat, materials: i.materials
+    }));
+  }
+  if (pickerConfig.filter && pickerConfig.filter.length) {
+    const filtered = items.filter(i => kw.test(String(i.title || "") + " " + String(i.vendor || "")));
+    if (filtered.length) items = filtered;
+  }
+  const backdrop = el("div", { class:"picker-modal-backdrop" });
+  const modal = el("div", { class:"picker-modal" });
+  const head = el("div", { class:"picker-modal-head" },
+    el("div", { style:"font-weight:700" }, pickerConfig.label + " • " + (source === "products" ? "Product Library" : "Inspiration")),
+    el("button", { type:"button", class:"btn secondary", onclick: () => backdrop.remove() }, "Close")
+  );
+  const grid = el("div", { class:"picker-modal-grid" });
+  if (!items.length) grid.append(el("div", { class:"notice" }, "No matching images found."));
+  items.forEach(it => {
+    const card = el("div", { class:"pick-card" },
+      el("img", { src: it.imageUrl, alt: it.title, loading:"lazy" }),
+      el("div", { class:"label" }, it.title)
+    );
+    card.addEventListener("click", () => {
+      setPickerSelection(cat, pickerConfig.id, { ...it, category: source, downloadURL: it.imageUrl, path: source + "/" + it.id });
+      backdrop.remove();
+      renderForm();
+    });
+    grid.append(card);
+  });
+  modal.append(head, grid);
+  backdrop.append(modal);
+  backdrop.addEventListener("click", e => { if (e.target === backdrop) backdrop.remove(); });
+  document.body.append(backdrop);
+}
+function openDetailLibraryModal(cat, detailKey, libraryCategory, title) {
+  const rows = state.libraryCache[libraryCategory] || [];
+  const backdrop = el("div", { class:"picker-modal-backdrop" });
+  const modal = el("div", { class:"picker-modal" });
+  const head = el("div", { class:"picker-modal-head" },
+    el("div", { style:"font-weight:700" }, title),
+    el("button", { type:"button", class:"btn secondary", onclick: () => backdrop.remove() }, "Close")
+  );
+  const grid = el("div", { class:"picker-modal-grid" });
+  if (!rows.length) grid.append(el("div", { class:"notice" }, "No images found in library/" + libraryCategory));
+  rows.forEach(item => {
+    const card = el("div", { class:"pick-card" },
+      el("img", { src: item.downloadURL, alt: item.label, loading:"lazy" }),
+      el("div", { class:"label" }, item.label)
+    );
+    card.addEventListener("click", () => {
+      const d = getCatData(cat);
+      if (!d.detailSelections) d.detailSelections = {};
+      d.detailSelections[detailKey] = { label: item.label, path: item.path, downloadURL: item.downloadURL };
+      backdrop.remove();
+      renderForm();
+    });
+    grid.append(card);
+  });
+  modal.append(head, grid);
+  backdrop.append(modal);
+  backdrop.addEventListener("click", e => { if (e.target === backdrop) backdrop.remove(); });
+  document.body.append(backdrop);
+}
+
+async function renderLibraryRail() {
+  const rail = document.getElementById("libraryRail");
+  if (!rail) return;
+  rail.innerHTML = '<div class="library-rail-inner" style="padding:14px;font-size:12px;color:var(--muted);letter-spacing:.5px">Loading image library…</div>';
+  if (!state.libraryRail) state.libraryRail = { libKey: "windows", segments: [], q: "", targetPickerId: "" };
+  const lr = state.libraryRail;
+  const cat = state.category;
+  const cfg = CATS[cat] || { pickers: [] };
+  let pickersForLib = (cfg.pickers || []).filter(p => p.category === lr.libKey);
+  if (!pickersForLib.length && (cfg.pickers || []).length) {
+    const want = cfg.pickers[0].category;
+    if (want && LIBRARY[want] && want !== lr.libKey) {
+      lr.libKey = want;
+      lr.segments = [];
+      lr.targetPickerId = cfg.pickers[0].id;
+      return renderLibraryRail();
+    }
+  }
+  pickersForLib = (cfg.pickers || []).filter(p => p.category === lr.libKey);
+  if (pickersForLib.length) {
+    const ok = pickersForLib.some(p => p.id === lr.targetPickerId);
+    if (!ok) lr.targetPickerId = pickersForLib[0].id;
+  } else {
+    lr.targetPickerId = "";
+  }
+  const sub = (lr.segments || []).join("/");
+  let files = [];
+  let folders = [];
+  try {
+    const listed = await listLibraryFolder(lr.libKey, sub);
+    files = listed.files || [];
+    folders = listed.folders || [];
+  } catch (e) {
+    console.warn("[library rail]", e);
+  }
+  const q = String(lr.q || "").trim().toLowerCase();
+  if (q) {
+    files = files.filter(f =>
+      String(f.label || "").toLowerCase().includes(q) || String(f.filename || "").toLowerCase().includes(q)
+    );
+  }
+  const meta = LIBRARY[lr.libKey] || { label: lr.libKey, folder: "" };
+  rail.innerHTML = "";
+  const inner = el("div", { class:"library-rail-inner" });
+  inner.append(
+    el("h3", {}, "Image library"),
+    el("div", { class:"sub" }, "Browse Storage folders, then click a thumb to prefill the slot below, or upload new images into the current path.")
+  );
+  const libSel = el("select", { class:"lib-rail-select", "aria-label": "Library category" });
+  Object.keys(LIBRARY).forEach(key => {
+    const m = LIBRARY[key];
+    const opt = el("option", { value: key }, m.label);
+    if (key === lr.libKey) opt.selected = true;
+    libSel.append(opt);
+  });
+  libSel.addEventListener("change", e => {
+    lr.libKey = e.target.value || "windows";
+    lr.segments = [];
+    renderLibraryRail();
+  });
+  inner.append(el("div", { class:"lib-rail-label" }, "Storage folder"), libSel);
+  const pathParts = ["library/" + meta.folder].concat(lr.segments || []);
+  const crumb = el("div", { class:"lib-rail-crumb" }, pathParts.join(" / "));
+  inner.append(crumb);
+  if ((lr.segments || []).length) {
+    const up = el("button", {
+      type: "button",
+      class: "btn secondary",
+      style: "font-size:10px;padding:6px 10px;align-self:flex-start",
+      onclick: () => { lr.segments.pop(); renderLibraryRail(); }
+    }, "↑ Up one folder");
+    inner.append(up);
+  }
+  const folGrid = el("div", { class:"lib-rail-folders" });
+  folders.forEach(fd => {
+    const t = el("button", {
+      type: "button",
+      class: "folder-tile"
+    }, fd.name.replace(/_/g, " "));
+    t.addEventListener("click", () => {
+      lr.segments = (lr.segments || []).concat(fd.name);
+      renderLibraryRail();
+    });
+    folGrid.append(t);
+  });
+  if (folders.length) inner.append(el("div", { class:"lib-rail-label" }, "Subfolders"), folGrid);
+  inner.append(el("div", { class:"lib-rail-label" }, "Apply selection to"));
+  const pickSel = el("select", { class:"lib-rail-select", "aria-label": "Picker slot", disabled: !pickersForLib.length });
+  if (!pickersForLib.length) {
+    pickSel.append(el("option", { value: "" }, "— No slot on this template for " + meta.label + " —"));
+  } else {
+    pickersForLib.forEach(p => {
+      const opt = el("option", { value: p.id }, p.label);
+      if (p.id === lr.targetPickerId) opt.selected = true;
+      pickSel.append(opt);
+    });
+  }
+  pickSel.addEventListener("change", e => { lr.targetPickerId = e.target.value || ""; });
+  inner.append(pickSel);
+  const filterInp = el("input", {
+    type: "search",
+    class: "lib-rail-filter",
+    placeholder: "Filter by name (Enter)",
+    value: lr.q || ""
+  });
+  filterInp.addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      lr.q = filterInp.value || "";
+      renderLibraryRail();
+    }
+  });
+  filterInp.addEventListener("blur", () => {
+    const v = filterInp.value || "";
+    if (v !== lr.q) {
+      lr.q = v;
+      renderLibraryRail();
+    }
+  });
+  inner.append(el("div", { class:"lib-rail-label" }, "Images in this folder"), filterInp);
+  const grid = el("div", { class:"lib-rail-grid" });
+  if (!files.length) {
+    grid.append(el("div", { class:"lib-rail-empty", style:"grid-column:1/-1" },
+      folders.length ? "Open a subfolder or add images below." : ("No images here yet — upload or add files under " + pathParts.join("/") + " in Storage.")));
+  }
+  files.forEach(img => {
+    const card = el("div", { class:"pick-card" },
+      el("img", { src: img.downloadURL, alt: img.label || "", loading: "lazy" }),
+      el("div", { class:"label" }, img.label)
+    );
+    card.addEventListener("click", () => {
+      if (!lr.targetPickerId || !pickersForLib.length) {
+        alert("This template has no picker tied to “" + meta.label + "”. Switch the template tab (Windows / Upholstery / …) or choose another library folder.");
+        return;
+      }
+      setPickerSelection(cat, lr.targetPickerId, {
+        category: lr.libKey,
+        storagePath: img.path,
+        path: img.path,
+        label: img.label,
+        downloadURL: img.downloadURL
+      });
+      renderForm();
+    });
+    grid.append(card);
+  });
+  inner.append(grid);
+  const upInp = el("input", { type: "file", accept: "image/*", style: "display:none" });
+  upInp.addEventListener("change", async ev => {
+    const f = ev.target.files && ev.target.files[0];
+    ev.target.value = "";
+    if (!f) return;
+    try {
+      const row = await uploadImageToLibraryFolder(lr.libKey, sub, f);
+      if (row && lr.targetPickerId && pickersForLib.length) {
+        setPickerSelection(cat, lr.targetPickerId, {
+          category: lr.libKey,
+          storagePath: row.path,
+          path: row.path,
+          label: row.label,
+          downloadURL: row.downloadURL
+        });
+      }
+      await renderLibraryRail();
+      renderForm();
+    } catch (err) {
+      alert("Upload failed: " + (err && err.message ? err.message : err));
+    }
+  });
+  const actions = el("div", { class:"lib-rail-actions" });
+  actions.append(
+    el("button", {
+      type: "button",
+      class: "btn-upload",
+      onclick: () => upInp.click()
+    }, "Upload image to this folder"),
+    el("button", {
+      type: "button",
+      class: "btn-mini",
+      onclick: async () => {
+        clearLibraryFolderCachesFor(lr.libKey);
+        delete state.libraryCache[lr.libKey];
+        await renderLibraryRail();
+      }
+    }, "Refresh list"),
+    upInp
+  );
+  inner.append(actions);
+  rail.append(inner);
+}
+
+function updatePreview() {
+  const cat = state.category;
+  const cfg = CATS[cat];
+  const d = getCatData(cat);
+  const tTitle = templateTitle(cat);
+  const tPlaceholder = templatePlaceholder(cat);
+  const ups = state.uploads[cat] || {};
+  const pks = state.pickers[cat] || {};
+  const root = document.getElementById("preview");
+  root.innerHTML = "";
+  const hdr = el("div", { class:"pp-header" });
+  hdr.append(el("div", { class:"pp-title" }, "WORK ORDER:  ", el("b", {}, tTitle + " "), el("span", { class:"num" }, d.workOrder || tPlaceholder)));
+  hdr.append(el("div", { class:"pp-page" }, "PAGE 01 OF 01"));
+  root.append(hdr);
+  const loc = el("div", { class:"pp-loc" }, el("b", {}, "LOCATION: "), d.location || el("span", { style:"color:#B8B0A6;font-style:italic" }, "[Room]"));
+  loc.append(el("div", { class:"pp-treatment" }, tTitle));
+  root.append(loc);
+  const body = el("div", { class:"preview-body" + (cat === "bedding" ? " preview-bedding" : "") });
+  const left = el("div");
+  left.append(el("div", { class:"pp-section" }, "Design Intent"));
+  const intentDisp = (cat === "pillows" && !String(d.designIntent || "").trim()) ? "—" : (d.designIntent || "");
+  left.append(el("div", { class:"pp-intent" + ((cat === "bedding" || cat === "pillows") ? " pp-intent--compact" : "") }, intentDisp));
+  left.append(el("div", { class:"pp-section" }, "Specs"));
+  const specs = el("div", { class:"pp-specs" });
+  const specRows = visibleSpecBulletsForCat(cat, cfg, d);
+  specRows.forEach(s => {
+    const raw = d.specs[s.id];
+    const disp = Array.isArray(raw) ? (raw.length ? raw.join(", ") : "—") : (raw || "—");
+    const att = d.specAttachments && d.specAttachments[s.id];
+    const pendSrc = ups["specAttach_" + s.id];
+    const imgSrc = (att && att.downloadURL) || pendSrc;
+    const row = el("div", { style:"display:flex;gap:10px;align-items:flex-start;margin-bottom:6px;flex-wrap:wrap" });
+    row.append(el("div", { style:"flex:1;min-width:140px;line-height:1.35" }, el("b", {}, s.label + ": "), disp));
+    if (imgSrc) row.append(el("img", { src: imgSrc, class:"spec-thumb", style:"width:52px;height:52px;object-fit:cover;border:1px solid var(--rule)", alt:"" }));
+    specs.append(row);
+  });
+  if (cat === "pillows") {
+    const mw = d.measurements || {};
+    const dimBits = [];
+    if (String(mw["FINISHED W"] || "").trim()) dimBits.push("W " + String(mw["FINISHED W"]).trim());
+    if (String(mw["FINISHED H"] || "").trim()) dimBits.push("H " + String(mw["FINISHED H"]).trim());
+    if (String(mw["BOX DEPTH"] || "").trim()) dimBits.push("Box depth " + String(mw["BOX DEPTH"]).trim());
+    if (String(mw["BOLSTER DIAMETER"] || "").trim()) dimBits.push("Bolster Ø " + String(mw["BOLSTER DIAMETER"]).trim());
+    if (String(mw["WELT SIZE"] || "").trim()) dimBits.push("Welt " + String(mw["WELT SIZE"]).trim());
+    if (String(mw["FLANGE SIZE"] || "").trim()) dimBits.push("Flange " + String(mw["FLANGE SIZE"]).trim());
+    if (dimBits.length) specs.append(el("div", {}, el("b", {}, "Dimensions: "), dimBits.join(" · ")));
+  }
+  if (cat === "bedding" && !selectedBeddingProductTypes(d).length) {
+    specs.append(el("div", { style:"font-style:italic;color:var(--muted)" }, "Select product type(s) to show bedding specs and measurements."));
+  }
+  left.append(specs);
+  body.append(left);
+  const mid = el("div");
+  const designLabel = cat === "pillows"
+    ? "Pillow Design"
+    : (cat === "upholstery" ? "Upholstery Design" : (cat === "bedding" ? "Bedding Design" : "Window Treatment Design"));
+  mid.append(el("div", { class:"pp-section" }, designLabel));
+  const rend = el("div", { class:"pp-rendering" });
+  if (ups.rendering) rend.append(el("img", { src: ups.rendering }));
+  else if (d.renderingUrl) rend.append(el("img", { src: d.renderingUrl }));
+  else rend.append("rendering - upload in left panel");
+  mid.append(rend);
+  if (cat === "pillows") {
+    const detSrc = ups.detail || d.detailSketchUrl;
+    if (detSrc) {
+      mid.append(el("div", { class:"pp-section", style:"margin-top:8px" }, "Box / detail"));
+      const dbox = el("div", { class:"pp-rendering", style:"min-height:120px;max-height:220px" });
+      dbox.append(el("img", { src: detSrc }));
+      mid.append(dbox);
+    }
+  }
+  body.append(mid);
+  const right = el("div");
+  right.append(el("div", { class:"pp-section" }, "Fabrics"));
+  const fabricDefs = getFabricRoleDefs(cat, d);
+  fabricDefs.forEach(fr => {
+    const f = d.fabrics[fr.id] || {};
+    const swKey = "swatch_" + fr.id;
+    const sw = ups[swKey] || (d.swatchUrls && d.swatchUrls[swKey]);
+    right.append(el("div", { class:"pp-fabric" },
+      el("div", { class:"lt" }, fr.id),
+      el("div", { class:"sw" }, sw ? el("img", { src: sw }) : ""),
+      el("div", {}, el("div", { style:"font-size:9px;font-weight:700;letter-spacing:1px" }, fr.role), f.vendor || "", el("br"), f.sku || "", el("br"), [f.color, f.width, f.content].filter(Boolean).join(" · "))
+    ));
+  });
+  if (d.treatmentOptions && d.treatmentOptions.length) {
+    right.append(el("div", { class:"pp-section", style:"margin-top:8px" }, "Layers / Options"));
+    right.append(el("div", { style:"font-size:10px;line-height:1.4" }, d.treatmentOptions.join(" • ")));
+  }
+  if (d.trimOptions && d.trimOptions.length) {
+    right.append(el("div", { class:"pp-section", style:"margin-top:8px" }, "Trim"));
+    right.append(el("div", { style:"font-size:10px;line-height:1.4" }, d.trimOptions.join(" • ")));
+  }
+  if (d.detailSelections && (d.detailSelections.finish || d.detailSelections.nailheads || d.detailSelections.feet)) {
+    right.append(el("div", { class:"pp-section", style:"margin-top:8px" }, "Details"));
+    const bits = [];
+    if (d.detailSelections.finish) bits.push("Finish: " + d.detailSelections.finish);
+    if (d.detailSelections.nailheads && d.detailSelections.nailheads.label) bits.push("Nailheads: " + d.detailSelections.nailheads.label);
+    if (d.detailSelections.feet && d.detailSelections.feet.label) bits.push("Feet/Legs: " + d.detailSelections.feet.label);
+    right.append(el("div", { style:"font-size:10px;line-height:1.4" }, bits.join(" • ")));
+  }
+  body.append(right);
+  root.append(body);
+  const strip = el("div", { class:"preview-strip" });
+  const cells = cfg.pickers.map(p => {
+    const pend = ups["picker_" + p.id];
+    return { title:p.label, sel:pks[p.id] || null, pend };
+  });
+  while (cells.length < 4) cells.push({ title:"—", sel:null, pend:null });
+  cells.slice(0, 4).forEach(c => {
+    const cell = el("div", { class:"strip-cell" });
+    cell.append(el("div", { class:"ttl" }, c.title));
+    const img = el("div", { class:"img" });
+    const src = (c.sel && c.sel.downloadURL) || c.pend;
+    if (src) img.append(el("img", { src }));
+    else img.append("—");
+    cell.append(img);
+    strip.append(cell);
+  });
+  root.append(strip);
+  const meas = el("div", { class:"pp-meas" });
+  const measKeys = visibleMeasurementsForCat(cat, cfg, d);
+  measKeys.forEach(m => meas.append(el("div", { class:"row" }, el("b", {}, m), el("span", {}, d.measurements[m] || "—"))));
+  root.append(meas);
+  const foot = el("div", { class:"preview-foot" });
+  foot.append(el("div", { class:"pp-notes-blk" }, el("h4", {}, "Notes"), el("ul", {}, ...d.notes.map(n => el("li", {}, n)))));
+  foot.append(el("div", { class:"pp-notes-blk" }, el("h4", {}, "Fabrication Notes"), el("ul", {}, ...d.fabNotes.map(n => el("li", {}, n)))));
+  foot.append(el("div", { class:"pp-notes-blk" }, el("h4", {}, "Approval"), el("div", {}, "Designer: ___________________ Date: _______"), el("div", { style:"margin-top:6px" }, "Client: ___________________ Date: _______")));
+  root.append(foot);
+  root.append(el("div", { class:"pp-cch" }, el("div", { class:"b1" }, "CCH"), el("div", { class:"b2" }, "Design Inc.")));
+}
+
+async function exportPPTX() {
+  const cat = state.category;
+  const cfg = CATS[cat];
+  const d = getCatData(cat);
+  const tTitle = templateTitle(cat);
+  const tPlaceholder = templatePlaceholder(cat);
+  const pks = state.pickers[cat] || {};
+  await uploadPendingAssets(cat, (d.projectId || "").trim());
+  const pres = new PptxGenJS();
+  pres.layout = "LAYOUT_WIDE";
+  pres.title = "CCH " + tTitle + " - " + (d.project || "") + " - " + (d.workOrder || "");
+  const s = pres.addSlide();
+  s.addText("WORK ORDER: " + tTitle + " " + (d.workOrder || tPlaceholder), { x:0.5, y:0.3, w:8.8, h:0.4, bold:true, fontSize:18 });
+  s.addText("LOCATION: " + (d.location || ""), { x:0.5, y:0.78, w:9, h:0.3, fontSize:10 });
+  s.addText(tTitle, { x:10.5, y:0.78, w:2.4, h:0.3, bold:true, fontSize:9, align:"right" });
+  s.addText("DESIGN INTENT", { x:0.5, y:1.3, w:2.8, h:0.25, bold:true, fontSize:10 });
+  const detailsLine = []
+    .concat((d.treatmentOptions && d.treatmentOptions.length) ? ["Layers: " + d.treatmentOptions.join(", ")] : [])
+    .concat((d.trimOptions && d.trimOptions.length) ? ["Trim: " + d.trimOptions.join(", ")] : [])
+    .concat((d.detailSelections && d.detailSelections.finish) ? ["Finish: " + d.detailSelections.finish] : [])
+    .concat((d.detailSelections && d.detailSelections.nailheads && d.detailSelections.nailheads.label) ? ["Nailheads: " + d.detailSelections.nailheads.label] : [])
+    .concat((d.detailSelections && d.detailSelections.feet && d.detailSelections.feet.label) ? ["Feet/Legs: " + d.detailSelections.feet.label] : []);
+  const intentAndLayers = (d.designIntent || "") + (detailsLine.length ? ("\n\n" + detailsLine.join("\n")) : "");
+  s.addText(intentAndLayers, { x:0.5, y:1.55, w:2.9, h:1.05, fontSize:8.5, italic:true });
+  const renderData = state.uploads[cat] && state.uploads[cat].rendering ? state.uploads[cat].rendering : await urlToDataUri(d.renderingUrl);
+  if (renderData) s.addImage({ data: renderData, x:3.65, y:1.3, w:6.0, h:2.4, sizing:{ type:"contain", w:6.0, h:2.4 } });
+  let sy = 4.0;
+  for (let i = 0; i < Math.min(4, cfg.pickers.length); i++) {
+    const p = cfg.pickers[i];
+    const sel = pks[p.id];
+    if (!sel || !sel.downloadURL) continue;
+    const dataUri = await urlToDataUri(sel.downloadURL);
+    if (dataUri) s.addImage({ data:dataUri, x:0.5 + i*3.1, y:sy, w:2.95, h:1.05, sizing:{ type:"contain", w:2.95, h:1.05 } });
+  }
+  const fname = "CCH_" + tTitle.replace(/\W+/g, "_") + "_" + (d.workOrder || "WO") + "_" + (d.project || "Project").replace(/\W+/g, "_") + ".pptx";
+  try {
+    const blob = await pres.write({ outputType:"blob" });
+    await saveExportBlob(blob, fname);
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 1000);
+  } catch (e) {
+    console.warn("Blob export fallback", e);
+    await pres.writeFile({ fileName: fname });
+  }
+}
+
+async function saveExportBlob(blob, fname) {
+  const cat = state.category;
+  const d = getCatData(cat);
+  const projectId = (d.projectId || "").trim();
+  if (!projectId || !state.currentWorkOrderId || !blob) return;
+  const path = "boards/" + projectId + "/workOrders/" + state.currentWorkOrderId + "/exports/" + Date.now() + "-" + fname;
+  const ref = storage.ref(path);
+  await ref.put(blob, { contentType:"application/vnd.openxmlformats-officedocument.presentationml.presentation" });
+  const url = await ref.getDownloadURL();
+  await db.collection("boards").doc(projectId).collection("workOrders").doc(state.currentWorkOrderId).set({
+    exportPptxUrl: url,
+    exportPptxPath: path,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  }, { merge:true });
+}
+
+async function urlToDataUri(url) {
+  if (!url) return "";
+  try {
+    const r = await fetch(url);
+    const blob = await r.blob();
+    return await new Promise(res => {
+      const fr = new FileReader();
+      fr.onload = e => res(e.target.result);
+      fr.readAsDataURL(blob);
+    });
+  } catch (e) { return ""; }
+}
+
+function exportPDF() {
+  const w = window.open("", "_blank");
+  const previewHTML = document.getElementById("preview").outerHTML;
+  const styles = Array.from(document.querySelectorAll("style")).map(s => s.outerHTML).join("");
+  w.document.write("<!doctype html><html><head><title>CCH Work Order - Print</title>" + styles + "<style>body{margin:0;background:#fff}.preview-page{box-shadow:none;margin:0;width:13.33in;height:7.5in} @media print {@page { size:13.33in 7.5in; margin:0 }}</style></head><body>" + previewHTML + "</body></html>");
+  w.document.close(); w.focus(); setTimeout(() => w.print(), 350);
+}
+
+async function renderForm() {
+  const cat = state.category;
+  const cfg = CATS[cat];
+  const d = getCatData(cat);
+  normalizeSpecsForCategory(cat, d);
+  if (cat === "pillows") syncPillowIntentFromSpecs(d);
+  // Defensive autofill: if project is selected but name/address are empty, hydrate from project cache.
+  if (d.projectId) {
+    const pMeta = state.projects.find(p => p.id === d.projectId);
+    if (pMeta) {
+      if (!String(d.project || "").trim()) d.project = pMeta.name || pMeta.id || "";
+      if (!String(d.address || "").trim()) d.address = pMeta.address || "";
+    }
+  }
+  await renderLibraryRail();
+  const pane = document.getElementById("formPane");
+  pane.innerHTML = "";
+  const toolbar = el("div", { class:"toolbar" });
+  const projField = el("div", { class:"field" }, el("label", {}, "Project"));
+  const projSel = el("select", { html:"<option value=''>Select a project</option>" });
+  state.projects.forEach(p => {
+    const text = p.name + (p.client ? " - " + p.client : "");
+    const opt = el("option", { value: p.id }, escapeHtml(text));
+    if (d.projectId === p.id) opt.selected = true;
+    projSel.append(opt);
+  });
+  projSel.addEventListener("change", async e => {
+    const projectId = e.target.value || "";
+    const chosen = state.projects.find(p => p.id === projectId);
+    state.currentWorkOrderId = "";
+    state.workOrdersByProject = projectId ? await listWorkOrders(projectId) : [];
+    // Keep project metadata in sync across all templates/categories.
+    Object.keys(CATS).forEach(catId => applySelectedProjectToCategory(catId, chosen || null));
+    // Ensure current visible category immediately has values, even if cache miss.
+    d.projectId = projectId;
+    d.project = chosen ? (chosen.name || chosen.id || "") : "";
+    d.address = chosen ? (chosen.address || "") : "";
+    await loadProjectRooms(projectId);
+    await loadInspirationItems(projectId);
+    if (state.projectRooms.length === 1) d.location = state.projectRooms[0].name;
+    else if (state.projectRooms.length > 1) {
+      const exists = state.projectRooms.some(r => String(r.name || "").toLowerCase() === String(d.location || "").toLowerCase());
+      if (!exists) d.location = "";
+    } else d.location = "";
+    renderForm();
+  });
+  projField.append(projSel);
+  toolbar.append(projField);
+  const workroomField = el("div", { class:"field" }, el("label", {}, "Workroom"));
+  const workroomRow = el("div", { style:"display:flex;gap:6px;align-items:center" });
+  const workroomSel = el("select", { html:"<option value=''>Select workroom</option>", style:"flex:1" });
+  state.workrooms.forEach(w => {
+    const nm = w.name || w.title || w.workroomName || w.id;
+    const opt = el("option", { value: w.id }, escapeHtml(nm));
+    if (d.workroomId === w.id) opt.selected = true;
+    workroomSel.append(opt);
+  });
+  workroomSel.addEventListener("change", e => {
+    d.workroomId = e.target.value || "";
+    const chosen = state.workrooms.find(w => w.id === d.workroomId);
+    d.workroomName = chosen ? (chosen.name || chosen.title || chosen.workroomName || chosen.id) : "";
+  });
+  const workroomBtn = el("button", {
+    type:"button",
+    class:"btn secondary",
+    style:"padding:8px 10px;font-size:10px;letter-spacing:1px",
+    onclick: () => {
+      const backdrop = el("div", { class:"picker-modal-backdrop" });
+      const modal = el("div", { class:"picker-modal" });
+      const head = el("div", { class:"picker-modal-head" },
+        el("div", { style:"font-weight:700" }, "Choose Workroom"),
+        el("div", { style:"display:flex;gap:6px" },
+          el("button", {
+            type:"button",
+            class:"btn secondary",
+            onclick: async () => { await addNewWorkroom(); backdrop.remove(); }
+          }, "Add New"),
+          el("button", { type:"button", class:"btn secondary", onclick: () => backdrop.remove() }, "Close")
+        )
+      );
+      const grid = el("div", { class:"picker-modal-grid" });
+      state.workrooms.forEach(w => {
+        const nm = w.name || w.title || w.workroomName || w.id;
+        const card = el("div", { class:"pick-card" }, el("div", { class:"label", style:"min-height:60px;padding:12px" }, nm));
+        card.addEventListener("click", () => {
+          d.workroomId = w.id;
+          d.workroomName = nm;
+          backdrop.remove();
+          renderForm();
+        });
+        grid.append(card);
+      });
+      modal.append(head, grid);
+      backdrop.append(modal);
+      backdrop.addEventListener("click", ev => { if (ev.target === backdrop) backdrop.remove(); });
+      document.body.append(backdrop);
+    }
+  }, "Popup");
+  const workroomAddBtn = el("button", {
+    type:"button",
+    class:"btn secondary",
+    style:"padding:8px 10px;font-size:10px;letter-spacing:1px",
+    onclick: () => addNewWorkroom()
+  }, "Add");
+  workroomRow.append(workroomSel, workroomBtn, workroomAddBtn);
+  workroomField.append(workroomRow);
+  toolbar.append(workroomField);
+  const workOrderField = el("div", { class:"field" }, el("label", {}, "Existing Work Orders"));
+  const sel = el("select", { html:"<option value=''>New Work Order</option>" });
+  state.workOrdersByProject.forEach(row => {
+    const opt = el("option", { value: row.id }, escapeHtml((row.workOrderNumber || row.id) + " - " + (row.location || "")));
+    if (state.currentWorkOrderId === row.id) opt.selected = true;
+    sel.append(opt);
+  });
+  sel.addEventListener("change", e => loadWorkOrderById(e.target.value));
+  workOrderField.append(sel);
+  toolbar.append(workOrderField);
+  pane.append(toolbar);
+  pane.append(el("div", { class:"notice" }, "Storage library categories are loaded from /library/* and saved to boards/{projectId}/workOrders."));
+  if (!d.projectId) {
+    pane.append(el("div", { class:"notice error" }, "Select a project first. Work-order metadata and numbering are generated from the selected project."));
+    updatePreview();
+    return;
+  }
+  if (!d.workOrder && !state.currentWorkOrderId) {
+    d.workOrder = nextWorkOrderNumber(d.project, cat, state.workOrdersByProject);
+  }
+  if (state.uiGroup === "windows") {
+    const typeField = el("div", { class:"field" }, el("label", {}, "Window Type"));
+    const typeSel = el("select");
+    WINDOW_TYPES.forEach(t => {
+      const opt = el("option", { value: t.id }, t.label);
+      if (cat === t.id) opt.selected = true;
+      typeSel.append(opt);
+    });
+    typeSel.addEventListener("change", e => {
+      state.category = e.target.value || "drapery";
+      renderForm();
+    });
+    typeField.append(typeSel);
+    pane.append(typeField);
+  }
+  const sec1 = el("div", { class:"form-section" });
+  sec1.append(el("h2", {}, "Project Info"));
+  sec1.append(field("Project Name", "text", d.project, v => { d.project = v; updatePreview(); }));
+  sec1.append(field("Address", "text", d.address || "", v => { d.address = v; updatePreview(); }, "Project address (auto-filled, editable)"));
+  const roomField = el("div", { class:"field" }, el("label", {}, "Room"));
+  const roomRow = el("div", { style:"display:flex;gap:6px;align-items:center" });
+  const roomSel = el("select", { style:"flex:1" });
+  roomSel.append(el("option", { value:"" }, state.projectRooms.length ? "Select project room" : "No rooms found"));
+  state.projectRooms.forEach(r => {
+    const opt = el("option", { value: r.name }, escapeHtml(r.name));
+    if (String(d.location || "").toLowerCase() === String(r.name || "").toLowerCase()) opt.selected = true;
+    roomSel.append(opt);
+  });
+  if (d.location && !state.projectRooms.some(r => String(r.name || "").toLowerCase() === String(d.location || "").toLowerCase())) {
+    const customOpt = el("option", { value:d.location }, escapeHtml(d.location + " (custom)"));
+    customOpt.selected = true;
+    roomSel.append(customOpt);
+  }
+  roomSel.addEventListener("change", e => {
+    d.location = e.target.value || "";
+    updatePreview();
+  });
+  const roomPickBtn = el("button", {
+    type:"button",
+    class:"btn secondary",
+    style:"padding:8px 10px;font-size:10px;letter-spacing:1px",
+    onclick: () => openRoomPickerModal(cat)
+  }, "Popup");
+  const roomAddBtn = el("button", {
+    type:"button",
+    class:"btn secondary",
+    style:"padding:8px 10px;font-size:10px;letter-spacing:1px",
+    onclick: () => {
+      const name = (window.prompt("Add room name:") || "").trim();
+      if (!name) return;
+      d.location = name;
+      renderForm();
+    }
+  }, "Add");
+  const roomClearBtn = el("button", {
+    type:"button",
+    class:"btn secondary",
+    style:"padding:8px 10px;font-size:10px;letter-spacing:1px",
+    onclick: () => { d.location = ""; renderForm(); }
+  }, "Clear");
+  roomRow.append(roomSel, roomPickBtn, roomAddBtn, roomClearBtn);
+  roomField.append(roomRow);
+  sec1.append(roomField);
+  const row = el("div", { class:"field-row three" });
+  const woWrap = el("div", { class:"field" }, el("label", {}, "Work Order # (Auto)"));
+  const woRow = el("div", { style:"display:flex;gap:6px;align-items:center" });
+  const woInput = el("input", { type:"text", value:d.workOrder || "", readonly:"readonly" });
+  const regenBtn = el("button", {
+    type:"button",
+    class:"btn secondary",
+    style:"padding:8px 10px;font-size:10px;letter-spacing:1px",
+    onclick: () => { d.workOrder = nextWorkOrderNumber(d.project, cat, state.workOrdersByProject); renderForm(); }
+  }, "Regenerate");
+  woRow.append(woInput, regenBtn);
+  woWrap.append(woRow);
+  row.append(woWrap);
+  row.append(field("Date", "text", d.date, v => { d.date = v; updatePreview(); }));
+  row.append(field("Rev", "text", String(d.revision || 1), v => { d.revision = Number(v || 1); updatePreview(); }));
+  sec1.append(row);
+  sec1.append(field("Location", "text", d.location, v => { d.location = v; updatePreview(); }));
+  pane.append(sec1);
+  const sec2 = el("div", { class:"form-section" });
+  sec2.append(el("h2", {}, "Design Intent"));
+  if (cat === "pillows") {
+    sec2.append(el("div", { class:"notice", style:"margin-bottom:10px;font-size:11px;padding:8px 10px" }, "No boilerplate text — the summary below fills in from your pillow selections."));
+    const intentWrap = el("div", { class:"field" }, el("label", {}, "Summary (auto from selections)"));
+    const intentTa = el("textarea", { readonly:"readonly", style:"min-height:56px;max-height:160px;font-size:12px;line-height:1.35;background:var(--field);color:var(--body);cursor:default" });
+    intentTa.value = d.designIntent || "";
+    intentWrap.append(intentTa);
+    sec2.append(intentWrap);
+  } else {
+    const presetField = el("div", { class:"field" }, el("label", {}, "Preset Intent"));
+    const presetSel = el("select", { html:"<option value=''>Select preset intent</option>" });
+    (INTENT_PRESETS[cat] || []).forEach((preset, idx) => presetSel.append(el("option", { value: String(idx) }, preset.label || ("Preset " + (idx + 1)))));
+    presetSel.addEventListener("change", e => {
+      const idx = parseInt(e.target.value, 10);
+      if (!isNaN(idx) && INTENT_PRESETS[cat] && INTENT_PRESETS[cat][idx]) {
+        d.designIntent = INTENT_PRESETS[cat][idx].text || "";
+        renderForm();
+      }
+    });
+    presetField.append(presetSel);
+    sec2.append(presetField);
+    const intentWrap = el("div", { class:"field" });
+    const intentTa = el("textarea", cat === "bedding" ? { style:"min-height:46px;max-height:100px;font-size:12px;line-height:1.35" } : {});
+    intentTa.value = d.designIntent || "";
+    intentTa.addEventListener("input", e => { d.designIntent = e.target.value; updatePreview(); });
+    intentWrap.append(intentTa);
+    sec2.append(intentWrap);
+  }
+  pane.append(sec2);
+  const sec3 = el("div", { class:"form-section" });
+  sec3.append(el("h2", {}, "Rendering & details"));
+  sec3.append(buildUpload(cat, "rendering", "Upload rendering image"));
+  if (cat === "pillows") {
+    sec3.append(el("div", { class:"field", style:"margin-top:14px" }, el("label", {}, "Box / construction detail")));
+    sec3.append(buildUpload(cat, "detail", "Upload boxing sketch, detail photo, or dimensions markup"));
+  }
+  pane.append(sec3);
+  const sec4 = el("div", { class:"form-section" });
+  sec4.append(el("h2", {}, "Design Specs"));
+  if (currentGroupFromCategory(cat) === "windows") {
+    const layerWrap = el("div", { class:"field" });
+    layerWrap.append(el("label", {}, "Layered Treatments / Trim Options"));
+    const layerChips = el("div", { class:"chip-group" });
+    LAYER_OPTIONS.forEach(opt => {
+      const on = (d.treatmentOptions || []).includes(opt);
+      layerChips.append(el("label", { class:"chip" + (on ? " checked" : "") },
+        el("input", {
+          type:"checkbox",
+          checked: on ? "checked" : undefined,
+          onchange: e => {
+            if (!d.treatmentOptions) d.treatmentOptions = [];
+            if (e.target.checked) {
+              if (!d.treatmentOptions.includes(opt)) d.treatmentOptions.push(opt);
+            } else {
+              d.treatmentOptions = d.treatmentOptions.filter(x => x !== opt);
+            }
+            renderForm();
+          }
+        }),
+        opt
+      ));
+    });
+    layerWrap.append(layerChips);
+    sec4.append(layerWrap);
+  }
+  const specBulletsVisible = visibleSpecBulletsForCat(cat, cfg, d);
+  specBulletsVisible.forEach(s => {
+    const wrap = el("div", { class:"field" });
+    wrap.append(el("label", {}, s.label));
+    if (s.multi) {
+      if (!Array.isArray(d.specs[s.id])) d.specs[s.id] = d.specs[s.id] ? [d.specs[s.id]] : [];
+      const sel = el("select", { multiple: true, size: Math.min(10, Math.max(4, s.options.length)) });
+      const curArr = Array.isArray(d.specs[s.id]) ? d.specs[s.id].map(String) : [];
+      s.options.forEach(opt => {
+        const o = el("option", { value: opt }, opt);
+        if (curArr.includes(String(opt))) o.selected = true;
+        sel.append(o);
+      });
+      sel.addEventListener("change", () => {
+        const picked = Array.from(sel.selectedOptions).map(o => o.value).filter(Boolean);
+        const prev = JSON.stringify(d.specs[s.id] || []);
+        d.specs[s.id] = picked;
+        if (prev !== JSON.stringify(picked) && d.specAttachments && d.specAttachments[s.id]) delete d.specAttachments[s.id];
+        autoPickForSpec(cat, s.id, picked.join(" "));
+        renderForm();
+      });
+      wrap.append(sel);
+    } else {
+      const sel = el("select");
+      sel.append(el("option", { value:"" }, "— Select —"));
+      const cur = String(d.specs[s.id] || "");
+      s.options.forEach(opt => {
+        const o = el("option", { value: opt }, opt);
+        if (cur === String(opt)) o.selected = true;
+        sel.append(o);
+      });
+      sel.addEventListener("change", () => {
+        const v = sel.value;
+        const prev = String(d.specs[s.id] || "");
+        if (prev !== String(v) && d.specAttachments && d.specAttachments[s.id]) delete d.specAttachments[s.id];
+        d.specs[s.id] = v;
+        autoPickForSpec(cat, s.id, v);
+        if (cat === "drapery" && s.id === "pleat") maybeOpenPleatLibraryAfterSpecChange(cat, s.id, d);
+        renderForm();
+      });
+      wrap.append(sel);
+    }
+    const attach = el("div", { class:"spec-attach-bar" });
+    const att = d.specAttachments && d.specAttachments[s.id];
+    const pend = state.uploads[cat] && state.uploads[cat]["specAttach_" + s.id];
+    if (att && att.downloadURL) attach.append(el("img", { class:"spec-thumb", src: pend || att.downloadURL, alt:"" }));
+    else if (pend) attach.append(el("img", { class:"spec-thumb", src: pend, alt:"" }));
+    attach.append(el("button", {
+      type:"button",
+      class:"btn secondary",
+      style:"padding:8px 10px;font-size:10px;letter-spacing:1px",
+      onclick: () => openSpecAttachmentLibraryModal(cat, s.id)
+    }, "Library"));
+    attach.append(el("button", {
+      type:"button",
+      class:"btn secondary",
+      style:"padding:8px 10px;font-size:10px;letter-spacing:1px",
+      onclick: () => queueSpecAttachmentFromComputer(cat, s.id)
+    }, "This computer"));
+    if (att && att.downloadURL || pend) {
+      attach.append(el("button", {
+        type:"button",
+        class:"btn secondary",
+        style:"padding:8px 10px;font-size:10px;letter-spacing:1px",
+        onclick: () => { setSpecAttachment(cat, s.id, null); delete state.uploads[cat]["specAttach_" + s.id]; delete state.uploadFiles[cat]["specAttach_" + s.id]; renderForm(); }
+      }, "Clear image"));
+    }
+    wrap.append(attach);
+    sec4.append(wrap);
+  });
+  pane.append(sec4);
+  const secDetails = el("div", { class:"form-section" });
+  secDetails.append(el("h2", {}, "Details & Trim"));
+  const trimWrap = el("div", { class:"field" });
+  trimWrap.append(el("label", {}, "Trim Options"));
+  const trimChipGroup = el("div", { class:"chip-group" });
+  ["Banding", "Welt", "Tape Trim", "Contrast Trim", "No Trim"].forEach(opt => {
+    const isOn = (d.trimOptions || []).includes(opt);
+    trimChipGroup.append(el("label", { class:"chip" + (isOn ? " checked" : "") },
+      el("input", {
+        type:"checkbox",
+        checked: isOn ? "checked" : undefined,
+        onchange: e => { d.trimOptions = upsertChipSelection(d.trimOptions, opt, !!e.target.checked); renderForm(); }
+      }),
+      opt
+    ));
+  });
+  trimWrap.append(trimChipGroup);
+  secDetails.append(trimWrap);
+  if (!d.detailSelections) d.detailSelections = { nailheads: null, feet: null, finish: "" };
+  const finishField = field("Finish", "text", d.detailSelections.finish || "", v => { d.detailSelections.finish = v; updatePreview(); }, "e.g. Antique brass, matte black, walnut");
+  secDetails.append(finishField);
+  const detailPickers = el("div", { style:"display:grid;grid-template-columns:1fr 1fr;gap:8px" });
+  const nailField = el("div", { class:"field" }, el("label", {}, "Nailheads"));
+  nailField.append(el("div", { style:"display:flex;gap:6px;align-items:center" },
+    el("input", { type:"text", readonly:"readonly", value:(d.detailSelections.nailheads && d.detailSelections.nailheads.label) || "", placeholder:"Select nailhead option", style:"flex:1" }),
+    el("button", { type:"button", class:"btn secondary", style:"padding:8px 10px;font-size:10px;letter-spacing:1px", onclick: async () => { await ensureLibrary("nailheads"); openDetailLibraryModal(cat, "nailheads", "nailheads", "Select Nailhead"); } }, "Popup")
+  ));
+  const feetField = el("div", { class:"field" }, el("label", {}, "Feet / Legs"));
+  feetField.append(el("div", { style:"display:flex;gap:6px;align-items:center" },
+    el("input", { type:"text", readonly:"readonly", value:(d.detailSelections.feet && d.detailSelections.feet.label) || "", placeholder:"Select feet/legs option", style:"flex:1" }),
+    el("button", { type:"button", class:"btn secondary", style:"padding:8px 10px;font-size:10px;letter-spacing:1px", onclick: async () => { await ensureLibrary("legs_feet"); openDetailLibraryModal(cat, "feet", "legs_feet", "Select Feet / Legs"); } }, "Popup")
+  ));
+  detailPickers.append(nailField, feetField);
+  secDetails.append(detailPickers);
+  pane.append(secDetails);
+  const fabricDefs = getFabricRoleDefs(cat, d);
+  const fabricToolbar = el("div", { class:"form-section" });
+  fabricToolbar.append(el("h2", {}, "Fabrics & Trims"));
+  const fabricActions = el("div", { style:"display:flex;gap:8px;flex-wrap:wrap" });
+  fabricActions.append(el("button", {
+    type:"button",
+    class:"btn secondary",
+    style:"padding:8px 10px;font-size:10px;letter-spacing:1px",
+    onclick: () => {
+      const current = getFabricRoleDefs(cat, d);
+      if (current.length >= 4) return;
+      if (!d.extraFabricRoles) d.extraFabricRoles = [];
+      const used = new Set(current.map(x => x.id));
+      const nextId = FABRIC_IDS.find(x => !used.has(x));
+      if (!nextId) return;
+      d.extraFabricRoles.push({ id: nextId, role: "TRIM " + nextId });
+      if (!d.fabrics[nextId]) d.fabrics[nextId] = { vendor:"", sku:"", color:"", width:"", content:"", repeat:"" };
+      renderForm();
+    }
+  }, "Add Fabric/Trim"));
+  fabricToolbar.append(fabricActions);
+  pane.append(fabricToolbar);
+  fabricDefs.forEach(fr => {
+    const sec = el("div", { class:"form-section" });
+    const fab = d.fabrics[fr.id] || {};
+    sec.append(el("h2", {}, "Fabric " + fr.id + " - " + fr.role));
+    if (fr.extra) {
+      sec.append(field("Role Label", "text", fr.role, v => {
+        const target = (d.extraFabricRoles || []).find(x => x.id === fr.id);
+        if (target) target.role = v || ("TRIM " + fr.id);
+        renderForm();
+      }));
+      sec.append(el("button", {
+        type:"button",
+        class:"btn secondary",
+        style:"padding:7px 10px;font-size:10px;letter-spacing:1px;margin-bottom:8px",
+        onclick: () => {
+          d.extraFabricRoles = (d.extraFabricRoles || []).filter(x => x.id !== fr.id);
+          delete d.fabrics[fr.id];
+          const swKey = "swatch_" + fr.id;
+          if (d.swatchUrls) delete d.swatchUrls[swKey];
+          if (state.uploads[cat]) delete state.uploads[cat][swKey];
+          if (state.uploadFiles[cat]) delete state.uploadFiles[cat][swKey];
+          renderForm();
+        }
+      }, "Remove This Fabric/Trim"));
+    }
+    const pickField = el("div", { class:"field" }, el("label", {}, "Pick from Product Library"));
+    const pickSel = el("select", { html:"<option value=''>Select product</option>" });
+    state.productLibrary.slice(0, 800).forEach(p => {
+      const title = p.title || p.name || p.sku || p.id;
+      const vendor = p.vendor || p.manufacturer || "";
+      const opt = el("option", { value: p.id }, escapeHtml(title + (vendor ? " - " + vendor : "")));
+      if (fab.productId === p.id) opt.selected = true;
+      pickSel.append(opt);
+    });
+    pickSel.addEventListener("change", e => {
+      const pid = e.target.value || "";
+      fab.productId = pid;
+      const p = state.productLibrary.find(x => x.id === pid);
+      // Selecting a different fabric product should fully reset auto-fill fields first.
+      fab.vendor = "";
+      fab.sku = "";
+      fab.color = "";
+      fab.width = "";
+      fab.repeat = "";
+      fab.content = "";
+      const swKey = "swatch_" + fr.id;
+      if (!d.swatchUrls) d.swatchUrls = {};
+      delete d.swatchUrls[swKey];
+      delete state.uploads[cat][swKey];
+      delete state.uploadFiles[cat][swKey];
+      // Force empty image state immediately so old swatch cannot persist.
+      d.swatchUrls[swKey] = "";
+      if (!pid) {
+        updatePreview();
+        renderForm();
+        return;
+      }
+      if (p) {
+        fab.vendor = p.vendor || p.manufacturer || "";
+        fab.sku = p.sku || "";
+        fab.color = p.finish || p.color || "";
+        fab.width = p.width || p.dimensions || "";
+        fab.repeat = p.repeat || p.patternRepeat || p.vRepeat || "";
+        fab.content = p.materials || p.content || "";
+        if (p.imageUrl) d.swatchUrls[swKey] = p.imageUrl;
+      }
+      updatePreview();
+      renderForm();
+    });
+    pickField.append(pickSel);
+    sec.append(pickField);
+    sec.append(field("Vendor", "text", fab.vendor, v => { fab.vendor = v; updatePreview(); }));
+    sec.append(field("Pattern / SKU", "text", fab.sku, v => { fab.sku = v; updatePreview(); }));
+    sec.append(fieldRow([["Color", "text", fab.color, v => { fab.color = v; updatePreview(); }], ["Width", "text", fab.width, v => { fab.width = v; updatePreview(); }]]));
+    sec.append(fieldRow([["Content", "text", fab.content, v => { fab.content = v; updatePreview(); }], ["Repeat", "text", fab.repeat, v => { fab.repeat = v; updatePreview(); }]]));
+    sec.append(buildUpload(cat, "swatch_" + fr.id, "Upload swatch for Fabric " + fr.id));
+    pane.append(sec);
+  });
+  for (const p of cfg.pickers) {
+    const sec = el("div", { class:"form-section" });
+    sec.append(el("h2", {}, p.label));
+    sec.append(await buildPicker(cat, p));
+    pane.append(sec);
+  }
+  const sec6 = el("div", { class:"form-section" });
+  sec6.append(el("h2", {}, "Measurements"));
+  const measGrid = el("div", { style:"display:grid;grid-template-columns:1fr 1fr;gap:8px" });
+  const measKeysForm = visibleMeasurementsForCat(cat, cfg, d);
+  if (cat === "bedding" && !measKeysForm.length) {
+    sec6.append(el("div", { class:"notice", style:"margin-bottom:10px" }, "Measurements appear after you select at least one product type."));
+  }
+  measKeysForm.forEach(m => {
+    const inp = el("input", { type:"text", value:d.measurements[m] || "" });
+    inp.addEventListener("input", e => { d.measurements[m] = e.target.value; updatePreview(); });
+    measGrid.append(el("div", { class:"field" }, el("label", {}, m), inp));
+  });
+  sec6.append(measGrid);
+  pane.append(sec6);
+  const sec7 = el("div", { class:"form-section" });
+  sec7.append(el("h2", {}, "Notes & Fabrication"));
+  sec7.append(field("Notes (one per line)", "textarea", d.notes.join("\n"), v => { d.notes = v.split("\n").map(x => x.trim()).filter(Boolean); updatePreview(); }));
+  sec7.append(field("Fabrication Notes (one per line)", "textarea", d.fabNotes.join("\n"), v => { d.fabNotes = v.split("\n").map(x => x.trim()).filter(Boolean); updatePreview(); }));
+  pane.append(sec7);
+  const actions = el("div", { class:"actions" });
+  actions.append(
+    el("button", { class:"btn secondary", onclick: () => saveWorkOrder(false) }, "Save Draft"),
+    el("button", { class:"btn secondary", onclick: () => saveWorkOrder(true) }, "Save New Revision"),
+    el("button", { class:"btn secondary", onclick: async () => {
+      const pid = (d.projectId || "").trim();
+      if (!pid || !state.currentWorkOrderId) { alert("Save this work order first, then duplicate."); return; }
+      await duplicateWorkOrderFromFirestore(pid, state.currentWorkOrderId);
+      renderForm();
+    }, style: state.currentWorkOrderId ? "" : "display:none" }, "Duplicate as new WO"),
+    el("button", { class:"btn", onclick: exportPPTX }, "Export PPTX"),
+    el("button", { class:"btn secondary", onclick: exportPDF }, "Export PDF"),
+    el("button", { class:"btn secondary", onclick: () => { state.data[cat] = defaultData(cat); state.pickers[cat] = {}; state.uploads[cat] = {}; state.uploadFiles[cat] = {}; state.currentWorkOrderId = ""; renderForm(); } }, "Reset")
+  );
+  pane.append(actions);
+  updatePreview();
+}
+
+document.getElementById("tabs").addEventListener("click", e => {
+  if (e.target.tagName !== "BUTTON") return;
+  document.querySelectorAll("#tabs button").forEach(b => b.classList.remove("active"));
+  e.target.classList.add("active");
+  const group = e.target.dataset.group || (e.target.dataset.cat ? currentGroupFromCategory(e.target.dataset.cat) : "windows");
+  state.uiGroup = group;
+  if (group === "windows") {
+    if (!["style", "drapery", "roman", "flatfold"].includes(state.category)) state.category = "style";
+  } else if (group === "upholstery") {
+    state.category = "upholstery";
+  } else if (group === "bedding") {
+    state.category = "bedding";
+  } else {
+    state.category = "pillows";
+  }
+  // Switching template should not carry an old selected work-order context.
+  state.currentWorkOrderId = "";
+  const d = getCatData(state.category);
+  if (d.projectId) d.workOrder = nextWorkOrderNumber(d.project, state.category, state.workOrdersByProject);
+  const _cfg = CATS[state.category];
+  const _first = _cfg && _cfg.pickers && _cfg.pickers[0];
+  if (_first && LIBRARY[_first.category] && state.libraryRail) {
+    state.libraryRail.libKey = _first.category;
+    state.libraryRail.segments = [];
+    state.libraryRail.targetPickerId = _first.id;
+  }
+  renderForm();
+});
+
+auth.onAuthStateChanged(async user => {
+  const note = document.getElementById("authNote");
+  if (!user) {
+    note.textContent = "Not signed in";
+    document.getElementById("blocked").style.display = "block";
+    return;
+  }
+  state.currentUser = user;
+  const isAdmin = ADMIN_EMAILS.includes((user.email || "").toLowerCase());
+  note.textContent = user.email || "";
+  if (!isAdmin) {
+    document.getElementById("blocked").style.display = "block";
+    return;
+  }
+  const shell = document.getElementById("builderShell");
+  if (shell) shell.style.display = "grid";
+  document.getElementById("app").style.display = "grid";
+  document.getElementById("blocked").style.display = "none";
+  state.uiGroup = currentGroupFromCategory(state.category);
+  document.querySelectorAll("#tabs button").forEach(b => {
+    const grp = b.dataset.group || (b.dataset.cat ? currentGroupFromCategory(b.dataset.cat) : "windows");
+    b.classList.toggle("active", grp === state.uiGroup);
+  });
+  await loadProjects();
+  await loadWorkrooms();
+  await loadProductLibrary();
+  await loadInspirationItems(getCatData(state.category).projectId || "");
+  await applyBuilderQueryParams();
+  await renderForm();
+});
+</script>
+</body>
+</html>

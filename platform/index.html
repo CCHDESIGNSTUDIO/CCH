@@ -2615,6 +2615,9 @@
         <button class="nav-item" data-page="workrooms">
           <span class="nav-icon">◇</span><span class="nav-label">Workrooms</span>
         </button>
+        <a class="nav-item" href="/builder/" target="_blank" rel="noopener noreferrer" style="text-decoration:none;color:inherit;align-items:center;" title="Custom Order Builder (new tab)">
+          <span class="nav-icon">📐</span><span class="nav-label">Order Builder</span>
+        </a>
         <button class="nav-item" data-page="deliveryreceivers">
           <span class="nav-icon">◇</span><span class="nav-label">Receivers</span>
         </button>
@@ -3440,6 +3443,16 @@
       var _navPage = (parts[0] || 'projects').toLowerCase();
       if (!currentUser && _navPage !== 'clientview' && _navPage !== 'clientboard') return;
       const page = _navPage;
+
+      // Product Library loads remaining catalog batches in the background; those callbacks call renderLibraryView().
+      // If we navigated away (e.g. to Vendors), the session must bump or the next batch will overwrite the current page.
+      if (page !== 'library') {
+        window._libLoadSession = (window._libLoadSession || 0) + 1;
+        if (window._pdEscHandler) {
+          try { document.removeEventListener('keydown', window._pdEscHandler); } catch (_pdE) {}
+          window._pdEscHandler = null;
+        }
+      }
 
       // Restore sidebar/topbar when leaving client view
       if (page !== 'clientview' && page !== 'clientboard') {
@@ -8718,9 +8731,10 @@
       `);
 
       const _isAdminUser = currentUser && ADMIN_EMAILS.includes((currentUser.email || '').toLowerCase());
-      const tabs = ['overview', 'tasks', 'selections', 'boards', 'ideabooks', 'designboards', 'ffe', 'specbook', '_div1', 'proposals', 'invoices', 'pos', ...(_isAdminUser ? ['financials'] : []), '_div2', 'files', 'time', 'comms', 'notes'];
-      const tabLabels = { overview: 'Overview', tasks: 'Tasks', selections: 'Selections', ideabooks: 'Inspiration', boards: 'Room Boards', designboards: 'Design Boards', ffe: 'FFE Tracker', specbook: 'Spec Book', proposals: 'Proposals', invoices: 'Invoices', pos: 'Purchase Orders', financials: 'Financials', files: 'Files & Docs', time: 'Time', comms: 'Communications', notes: 'Notes' };
-      const tabIcons = { overview: '◈', tasks: '✅', selections: '🛍️', ideabooks: '💡', boards: '🏠', designboards: '🎨', ffe: '🛋️', specbook: '📖', proposals: '📋', invoices: '💰', pos: '📦', financials: '📊', files: '📁', time: '⏱️', comms: '💬', notes: '📝' };
+      // Work Orders: any signed-in user (not only admin) — was easy to miss when bundled with Financials; placed after Overview.
+      const tabs = ['overview', ...(currentUser ? ['workorders'] : []), 'tasks', 'selections', 'boards', 'ideabooks', 'designboards', 'ffe', 'specbook', '_div1', 'proposals', 'invoices', 'pos', ...(_isAdminUser ? ['financials'] : []), '_div2', 'files', 'time', 'comms', 'notes'];
+      const tabLabels = { overview: 'Overview', tasks: 'Tasks', selections: 'Selections', ideabooks: 'Inspiration', boards: 'Room Boards', designboards: 'Design Boards', ffe: 'FFE Tracker', specbook: 'Spec Book', proposals: 'Proposals', invoices: 'Invoices', pos: 'Purchase Orders', financials: 'Financials', workorders: 'Work Orders', files: 'Files & Docs', time: 'Time', comms: 'Communications', notes: 'Notes' };
+      const tabIcons = { overview: '◈', tasks: '✅', selections: '🛍️', ideabooks: '💡', boards: '🏠', designboards: '🎨', ffe: '🛋️', specbook: '📖', proposals: '📋', invoices: '💰', pos: '📦', financials: '📊', workorders: '📐', files: '📁', time: '⏱️', comms: '💬', notes: '📝' };
 
       // Load profit data for summary bar
       let _projInvoices = [], _projPOs = [], _projTime = [];
@@ -8932,7 +8946,7 @@
       window.location.hash = `#/project/${currentProjectId}/${tab}`;
       document.querySelectorAll('.project-tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.project-tab').forEach(t => {
-        if (t.textContent.trim() === (({overview:'Overview',tasks:'Tasks',selections:'Selections',ideabooks:'Inspiration',boards:'Room Boards',designboards:'Design Boards',ffe:'FFE Tracker',proposals:'Proposals',invoices:'Invoices',pos:'Purchase Orders',financials:'Financials',files:'Files & Docs',time:'Time',comms:'Communications',notes:'Notes'})[tab] || '')) t.classList.add('active');
+        if (t.textContent.trim() === (({overview:'Overview',tasks:'Tasks',selections:'Selections',ideabooks:'Inspiration',boards:'Room Boards',designboards:'Design Boards',ffe:'FFE Tracker',specbook:'Spec Book',proposals:'Proposals',invoices:'Invoices',pos:'Purchase Orders',financials:'Financials',workorders:'Work Orders',files:'Files & Docs',time:'Time',comms:'Communications',notes:'Notes'})[tab] || '')) t.classList.add('active');
       });
       renderProjectDetail(); // Re-render with new tab
     }
@@ -8961,10 +8975,68 @@
       else if (currentProjectTab === 'ffe') await renderFFETab(T, proj);
       else if (currentProjectTab === 'specbook') await renderSpecBookTab(T, proj);
       else if (currentProjectTab === 'financials') await renderFinancialsTab(T, proj);
+      else if (currentProjectTab === 'workorders') await renderWorkOrdersTab(T, proj);
       else if (currentProjectTab === 'time') await renderTimeTab(T, proj);
       else if (currentProjectTab === 'files') await renderFilesTab(T, proj);
       else if (currentProjectTab === 'comms') await renderCommsTab(T, proj);
       else if (currentProjectTab === 'notes') await renderNotesTab(T, proj);
+    }
+
+    /** Custom Order Builder — saved work orders under boards/{projectId}/workOrders */
+    async function renderWorkOrdersTab(T, proj) {
+      T.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400);">Loading work orders...</div>';
+      if (!currentUser) {
+        T.innerHTML = '<div class="empty-state"><div class="empty-text">Sign in to view work orders.</div></div>';
+        return;
+      }
+      var rows = [];
+      try {
+        var woSnap = await db.collection('boards').doc(proj.id).collection('workOrders').orderBy('updatedAt', 'desc').limit(100).get();
+        woSnap.forEach(function(d) { rows.push({ id: d.id, data: d.data() }); });
+      } catch (e) {
+        console.warn('[Work Orders tab]', e);
+        T.innerHTML = '<div class="notice error" style="margin:16px;">Could not load work orders. Try again or check the browser console.</div>';
+        return;
+      }
+      var base = window.location.origin.replace(/\/$/, '') + '/builder/?projectId=' + encodeURIComponent(proj.id);
+      var tdStyle = 'padding:10px 12px;border-bottom:1px solid rgba(27,51,82,0.08);font-size:13px;';
+      var thead = '<thead><tr style="background:rgba(27,51,82,0.04);font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-500);">' +
+        '<th style="padding:10px 12px;text-align:left;">Work order #</th>' +
+        '<th style="padding:10px 12px;text-align:left;">Category</th>' +
+        '<th style="padding:10px 12px;text-align:left;">Room / location</th>' +
+        '<th style="padding:10px 12px;text-align:center;">Rev</th>' +
+        '<th style="padding:10px 12px;text-align:left;">Updated</th>' +
+        '<th style="padding:10px 12px;text-align:right;">Actions</th></tr></thead>';
+      var body = rows.map(function(r) {
+        var x = r.data || {};
+        var wo = esc(x.workOrderNumber || r.id || '');
+        var cat = esc(x.category || '');
+        var loc = esc(x.location || '');
+        var rev = esc(x.revision != null && x.revision !== '' ? String(x.revision) : '—');
+        var upd = '—';
+        try {
+          if (x.updatedAt && x.updatedAt.toDate) upd = x.updatedAt.toDate().toLocaleString();
+          else if (x.updatedAt) upd = String(x.updatedAt);
+        } catch (e0) {}
+        var openU = base + '&workOrderId=' + encodeURIComponent(r.id);
+        var dupU = base + '&duplicateFrom=' + encodeURIComponent(r.id);
+        return '<tr>' +
+          '<td style="' + tdStyle + 'font-family:var(--font-mono);font-weight:600;color:#1B3352;">' + wo + '</td>' +
+          '<td style="' + tdStyle + '">' + cat + '</td>' +
+          '<td style="' + tdStyle + '">' + loc + '</td>' +
+          '<td style="' + tdStyle + 'text-align:center;">' + rev + '</td>' +
+          '<td style="' + tdStyle + 'font-size:12px;color:var(--gray-500);">' + esc(upd) + '</td>' +
+          '<td style="' + tdStyle + 'text-align:right;white-space:nowrap;">' +
+          '<a class="btn btn-secondary btn-sm" href="' + escAttr(openU) + '" target="_blank" rel="noopener noreferrer" style="margin-right:6px;">Open in Builder</a>' +
+          '<a class="btn btn-secondary btn-sm" href="' + escAttr(dupU) + '" target="_blank" rel="noopener noreferrer">Duplicate</a>' +
+          '</td></tr>';
+      }).join('');
+      var empty = '<div class="empty-state" style="padding:40px;"><div class="empty-text">No saved work orders yet. Use <strong>Custom Order Builder</strong> to create one for this project.</div></div>';
+      T.innerHTML =
+        '<div style="margin-bottom:16px;font-size:13px;color:var(--gray-500);">Work orders from the Custom Order Builder are stored in Firestore. Open an existing order or duplicate it to get a <strong>new</strong> work order number before saving.</div>' +
+        (rows.length
+          ? '<div style="overflow-x:auto;border:1px solid rgba(27,51,82,0.1);background:#fff;"><table style="width:100%;border-collapse:collapse;">' + thead + '<tbody>' + body + '</tbody></table></div>'
+          : empty);
     }
 
     // ----- FILES & DOCUMENTS TAB -----
@@ -16480,6 +16552,9 @@ async function renderBoardsTab(T, proj) {
                 ${projSortItems(pos, 'pos').map(po => {
                   const itemCount = (po.items || []).length;
                   const _poBal = (parseFloat(po.total) || 0) - (parseFloat(po.paidAmount) || 0);
+                  const _poProposalId = po.linkedProposalId || po.proposalId || po.proposalDocId || '';
+                  const _poInvoiceId = po.linkedInvoiceId || po.invoiceId || po.invoiceDocId || '';
+                  const _poConnectedRefs = (String(po.connectedDocs || '').match(/(PO|IN|PR)[\s-]?\d+/ig) || []);
                   const poNum = esc(po.number || po.num || po.id.slice(0,8));
                   const poTagRaw = (function() {
                     var t = (typeof proposalDocumentTagText === 'function' ? proposalDocumentTagText(po) : '') || '';
@@ -16504,10 +16579,11 @@ async function renderBoardsTab(T, proj) {
                     <td class="col-date" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;" title="${escAttr(po.shipTo || po.deliverTo || po.receiver || '')}">${esc(po.shipTo || po.deliverTo || po.receiver || '—')}</td>
                     <td onclick="event.stopPropagation()">${qbCellBadge(getQbId(po), po.qbStatus, po)}</td>
                     <td class="col-links" onclick="event.stopPropagation()">
-                      ${po.linkedProposalId ? '<a onclick="navigate(\'#/project/'+proj.id+'/proposal/'+po.linkedProposalId+'\')" style="color:var(--teal);cursor:pointer;margin-right:4px;" title="Linked Proposal">📋</a>' : ''}
-                      ${po.linkedInvoiceId ? '<a onclick="navigate(\'#/project/'+proj.id+'/invoice/'+po.linkedInvoiceId+'\')" style="color:var(--teal);cursor:pointer;margin-right:4px;" title="Linked Invoice">🧾</a>' : ''}
+                      ${_poProposalId ? '<a onclick="navigate(\'#/project/'+proj.id+'/proposal/'+_poProposalId+'\')" style="color:var(--teal);cursor:pointer;margin-right:4px;" title="Linked Proposal">📋</a>' : ''}
+                      ${_poInvoiceId ? '<a onclick="navigate(\'#/project/'+proj.id+'/invoice/'+_poInvoiceId+'\')" style="color:var(--teal);cursor:pointer;margin-right:4px;" title="Linked Invoice">🧾</a>' : ''}
+                      ${_poConnectedRefs.length ? '<span style="color:var(--gray-500);font-size:11px;margin-right:4px;" title="' + escAttr(_poConnectedRefs.join(', ')) + '">📎 ' + _poConnectedRefs.length + '</span>' : ''}
                       ${(po.attachments && po.attachments.length > 0) ? '<span style="cursor:pointer;color:var(--teal);" onclick="viewPOAttachments(\''+proj.id+'\',\''+po.id+'\')" title="'+po.attachments.length+' attachment(s)">📎 '+po.attachments.length+'</span>' : ''}
-                      ${!po.linkedProposalId && !po.linkedInvoiceId ? '<a onclick="linkDocModal(\''+proj.id+'\',\'purchaseOrders\',\''+po.id+'\')" style="color:var(--gray-300);cursor:pointer;" title="Link docs">🔗</a>' : ''}
+                      ${!_poProposalId && !_poInvoiceId ? '<a onclick="linkDocModal(\''+proj.id+'\',\'purchaseOrders\',\''+po.id+'\')" style="color:var(--gray-300);cursor:pointer;" title="Link docs">🔗</a>' : ''}
                     </td>
                     <td class="col-actions" onclick="event.stopPropagation()">
                       <div class="action-menu-wrap" style="display:flex;align-items:center;gap:4px;position:relative;">
@@ -36160,6 +36236,38 @@ async function renderBoardsTab(T, proj) {
     }
     window.getProductImg = getProductImg;
 
+    /** Library list/grid thumbnails: use strict `getProductImg` first, then resolved HTTP/data URLs (merge left blanks must not hide real URLs rejected only by weak-url heuristics). */
+    function libraryListThumbUrl(p) {
+      if (!p) return '';
+      var strict = getProductImg(p);
+      if (strict) return strict;
+      function tryOne(raw) {
+        var r = _resolveImgSrc(String(raw == null ? '' : raw).trim());
+        if (!r) return '';
+        if (/^https?:\/\//i.test(r) || r.indexOf('//') === 0 || /^data:image/i.test(r)) return r;
+        return '';
+      }
+      var keys = ['imageUrl', 'image', 'img', 'thumbnail', 'photo', 'coverImage', 'preview', 'productImage', 'imageURL'];
+      for (var ki = 0; ki < keys.length; ki++) {
+        var u = tryOne(p[keys[ki]]);
+        if (u) return u;
+      }
+      var arrKeys = ['images', 'imageUrls', 'gallery', 'photos', 'photoUrls', 'productPhotos'];
+      for (var ai = 0; ai < arrKeys.length; ai++) {
+        try {
+          var it = _coerceImageIterable(p[arrKeys[ai]]);
+          for (var j = 0; j < it.length; j++) {
+            var ent = it[j];
+            var s = typeof ent === 'string' ? ent : (ent && (ent.url || ent.imageUrl || ent.src || ent.href || ent.thumbnail || ent.photo));
+            var u2 = tryOne(s);
+            if (u2) return u2;
+          }
+        } catch (_e) {}
+      }
+      return '';
+    }
+    window.libraryListThumbUrl = libraryListThumbUrl;
+
     /** Path segments for URL heuristics (client board + design-board save). */
     function cchBoardImagePathSegmentCount(u) {
       try {
@@ -36469,6 +36577,74 @@ async function renderBoardsTab(T, proj) {
       }
     }
 
+    /** Prefer strongest thumbnail URL when merging two catalog docs (strict vs relaxed picks). */
+    function _pickBestMergedCatalogImage(existing, incoming, out) {
+      var weakFn = typeof cchBoardImageIsWeak === 'function' ? cchBoardImageIsWeak : null;
+      var urls = [libraryListThumbUrl(out), libraryListThumbUrl(existing), libraryListThumbUrl(incoming)].filter(Boolean);
+      var fallback = '';
+      for (var i = 0; i < urls.length; i++) {
+        var u = urls[i];
+        if (!weakFn || !weakFn(u)) return u;
+        fallback = fallback || u;
+      }
+      return fallback || '';
+    }
+
+    /**
+     * Merge `products` + `productLibrary` by doc id.
+     * IMPORTANT: Never let incoming empty `imageUrl` / empty `images[]` wipe existing thumbnails (was breaking production after merge).
+     */
+    function _mergeLibraryCatalogRows(existing, incoming) {
+      if (!incoming) return existing;
+      if (!existing) return incoming;
+      var MEDIA_KEYS = { imageUrl: 1, image: 1, img: 1, thumbnail: 1, photo: 1, src: 1, coverImage: 1, preview: 1, productImage: 1, imageURL: 1, images: 1, imageUrls: 1, gallery: 1, photos: 1, photoUrls: 1, productPhotos: 1 };
+      var out = Object.assign({}, existing);
+      Object.keys(incoming).forEach(function(k) {
+        var iv = incoming[k];
+        if (MEDIA_KEYS[k]) {
+          if (iv === '' || iv === null || iv === undefined) return;
+          if (Array.isArray(iv) && iv.length === 0) return;
+          out[k] = iv;
+          return;
+        }
+        out[k] = iv;
+      });
+      ['houzzId', 'houzzProductId'].forEach(function(k) {
+        var cur = String(out[k] != null ? out[k] : '').trim();
+        if (!cur) {
+          var e = String(existing[k] != null ? existing[k] : '').trim();
+          var i = String(incoming[k] != null ? incoming[k] : '').trim();
+          if (i) out[k] = incoming[k];
+          else if (e) out[k] = existing[k];
+        }
+      });
+      var best = _pickBestMergedCatalogImage(existing, incoming, out);
+      if (best) out.imageUrl = best;
+
+      ['cost', 'costPrice', 'clientPrice', 'sellPrice', 'totalSelling', 'sku'].forEach(function(k) {
+        var v = out[k];
+        var missing = v == null || v === '' || (typeof v === 'number' && !isFinite(v));
+        if (missing) {
+          if (incoming[k] != null && incoming[k] !== '') out[k] = incoming[k];
+          if ((out[k] == null || out[k] === '') && existing[k] != null && existing[k] !== '') out[k] = existing[k];
+        }
+      });
+      return out;
+    }
+    function _libIngestSnapIntoMap(mergeMap, snap) {
+      snap.forEach(function(d) {
+        var row = Object.assign({ id: d.id }, d.data());
+        mergeMap[d.id] = _mergeLibraryCatalogRows(mergeMap[d.id], row);
+      });
+    }
+    function _libRebuildProductsFromMergeMap(mergeMap) {
+      libraryProducts = Object.keys(mergeMap).map(function(k) { return mergeMap[k]; });
+      libraryProducts.sort(function(a, b) { return (b.updatedAt || '').localeCompare(a.updatedAt || ''); });
+      libraryProducts = libraryProducts.filter(isRealProduct);
+      normalizeLibraryProducts();
+      buildLibraryGlobalSets();
+    }
+
     async function renderProductLibrary() {
       setBreadcrumb([{ label: 'Product Library' }]);
       setTopbarActions('<button type="button" class="btn btn-secondary" style="margin-right:8px;" onclick="showImportTearSheetModal(null,null)" title="Upload RH / Houzz tear sheet PDF — update product photos">📄 Import tear sheet PDF</button><label class="btn btn-secondary" style="margin-right:8px;cursor:pointer;">📷 Upload Images<input type="file" accept="image/*" multiple style="display:none;" onchange="bulkUploadProductImages(this.files);this.value=\'\'"></label><button type="button" class="btn btn-primary" onclick="showNewProductModal()">Add new product</button>');
@@ -36493,56 +36669,77 @@ async function renderBoardsTab(T, proj) {
       // Track which load session this is so background batches stop if we navigate away
       var loadSession = window._libLoadSession = (window._libLoadSession || 0) + 1;
 
-      // Load from products collection - show first batch immediately, load rest in background
+      // Load `products` + `productLibrary` and merge by doc id (staging often has Houzz + images on productLibrary only).
       try {
-        libraryProducts = [];
-        let lastDoc = null;
+        var mergeMap = {};
+        let lastDocP = null;
+        let lastDocL = null;
         const batchSize = 500;
-        // Load first batch and render immediately
-        const firstSnap = await db.collection('products').limit(batchSize).get();
-        if (window._libLoadSession !== loadSession) return; // navigated away
-        firstSnap.forEach(d => libraryProducts.push({ id: d.id, ...d.data() }));
-        lastDoc = firstSnap.docs.length === batchSize ? firstSnap.docs[firstSnap.docs.length - 1] : null;
-        libraryProducts.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
-        libraryProducts = libraryProducts.filter(isRealProduct);
-        normalizeLibraryProducts();
-        buildLibraryGlobalSets();
-        renderLibraryView();
-        // Load remaining batches in background — NO re-render until done
-        if (lastDoc) {
-          (async function loadMore() {
-            var batchNum = 1;
-            while (lastDoc) {
-              if (window._libLoadSession !== loadSession) return;
-              try {
-                const snap = await db.collection('products').startAfter(lastDoc).limit(batchSize).get();
-                if (window._libLoadSession !== loadSession) return;
-                snap.forEach(d => libraryProducts.push({ id: d.id, ...d.data() }));
-                batchNum++;
-                if (snap.docs.length < batchSize) { lastDoc = null; } else { lastDoc = snap.docs[snap.docs.length - 1]; }
-              } catch(e) { break; }
-            }
-            // All batches loaded — one final render
-            if (window._libLoadSession !== loadSession) return;
-            libraryProducts.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
-            libraryProducts = libraryProducts.filter(isRealProduct);
-            normalizeLibraryProducts();
-            buildLibraryGlobalSets();
-            renderLibraryView();
-            showToast(libraryProducts.length + ' products loaded');
-          })();
+
+        const firstSnapP = await db.collection('products').limit(batchSize).get();
+        if (window._libLoadSession !== loadSession) return;
+        _libIngestSnapIntoMap(mergeMap, firstSnapP);
+        lastDocP = firstSnapP.docs.length === batchSize ? firstSnapP.docs[firstSnapP.docs.length - 1] : null;
+
+        try {
+          const firstSnapL = await db.collection('productLibrary').limit(batchSize).get();
+          if (window._libLoadSession !== loadSession) return;
+          _libIngestSnapIntoMap(mergeMap, firstSnapL);
+          lastDocL = firstSnapL.docs.length === batchSize ? firstSnapL.docs[firstSnapL.docs.length - 1] : null;
+        } catch (_eLib1) {
+          lastDocL = null;
         }
-        return; // skip the old code below
+
+        _libRebuildProductsFromMergeMap(mergeMap);
+        renderLibraryView();
+
+        (async function loadMoreMerged() {
+          while (lastDocP || lastDocL) {
+            if (window._libLoadSession !== loadSession) return;
+            try {
+              if (lastDocP) {
+                const snapP = await db.collection('products').startAfter(lastDocP).limit(batchSize).get();
+                if (window._libLoadSession !== loadSession) return;
+                _libIngestSnapIntoMap(mergeMap, snapP);
+                lastDocP = snapP.docs.length === batchSize ? snapP.docs[snapP.docs.length - 1] : null;
+              }
+            } catch (_eP) {
+              lastDocP = null;
+            }
+            try {
+              if (lastDocL) {
+                const snapL = await db.collection('productLibrary').startAfter(lastDocL).limit(batchSize).get();
+                if (window._libLoadSession !== loadSession) return;
+                _libIngestSnapIntoMap(mergeMap, snapL);
+                lastDocL = snapL.docs.length === batchSize ? snapL.docs[snapL.docs.length - 1] : null;
+              }
+            } catch (_eL) {
+              lastDocL = null;
+            }
+          }
+          if (window._libLoadSession !== loadSession) return;
+          _libRebuildProductsFromMergeMap(mergeMap);
+          renderLibraryView();
+          showToast(libraryProducts.length + ' products loaded');
+        })();
+
+        return;
       } catch(e) {
         if (window._libLoadSession !== loadSession) return;
         try {
+          var mergeMapFB = {};
           const snap = await db.collection('products').limit(6000).get();
+          _libIngestSnapIntoMap(mergeMapFB, snap);
+          try {
+            const snapL2 = await db.collection('productLibrary').limit(6000).get();
+            _libIngestSnapIntoMap(mergeMapFB, snapL2);
+          } catch (_eLfb) {}
+          _libRebuildProductsFromMergeMap(mergeMapFB);
+        } catch(e2) {
           libraryProducts = [];
-          snap.forEach(d => libraryProducts.push({ id: d.id, ...d.data() }));
-        } catch(e2) { libraryProducts = []; }
+        }
       }
 
-      // Filter out junk (fallback path — first-batch path returns early above)
       libraryProducts = libraryProducts.filter(isRealProduct);
       normalizeLibraryProducts();
       buildLibraryGlobalSets();
@@ -37861,7 +38058,9 @@ async function renderBoardsTab(T, proj) {
                         str(p.materials).includes(s) ||
                         str(p.finish).includes(s) ||
                         str(p.dimensions).includes(s) ||
-                        str(p.category).includes(s);
+                        str(p.category).includes(s) ||
+                        str(p.houzzId).includes(s) ||
+                        str(p.houzzProductId).includes(s);
           if (!match) return false;
         }
         if (libraryFilter.vendor && (p.vendor || '') !== libraryFilter.vendor && (p.manufacturer || '') !== libraryFilter.vendor) return false;
@@ -37924,25 +38123,35 @@ async function renderBoardsTab(T, proj) {
             <tbody>${displayItems.map(p => {
               const cost = parseFloat(p.cost || p.costPrice) || 0;
               const sell = parseFloat(p.clientPrice || p.sellPrice || p.totalSelling) || 0;
-              const imgSrc = getProductImg(p);
+              const imgSrc = libraryListThumbUrl(p);
               const imgHtml = imgSrc
                 ? '<img src="' + _escImgSrcAttr(imgSrc) + '" referrerpolicy="no-referrer" style="width:80px;height:80px;object-fit:cover;border-radius:0;background:var(--gray-100);" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
                   '<div style="display:none;width:80px;height:80px;border-radius:0;background:var(--gray-100);align-items:center;justify-content:center;color:var(--gray-300);font-size:20px;">📷</div>'
                 : '<label onclick="event.stopPropagation()" style="width:80px;height:80px;border-radius:0;background:var(--gray-100);display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:20px;cursor:pointer;border:2px dashed var(--gray-200);transition:border-color 0.15s;" onmouseenter="this.style.borderColor=\'var(--gold)\'" onmouseleave="this.style.borderColor=\'var(--gray-200)\'" title="Upload image">📷<input type="file" accept="image/*" style="display:none;" onchange="event.stopPropagation();window._pdUploadImage(this.files[0],\'' + p.id + '\');this.value=\'\'"></label>';
               var _k = p.libraryItemKind || p.itemKind || 'product';
               var _kb = _k === 'design_service' ? '<span style="font-size:9px;font-weight:700;background:#E8EEF5;color:#1B3352;padding:2px 5px;margin-left:6px;vertical-align:middle;">SVC</span>' : (_k === 'expense' ? '<span style="font-size:9px;font-weight:700;background:#F5E8E8;color:#8B2E2E;padding:2px 5px;margin-left:6px;vertical-align:middle;">EXP</span>' : '');
+              var _isHouzz = !!String(p.houzzId || p.houzzProductId || '').trim();
+              var _src = String(p.source || p.dataSource || p.origin || '').toLowerCase();
+              var _isStudioAdded = _src.indexOf('clipper') >= 0 || _src.indexOf('manual') >= 0 || _src.indexOf('studio') >= 0;
+              var _houzzBadge = _isHouzz
+                ? '<span title="Houzz-origin product" style="margin-left:6px;font-size:10px;font-weight:700;background:#E6F4EA;color:#1B5E20;border:1px solid rgba(27,94,32,0.2);padding:1px 6px;vertical-align:middle;">H</span>'
+                : (_isStudioAdded ? '<span title="Studio-added item" style="margin-left:6px;font-size:10px;font-weight:700;background:#EEF2FF;color:#1E3A8A;border:1px solid rgba(30,58,138,0.18);padding:1px 6px;vertical-align:middle;">S</span>' : '');
+              var _linkedCount = [p.houzzProposal, p.houzzInvoice, p.houzzPO, p.proposal, p.invoice, p.po]
+                .filter(function(v) { return !!String(v || '').trim(); }).length;
               var _lid = escAttr(p.id);
+              var _hzShow = String(p.houzzId || p.houzzProductId || '').trim();
               return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" data-libid="' + _lid + '" onclick="showProductDetail(this.getAttribute(\'data-libid\'))">' +
                 '<td style="padding:8px;text-align:center;" onclick="event.stopPropagation()"><input type="checkbox" class="lib-cb" data-id="' + _lid + '" aria-label="Select product row"></td>' +
                 '<td style="padding:8px 10px;">' + imgHtml + '</td>' +
-                '<td style="padding:8px 10px;"><div style="font-weight:600;font-size:14px;">' + esc(p.title || '') + _kb + '</div>' +
+                '<td style="padding:8px 10px;"><div style="font-weight:600;font-size:14px;">' + esc(p.title || '') + _kb + _houzzBadge + '</div>' +
+                  (_hzShow ? '<div style="font-size:10px;color:#2E7D32;margin-top:3px;font-family:ui-monospace,monospace;" title="Houzz product id">Houzz ' + esc(_hzShow) + '</div>' : '') +
                   (p.description ? '<div style="font-size:11px;color:var(--gray-400);max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">' + esc(p.description) + '</div>' : '') +
                   (p.dimensions ? '<div style="font-size:11px;color:var(--gray-400);margin-top:1px;">' + esc(p.dimensions) + '</div>' : '') + '</td>' +
                 '<td style="padding:8px 10px;font-size:12px;">' + esc(p.vendor || p.manufacturer || '') + '</td>' +
                 '<td style="padding:8px 10px;font-size:12px;">' + esc(p.category || '') + '</td>' +
                 '<td style="padding:8px 10px;font-size:12px;color:var(--gray-500);white-space:nowrap;">' + esc(formatLibraryDateAdded(p)) + '</td>' +
                 '<td style="padding:8px;text-align:center;" onclick="event.stopPropagation()">' +
-                  (p.houzzId ? '<button type="button" title="Show linked proposals, invoices, POs" data-libid="' + _lid + '" onclick="event.stopPropagation();_pdShowLinkedPopover(this,this.getAttribute(\'data-libid\'))" style="border:1px solid var(--gray-200);background:#fff;cursor:pointer;padding:4px 8px;font-size:14px;border-radius:0;">🔗</button>' : '<span style="color:var(--gray-300);font-size:11px;">—</span>') +
+                  (_isHouzz ? '<button type="button" title="Show connected docs" data-libid="' + _lid + '" onclick="event.stopPropagation();_pdShowLinkedPopover(this,this.getAttribute(\'data-libid\'))" style="border:1px solid var(--gray-200);background:#fff;cursor:pointer;padding:4px 8px;font-size:13px;border-radius:0;">📎' + (_linkedCount > 0 ? (' ' + _linkedCount) : '') + '</button>' : '<span style="color:var(--gray-300);font-size:11px;">—</span>') +
                 '</td>' +
                 '<td style="padding:8px 10px;text-align:right;font-family:var(--font-mono);font-size:13px;">' + (cost ? '$' + cost.toLocaleString('en-US', {minimumFractionDigits:2}) : '-') + '</td>' +
                 '<td style="padding:8px 10px;text-align:right;font-family:var(--font-mono);font-size:13px;color:var(--green);">' + (sell ? '$' + sell.toLocaleString('en-US', {minimumFractionDigits:2}) : '-') + '</td>' +
@@ -37966,9 +38175,9 @@ async function renderBoardsTab(T, proj) {
               : '';
             return `
             <div class="pl-card" onclick="showProductDetail('${p.id}')">
-              ${getProductImg(p)
-                ? `<img class="pl-card-img" src="${_escImgSrcAttr(getProductImg(p))}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="pl-card-img" style="display:none;align-items:center;justify-content:center;color:var(--gray-300);font-size:40px;">📷</div>`
-                : '<div class="pl-card-img" style="display:flex;align-items:center;justify-content:center;color:var(--gray-300);font-size:40px;">📦</div>'}
+              ${(() => { var _th = libraryListThumbUrl(p); return _th
+                ? `<img class="pl-card-img" src="${_escImgSrcAttr(_th)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="pl-card-img" style="display:none;align-items:center;justify-content:center;color:var(--gray-300);font-size:40px;">📷</div>`
+                : '<div class="pl-card-img" style="display:flex;align-items:center;justify-content:center;color:var(--gray-300);font-size:40px;">📦</div>'; })()}
               <div class="pl-card-overlay"></div>
               <div class="pl-card-actions">
                 <label class="pl-action-btn" onclick="event.stopPropagation()" title="Upload Image" style="cursor:pointer;">&#128247;<input type="file" accept="image/*" style="display:none;" onchange="event.stopPropagation();window._pdUploadImage(this.files[0],'${p.id}');this.value=''"></label>
@@ -39780,10 +39989,14 @@ async function renderBoardsTab(T, proj) {
       if (!prod) return;
       var title = (prod.title || '').toLowerCase().trim();
       var sku = (prod.sku || '').toLowerCase().trim();
-      var houzzId = String(prod.houzzId || '').trim();
+      var houzzId = String(prod.houzzId || prod.houzzProductId || '').trim();
 
       var poEl = document.getElementById('peProductPOs');
       var invEl = document.getElementById('peProductInvoices');
+      var propEl = document.getElementById('peProductProposals');
+      if (poEl) poEl.innerHTML = 'Loading…';
+      if (invEl) invEl.innerHTML = 'Loading…';
+      if (propEl) propEl.innerHTML = 'Loading…';
 
       var poRefs = new Map();
       var invRefs = new Map();
@@ -39802,7 +40015,6 @@ async function renderBoardsTab(T, proj) {
         if (sm) status = sm[1].trim();
         return { num: num, status: status };
       }
-
       function normRef(s, prefix) {
         if (!s) return null;
         var t = String(s).trim().toUpperCase().replace(/^PR-?DRAFT[-\s]/i, '');
@@ -39812,73 +40024,92 @@ async function renderBoardsTab(T, proj) {
       }
       function parseConnectedDocs(s, pName, projId) {
         if (!s) return;
-        // "PO-12592, PO-12918, IN-12455, PR-12937"
         String(s).split(/[,;\n]+/).forEach(function(part) {
           var t = part.trim();
           if (!t) return;
-          var po = normRef(t, 'PO'); if (po) { poRefs.set(po, { project: pName, status: '', projectId: projId }); matchedProjects.add(projId); }
-          var inv = normRef(t, 'IN'); if (inv) { invRefs.set(inv, { project: pName, status: '', projectId: projId }); matchedProjects.add(projId); }
-          var pr = normRef(t, 'PR'); if (pr) { proposalRefs.set(pr, { project: pName, status: '', projectId: projId }); matchedProjects.add(projId); }
+          var po = normRef(t, 'PO'); if (po) { poRefs.set(po, { project: pName, status: '', projectId: projId }); if (projId) matchedProjects.add(projId); }
+          var inv = normRef(t, 'IN'); if (inv) { invRefs.set(inv, { project: pName, status: '', projectId: projId }); if (projId) matchedProjects.add(projId); }
+          var pr = normRef(t, 'PR'); if (pr) { proposalRefs.set(pr, { project: pName, status: '', projectId: projId }); if (projId) matchedProjects.add(projId); }
         });
       }
+      function normHouzz(v) {
+        return String(v || '').trim().toLowerCase();
+      }
+      var targetHouzz = normHouzz(houzzId);
+      function matchHouzzFirst(candidateHouzz, candidateSku, candidateTitle) {
+        var cHouzz = normHouzz(candidateHouzz);
+        // 1) exact houzzId match first
+        if (targetHouzz && cHouzz) return cHouzz === targetHouzz;
+        // 2) fallback to sku/title when houzz id is missing on either side
+        if (sku && candidateSku && String(candidateSku).toLowerCase().trim() === sku) return true;
+        if (title && title.length >= 4 && candidateTitle) {
+          var cTitle = String(candidateTitle).toLowerCase().trim();
+          if (cTitle && (cTitle === title || cTitle.includes(title) || title.includes(cTitle))) return true;
+        }
+        return false;
+      }
+      function collectDocRefsFromRecord(rec, projectName, projectId) {
+        var poR = parseHouzzRef(rec && rec.houzzPO, 'PO');
+        if (poR) { poRefs.set(poR.num, { project: projectName, status: poR.status, projectId: projectId }); if (projectId) matchedProjects.add(projectId); }
+        var invR = parseHouzzRef(rec && rec.houzzInvoice, 'IN');
+        if (invR) { invRefs.set(invR.num, { project: projectName, status: invR.status, projectId: projectId }); if (projectId) matchedProjects.add(projectId); }
+        var prR = parseHouzzRef(rec && rec.houzzProposal, 'PR');
+        if (prR) { proposalRefs.set(prR.num, { project: projectName, status: prR.status, projectId: projectId }); if (projectId) matchedProjects.add(projectId); }
+        var npo = normRef(rec && (rec.poNum || rec.poNumber || rec.po), 'PO');
+        if (npo) { poRefs.set(npo, { project: projectName, status: String((rec && rec.poStatus) || ''), projectId: projectId }); if (projectId) matchedProjects.add(projectId); }
+        var ninv = normRef(rec && (rec.invoiceNum || rec.invoice), 'IN');
+        if (ninv) { invRefs.set(ninv, { project: projectName, status: String((rec && rec.invoiceStatus) || ''), projectId: projectId }); if (projectId) matchedProjects.add(projectId); }
+        var npr = normRef(rec && (rec.proposalNum || rec.proposal), 'PR');
+        if (npr) { proposalRefs.set(npr, { project: projectName, status: String((rec && rec.proposalStatus) || ''), projectId: projectId }); if (projectId) matchedProjects.add(projectId); }
+        parseConnectedDocs(rec && rec.connectedDocs, projectName, projectId);
+      }
 
+      var projSnap;
       try {
-        var projSnap = await db.collection('boards').limit(200).get();
+        projSnap = await db.collection('boards').limit(300).get();
         for (var bi = 0; bi < projSnap.docs.length; bi++) {
           var pd = projSnap.docs[bi];
           var pName = pd.data().name || pd.id;
-          // Pass A: clips
-          try {
-            var clips = await pd.ref.collection('clips').limit(500).get();
-            clips.forEach(function(cd) {
-              var c = cd.data();
-              var cTitle = (c.title || '').toLowerCase().trim();
-              var cSku = (c.sku || '').toLowerCase().trim();
-              var cHouzzId = String(c.houzzId || c.houzzProductId || '').trim();
-              var match = false;
-              if (houzzId && cHouzzId && cHouzzId === houzzId) match = true;
-              else if (sku && cSku && cSku === sku) match = true;
-              else if (title && title.length >= 4 && cTitle && (cTitle === title || cTitle.includes(title) || title.includes(cTitle))) match = true;
-              if (!match) return;
-              var poR = parseHouzzRef(c.houzzPO, 'PO');
-              if (poR) { poRefs.set(poR.num, { project: pName, status: poR.status, projectId: pd.id }); matchedProjects.add(pd.id); }
-              var invR = parseHouzzRef(c.houzzInvoice, 'IN');
-              if (invR) { invRefs.set(invR.num, { project: pName, status: invR.status, projectId: pd.id }); matchedProjects.add(pd.id); }
-              var prR = parseHouzzRef(c.houzzProposal, 'PR');
-              if (prR) { proposalRefs.set(prR.num, { project: pName, status: prR.status, projectId: pd.id }); matchedProjects.add(pd.id); }
-              var npo = normRef(c.poNum, 'PO');
-              if (npo) { poRefs.set(npo, { project: pName, status: c.poStatus || '', projectId: pd.id }); matchedProjects.add(pd.id); }
-              var ninv = normRef(c.invoiceNum, 'IN');
-              if (ninv) { invRefs.set(ninv, { project: pName, status: c.invoiceStatus || '', projectId: pd.id }); matchedProjects.add(pd.id); }
-              var npr = normRef(c.proposalNum, 'PR');
-              if (npr) { proposalRefs.set(npr, { project: pName, status: c.proposalStatus || '', projectId: pd.id }); matchedProjects.add(pd.id); }
-              parseConnectedDocs(c.connectedDocs, pName, pd.id);
-            });
-          } catch (_e) {}
-          // Pass B: scan proposals/invoices/POs items[] directly (catches products that are on docs but not on a clip)
+
+          // Pass A: scan all clips + selections (if present)
+          var srcCols = ['clips', 'selections'];
+          for (var ci = 0; ci < srcCols.length; ci++) {
+            try {
+              var srcSnap = await pd.ref.collection(srcCols[ci]).limit(800).get();
+              srcSnap.forEach(function(sd) {
+                var c = sd.data() || {};
+                if (!matchHouzzFirst(c.houzzId || c.houzzProductId, c.sku, c.title || c.name || c.description)) return;
+                collectDocRefsFromRecord(c, pName, pd.id);
+              });
+            } catch (_eSrc) {}
+          }
+
+          // Pass B: scan all proposals/invoices/purchaseOrders items[]
           var subDefs = [
             { sub: 'proposals', refs: proposalRefs, prefix: 'PR', numField: 'proposalNum' },
             { sub: 'invoices', refs: invRefs, prefix: 'IN', numField: 'invoiceNum' },
-            { sub: 'purchaseOrders', refs: poRefs, prefix: 'PO', numField: 'poNumber' },
+            { sub: 'purchaseOrders', refs: poRefs, prefix: 'PO', numField: 'poNumber' }
           ];
           for (var sdi = 0; sdi < subDefs.length; sdi++) {
             var sdef = subDefs[sdi];
             try {
-              var docs = await pd.ref.collection(sdef.sub).limit(500).get();
+              var docs = await pd.ref.collection(sdef.sub).limit(800).get();
               docs.forEach(function(d) {
-                var x = d.data();
+                var x = d.data() || {};
+                // Match against line items (houzz first)
                 var items = x.items || x.lineItems || [];
-                if (!Array.isArray(items) || items.length === 0) return;
-                var hit = items.some(function(it) {
-                  var iT = (it.title || it.name || it.description || '').toLowerCase().trim();
-                  var iS = (it.sku || '').toLowerCase().trim();
-                  var iHId = String(it.houzzId || it.houzzProductId || '').trim();
-                  if (houzzId && iHId && iHId === houzzId) return true;
-                  if (sku && iS && iS === sku) return true;
-                  if (title && title.length >= 4 && iT && (iT === title || iT.includes(title) || title.includes(iT))) return true;
-                  return false;
-                });
+                var hit = false;
+                if (Array.isArray(items) && items.length) {
+                  hit = items.some(function(it) {
+                    return matchHouzzFirst(it && (it.houzzId || it.houzzProductId), it && it.sku, it && (it.title || it.name || it.description));
+                  });
+                }
+                // Fallback: document-level matching when line items are sparse
+                if (!hit) {
+                  hit = matchHouzzFirst(x.houzzId || x.houzzProductId, x.sku, x.title || x.name || x.description);
+                }
                 if (!hit) return;
+
                 var rawNum = x[sdef.numField] || x.proposalNum || x.invoiceNum || x.poNumber || x.number || d.id;
                 var num = normRef(rawNum, sdef.prefix);
                 if (!num) return;
@@ -39886,13 +40117,15 @@ async function renderBoardsTab(T, proj) {
                   sdef.refs.set(num, { project: pName, status: x.status || '', projectId: pd.id });
                 }
                 matchedProjects.add(pd.id);
+                collectDocRefsFromRecord(x, pName, pd.id);
               });
-            } catch (_e) {}
+            } catch (_eDoc) {}
           }
         }
       } catch (e) {
         if (poEl) poEl.innerHTML = '<span style="color:var(--gray-300);">Could not load POs</span>';
         if (invEl) invEl.innerHTML = '<span style="color:var(--gray-300);">Could not load invoices</span>';
+        if (propEl) propEl.innerHTML = '<span style="color:var(--gray-300);">Could not load proposals</span>';
         return;
       }
 
@@ -41159,7 +41392,7 @@ async function renderBoardsTab(T, proj) {
           if (!vendorMap[name]) {
             vendorMap[name] = {
               name: name, description: '', type: '', contact: '', email: '', phone: '', tags: '',
-              website: p.vendorUrl || '', productCount: 0, totalCost: 0, totalSell: 0, source: 'products'
+              website: p.vendorUrl || '', productCount: 0, totalCost: 0, totalSell: 0, poCount: 0, poTotal: 0, source: 'products'
             };
           }
           vendorMap[name].productCount++;
@@ -41169,9 +41402,77 @@ async function renderBoardsTab(T, proj) {
         });
       } catch(e) { console.error('Product load error:', e); }
 
+      // 2b. Initialize poCount/poTotal on any vendor records that didn't get them above
+      Object.values(vendorMap).forEach(function(v) {
+        if (typeof v.poCount !== 'number') v.poCount = 0;
+        if (typeof v.poTotal !== 'number') v.poTotal = 0;
+      });
+
+      // Render now (without PO counts) so the page is interactive fast; PO counts back-fill below.
       vendorsCache = Object.values(vendorMap);
       vendorsTotalCount = vendorsCache.length;
       renderVendorsList();
+
+      // 3. Load PO counts per vendor across all boards in parallel.
+      //    Houzz-style "POs" column: count of distinct POs attributed to this vendor.
+      //    Vendor attribution: PO-level vendor field first; fall back to item-level vendor for Houzz-imported POs.
+      try {
+        const projSnap = await (typeof getCachedBoards === 'function' ? getCachedBoards() : db.collection('boards').get());
+        const boardDocs = projSnap.docs || [];
+        const poSnaps = await Promise.all(boardDocs.map(function(pd) {
+          return db.collection('boards').doc(pd.id).collection('purchaseOrders').get().catch(function() { return { forEach: function() {} }; });
+        }));
+        // Build a lookup of normalized vendor names so we can match Houzz vendor variants to vendorMap keys.
+        var nameLower = {};
+        Object.keys(vendorMap).forEach(function(n) { nameLower[n.toLowerCase().trim()] = n; });
+        function attributeVendor(rawName) {
+          if (!rawName) return null;
+          var k = String(rawName).toLowerCase().trim();
+          if (!k) return null;
+          if (nameLower[k]) return nameLower[k];
+          // partial match (length-guarded)
+          if (k.length > 3) {
+            for (var ln in nameLower) {
+              if (ln.length > 3 && (ln.includes(k) || k.includes(ln))) return nameLower[ln];
+            }
+          }
+          // unseen vendor — register it
+          var displayName = String(rawName).trim();
+          vendorMap[displayName] = {
+            name: displayName, description: '', type: '', contact: '', email: '', phone: '', tags: '',
+            website: '', productCount: 0, totalCost: 0, totalSell: 0, poCount: 0, poTotal: 0, source: 'po-only'
+          };
+          nameLower[k] = displayName;
+          return displayName;
+        }
+        for (var i = 0; i < poSnaps.length; i++) {
+          poSnaps[i].forEach(function(d) {
+            var po = d.data();
+            // PO-level vendor first
+            var attributed = attributeVendor(po.vendor || po.vendorName || '');
+            // Fall back to item-level vendor (Houzz imports vary). Only count once per PO per vendor.
+            if (!attributed && po.items && po.items.length) {
+              var seen = new Set();
+              for (var k = 0; k < po.items.length; k++) {
+                var iv = attributeVendor(po.items[k] && (po.items[k].vendor || po.items[k].vendorName));
+                if (iv && !seen.has(iv)) {
+                  seen.add(iv);
+                  vendorMap[iv].poCount++;
+                  vendorMap[iv].poTotal += parseFloat(po.total || po.amount) || 0;
+                }
+              }
+              return;
+            }
+            if (attributed) {
+              vendorMap[attributed].poCount++;
+              vendorMap[attributed].poTotal += parseFloat(po.total || po.amount) || 0;
+            }
+          });
+        }
+        vendorsCache = Object.values(vendorMap);
+        vendorsTotalCount = vendorsCache.length;
+        renderVendorsList();
+      } catch(e) { console.warn('Vendor PO load error:', e); }
     }
 
     function renderVendorsList() {
@@ -41191,7 +41492,7 @@ async function renderBoardsTab(T, proj) {
       // Sort
       filtered.sort(function(a, b) {
         var dir = vendorSortDir === 'asc' ? 1 : -1;
-        if (vendorSortField === 'productCount' || vendorSortField === 'totalCost' || vendorSortField === 'totalSell') {
+        if (vendorSortField === 'productCount' || vendorSortField === 'totalCost' || vendorSortField === 'totalSell' || vendorSortField === 'poCount' || vendorSortField === 'poTotal') {
           return ((a[vendorSortField] || 0) - (b[vendorSortField] || 0)) * dir;
         }
         var aVal = String(a[vendorSortField] || '').toLowerCase();
@@ -41221,16 +41522,22 @@ async function renderBoardsTab(T, proj) {
               <th style="padding:10px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;cursor:pointer;user-select:none;" onclick="${vsClick('email')}">Email${vsa('email')}</th>
               <th style="padding:10px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;cursor:pointer;user-select:none;" onclick="${vsClick('phone')}">Phone${vsa('phone')}</th>
               <th style="padding:10px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;cursor:pointer;user-select:none;" onclick="${vsClick('tags')}">Tags${vsa('tags')}</th>
+              <th style="padding:10px;text-align:right;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;cursor:pointer;user-select:none;width:90px;" onclick="${vsClick('poCount')}" title="Click vendor row to view POs">POs${vsa('poCount')}</th>
               <th style="padding:10px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;width:50px;">Edit</th>
             </tr></thead>
             <tbody>
-              ${filtered.map(function(v) { return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="navigate(\'#/vendors/' + encodeURIComponent(v.name) + '\')">' +
+              ${filtered.map(function(v) {
+                var poBadge = v.poCount > 0
+                  ? '<span style="display:inline-block;padding:2px 8px;background:rgba(196,164,100,0.12);color:#8B6F2A;border:1px solid rgba(196,164,100,0.3);border-radius:0;font-weight:600;font-size:11px;font-family:var(--font-mono);">📦 ' + v.poCount + ' PO' + (v.poCount === 1 ? '' : 's') + '</span>'
+                  : '<span style="color:var(--gray-300);font-size:11px;">—</span>';
+                return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="window._vendorDetailTab=\'pos\';navigate(\'#/vendors/' + encodeURIComponent(v.name) + '\')">' +
                 '<td style="padding:10px;font-weight:600;font-size:14px;white-space:nowrap;">' + esc(v.name) + '</td>' +
                 '<td style="padding:10px;font-size:12px;color:var(--gray-500);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(v.description || '') + '</td>' +
                 '<td style="padding:10px;font-size:12px;">' + esc(v.contact || '') + '</td>' +
                 '<td style="padding:10px;font-size:12px;"><a href="mailto:' + escAttr(v.email || '') + '" onclick="event.stopPropagation()" style="color:var(--teal);">' + esc(v.email || '') + '</a></td>' +
                 '<td style="padding:10px;font-size:12px;white-space:nowrap;">' + esc(v.phone || '') + '</td>' +
                 '<td style="padding:10px;font-size:11px;color:var(--gray-400);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(v.tags || '') + '</td>' +
+                '<td style="padding:10px;text-align:right;white-space:nowrap;">' + poBadge + '</td>' +
                 '<td style="padding:10px;"><button class="btn btn-sm" style="font-size:11px;" onclick="event.stopPropagation();editVendorInline(\'' + escAttr(v.name) + '\')">Edit</button></td>' +
               '</tr>'; }).join('')}
             </tbody>
@@ -41346,7 +41653,8 @@ async function renderBoardsTab(T, proj) {
 
       T.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Loading vendor...</div>';
 
-      // Load vendor products — use flexible matching to handle import variations
+      // Load vendor products — use flexible matching to handle import variations.
+      // Pulls from BOTH /products/ and /productLibrary/ so the enriched library docs are included.
       let vendorProducts = [];
       try {
         // Try exact Firestore query first
@@ -41358,6 +41666,16 @@ async function renderBoardsTab(T, proj) {
           var existingIds = new Set(vendorProducts.map(function(p) { return p.id; }));
           snap2.forEach(d => { if (!existingIds.has(d.id)) vendorProducts.push({ id: d.id, ...d.data() }); });
         } catch(e1) {}
+        // Pull from /productLibrary/ too — Houzz-imported docs live there with the enriched data.
+        try {
+          const seenIds = new Set(vendorProducts.map(function(p) { return p.id; }));
+          const snapL = await db.collection('productLibrary').where('vendor', '==', vendorName).limit(500).get();
+          snapL.forEach(d => { if (!seenIds.has(d.id)) { vendorProducts.push({ id: d.id, ...d.data() }); seenIds.add(d.id); } });
+          try {
+            const snapL2 = await db.collection('productLibrary').where('manufacturer', '==', vendorName).limit(500).get();
+            snapL2.forEach(d => { if (!seenIds.has(d.id)) { vendorProducts.push({ id: d.id, ...d.data() }); seenIds.add(d.id); } });
+          } catch(_eL2) {}
+        } catch(_eL) {}
         // If still empty, scan with partial matching (handles import name variations)
         if (vendorProducts.length === 0) {
           try {
@@ -41370,6 +41688,18 @@ async function renderBoardsTab(T, proj) {
               }
             });
           } catch(e1) {}
+          // Same partial-match fallback for /productLibrary/
+          try {
+            const snapAllL = await db.collection('productLibrary').limit(3000).get();
+            const seenIds = new Set(vendorProducts.map(function(p) { return p.id; }));
+            snapAllL.forEach(d => {
+              const p = d.data();
+              var pVendor = (p.vendor || p.manufacturer || '').toLowerCase();
+              if (pVendor && vnLower && (pVendor === vnLower || (pVendor.length > 3 && vnLower.length > 3 && (pVendor.includes(vnLower) || vnLower.includes(pVendor))))) {
+                if (!seenIds.has(d.id)) { vendorProducts.push({ id: d.id, ...p }); seenIds.add(d.id); }
+              }
+            });
+          } catch(_eAL) {}
         }
       } catch(e) {
         console.warn('[VendorDetail] Products query error, trying fallback:', e);
@@ -41470,9 +41800,10 @@ async function renderBoardsTab(T, proj) {
       var vendorPOs = cache.vendorPOs;
       var vendorInvoices = cache.vendorInvoices;
 
-      // Summary stats
-      const totalCost = vendorProducts.reduce((s,p) => s + (parseFloat(p.cost || p.costPrice || 0) || 0), 0);
-      const totalSell = vendorProducts.reduce((s,p) => s + (parseFloat(p.clientPrice || p.sellPrice || p.totalSelling || 0) || 0), 0);
+      // Summary stats — guard against NaN from malformed string fields
+      function _vSafeNum(v) { var n = parseFloat(v); return (isFinite(n) && n > 0) ? n : 0; }
+      const totalCost = vendorProducts.reduce((s,p) => s + _vSafeNum(p.cost || p.costPrice), 0);
+      const totalSell = vendorProducts.reduce((s,p) => s + _vSafeNum(p.clientPrice || p.sellPrice || p.totalSelling), 0);
       const categories = [...new Set(vendorProducts.map(p => p.category).filter(Boolean))];
 
       // Vendor detail tabs state
@@ -41497,12 +41828,38 @@ async function renderBoardsTab(T, proj) {
             '<th style="padding:10px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">SKU</th>' +
             '</tr></thead><tbody>' +
             vendorProducts.map(function(p) {
-              var imgSrc = getProductImg(p);
-              var cost = parseFloat(p.cost || p.costPrice) || 0;
-              var sell = parseFloat(p.clientPrice || p.sellPrice || p.totalSelling) || 0;
+              // Vendor detail thumbnail: prefer raw imageUrl-like fields directly (Firebase Storage / data: / vendor CDN).
+              // Only fall back to library/strict resolvers if no direct URL is present. This bypasses heuristics
+              // that were rejecting valid Firebase Storage URLs in this view.
+              var _rawImg = (function() {
+                var keys = ['imageUrl', 'image', 'img', 'thumbnail', 'photo', 'coverImage', 'preview', 'productImage', 'imageURL'];
+                for (var ki = 0; ki < keys.length; ki++) {
+                  var v = p[keys[ki]];
+                  if (v == null) continue;
+                  var s = String(v).trim();
+                  if (!s) continue;
+                  if (/^https?:\/\//i.test(s) || s.indexOf('//') === 0 || /^data:image/i.test(s)) return s;
+                }
+                // images[] gallery shape
+                if (Array.isArray(p.images)) {
+                  for (var gi = 0; gi < p.images.length; gi++) {
+                    var ent = p.images[gi];
+                    var u = typeof ent === 'string' ? ent : (ent && (ent.url || ent.imageUrl || ent.src || ent.href));
+                    if (u && /^https?:\/\//i.test(u)) return String(u).trim();
+                  }
+                }
+                return '';
+              })();
+              var imgSrc = _rawImg || (typeof libraryListThumbUrl === 'function' ? libraryListThumbUrl(p) : getProductImg(p));
+              var cost = _vSafeNum(p.cost || p.costPrice);
+              var sell = _vSafeNum(p.clientPrice || p.sellPrice || p.totalSelling);
               var qty = parseFloat(p.qty || p.quantity) || '';
               return '<tr style="border-bottom:1px solid var(--gray-100);">' +
-                '<td style="padding:6px 10px;">' + (imgSrc ? '<img src="' + _escImgSrcAttr(imgSrc) + '" style="width:40px;height:40px;object-fit:cover;border-radius:4px;background:var(--gray-100);" onerror="this.style.display=\'none\'">' : '<div style="width:40px;height:40px;border-radius:4px;background:var(--gray-100);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--gray-300);">📦</div>') + '</td>' +
+                '<td style="padding:6px 10px;">' + (imgSrc
+                  ? '<img src="' + _escImgSrcAttr(imgSrc) + '" referrerpolicy="no-referrer" style="width:40px;height:40px;object-fit:cover;border-radius:4px;background:var(--gray-100);" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
+                    '<div style="display:none;width:40px;height:40px;border-radius:4px;background:var(--gray-100);align-items:center;justify-content:center;font-size:14px;color:var(--gray-300);">📦</div>'
+                  : '<div style="width:40px;height:40px;border-radius:4px;background:var(--gray-100);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--gray-300);">📦</div>'
+                ) + '</td>' +
                 '<td style="padding:6px 10px;"><div style="font-weight:600;font-size:13px;">' + esc(p.title || 'Untitled') + '</div>' +
                   (p.description ? '<div style="font-size:11px;color:var(--gray-400);max-width:250px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(p.description) + '</div>' : '') + '</td>' +
                 '<td style="padding:6px 10px;font-size:12px;">' + esc(p.project || p.projectName || '') + '</td>' +
@@ -41531,8 +41888,8 @@ async function renderBoardsTab(T, proj) {
             vendorPOs.map(function(po) {
               var total = parseFloat(po.total || po.amount) || 0;
               if (!total && po.items) { total = po.items.reduce(function(s,i) { return s + (parseFloat(i.total || i.amount) || 0); }, 0); }
-              return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="navigate(\'#/project/' + po.projectId + '/pos\')">' +
-                '<td style="padding:10px;font-weight:600;">' + esc(po.number || po.id.slice(0,8)) + '</td>' +
+              return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="navigate(\'#/project/' + encodeURIComponent(po.projectId) + '/po/' + encodeURIComponent(po.id) + '\')">' +
+                '<td style="padding:10px;font-weight:600;color:#0A1F3D;text-decoration:underline;">' + esc(po.number || po.id.slice(0,8)) + '</td>' +
                 '<td style="padding:10px;">' + esc(po.projectName || '') + '</td>' +
                 '<td style="padding:10px;">' + esc(po.date || '') + '</td>' +
                 '<td style="padding:10px;">' + statusBadge(po.status || 'draft') + '</td>' +
@@ -43436,6 +43793,7 @@ async function renderBoardsTab(T, proj) {
                   <th style="${thStyle}text-align:right;cursor:pointer;" onclick="sortByField('paidAmount','pos')">Paid${sortArrow('paidAmount','pos')}</th>
                   <th style="${thStyle}text-align:right;cursor:pointer;" onclick="sortByField('balance','pos')">Balance${sortArrow('balance','pos')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('qb','pos')">QB Sync${sortArrow('qb','pos')}</th>
+                  <th style="${thStyle}text-align:center;">Linked Docs</th>
                   <th style="${thStyle}text-align:center;">Actions</th>
                 </tr>
               </thead>
@@ -43444,6 +43802,9 @@ async function renderBoardsTab(T, proj) {
                   const loc = po.location || po.shipTo || '';
                   const workroom = po.workroom || (po.status === 'At Workroom' ? loc : '') || '';
                   const receiver = po.receiver || (po.status === 'At Receiver' ? loc : '') || '';
+                  const _poProposalId = po.linkedProposalId || po.proposalId || po.proposalDocId || '';
+                  const _poInvoiceId = po.linkedInvoiceId || po.invoiceId || po.invoiceDocId || '';
+                  const _poConnectedRefs = (String(po.connectedDocs || '').match(/(PO|IN|PR)[\s-]?\d+/ig) || []);
                   return `
                   <tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="navigate('#/project/${po.projectId}/po/${po.id}')">
                     <td style="${tdStyle}font-weight:600;font-family:monospace;color:var(--gold);">
@@ -43461,6 +43822,12 @@ async function renderBoardsTab(T, proj) {
                     <td style="${tdStyle}text-align:right;font-family:monospace;color:${(parseFloat(po.paidAmount)||0) > 0 ? '#5FA56B' : 'var(--gray-400)'};">${(parseFloat(po.paidAmount)||0) > 0 ? '$'+(parseFloat(po.paidAmount)).toLocaleString('en-US',{minimumFractionDigits:2}) : '—'}</td>
                     <td style="${tdStyle}text-align:right;font-weight:600;font-family:monospace;color:${((parseFloat(po.total)||0)-(parseFloat(po.paidAmount)||0)) > 0 ? '#C4A464' : '#5FA56B'};">$${((parseFloat(po.total)||0)-(parseFloat(po.paidAmount)||0)).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
                     <td style="${tdStyle}">${qbCellBadge(getQbId(po), po.qbStatus, po)}</td>
+                    <td style="${tdStyle}text-align:center;" onclick="event.stopPropagation()">
+                      ${_poProposalId ? '<a onclick="navigate(\'#/project/'+po.projectId+'/proposal/'+_poProposalId+'\')" style="color:var(--teal);cursor:pointer;margin-right:4px;" title="Linked Proposal">📋</a>' : ''}
+                      ${_poInvoiceId ? '<a onclick="navigate(\'#/project/'+po.projectId+'/invoice/'+_poInvoiceId+'\')" style="color:var(--teal);cursor:pointer;margin-right:4px;" title="Linked Invoice">🧾</a>' : ''}
+                      ${_poConnectedRefs.length ? '<span style="color:var(--gray-500);font-size:11px;" title="' + escAttr(_poConnectedRefs.join(', ')) + '">📎 '+_poConnectedRefs.length+'</span>' : ''}
+                      ${!_poProposalId && !_poInvoiceId && !_poConnectedRefs.length ? '<span style="color:var(--gray-300);">—</span>' : ''}
+                    </td>
                     <td style="${tdStyle}text-align:center;" onclick="event.stopPropagation()">
                       <div class="action-menu-wrap" style="display:flex;align-items:center;justify-content:center;gap:4px;">
                         <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 10px;white-space:nowrap;" onclick="event.stopPropagation();navigate('#/project/${po.projectId}/po/${po.id}')">✏️ Edit</button>
@@ -53923,7 +54290,7 @@ ${pages}
     // esc() and escAttr() defined at top of script (line ~1127)
 
   </script>
-  <script src="cch-functions.js?v=1774994684878"></script>
+  <script src="cch-functions.js?v=1777060500000"></script>
   <script src="cch-design-board.js?v=1776046000000"></script>
   <script src="cch-client-board.js?v=1776250000000"></script>
   <script src="cch-proposals-invoices-fix.js?v=1776192000000"></script>

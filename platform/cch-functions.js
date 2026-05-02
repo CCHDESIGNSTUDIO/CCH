@@ -412,47 +412,105 @@ async function renderVendors() {
     });
     vendors.sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
     window._allVendors = vendors;
-    renderVendorsView('');
+    if (typeof window._vendorSearchQuery !== 'string') window._vendorSearchQuery = '';
+    if (typeof window._vendorFilterType !== 'string') window._vendorFilterType = '';
+    if (typeof window._vendorFilterCategory !== 'string') window._vendorFilterCategory = '';
+    renderVendorsView();
   } catch(e) { T.innerHTML = '<div class="empty-state"><div class="empty-text">Error: ' + esc(e.message) + '</div></div>'; }
 }
 
 function renderVendorsView(query) {
     var T = document.getElementById('contentArea');
     var vendors = window._allVendors || [];
-    var filtered = vendors;
-    if (query) {
-      var q = query.toLowerCase();
-      filtered = vendors.filter(function(v) {
-        return (v.name||'').toLowerCase().indexOf(q) >= 0 ||
-               (v.type||'').toLowerCase().indexOf(q) >= 0 ||
-               (v.contact||'').toLowerCase().indexOf(q) >= 0 ||
-               (v.email||'').toLowerCase().indexOf(q) >= 0 ||
-               (v.address||'').toLowerCase().indexOf(q) >= 0 ||
-               (v.description||'').toLowerCase().indexOf(q) >= 0 ||
-               (v.tags||'').toLowerCase().indexOf(q) >= 0;
+    if (arguments.length >= 1 && typeof query === 'string') window._vendorSearchQuery = query;
+    var searchRaw = window._vendorSearchQuery || '';
+    var search = searchRaw.toLowerCase().trim();
+
+    var typeOptsSet = {};
+    var catOptsSet = {};
+    vendors.forEach(function(v) {
+      var t = String(v.type || '').trim();
+      if (t) typeOptsSet[t] = true;
+      var c = String(v.category || 'Vendor').trim();
+      if (c) catOptsSet[c] = true;
+    });
+    var typeList = Object.keys(typeOptsSet).sort(function(a,b){ return a.localeCompare(b); });
+    var catList = Object.keys(catOptsSet).sort(function(a,b){ return a.localeCompare(b); });
+    var selType = window._vendorFilterType || '';
+    var selCat = window._vendorFilterCategory || '';
+
+    var filterBar =
+      '<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:16px;">' +
+      '<div style="flex:1;min-width:200px;">' +
+      '<label class="form-label" style="font-size:11px;color:var(--gray-400);display:block;margin-bottom:4px;">Search</label>' +
+      '<input type="search" class="form-input" placeholder="Vendor name, type, category, tags, email…" value="' + esc(searchRaw) + '" oninput="renderVendorsView(this.value)" style="width:100%;max-width:420px;">' +
+      '</div>' +
+      '<div>' +
+      '<label class="form-label" style="font-size:11px;color:var(--gray-400);display:block;margin-bottom:4px;">Type</label>' +
+      '<select class="form-input" style="min-width:160px;padding:8px 10px;" onchange="window._vendorFilterType=this.value;renderVendorsView();">' +
+      '<option value="">All types</option>' +
+      typeList.map(function(t) {
+        return '<option value="' + escAttr(t) + '"' + (selType === t ? ' selected' : '') + '>' + esc(t) + '</option>';
+      }).join('') +
+      '</select></div>' +
+      '<div>' +
+      '<label class="form-label" style="font-size:11px;color:var(--gray-400);display:block;margin-bottom:4px;">Category</label>' +
+      '<select class="form-input" style="min-width:160px;padding:8px 10px;" onchange="window._vendorFilterCategory=this.value;renderVendorsView();">' +
+      '<option value="">All categories</option>' +
+      catList.map(function(c) {
+        return '<option value="' + escAttr(c) + '"' + (selCat === c ? ' selected' : '') + '>' + esc(c) + '</option>';
+      }).join('') +
+      '</select></div>' +
+      '<button type="button" class="btn btn-secondary btn-sm" style="margin-bottom:2px;" onclick="window._vendorSearchQuery=\'\';window._vendorFilterType=\'\';window._vendorFilterCategory=\'\';renderVendorsView();">Clear filters</button>' +
+      '</div>';
+
+    var filtered = vendors.slice();
+    if (search) {
+      filtered = filtered.filter(function(v) {
+        var catStr = String(v.category || 'Vendor');
+        return (v.name||'').toLowerCase().indexOf(search) >= 0 ||
+               (v.type||'').toLowerCase().indexOf(search) >= 0 ||
+               catStr.toLowerCase().indexOf(search) >= 0 ||
+               (v.contact||'').toLowerCase().indexOf(search) >= 0 ||
+               (v.email||'').toLowerCase().indexOf(search) >= 0 ||
+               (v.address||'').toLowerCase().indexOf(search) >= 0 ||
+               (v.description||'').toLowerCase().indexOf(search) >= 0 ||
+               (v.tags||'').toLowerCase().indexOf(search) >= 0;
       });
     }
+    if (selType) {
+      filtered = filtered.filter(function(v) { return String(v.type || '').trim() === selType; });
+    }
+    if (selCat) {
+      filtered = filtered.filter(function(v) { return String(v.category || 'Vendor').trim() === selCat; });
+    }
+
     if (vendors.length === 0) {
       T.innerHTML = '<h1 class="page-title">Vendors</h1><div class="empty-state"><div class="empty-icon">🏭</div><div class="empty-text">No vendors yet.</div><button class="btn btn-primary" onclick="showNewVendorModal(null,\'Vendor\')">+ New Vendor</button></div>';
       return;
     }
     var rows = filtered.map(function(v) {
-      return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="showVendorDetail(\'' + v.id + '\')">' +
+      var catDisp = String(v.category || 'Vendor').trim();
+      return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="navigate(\'#\\/vendors/' + encodeURIComponent(v.id) + '\')">' +
         '<td style="padding:10px 12px;font-weight:600;">' + esc(v.name||'') + '</td>' +
-        '<td style="padding:10px 12px;font-size:12px;color:var(--gray-500);">' + esc(v.description||v.type||'') + '</td>' +
+        '<td style="padding:10px 12px;font-size:12px;color:var(--gray-600);white-space:nowrap;">' + esc(String(v.type||'').trim() || '—') + '</td>' +
+        '<td style="padding:10px 12px;font-size:11px;color:var(--gray-500);white-space:nowrap;">' + esc(catDisp) + '</td>' +
+        '<td style="padding:10px 12px;font-size:12px;color:var(--gray-500);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(v.description||'') + '</td>' +
         '<td style="padding:10px 12px;">' + esc(v.contact||'') + '</td>' +
         '<td style="padding:10px 12px;">' + esc(v.email||'') + '</td>' +
         '<td style="padding:10px 12px;">' + esc(v.phone||'') + '</td>' +
-        '<td style="padding:10px 12px;font-size:11px;color:var(--gray-400);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(v.tags||'') + '</td>' +
+        '<td style="padding:10px 12px;font-size:11px;color:var(--gray-400);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(v.tags||'') + '</td>' +
         '<td style="padding:10px 8px;"><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();showNewVendorModal(\'' + v.id + '\',\'Vendor\')">Edit</button></td></tr>';
     }).join('');
     T.innerHTML = '<h1 class="page-title">Vendors</h1>' +
-      '<div style="display:flex;gap:12px;margin-bottom:16px;"><input type="text" class="form-input" placeholder="Search vendors..." value="' + esc(query||'') + '" oninput="renderVendorsView(this.value)" style="max-width:400px;"></div>' +
+      filterBar +
       '<p style="color:var(--gray-400);margin-bottom:12px;font-size:13px;">Showing ' + filtered.length + ' of ' + vendors.length + ' vendors</p>' +
       '<div class="card" style="overflow:hidden;">' +
       '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
       '<thead><tr style="border-bottom:2px solid var(--gray-200);">' +
       '<th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Vendor</th>' +
+      '<th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Type</th>' +
+      '<th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Category</th>' +
       '<th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Description</th>' +
       '<th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Contact</th>' +
       '<th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Email</th>' +
@@ -563,6 +621,56 @@ async function moveVendorCategory(docId, newCategory) {
   } catch(e) { if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Move vendor'); }
 }
 
+// --- Vendor detail: board scans were sequential + products used .get() (full catalog) → timeouts / endless "Loading…".
+function _vendorFetchBoardsSnap() {
+  if (typeof getCachedBoards === 'function') return getCachedBoards();
+  return db.collection('boards').get();
+}
+
+async function _vendorParallelBoardSubcollections(boards, subcollName, chunkSize, handleSnap) {
+  var n = boards.length;
+  var size = chunkSize || 14;
+  for (var start = 0; start < n; start += size) {
+    var slice = boards.slice(start, start + size);
+    await Promise.all(slice.map(function(board) {
+      return db.collection('boards').doc(board.id).collection(subcollName).get().then(function(snap) {
+        handleSnap(board, snap);
+      }).catch(function() {});
+    }));
+  }
+}
+
+async function _vendorAppendLibraryProducts(products, vendorRaw) {
+  var vr = String(vendorRaw || '').trim();
+  if (!vr) return;
+  var seenKey = {};
+  products.forEach(function(p) {
+    var id = p._clipId || p.id;
+    if (id) seenKey['clip:' + id] = true;
+  });
+  function ingestSnap(snap, collName) {
+    snap.forEach(function(d) {
+      var key = collName + ':' + d.id;
+      if (seenKey[key]) return;
+      var data = d.data();
+      var existsTitle = products.some(function(p) {
+        return (p.title || '').toLowerCase() === (data.title || '').toLowerCase() && (p._projectName === 'Product Library' || p._projectId === 'library');
+      });
+      if (existsTitle) return;
+      seenKey[key] = true;
+      products.push(Object.assign({ _clipId: d.id, _projectId: 'library', _projectName: 'Product Library' }, data));
+    });
+  }
+  var tasks = [];
+  ['products', 'productLibrary'].forEach(function(collName) {
+    tasks.push(
+      db.collection(collName).where('vendor', '==', vr).limit(500).get().then(function(s) { ingestSnap(s, collName); }).catch(function() {}),
+      db.collection(collName).where('manufacturer', '==', vr).limit(500).get().then(function(s) { ingestSnap(s, collName); }).catch(function() {})
+    );
+  });
+  await Promise.all(tasks);
+}
+
 // ==================== VENDOR DETAIL PAGE ====================
 async function showVendorDetail(vendorId) {
   var T = document.getElementById('contentArea');
@@ -573,7 +681,7 @@ async function showVendorDetail(vendorId) {
   var v = vDoc.data();
   var vName = v.name || '';
 
-  setBreadcrumb([{ label: 'Vendors', onclick: 'renderVendors()' }, { label: vName }]);
+  setBreadcrumb([{ label: 'Vendors', hash: '#/vendors' }, { label: vName }]);
   setTopbarActions('<button class="btn btn-secondary" onclick="showNewVendorModal(\'' + vendorId + '\',\'Vendor\')">✏️ Edit Info</button>');
 
   // Build the page shell with tabs
@@ -595,10 +703,17 @@ async function showVendorDetail(vendorId) {
     '<div id="vendorTabContent"><div style="text-align:center;padding:40px;color:var(--gray-400);">Loading products...</div></div>';
 
   // Store vendor data globally for tab switching
-  window._vendorDetail = { id: vendorId, data: v, name: vName, products: null, pos: null };
+  window._vendorDetail = { id: vendorId, data: v, name: vName, products: null, pos: null, productsError: null, posError: null };
 
   // Load products tab by default
-  await loadVendorProducts(vName);
+  try {
+    await loadVendorProducts(vName);
+  } catch (err) {
+    console.error('loadVendorProducts', err);
+    window._vendorDetail.products = [];
+    window._vendorDetail.productsError = (err && err.message) ? err.message : String(err);
+    renderVendorProductsTab();
+  }
 }
 
 function switchVendorTab(tab) {
@@ -607,11 +722,24 @@ function switchVendorTab(tab) {
   if (tabBtn) tabBtn.classList.add('active');
 
   if (tab === 'products') renderVendorProductsTab();
-  else if (tab === 'pos') loadVendorPOs(window._vendorDetail.name);
+  else if (tab === 'pos') {
+    loadVendorPOs(window._vendorDetail.name).catch(function(e) {
+      console.error('loadVendorPOs', e);
+      window._vendorDetail.pos = [];
+      window._vendorDetail.posError = (e && e.message) ? e.message : String(e);
+      var el = document.getElementById('vendorTabContent');
+      if (el) {
+        el.innerHTML = '<div style="padding:12px;margin:24px;background:#FDF2F2;color:#8B2E2E;font-size:13px;border:1px solid rgba(139,46,46,0.2);">' +
+          'Could not load purchase orders: ' + esc(window._vendorDetail.posError) + '</div>' +
+          '<div class="empty-state"><div class="empty-icon">🛒</div><div class="empty-text">Try again or refresh the page.</div></div>';
+      }
+    });
+  }
   else if (tab === 'info') renderVendorInfoTab();
 }
 
 async function loadVendorProducts(vendorName) {
+  window._vendorDetail.productsError = null;
   var vn = vendorName.toLowerCase().trim();
   if (!vn) {
     window._vendorDetail.products = [];
@@ -619,15 +747,12 @@ async function loadVendorProducts(vendorName) {
     return;
   }
   var products = [];
+  try {
+    var boardsSnap = await _vendorFetchBoardsSnap();
+    var boards = [];
+    boardsSnap.forEach(function(d) { boards.push({ id: d.id, name: d.data().name || d.id }); });
 
-  // Scan all projects for clips with this vendor
-  var boardsSnap = await db.collection('boards').get();
-  var boards = [];
-  boardsSnap.forEach(function(d) { boards.push({ id: d.id, name: d.data().name || d.id }); });
-
-  for (var i = 0; i < boards.length; i++) {
-    try {
-      var clipsSnap = await db.collection('boards').doc(boards[i].id).collection('clips').get();
+    await _vendorParallelBoardSubcollections(boards, 'clips', 14, function(board, clipsSnap) {
       clipsSnap.forEach(function(d) {
         var data = d.data();
         var cv = (data.vendor || '').toLowerCase().trim();
@@ -635,26 +760,16 @@ async function loadVendorProducts(vendorName) {
         var cvMatch = cv && (cv === vn || cv.indexOf(vn) >= 0 || vn.indexOf(cv) >= 0);
         var cmMatch = cm && (cm === vn || cm.indexOf(vn) >= 0 || vn.indexOf(cm) >= 0);
         if (cvMatch || cmMatch) {
-          products.push(Object.assign({ _clipId: d.id, _projectId: boards[i].id, _projectName: boards[i].name }, data));
+          products.push(Object.assign({ _clipId: d.id, _projectId: board.id, _projectName: board.name }, data));
         }
       });
-    } catch(e) {}
-  }
-
-  // Also check products collection
-  try {
-    var prodSnap = await db.collection('products').get();
-    prodSnap.forEach(function(d) {
-      var data = d.data();
-      var pv = (data.vendor || '').toLowerCase().trim();
-      var pm = (data.manufacturer || '').toLowerCase().trim();
-      if (pv === vn || pm === vn) {
-        // Only add if not already found by title
-        var exists = products.some(function(p) { return (p.title || '').toLowerCase() === (data.title || '').toLowerCase(); });
-        if (!exists) products.push(Object.assign({ _clipId: d.id, _projectId: 'library', _projectName: 'Product Library' }, data));
-      }
     });
-  } catch(e) {}
+
+    await _vendorAppendLibraryProducts(products, vendorName.trim());
+  } catch (e) {
+    console.error('loadVendorProducts', e);
+    window._vendorDetail.productsError = (e && e.message) ? e.message : String(e);
+  }
 
   window._vendorDetail.products = products;
   renderVendorProductsTab();
@@ -666,7 +781,14 @@ function renderVendorProductsTab() {
   if (!products) { C.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400);">Loading...</div>'; return; }
 
   if (products.length === 0) {
-    C.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">No products found for this vendor.</div></div>';
+    var errBanner = '';
+    if (window._vendorDetail.productsError) {
+      errBanner = '<div style="padding:12px;margin-bottom:16px;background:#FDF2F2;color:#8B2E2E;font-size:13px;border:1px solid rgba(139,46,46,0.2);">' +
+        'Could not finish loading products: ' + esc(window._vendorDetail.productsError) + '</div>';
+    }
+    var tabZero = document.getElementById('vTab-products');
+    if (tabZero) tabZero.textContent = '📦 Products';
+    C.innerHTML = errBanner + '<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">No products found for this vendor.</div></div>';
     return;
   }
 
@@ -674,11 +796,40 @@ function renderVendorProductsTab() {
   var tabBtn = document.getElementById('vTab-products');
   if (tabBtn) tabBtn.textContent = '📦 Products (' + products.length + ')';
 
+  // Safe number coercion: NaN / negative / non-finite all become 0 so we never render "$NaN".
+  function _vfSafeNum(v) { var n = parseFloat(v); return (isFinite(n) && n > 0) ? n : 0; }
+  function _vfFmt(n) { var x = _vfSafeNum(n); return x > 0 ? '$' + x.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'; }
+
+  // Build a title→library-imageUrl lookup so a clip with a stale/broken AWS URL can fall back
+  // to the same product's permanent Firebase Storage URL from /products/ or /productLibrary/.
+  var libImgByTitle = {};
+  products.forEach(function(p) {
+    if (p._projectId !== 'library') return;
+    var t = String(p.title || '').toLowerCase().trim();
+    if (!t) return;
+    var u = String(p.imageUrl || '').trim();
+    if (!u) return;
+    if (!libImgByTitle[t]) libImgByTitle[t] = u;
+  });
+  function _vfBestImg(p) {
+    var u = String(p.imageUrl || '').trim();
+    // Prefer the current URL if it's already on Firebase Storage / data: / a known retail CDN.
+    if (u && (/firebasestorage\.googleapis\.com|firebasestorage\.app/i.test(u) || /^data:image/i.test(u))) return u;
+    // If the clip's URL is an expiring AWS / Houzz CDN URL, try the library lookup first (permanent).
+    var t = String(p.title || '').toLowerCase().trim();
+    if (t && libImgByTitle[t]) return libImgByTitle[t];
+    return u;
+  }
+
   var totalCost = 0, totalSell = 0;
-  products.forEach(function(p) { totalCost += parseFloat(p.cost || p.totalCost || 0); totalSell += parseFloat(p.clientPrice || p.totalSelling || 0); });
+  products.forEach(function(p) { totalCost += _vfSafeNum(p.cost || p.totalCost); totalSell += _vfSafeNum(p.clientPrice || p.totalSelling); });
 
   var rows = products.map(function(p) {
-    var imgHtml = p.imageUrl ? '<img src="' + p.imageUrl + '" style="width:36px;height:36px;object-fit:cover;border-radius:4px;background:#f5f5f5;" onerror="this.style.display=\'none\'">' : '<div style="width:36px;height:36px;background:var(--gray-100);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--gray-300);">—</div>';
+    var imgUrl = _vfBestImg(p);
+    var imgHtml = imgUrl
+      ? '<img src="' + (typeof _escImgSrcAttr === 'function' ? _escImgSrcAttr(imgUrl) : imgUrl) + '" referrerpolicy="no-referrer" style="width:36px;height:36px;object-fit:cover;border-radius:4px;background:#f5f5f5;" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
+        '<div style="display:none;width:36px;height:36px;background:var(--gray-100);border-radius:4px;align-items:center;justify-content:center;font-size:14px;color:var(--gray-300);">📦</div>'
+      : '<div style="width:36px;height:36px;background:var(--gray-100);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--gray-300);">📦</div>';
     return '<tr style="border-bottom:1px solid var(--gray-100);">' +
       '<td style="padding:8px;">' + imgHtml + '</td>' +
       '<td style="padding:8px;"><div style="font-weight:600;font-size:13px;">' + esc(p.title || '') + '</div>' +
@@ -686,8 +837,8 @@ function renderVendorProductsTab() {
       '<td style="padding:8px;font-size:12px;">' + esc(p._projectName || '') + '</td>' +
       '<td style="padding:8px;font-size:12px;">' + esc(p.category || '') + '</td>' +
       '<td style="padding:8px;font-size:12px;">' + esc(p.room || '') + '</td>' +
-      '<td style="padding:8px;font-family:var(--font-mono);font-size:13px;">$' + (parseFloat(p.cost || 0)).toLocaleString() + '</td>' +
-      '<td style="padding:8px;font-family:var(--font-mono);font-size:13px;color:var(--green);">$' + (parseFloat(p.clientPrice || 0)).toLocaleString() + '</td>' +
+      '<td style="padding:8px;font-family:var(--font-mono);font-size:13px;">' + _vfFmt(p.cost) + '</td>' +
+      '<td style="padding:8px;font-family:var(--font-mono);font-size:13px;color:var(--green);">' + _vfFmt(p.clientPrice) + '</td>' +
       '<td style="padding:8px;font-size:12px;text-align:center;">' + (p.qty || 1) + '</td>' +
       '<td style="padding:8px;font-size:11px;">' + esc(p.sku || '') + '</td>' +
       '</tr>';
@@ -696,8 +847,8 @@ function renderVendorProductsTab() {
   C.innerHTML =
     '<div style="display:flex;gap:24px;margin-bottom:16px;">' +
       '<div style="font-size:13px;color:var(--gray-400);">' + products.length + ' products</div>' +
-      '<div style="font-size:13px;">Total Cost: <strong style="color:var(--gold);">$' + totalCost.toLocaleString() + '</strong></div>' +
-      '<div style="font-size:13px;">Total Selling: <strong style="color:var(--green);">$' + totalSell.toLocaleString() + '</strong></div>' +
+      '<div style="font-size:13px;">Total Cost: <strong style="color:var(--gold);">$' + totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</strong></div>' +
+      '<div style="font-size:13px;">Total Selling: <strong style="color:var(--green);">$' + totalSell.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</strong></div>' +
     '</div>' +
     '<div class="card" style="overflow:hidden;"><table style="width:100%;border-collapse:collapse;font-size:13px;">' +
     '<thead><tr style="border-bottom:2px solid var(--gray-200);">' +
@@ -714,6 +865,7 @@ function renderVendorProductsTab() {
 }
 
 async function loadVendorPOs(vendorName) {
+  window._vendorDetail.posError = null;
   var C = document.getElementById('vendorTabContent');
   C.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400);">Loading purchase orders...</div>';
 
@@ -721,46 +873,49 @@ async function loadVendorPOs(vendorName) {
   if (!vn) {
     window._vendorDetail.pos = [];
     C.innerHTML = '<div class="empty-state"><div class="empty-icon">🛒</div><div class="empty-text">No purchase orders found for this vendor.</div></div>';
+    var tEmpty = document.getElementById('vTab-pos');
+    if (tEmpty) tEmpty.textContent = '🛒 Purchase Orders';
     return;
   }
   var pos = [];
 
-  // Scan all projects for POs with this vendor
-  var boardsSnap = await db.collection('boards').get();
-  var boards = [];
-  boardsSnap.forEach(function(d) { boards.push({ id: d.id, name: d.data().name || d.id }); });
+  try {
+    var boardsSnap = await _vendorFetchBoardsSnap();
+    var boards = [];
+    boardsSnap.forEach(function(d) { boards.push({ id: d.id, name: d.data().name || d.id }); });
 
-  for (var i = 0; i < boards.length; i++) {
-    try {
-      var posSnap = await db.collection('boards').doc(boards[i].id).collection('purchaseOrders').get();
+    await _vendorParallelBoardSubcollections(boards, 'purchaseOrders', 14, function(board, posSnap) {
       posSnap.forEach(function(d) {
         var data = d.data();
         var pv = (data.vendor || '').toLowerCase().trim();
         if (pv && (pv === vn || pv.indexOf(vn) >= 0 || vn.indexOf(pv) >= 0)) {
-          pos.push(Object.assign({ _poId: d.id, _projectId: boards[i].id, _projectName: boards[i].name }, data));
+          pos.push(Object.assign({ _poId: d.id, _projectId: board.id, _projectName: board.name }, data));
         }
       });
-    } catch(e) {}
-  }
-
-  // Also check clips for PO references
-  var poNums = new Set(pos.map(function(p) { return p.number || p.poNum || ''; }).filter(Boolean));
-  if (window._vendorDetail.products) {
-    window._vendorDetail.products.forEach(function(p) {
-      if (p.poNum && !poNums.has(p.poNum)) {
-        pos.push({
-          number: p.poNum,
-          poNum: p.poNum,
-          vendor: vendorName,
-          status: p.poStatus || 'From Import',
-          total: parseFloat(p.totalCost || p.cost || 0),
-          _projectId: p._projectId,
-          _projectName: p._projectName,
-          _source: 'clip-ref'
-        });
-        poNums.add(p.poNum);
-      }
     });
+
+    // Also check clips for PO references (needs products loaded)
+    var poNums = new Set(pos.map(function(p) { return p.number || p.poNum || ''; }).filter(Boolean));
+    if (window._vendorDetail.products) {
+      window._vendorDetail.products.forEach(function(p) {
+        if (p.poNum && !poNums.has(p.poNum)) {
+          pos.push({
+            number: p.poNum,
+            poNum: p.poNum,
+            vendor: vendorName,
+            status: p.poStatus || 'From Import',
+            total: parseFloat(p.totalCost || p.cost || 0),
+            _projectId: p._projectId,
+            _projectName: p._projectName,
+            _source: 'clip-ref'
+          });
+          poNums.add(p.poNum);
+        }
+      });
+    }
+  } catch (e) {
+    console.error('loadVendorPOs', e);
+    window._vendorDetail.posError = (e && e.message) ? e.message : String(e);
   }
 
   window._vendorDetail.pos = pos;
@@ -770,22 +925,38 @@ async function loadVendorPOs(vendorName) {
   if (tabBtn) tabBtn.textContent = '🛒 Purchase Orders (' + pos.length + ')';
 
   if (pos.length === 0) {
-    C.innerHTML = '<div class="empty-state"><div class="empty-icon">🛒</div><div class="empty-text">No purchase orders found for this vendor.</div></div>';
+    var poErr = '';
+    if (window._vendorDetail.posError) {
+      poErr = '<div style="padding:12px;margin-bottom:16px;background:#FDF2F2;color:#8B2E2E;font-size:13px;border:1px solid rgba(139,46,46,0.2);">' +
+        'Could not finish loading POs: ' + esc(window._vendorDetail.posError) + '</div>';
+    }
+    C.innerHTML = poErr + '<div class="empty-state"><div class="empty-icon">🛒</div><div class="empty-text">No purchase orders found for this vendor.</div></div>';
     return;
   }
 
+  function _vfPoSafe(v) { var n = parseFloat(v); return (isFinite(n) && n > 0) ? n : 0; }
+  function _vfPoFmt(n) { var x = _vfPoSafe(n); return '$' + x.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
   var totalPO = 0;
-  pos.forEach(function(p) { totalPO += parseFloat(p.total || 0); });
+  pos.forEach(function(p) { totalPO += _vfPoSafe(p.total); });
 
   var rows = pos.map(function(p) {
     var num = p.number || p.poNum || '—';
     var status = p.status || 'Draft';
     var statusClass = status === 'Sent' ? 'color:var(--gold)' : status === 'Received' ? 'color:var(--green)' : '';
-    return '<tr style="border-bottom:1px solid var(--gray-100);">' +
-      '<td style="padding:10px 12px;font-weight:600;">' + esc(num) + '</td>' +
+    // Make rows clickable — link directly to the specific PO doc.
+    var hasLink = p._projectId && p._poId;
+    var rowAttrs = hasLink
+      ? ' style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="navigate(\'#/project/' + encodeURIComponent(p._projectId) + '/po/' + encodeURIComponent(p._poId) + '\')"'
+      : ' style="border-bottom:1px solid var(--gray-100);"';
+    var numCell = hasLink
+      ? '<td style="padding:10px 12px;font-weight:600;color:#0A1F3D;text-decoration:underline;">' + esc(num) + '</td>'
+      : '<td style="padding:10px 12px;font-weight:600;">' + esc(num) + '</td>';
+    return '<tr' + rowAttrs + '>' +
+      numCell +
       '<td style="padding:10px 12px;font-size:12px;">' + esc(p._projectName || '') + '</td>' +
       '<td style="padding:10px 12px;"><span style="' + statusClass + '">' + esc(status) + '</span></td>' +
-      '<td style="padding:10px 12px;font-family:var(--font-mono);">$' + (parseFloat(p.total || 0)).toLocaleString() + '</td>' +
+      '<td style="padding:10px 12px;font-family:var(--font-mono);">' + _vfPoFmt(p.total) + '</td>' +
       '<td style="padding:10px 12px;font-size:12px;color:var(--gray-400);">' + esc(p.date || p.createdAt || '') + '</td>' +
       '</tr>';
   }).join('');
@@ -793,7 +964,7 @@ async function loadVendorPOs(vendorName) {
   C.innerHTML =
     '<div style="display:flex;gap:24px;margin-bottom:16px;">' +
       '<div style="font-size:13px;color:var(--gray-400);">' + pos.length + ' purchase orders</div>' +
-      '<div style="font-size:13px;">Total: <strong style="color:var(--gold);">$' + totalPO.toLocaleString() + '</strong></div>' +
+      '<div style="font-size:13px;">Total: <strong style="color:var(--gold);">' + _vfPoFmt(totalPO) + '</strong></div>' +
     '</div>' +
     '<div class="card" style="overflow:hidden;"><table style="width:100%;border-collapse:collapse;font-size:13px;">' +
     '<thead><tr style="border-bottom:2px solid var(--gray-200);">' +

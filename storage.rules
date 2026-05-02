@@ -84,5 +84,20 @@ service firebase.storage {
       allow create, update: if allowedImageWrite();
       allow delete: if signedIn();
     }
+
+    /** Custom Order Builder & Studio: reference images (pleats, welts, etc.) under library/{category}/... */
+    match /library/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if allowedImageWrite();
+      allow delete: if signedIn();
+    }
+
+    /** Houzz catalog images uploaded via May 1-2, 2026 migration. Reads stay public (product display),
+     *  writes require signed-in (no more bulk-upload work expected). */
+    match /houzz-products/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if allowedImageWrite();
+      allow delete: if signedIn();
+    }
   }
 }
