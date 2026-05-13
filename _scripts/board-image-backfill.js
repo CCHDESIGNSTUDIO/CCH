@@ -19,8 +19,10 @@ const db = admin.firestore();
 
 const APPLY = process.argv.includes('--apply');
 const FORCE = process.argv.includes('--force');
-const BOARD_ID = '31-whitesail';
-const PROJ_LABEL = '31 Whitesail';
+// Board ID and matching project label are the first two positional args
+const POSARGS = process.argv.slice(2).filter(a => !a.startsWith('--'));
+const BOARD_ID = POSARGS[0] || '31-whitesail';
+const PROJ_LABEL = POSARGS[1] || '31 Whitesail';
 
 function norm(s) { return String(s || '').trim().toLowerCase().replace(/\s+/g, ' '); }
 function key(title, vendor) { return norm(title) + '||' + norm(vendor); }
@@ -52,11 +54,11 @@ function isWeakUrl(u) {
     const k = key(r.title || r.name, r.vendor || r.manufacturer);
     if (k !== '||') libByKey[k] = r;
   }
-  console.log(`Product Library rows for Whitesail: ${libRows.length}`);
+  console.log(`Product Library rows for project: ${libRows.length}`);
 
   // 2. Scan clips
   const clipSnap = await db.collection('boards').doc(BOARD_ID).collection('clips').get();
-  console.log(`Whitesail clips: ${clipSnap.size}`);
+  console.log(`Board clips: ${clipSnap.size}`);
 
   let scanned = 0, alreadyStrong = 0, weakNoMatch = 0, noLibImg = 0, willUpdate = 0, didUpdate = 0, errors = 0;
   const updates = [];
