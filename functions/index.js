@@ -6,6 +6,68 @@ admin.initializeApp();
 
 const db = admin.firestore();
 
+/** Normalize Timely / Studio project label for board matching (mirrors client `_normProjectLabelForBoard`). */
+function normTimelyProjectName(s) {
+  return String(s || "").trim().toLowerCase().replace(/\s+/g, " ").replace(/[\u2013\u2014]/g, "-");
+}
+function slugTimelyProjectName(name) {
+  return String(name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+}
+
+/** Load all boards once; used by Timely sync/webhook to set `projectId` (CCH board id) on `timelyEntries`. */
+async function loadBoardsLookupForTimely() {
+  const snap = await db.collection("boards").get();
+  const boardsArr = [];
+  snap.forEach((d) => {
+    const id = String(d.id || "").trim();
+    if (!id) return;
+    const bd = d.data() || {};
+    const nm = String(bd.name || bd.title || "").trim();
+    boardsArr.push({ id, nameNorm: normTimelyProjectName(nm) });
+  });
+  return boardsArr;
+}
+
+/** Resolve CCH Firestore board id from Timely project name (best-effort; returns "" if ambiguous). */
+function resolveCchBoardIdFromBoardsArray(boardsArr, projectName) {
+  const want = normTimelyProjectName(projectName);
+  if (!want) return "";
+  const wantSlug = slugTimelyProjectName(projectName);
+  const nameExact = boardsArr.filter((b) => b.nameNorm === want);
+  if (nameExact.length === 1) return nameExact[0].id;
+  const slugHit = boardsArr.filter((b) => b.id.toLowerCase() === wantSlug);
+  if (slugHit.length === 1) return slugHit[0].id;
+  if (want.length >= 8) {
+    const fuzzy = boardsArr.filter(
+      (b) => b.nameNorm && (b.nameNorm.includes(want) || want.includes(b.nameNorm))
+    );
+    if (fuzzy.length === 1) return fuzzy[0].id;
+  }
+  if (want.length >= 4 && want.length < 8) {
+    const fuzzyShort = boardsArr.filter((b) => b.nameNorm && b.nameNorm.includes(want));
+    if (fuzzyShort.length === 1) return fuzzyShort[0].id;
+  }
+  const projLow = String(projectName || "").trim().toLowerCase();
+  for (let i = 0; i < boardsArr.length; i++) {
+    if (boardsArr[i].id.toLowerCase() === projLow) return boardsArr[i].id;
+  }
+  return "";
+}
+
+let _timelyBoardsLookupCache = null;
+let _timelyBoardsLookupCacheAt = 0;
+const TIMELY_BOARDS_CACHE_MS = 5 * 60 * 1000;
+
+async function getBoardsLookupForTimelyCached() {
+  const now = Date.now();
+  if (_timelyBoardsLookupCache && now - _timelyBoardsLookupCacheAt < TIMELY_BOARDS_CACHE_MS) {
+    return _timelyBoardsLookupCache;
+  }
+  _timelyBoardsLookupCache = await loadBoardsLookupForTimely();
+  _timelyBoardsLookupCacheAt = now;
+  return _timelyBoardsLookupCache;
+}
+
 const TIMELY_CLIENT_ID = "X0t2mXABI8R81qN8PDzX1iSAfMybb6cdpzfUT1Z1Otc";
 const TIMELY_CLIENT_SECRET = "f71829f106a93ce3e692b7f392d457a6d95bec579932095fa368430a16b884ca";
 const TIMELY_REDIRECT_URI = "https://cch-platform.web.app";
@@ -84,6 +146,8 @@ exports.timelySyncEntries = functions.https.onRequest(async (req, res) => {
     if (resp.status === 401) return res.status(401).json({ error: "Token expired — reconnect Timely" });
     const entries = await resp.json();
 
+    const boardsArr = await loadBoardsLookupForTimely();
+
     // Write each entry to Firestore
     let saved = 0;
     for (const entry of entries) {
@@ -94,14 +158,16 @@ exports.timelySyncEntries = functions.https.onRequest(async (req, res) => {
       const dur = entry.duration || {};
       const durSecs = parseFloat(dur.total_seconds) || 0;
       const hoursVal = parseFloat(dur.total_hours) || (durSecs / 3600) || (parseFloat(dur.total_minutes) / 60) || 0;
-      await db.collection("timelyEntries").doc(docId).set({
+      const projectName = entry.project ? entry.project.name : "";
+      const cchProjectId = resolveCchBoardIdFromBoardsArray(boardsArr, projectName);
+      const row = {
         source: "timely-api",
         timelyId: entry.id,
         date: entry.day || "",
         hours: hoursVal,
         minutes: Math.round(durSecs / 60),
         note: entry.note || "",
-        project: entry.project ? entry.project.name : "",
+        project: projectName,
         timelyProjectId: entry.project_id || "",
         member: entry.user ? entry.user.name : "",
         timelyUserId: entry.user_id || "",
@@ -110,7 +176,9 @@ exports.timelySyncEntries = functions.https.onRequest(async (req, res) => {
         createdAt: entry.created_at || "",
         updatedAt: entry.updated_at || "",
         raw: entry
-      }, { merge: true });
+      };
+      if (cchProjectId) row.projectId = cchProjectId;
+      await db.collection("timelyEntries").doc(docId).set(row, { merge: true });
       saved++;
     }
 
@@ -155,15 +223,18 @@ exports.timelyWebhook = functions.https.onRequest(async (req, res) => {
     const duration = durSecs / 3600; // store as decimal hours
     const date = entry.day || entry.date || new Date().toISOString().slice(0, 10);
     const note = entry.note || entry.description || "";
-    const projectId = entry.project_id || "";
+    const timelyApiProjectId = entry.project_id || "";
     const projectName = (entry.project && entry.project.name) || "";
     const userId = entry.user_id || "";
     const userName = (entry.user && entry.user.name) || "";
     const billed = entry.billed || false;
 
+    const boardsArr = await getBoardsLookupForTimelyCached();
+    const cchProjectId = resolveCchBoardIdFromBoardsArray(boardsArr, projectName);
+
     // Write to Firestore — desktopTimeLogs style for Smart Time compatibility
     const docId = date + "-timely-" + timelyId;
-    await db.collection("timelyEntries").doc(docId).set({
+    const whRow = {
       source: "timely-webhook",
       timelyId: timelyId,
       date: date,
@@ -172,14 +243,16 @@ exports.timelyWebhook = functions.https.onRequest(async (req, res) => {
       durationMinutes: durationMin,
       note: note,
       project: projectName,
-      timelyProjectId: projectId,
+      timelyProjectId: timelyApiProjectId,
       member: userName,
       timelyUserId: userId,
       billed: billed,
       event: event,
       receivedAt: new Date().toISOString(),
       raw: entry
-    }, { merge: true });
+    };
+    if (cchProjectId) whRow.projectId = cchProjectId;
+    await db.collection("timelyEntries").doc(docId).set(whRow, { merge: true });
 
     console.log("[Timely Webhook] Saved:", docId, projectName, durationMin + "min");
     return res.status(200).json({ status: "ok", docId: docId });
@@ -418,6 +491,99 @@ function assertQbPushAllowed(request) {
     );
   }
 }
+
+/**
+ * One-shot / dry-run: set CCH `projectId` on all `timelyEntries` from `project` name (Admin only).
+ * Call from Studio signed in as billing admin: httpsCallable with `{ apply: false }` then `{ apply: true }`.
+ */
+exports.backfillTimelyEntriesProjectId = functions
+  .runWith({ timeoutSeconds: 540, memory: "512MB" })
+  .https.onCall(async (data, context) => {
+    if (!context.auth || !context.auth.token.email) {
+      throw new functions.https.HttpsError("unauthenticated", "Sign in required");
+    }
+    const email = String(context.auth.token.email).toLowerCase();
+    if (!QB_ADMIN_EMAILS.includes(email)) {
+      throw new functions.https.HttpsError("permission-denied", "Billing admin only");
+    }
+    const apply = !!(data && data.apply);
+    const boardsArr = await loadBoardsLookupForTimely();
+    let checked = 0;
+    let skippedNoProject = 0;
+    let unchanged = 0;
+    let toChange = 0;
+    let applied = 0;
+    let errors = 0;
+    const samples = [];
+    let lastDoc = null;
+    let pageIdx = 0;
+    const nowIso = () => new Date().toISOString();
+    /* eslint-disable no-await-in-loop */
+    while (pageIdx < 2000) {
+      pageIdx++;
+      let q = db.collection("timelyEntries").orderBy(admin.firestore.FieldPath.documentId()).limit(350);
+      if (lastDoc) q = q.startAfter(lastDoc);
+      const snap = await q.get();
+      if (snap.empty) break;
+      const pending = [];
+      snap.forEach((doc) => {
+        const d = doc.data() || {};
+        const projectName = String(d.project || "").trim();
+        if (!projectName) {
+          skippedNoProject++;
+          return;
+        }
+        checked++;
+        const cur = String(d.projectId || "").trim();
+        const resolved = resolveCchBoardIdFromBoardsArray(boardsArr, projectName);
+        if (!resolved || resolved === cur) {
+          unchanged++;
+          return;
+        }
+        toChange++;
+        if (samples.length < 18) {
+          samples.push(`${doc.id}  "${projectName}"  ${cur || "(no id)"}  →  ${resolved}`);
+        }
+        pending.push({ ref: doc.ref, resolved });
+      });
+      if (apply && pending.length) {
+        for (let pi = 0; pi < pending.length; pi += 400) {
+          const slice = pending.slice(pi, pi + 400);
+          const batch = db.batch();
+          slice.forEach((item) => {
+            batch.update(item.ref, { projectId: item.resolved, updatedAt: nowIso() });
+          });
+          try {
+            await batch.commit();
+            applied += slice.length;
+          } catch (be) {
+            console.error("[backfillTimelyEntriesProjectId] batch", be);
+            for (const item of slice) {
+              try {
+                await item.ref.update({ projectId: item.resolved, updatedAt: nowIso() });
+                applied++;
+              } catch (e1) {
+                errors++;
+              }
+            }
+          }
+        }
+      }
+      lastDoc = snap.docs[snap.docs.length - 1];
+      if (snap.docs.length < 350) break;
+    }
+    return {
+      ok: true,
+      apply,
+      checked,
+      skippedNoProject,
+      unchanged,
+      toChange,
+      applied,
+      errors,
+      samples
+    };
+  });
 
 const QB_PUSH_LOCK_FIELD = "qbPushLockAt";
 const QB_PUSH_LOCK_TTL_MS = 3 * 60 * 1000;
@@ -1365,6 +1531,8 @@ exports.rebuildSearchIndex = functions.https.onRequest(async (req, res) => {
     // Projects
     projSnap.forEach(d => {
       const data = d.data();
+      const addrBits = [data.projectAddress, data.address, data.city, data.state, data.zip, data.phone].filter(Boolean).join(" ");
+      const notesBit = String(data.notes || data.description || "").slice(0, 500);
       allItems.push({
         type: "project", id: d.id, projectId: d.id,
         title: data.name || d.id,
@@ -1373,7 +1541,7 @@ exports.rebuildSearchIndex = functions.https.onRequest(async (req, res) => {
         amount: parseFloat(data.designFee || data.fee || data.budget) || 0,
         vendor: "",
         number: "",
-        search: [data.name, data.clientName, data.projectAddress, d.id].filter(Boolean).join(" ").toLowerCase()
+        search: [data.name, data.clientName, addrBits, notesBit, data.status, data.slug, d.id].filter(Boolean).join(" ").toLowerCase()
       });
       stats.projects++;
     });

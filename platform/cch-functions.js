@@ -1,4 +1,5 @@
 // CCH Platform Extended Functions - NO TEMPLATE LITERALS
+// CCH Platform Extended Functions - NO TEMPLATE LITERALS
 
 async function updateDocStatus(projectId, collection, docId, newStatus) {
   try {
@@ -295,9 +296,28 @@ async function renderClients() {
   var T = document.getElementById('contentArea');
   T.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Loading...</div>';
   try {
+    function _cnorm(v) { return String(v || '').trim().toLowerCase().replace(/\s+/g, ' '); }
+    var boardByClient = {};
+    try {
+      var bs = await getCachedBoards();
+      bs.forEach(function(d) {
+        var pd = d.data() || {};
+        var raw = String(pd.clientName || pd.client || '').trim();
+        var key = _cnorm(raw);
+        if (!key) return;
+        if (!boardByClient[key]) boardByClient[key] = [];
+        boardByClient[key].push({ id: d.id, name: pd.name || d.id });
+      });
+    } catch (_be) {}
+
     var snap = await db.collection('clients').get();
     var clients = [];
-    snap.forEach(function(d) { clients.push(Object.assign({ id: d.id }, d.data())); });
+    snap.forEach(function(d) {
+      var row = Object.assign({ id: d.id }, d.data());
+      var ckey = _cnorm(row.name || row.fullName || row.clientName || '');
+      row._projects = ckey && boardByClient[ckey] ? boardByClient[ckey].slice() : [];
+      clients.push(row);
+    });
     clients.sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
     window._allClients = clients;
     renderClientsView('');
@@ -323,12 +343,19 @@ function renderClientsView(query) {
       return;
     }
     var rows = filtered.map(function(c) {
+      var portalBtn = '';
+      var projectCount = Array.isArray(c._projects) ? c._projects.length : 0;
+      if (projectCount > 1) {
+        portalBtn = '<button class="btn btn-secondary btn-sm" style="margin-right:6px;" onclick="event.stopPropagation();navigate(\'#/clientportal/' + encodeURIComponent(c.name || '') + '\')">Client Portal</button>';
+      } else if (projectCount === 1 && c._projects[0] && c._projects[0].id) {
+        portalBtn = '<button class="btn btn-secondary btn-sm" style="margin-right:6px;" onclick="event.stopPropagation();navigate(\'#/clientview/' + escAttr(c._projects[0].id) + '\')">Client Portal</button>';
+      }
       return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="showNewClientModal(\'' + c.id + '\')">' +
         '<td style="padding:12px 16px;font-weight:600;">' + esc(c.name||'') + '<br><span style="font-size:11px;color:var(--gray-400);">' + esc(c.company||'') + '</span></td>' +
         '<td style="padding:12px 16px;">' + esc(c.email||'') + '</td>' +
         '<td style="padding:12px 16px;">' + esc(c.phone||'') + '</td>' +
         '<td style="padding:12px 16px;font-size:12px;">' + esc((c.address||'').substring(0,40)) + '</td>' +
-        '<td style="padding:12px 8px;"><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();showNewClientModal(\'' + c.id + '\')">Edit</button></td></tr>';
+        '<td style="padding:12px 8px;white-space:nowrap;">' + portalBtn + '<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();showNewClientModal(\'' + c.id + '\')">Edit</button></td></tr>';
     }).join('');
     T.innerHTML = '<h1 class="page-title">Clients</h1>' +
       '<div style="display:flex;gap:12px;margin-bottom:16px;"><input type="text" class="form-input" placeholder="Search clients..." value="' + esc(query||'') + '" oninput="renderClientsView(this.value)" style="max-width:400px;"></div>' +
@@ -671,8 +698,9 @@ async function _vendorAppendLibraryProducts(products, vendorRaw) {
   await Promise.all(tasks);
 }
 
-// ==================== VENDOR DETAIL PAGE ====================
-async function showVendorDetail(vendorId) {
+// ==================== VENDOR DETAIL PAGE (Firestore vendors/{docId}) ====================
+// Named distinctly from index.html showVendorDetail(vendorName) used by Financials drill-down.
+async function showVendorFirestoreDetail(vendorId) {
   var T = document.getElementById('contentArea');
   T.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Loading vendor...</div>';
 
@@ -1279,3 +1307,365 @@ async function showNewProposalBuilder(projectId) {
 }
 
 console.log('CCH Functions loaded OK');
+
+// --- Admin: backfill timeEntries.projectId (console). Loaded from cch-functions.js so it survives index.html CDN cache. ---
+(function() {
+  function _cchNormPL(s) {
+    return String(s || '').trim().toLowerCase().replace(/\s+/g, ' ').replace(/[\u2013\u2014]/g, '-');
+  }
+  function _cchSlug(name) {
+    return String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  }
+  async function _cchResolveBoardId(projName, entries) {
+    var want = _cchNormPL(projName);
+    var wantSlug = _cchSlug(projName);
+    var boardsArr = [];
+    try {
+      if (typeof getCachedBoards === 'function') {
+        var bs = await getCachedBoards();
+        bs.forEach(function(d) {
+          var id = String(d.id || '').trim();
+          if (!id) return;
+          var bd = d.data && d.data();
+          var nm = String((bd && (bd.name || bd.title)) || '').trim();
+          boardsArr.push({ id: id, nameNorm: _cchNormPL(nm) });
+        });
+      }
+    } catch (_e0) {}
+    var unanimous = '';
+    try {
+      var pids = (entries || []).map(function(t) { return String(t.projectId || '').trim(); }).filter(Boolean);
+      if (pids.length === (entries || []).length && pids.length && pids.every(function(p) { return p === pids[0]; })) unanimous = pids[0];
+    } catch (_e1) {}
+    if (unanimous) {
+      if (!boardsArr.length) return unanimous;
+      var rb = boardsArr.find(function(b) { return b.id === unanimous; });
+      if (!rb) return unanimous;
+      var nmOk = rb.nameNorm === want || (want.length >= 6 && (rb.nameNorm.indexOf(want) >= 0 || want.indexOf(rb.nameNorm) >= 0));
+      if (nmOk) return unanimous;
+    }
+    var nameExact = boardsArr.filter(function(b) { return b.nameNorm === want; });
+    if (nameExact.length === 1) return nameExact[0].id;
+    var slugHit = boardsArr.filter(function(b) { return b.id.toLowerCase() === wantSlug; });
+    if (slugHit.length === 1) return slugHit[0].id;
+    if (want.length >= 8) {
+      var fuzzy = boardsArr.filter(function(b) {
+        if (!b.nameNorm) return false;
+        return b.nameNorm.indexOf(want) >= 0 || want.indexOf(b.nameNorm) >= 0;
+      });
+      if (fuzzy.length === 1) return fuzzy[0].id;
+    }
+    if (want.length >= 4 && want.length < 8) {
+      var fuzzyShort = boardsArr.filter(function(b) {
+        if (!b.nameNorm) return false;
+        return b.nameNorm.indexOf(want) >= 0;
+      });
+      if (fuzzyShort.length === 1) return fuzzyShort[0].id;
+    }
+    var projLow = String(projName || '').trim().toLowerCase();
+    for (var i = 0; i < boardsArr.length; i++) {
+      if (boardsArr[i].id.toLowerCase() === projLow) return boardsArr[i].id;
+    }
+    return wantSlug;
+  }
+
+  window.adminBackfillTimeEntryProjectIds = async function(apply) {
+    apply = !!apply;
+    if (typeof isTimeAdmin !== 'function' || !isTimeAdmin()) {
+      alert('Not authorized: requires time admin.');
+      return { ok: false, reason: 'auth' };
+    }
+    if (typeof db === 'undefined' || !db) {
+      alert('Firestore not ready — stay on Studio signed in.');
+      return { ok: false, reason: 'no-db' };
+    }
+    if (typeof getCachedBoards !== 'function') {
+      alert('Studio core not loaded — hard refresh (Ctrl+Shift+R) on the main Studio app, then run again.');
+      return { ok: false, reason: 'no-boards' };
+    }
+    var resolveFn = typeof resolveBoardIdForTimeLedgerInvoice === 'function' ? resolveBoardIdForTimeLedgerInvoice : _cchResolveBoardId;
+    var normFn = typeof _normProjectLabelForBoard === 'function' ? _normProjectLabelForBoard : _cchNormPL;
+
+    var resolveCache = {};
+    var checked = 0;
+    var skippedNoProject = 0;
+    var unchanged = 0;
+    var toChange = 0;
+    var applied = 0;
+    var errors = 0;
+    var samples = [];
+    var lastDoc = null;
+    var pageIdx = 0;
+    var nowIso = function() { return new Date().toISOString(); };
+
+    try {
+      while (pageIdx < 2000) {
+        var q = db.collection('timeEntries').orderBy(firebase.firestore.FieldPath.documentId()).limit(350);
+        if (lastDoc) q = q.startAfter(lastDoc);
+        var snap = await q.get();
+        if (snap.empty) break;
+        pageIdx++;
+
+        var pending = [];
+        var rows = [];
+        for (var di = 0; di < snap.docs.length; di++) {
+          var docRef = snap.docs[di];
+          var d = docRef.data() || {};
+          var projectName = String(d.project || '').trim();
+          if (!projectName) {
+            skippedNoProject++;
+            continue;
+          }
+          checked++;
+          var curPid = String(d.projectId || '').trim();
+          rows.push({ docRef: docRef, projectName: projectName, curPid: curPid });
+        }
+        var uniqKeys = {};
+        var uniqList = [];
+        for (var ri = 0; ri < rows.length; ri++) {
+          var ck = normFn(rows[ri].projectName) + '::' + rows[ri].curPid;
+          if (uniqKeys[ck]) continue;
+          uniqKeys[ck] = true;
+          uniqList.push({ key: ck, projectName: rows[ri].projectName, curPid: rows[ri].curPid });
+        }
+        await Promise.all(uniqList.map(async function(u) {
+          if (Object.prototype.hasOwnProperty.call(resolveCache, u.key)) return;
+          var r = await resolveFn(u.projectName, [{ project: u.projectName, projectId: u.curPid }]);
+          resolveCache[u.key] = r || '';
+        }));
+        for (var rj = 0; rj < rows.length; rj++) {
+          var row = rows[rj];
+          var ck2 = normFn(row.projectName) + '::' + row.curPid;
+          var resolved = resolveCache[ck2] || '';
+          if (!resolved || resolved === row.curPid) {
+            unchanged++;
+            continue;
+          }
+          toChange++;
+          if (samples.length < 18) {
+            samples.push(row.docRef.id + '  "' + row.projectName + '"  ' + (row.curPid || '(no id)') + ' → ' + resolved);
+          }
+          pending.push({ ref: row.docRef.ref, resolved: resolved });
+        }
+
+        if (apply && pending.length) {
+          for (var pi = 0; pi < pending.length; pi += 400) {
+            var slice = pending.slice(pi, pi + 400);
+            try {
+              var batch = db.batch();
+              slice.forEach(function(item) {
+                batch.update(item.ref, { projectId: item.resolved, updatedAt: nowIso() });
+              });
+              await batch.commit();
+              applied += slice.length;
+            } catch (be) {
+              console.warn('[adminBackfillTimeEntryProjectIds] batch', be);
+              for (var sj = 0; sj < slice.length; sj++) {
+                try {
+                  await slice[sj].ref.update({ projectId: slice[sj].resolved, updatedAt: nowIso() });
+                  applied++;
+                } catch (e1) {
+                  errors++;
+                }
+              }
+            }
+          }
+        }
+
+        lastDoc = snap.docs[snap.docs.length - 1];
+        if (snap.docs.length < 350) break;
+      }
+    } catch (e) {
+      console.error('[adminBackfillTimeEntryProjectIds]', e);
+      alert('Stopped with error: ' + (e && e.message ? e.message : String(e)));
+      return { ok: false, error: e, checked: checked, toChange: toChange, applied: applied };
+    }
+
+    var msg = [
+      'Time entry projectId backfill ' + (apply ? '(APPLIED)' : '(DRY RUN)'),
+      'Rows scanned (with project name): ' + checked,
+      'Skipped (no project name): ' + skippedNoProject,
+      'Already correct: ' + unchanged,
+      'Would change / changed: ' + toChange + (apply ? ('  ·  writes committed: ' + applied) : ''),
+      errors ? ('Errors: ' + errors) : '',
+      samples.length ? ('Sample changes:\n' + samples.join('\n')) : '(no changes needed)'
+    ].filter(Boolean).join('\n');
+
+    try { if (typeof showToast === 'function') showToast((apply ? 'Backfill applied: ' : 'Dry run: ') + toChange + ' row(s) to update', apply ? 'success' : 'info'); } catch (_t0) {}
+    alert(msg);
+    return { ok: true, apply: apply, checked: checked, skippedNoProject: skippedNoProject, unchanged: unchanged, toChange: toChange, applied: applied, errors: errors, samples: samples };
+  };
+
+  /** Backfill `projectId` (CCH board id) on `timelyEntries` from Timely `project` name — run dry then apply. */
+  window.adminBackfillTimelyEntryProjectIds = async function(apply) {
+    apply = !!apply;
+    if (typeof isTimeAdmin !== 'function' || !isTimeAdmin()) {
+      alert('Not authorized: requires time admin.');
+      return { ok: false, reason: 'auth' };
+    }
+    if (typeof db === 'undefined' || !db) {
+      alert('Firestore not ready — stay on Studio signed in.');
+      return { ok: false, reason: 'no-db' };
+    }
+    if (typeof getCachedBoards !== 'function') {
+      alert('Studio core not loaded — hard refresh (Ctrl+Shift+R) on the main Studio app, then run again.');
+      return { ok: false, reason: 'no-boards' };
+    }
+    var resolveFn = typeof resolveBoardIdForTimeLedgerInvoice === 'function' ? resolveBoardIdForTimeLedgerInvoice : _cchResolveBoardId;
+    var normFn = typeof _normProjectLabelForBoard === 'function' ? _normProjectLabelForBoard : _cchNormPL;
+
+    var resolveCache = {};
+    var checked = 0;
+    var skippedNoProject = 0;
+    var unchanged = 0;
+    var toChange = 0;
+    var applied = 0;
+    var errors = 0;
+    var samples = [];
+    var lastDoc = null;
+    var pageIdx = 0;
+    var nowIso = function() { return new Date().toISOString(); };
+
+    try {
+      while (pageIdx < 2000) {
+        var q = db.collection('timelyEntries').orderBy(firebase.firestore.FieldPath.documentId()).limit(350);
+        if (lastDoc) q = q.startAfter(lastDoc);
+        var snap = await q.get();
+        if (snap.empty) break;
+        pageIdx++;
+
+        var pending = [];
+        var rows = [];
+        for (var di = 0; di < snap.docs.length; di++) {
+          var docRef = snap.docs[di];
+          var d = docRef.data() || {};
+          var projectName = String(d.project || '').trim();
+          if (!projectName) {
+            skippedNoProject++;
+            continue;
+          }
+          checked++;
+          var curPid = String(d.projectId || '').trim();
+          rows.push({ docRef: docRef, projectName: projectName, curPid: curPid });
+        }
+        var uniqKeys = {};
+        var uniqList = [];
+        for (var ri = 0; ri < rows.length; ri++) {
+          var ck = normFn(rows[ri].projectName) + '::' + rows[ri].curPid;
+          if (uniqKeys[ck]) continue;
+          uniqKeys[ck] = true;
+          uniqList.push({ key: ck, projectName: rows[ri].projectName, curPid: rows[ri].curPid });
+        }
+        await Promise.all(uniqList.map(async function(u) {
+          if (Object.prototype.hasOwnProperty.call(resolveCache, u.key)) return;
+          var r = await resolveFn(u.projectName, [{ project: u.projectName, projectId: u.curPid }]);
+          resolveCache[u.key] = r || '';
+        }));
+        for (var rj = 0; rj < rows.length; rj++) {
+          var row = rows[rj];
+          var ck2 = normFn(row.projectName) + '::' + row.curPid;
+          var resolved = resolveCache[ck2] || '';
+          if (!resolved || resolved === row.curPid) {
+            unchanged++;
+            continue;
+          }
+          toChange++;
+          if (samples.length < 18) {
+            samples.push(row.docRef.id + '  "' + row.projectName + '"  ' + (row.curPid || '(no id)') + ' → ' + resolved);
+          }
+          pending.push({ ref: row.docRef.ref, resolved: resolved });
+        }
+
+        if (apply && pending.length) {
+          for (var pi = 0; pi < pending.length; pi += 400) {
+            var slice = pending.slice(pi, pi + 400);
+            try {
+              var batch = db.batch();
+              slice.forEach(function(item) {
+                batch.update(item.ref, { projectId: item.resolved, updatedAt: nowIso() });
+              });
+              await batch.commit();
+              applied += slice.length;
+            } catch (be) {
+              console.warn('[adminBackfillTimelyEntryProjectIds] batch', be);
+              for (var sj = 0; sj < slice.length; sj++) {
+                try {
+                  await slice[sj].ref.update({ projectId: slice[sj].resolved, updatedAt: nowIso() });
+                  applied++;
+                } catch (e1) {
+                  errors++;
+                }
+              }
+            }
+          }
+        }
+
+        lastDoc = snap.docs[snap.docs.length - 1];
+        if (snap.docs.length < 350) break;
+      }
+    } catch (e) {
+      console.error('[adminBackfillTimelyEntryProjectIds]', e);
+      alert('Stopped with error: ' + (e && e.message ? e.message : String(e)));
+      return { ok: false, error: e, checked: checked, toChange: toChange, applied: applied };
+    }
+
+    var msg2 = [
+      'Timely log projectId backfill ' + (apply ? '(APPLIED)' : '(DRY RUN)'),
+      'Rows scanned (with project name): ' + checked,
+      'Skipped (no project name): ' + skippedNoProject,
+      'Already correct: ' + unchanged,
+      'Would change / changed: ' + toChange + (apply ? ('  ·  writes committed: ' + applied) : ''),
+      errors ? ('Errors: ' + errors) : '',
+      samples.length ? ('Sample changes:\n' + samples.join('\n')) : '(no changes needed)'
+    ].filter(Boolean).join('\n');
+
+    try { if (typeof showToast === 'function') showToast((apply ? 'Timely backfill applied: ' : 'Timely dry run: ') + toChange + ' row(s)', apply ? 'success' : 'info'); } catch (_t1) {}
+    alert(msg2);
+    return { ok: true, apply: apply, checked: checked, skippedNoProject: skippedNoProject, unchanged: unchanged, toChange: toChange, applied: applied, errors: errors, samples: samples };
+  };
+
+  /**
+   * Same Timely `timelyEntries` projectId backfill via Cloud Function (Admin SDK — no browser pagination limits).
+   * Requires: deploy `backfillTimelyEntriesProjectId`, Studio signed in as billing admin.
+   */
+  window.runBackfillTimelyEntriesProjectIdCloud = async function(apply) {
+    apply = !!apply;
+    if (typeof firebase === 'undefined' || !firebase.functions) {
+      alert('Firebase Functions SDK not loaded — refresh Studio.');
+      return { ok: false, reason: 'no-functions' };
+    }
+    var au = firebase.auth && firebase.auth().currentUser;
+    if (!au) {
+      alert('Sign in to Studio first.');
+      return { ok: false, reason: 'auth' };
+    }
+    try {
+      await au.getIdToken(true);
+    } catch (eTok) {
+      alert('Session error: ' + (eTok && eTok.message ? eTok.message : eTok));
+      return { ok: false, reason: 'token' };
+    }
+    try {
+      var fn = firebase.app().functions('us-central1').httpsCallable('backfillTimelyEntriesProjectId');
+      var result = await fn({ apply: apply });
+      var d = result && result.data;
+      var lines = [
+        'Timely logs projectId backfill (cloud) ' + (apply ? '(APPLIED)' : '(DRY RUN)'),
+        'Rows scanned (with project name): ' + (d && d.checked != null ? d.checked : '?'),
+        'Skipped (no project name): ' + (d && d.skippedNoProject != null ? d.skippedNoProject : '?'),
+        'Already correct: ' + (d && d.unchanged != null ? d.unchanged : '?'),
+        'Would change / changed: ' + (d && d.toChange != null ? d.toChange : '?') + (apply && d && d.applied != null ? ('  · writes: ' + d.applied) : ''),
+        d && d.errors ? ('Errors: ' + d.errors) : '',
+        (d && d.samples && d.samples.length) ? ('Sample:\n' + d.samples.join('\n')) : ''
+      ].filter(Boolean).join('\n');
+      try { if (typeof showToast === 'function') showToast((apply ? 'Cloud backfill applied' : 'Cloud dry run') + ': ' + (d && d.toChange), apply ? 'success' : 'info'); } catch (_t2) {}
+      alert(lines);
+      return d || { ok: true };
+    } catch (e) {
+      var msg = (e && e.message) ? e.message : String(e);
+      if (e && e.details) msg += '\n' + JSON.stringify(e.details);
+      alert('Cloud backfill failed:\n' + msg);
+      return { ok: false, error: e };
+    }
+  };
+})();

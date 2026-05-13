@@ -100,15 +100,18 @@
       border: none !important;
     }
 
-    /* Fix: Line items too small — increase minimum sizes */
+    /* Doc edit: compact landscape table (invoice/proposal/PO line editor) */
+    .doc-edit-table tbody tr.doc-edit-line-row td {
+      vertical-align: middle !important;
+    }
     .doc-edit-row {
-      min-height: 80px !important;
+      min-height: 48px !important;
     }
     .doc-edit-img, .doc-edit-img img {
-      width: 64px !important;
-      height: 64px !important;
-      min-width: 64px !important;
-      min-height: 64px !important;
+      width: 48px !important;
+      height: 48px !important;
+      min-width: 48px !important;
+      min-height: 48px !important;
     }
     .doc-edit-name {
       font-size: 14px !important;
@@ -578,23 +581,39 @@
       var prop = propDoc.data();
       var rawItems = prop.items || [];
       var productLines = rawItems.filter(function(it) { return !_isGroupRow(it); });
+      /** Prefer shared helpers so gates match the proposal UI and legacy approved/declined flags work. */
+      function _lineApprovedForInvoice(it) {
+        if (_isGroupRow(it)) return false;
+        if (typeof getProposalLineApprovalStatus === 'function') {
+          return getProposalLineApprovalStatus(it) === 'approved';
+        }
+        return _lineApprovalState(it) === 'approved';
+      }
       var gateMsgs = [];
-      if (productLines.length === 0) gateMsgs.push('Add at least one line item.');
-      if ((prop.status || 'Draft') !== 'Approved') gateMsgs.push('Proposal status must be Approved (use the status badge or Edit details).');
-      var pendingN = 0, approvedN = 0;
-      productLines.forEach(function(it) {
-        var st = _lineApprovalState(it);
-        if (st === 'pending') pendingN++;
-        if (st === 'approved') approvedN++;
-      });
-      if (pendingN > 0) gateMsgs.push(pendingN + ' line(s) still Pending — set each to Approved or Declined.');
-      if (approvedN < 1 && productLines.length > 0) gateMsgs.push('At least one line must be Approved to invoice.');
+      if (prop.linkedInvoiceId || String(prop.status || '').toLowerCase() === 'invoiced') {
+        gateMsgs.push('This proposal is already linked to an invoice. Use the Invoices tab, or duplicate the proposal if you need another bill.');
+      }
+      if (gateMsgs.length === 0 && typeof proposalInvoiceGateSummary === 'function') {
+        var _pg = proposalInvoiceGateSummary(prop, rawItems);
+        if (!_pg.ok && _pg.msgs && _pg.msgs.length) gateMsgs = _pg.msgs.slice();
+      }
+      if (gateMsgs.length === 0 && typeof proposalInvoiceGateSummary !== 'function') {
+        if (productLines.length === 0) gateMsgs.push('Add at least one line item.');
+        var pendingN = 0, approvedN = 0;
+        productLines.forEach(function(it) {
+          var st = _lineApprovalState(it);
+          if (st === 'pending') pendingN++;
+          if (st === 'approved') approvedN++;
+        });
+        if (pendingN > 0) gateMsgs.push(pendingN + ' line(s) still Pending — set each to Approved or Declined.');
+        if (approvedN < 1 && productLines.length > 0) gateMsgs.push('At least one line must be Approved to invoice.');
+      }
       if (gateMsgs.length > 0) {
         if (typeof cchAlert === 'function') await cchAlert('Cannot create invoice yet:\n\n• ' + gateMsgs.join('\n• '), 'Convert to Invoice');
         return;
       }
 
-      var sourceForInvoice = rawItems.filter(function(item) { return !_isGroupRow(item) && _lineApprovalState(item) === 'approved'; });
+      var sourceForInvoice = rawItems.filter(function(item) { return _lineApprovedForInvoice(item); });
       var skipped = productLines.length - sourceForInvoice.length;
       var _convMsg = 'Create a new Invoice from this proposal?\n\n• ' + sourceForInvoice.length + ' approved line(s) will be copied.\n' + (skipped > 0 ? '• ' + skipped + ' line(s) skipped (not Approved).\n' : '') + '\nImages and pricing will transfer for each copied line.';
       if (typeof cchConfirm !== 'function') return;
@@ -969,6 +988,10 @@
     var m = (mode === 'category') ? 'category' : 'room';
     function add(key, row) {
       var k = String(key || '').trim() || 'General';
+      if (type === 'invoice') {
+        var lk = k.toLowerCase();
+        if (lk === 'time billing' || lk === 'time-billing' || lk === 'timebilling') k = 'CCH Design';
+      }
       if (!grouped[k]) grouped[k] = [];
       grouped[k].push(row);
     }
@@ -987,6 +1010,29 @@
       add(key, row);
     });
     return grouped;
+  };
+
+  /** T&E / travel lines Smart Time often leaves as expenseType product — use service-style row (no 📦). Uses title/category/room only so T&E bullets inside design-service notes do not tag the whole line. */
+  window.cchInvoiceLineIsTeTravelPresentation = function(it) {
+    if (!it) return false;
+    var head = (
+      String(it.title || '') + ' ' + String(it.name || '') + ' ' + String(it.category || '') + ' ' + String(it.room || '') + ' ' +
+      String(it.billingCategory || '')
+    ).toLowerCase();
+    if (/\bt[&]e\b/.test(head)) return true;
+    if (/\btravel\s*&\s*entertainment\b/.test(head)) return true;
+    if (/\bt[&]e\s*vh\b/.test(head)) return true;
+    if (/\bmileage\b/.test(head) && /\b(travel|trip|onsite|site\s+visit|drive|mile)\b/.test(head)) return true;
+    return false;
+  };
+
+  /** Invoice read-only view: dashed service cell + T&E badge instead of product box when appropriate. */
+  window.cchInvoiceLineUseServiceStyleInView = function(it) {
+    if (!it) return false;
+    if (it.expenseType === 'service' || it.itemType === 'service') return true;
+    if (typeof window.cchInvoiceLineIsTeTravelPresentation === 'function' && window.cchInvoiceLineIsTeTravelPresentation(it)) return true;
+    if (typeof invoiceLineIsDesignServicesNoMarkup === 'function' && invoiceLineIsDesignServicesNoMarkup(it)) return true;
+    return false;
   };
 
   window.setDocGroupView = async function(type, projectId, docId, mode) {
@@ -1817,25 +1863,34 @@
 
     // Totals — tax cascade: doc → project → company default
     var subtotal = 0, taxableSubtotal = 0, totalShipping = 0;
-    items.forEach(function(i) {
-      if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(i)) return;
-      var qty = parseFloat(i.qty) || 1;
-      var cost = parseFloat(i.cost) || 0;
-      var mkup = parseFloat(i.markupPct) || 0;
-      var ship = parseFloat(i.shipping) || 0;
-      var amt = parseFloat(i.amount) || 0;
-      var lineAmt = (cost > 0 ? cost * qty * (1 + mkup / 100) : amt);
-      subtotal += lineAmt;
-      var isTaxable = i.taxable !== false && (i.taxable === true || i.expenseType === 'product' || (!i.expenseType && i.taxable !== false));
-      if (isTaxable) taxableSubtotal += lineAmt;
-      totalShipping += ship;
-    });
+    var invVoidEarly = type === 'invoice' && String(docData.status || '').toLowerCase() === 'void';
+    if (!invVoidEarly) {
+      items.forEach(function(i) {
+        if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(i)) return;
+        var ship = parseFloat(i.shipping) || 0;
+        var lineAmt;
+        if (type === 'invoice' && typeof window.invoiceLineAmountForTotals === 'function') {
+          lineAmt = window.invoiceLineAmountForTotals(i).lineAmt;
+        } else {
+          var qty = parseFloat(i.qty) || 1;
+          var cost = parseFloat(i.cost) || 0;
+          var mkup = parseFloat(i.markupPct) || 0;
+          if (type === 'invoice' && typeof invoiceLineIsDesignServicesNoMarkup === 'function' && invoiceLineIsDesignServicesNoMarkup(i)) mkup = 0;
+          var amt = parseFloat(i.amount) || 0;
+          lineAmt = (cost > 0 ? cost * qty * (1 + mkup / 100) : amt);
+        }
+        subtotal += lineAmt;
+        var isTaxable = i.taxable !== false && (i.taxable === true || i.expenseType === 'product' || (!i.expenseType && i.taxable !== false));
+        if (isTaxable) taxableSubtotal += lineAmt;
+        totalShipping += ship;
+      });
+    }
     var taxRate = parseFloat(docData.taxRate) || parseFloat(projData.taxRate) || (window._companyTaxConfig ? window._companyTaxConfig.defaultTaxRate : 0) || 0;
-    var tax = taxableSubtotal * (taxRate / 100);
-    var grandTotal = subtotal + totalShipping + tax;
+    var tax = invVoidEarly ? 0 : taxableSubtotal * (taxRate / 100);
+    var grandTotal = invVoidEarly ? 0 : subtotal + totalShipping + tax;
     var payments = docData.payments || [];
     var totalPaid = payments.reduce(function(s,p) { return s + (parseFloat(p.amount) || 0); }, 0);
-    var balance = grandTotal - totalPaid;
+    var balance = invVoidEarly ? 0 : grandTotal - totalPaid;
 
     // Group items by user-selected view mode (room/category) for proposals + invoices.
     var docGroupMode = (typeof window.cchDocGroupModeForData === 'function')
@@ -1851,7 +1906,9 @@
     var qbRealId = (typeof getQbId === 'function' ? getQbId(docData) : (docData.qbDocId || null));
     var qbViewTopBtn = '';
     if (type === 'invoice' || type === 'po') {
-      if (qbRealId) {
+      if (invVoidEarly && type === 'invoice') {
+        qbViewTopBtn = '<span style="font-size:11px;color:var(--gray-500);margin-left:8px;" title="Void invoices are not pushed to QuickBooks.">Void — not billable in QB</span>';
+      } else if (qbRealId) {
         qbViewTopBtn = '<span class="badge badge-approved" style="font-size:11px;padding:5px 12px;margin-left:4px;">✅ QB Synced (' + esc(String(qbRealId)) + ')</span>';
       } else if (docData.qbPushPending) {
         qbViewTopBtn = '<span class="badge" style="font-size:11px;padding:5px 12px;margin-left:4px;background:rgba(245,158,11,0.15);color:#92400E;border:1px solid rgba(245,158,11,0.35);" title="Cloud sync in progress — usually under 1 minute. Refresh to update.">⏳ QB queued</span>';
@@ -1863,7 +1920,7 @@
       }
     }
     var lineItemsQbBtn = '';
-    if (type === 'invoice' && !qbRealId && _canPushQBView) {
+    if (type === 'invoice' && !qbRealId && _canPushQBView && !invVoidEarly) {
       if (docData.qbPushPending) {
         lineItemsQbBtn = '<span style="font-size:11px;color:#92400E;font-weight:600;padding:6px 12px;white-space:nowrap;">⏳ Queued for QuickBooks…</span>';
       } else {
@@ -1914,7 +1971,13 @@
     var itemsHTML = '';
     Object.keys(grouped).sort().forEach(function(cat) {
       var catItems = grouped[cat];
-      var catTotal = catItems.reduce(function(s, i) { return s + (parseFloat(i.amount) || 0); }, 0);
+      var catTotal = catItems.reduce(function(s, i) {
+        if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(i)) return s;
+        if (type === 'invoice' && typeof window.invoiceLineAmountForTotals === 'function') {
+          return s + window.invoiceLineAmountForTotals(i).lineAmt;
+        }
+        return s + (parseFloat(i.amount) || 0);
+      }, 0);
       itemsHTML += '<div style="margin-bottom:28px;">' +
         '<div style="font-size:14px;font-weight:600;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--gold);display:flex;justify-content:space-between;">' +
           '<span>' + esc(cat) + '</span>' +
@@ -1936,10 +1999,17 @@
         var qty = parseFloat(item.qty) || 1;
         var cost = parseFloat(item.cost) || 0;
         var mkup = parseFloat(item.markupPct) || 0;
+        if (type === 'invoice' && typeof invoiceLineIsDesignServicesNoMarkup === 'function' && invoiceLineIsDesignServicesNoMarkup(item)) mkup = 0;
         var ship = parseFloat(item.shipping) || 0;
         var amt = parseFloat(item.amount) || 0;
+        var lineAmtForRow = (type === 'invoice' && typeof window.invoiceLineAmountForTotals === 'function')
+          ? window.invoiceLineAmountForTotals(item).lineAmt
+          : (cost > 0 ? cost * qty * (1 + mkup / 100) : amt);
         var isTaxable = item.taxable !== false && (item.taxable === true || item.expenseType === 'product' || (!item.expenseType && item.taxable !== false));
         var isSvcRow = item.expenseType === 'service' || item.itemType === 'service';
+        if (type === 'invoice' && typeof window.cchInvoiceLineUseServiceStyleInView === 'function' && window.cchInvoiceLineUseServiceStyleInView(item)) {
+          isSvcRow = true;
+        }
         var imgTag;
         if (type === 'invoice' && isSvcRow) {
           imgTag = '<div style="width:64px;height:64px;background:transparent;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--gray-300);border:1px dashed var(--gray-200);">—</div>';
@@ -1954,24 +2024,52 @@
           descRaw = window.sanitizeInvoicePreviewLineText(descRaw);
           lineNotes = window.sanitizeInvoicePreviewLineText(lineNotes);
         }
-        var descHtml = descRaw ? '<div style="font-size:12px;color:var(--gray-400);margin-top:2px;white-space:pre-wrap;">' + esc(descRaw) + '</div>' : '';
-        var notesHtml = '';
+        var _nl = lineNotes ? String(lineNotes).split(/\r?\n/).map(function(l) { return l.trim(); }).filter(Boolean) : [];
+        var noteLineCount = _nl.length;
+        var descTrim = String(descRaw || '').trim();
+        var expandDetail = type === 'invoice' && (noteLineCount > 1 || descTrim.length > 200);
+        var descHtmlInner = descTrim ? '<div style="font-size:12px;color:var(--gray-400);margin-top:2px;white-space:pre-wrap;">' + esc(descRaw) + '</div>' : '';
+        var notesHtmlInner = '';
         if (lineNotes) {
-          var _nl = String(lineNotes).split(/\r?\n/).map(function(l) { return l.trim(); }).filter(Boolean);
           if (_nl.length <= 1) {
-            notesHtml = '<div style="font-size:11px;color:var(--gray-500);margin-top:4px;white-space:pre-wrap;line-height:1.45;">' + esc(lineNotes) + '</div>';
+            notesHtmlInner = '<div style="font-size:11px;color:var(--gray-500);margin-top:4px;white-space:pre-wrap;line-height:1.45;">' + esc(lineNotes) + '</div>';
           } else {
-            notesHtml = '<ul style="font-size:11px;color:var(--gray-500);margin:6px 0 0 1.1em;padding:0;line-height:1.45;list-style:disc;">' +
+            notesHtmlInner = '<ul style="font-size:11px;color:var(--gray-500);margin:6px 0 0 1.1em;padding:0;line-height:1.45;list-style:disc;">' +
               _nl.map(function(l) { return '<li style="margin:2px 0;">' + esc(l) + '</li>'; }).join('') + '</ul>';
           }
         }
+        var detailBlock = '';
+        if (expandDetail) {
+          var qtyStr = (Math.abs(qty - Math.round(qty)) < 0.001) ? String(Math.round(qty)) : String(qty);
+          var unitLbl = (Math.abs(qty - 1) < 0.001) ? 'hr' : 'hrs';
+          var hint = noteLineCount > 1
+            ? (qtyStr + ' ' + unitLbl + ' · ' + noteLineCount + ' entr' + (noteLineCount === 1 ? 'y' : 'ies') + ' — click to expand')
+            : 'Details — click to expand';
+          detailBlock = '<details class="cch-inv-line-details" style="margin-top:6px;">' +
+            '<summary style="cursor:pointer;font-size:12px;font-weight:600;color:#1B3352;list-style:none;">' + esc(hint) + '</summary>' +
+            '<div style="margin-top:8px;padding-left:8px;border-left:2px solid rgba(200,169,110,0.4);">' + descHtmlInner + notesHtmlInner + '</div></details>';
+        } else {
+          detailBlock = descHtmlInner + notesHtmlInner;
+        }
         var _lineTitle = typeof window.invoiceLineDisplayTitle === 'function' ? window.invoiceLineDisplayTitle(item) : (item.title || 'Untitled');
+        var typeBadgeHtml = '';
+        if (type === 'invoice') {
+          if (typeof invoiceLineIsDesignServicesNoMarkup === 'function' && invoiceLineIsDesignServicesNoMarkup(item)) {
+            typeBadgeHtml = '<div style="font-size:10px;margin-top:4px;"><span style="padding:2px 8px;border-radius:8px;background:rgba(200,169,110,0.12);color:var(--gold);font-weight:600;">service</span></div>';
+          } else if (typeof window.cchInvoiceLineIsTeTravelPresentation === 'function' && window.cchInvoiceLineIsTeTravelPresentation(item)) {
+            typeBadgeHtml = '<div style="font-size:10px;margin-top:4px;"><span style="padding:2px 8px;border-radius:8px;background:rgba(2,136,209,0.12);color:#0277BD;font-weight:600;">T&amp;E</span></div>';
+          } else if (item.expenseType && item.expenseType !== 'product') {
+            typeBadgeHtml = '<div style="font-size:10px;margin-top:4px;"><span style="padding:2px 8px;border-radius:8px;background:rgba(200,169,110,0.12);color:var(--gold);font-weight:600;">' + esc(item.expenseType) + '</span></div>';
+          }
+        } else if (item.expenseType && item.expenseType !== 'product') {
+          typeBadgeHtml = '<div style="font-size:10px;margin-top:4px;"><span style="padding:2px 8px;border-radius:8px;background:rgba(200,169,110,0.12);color:var(--gold);font-weight:600;">' + esc(item.expenseType) + '</span></div>';
+        }
         itemsHTML += '<tr style="border-bottom:1px solid var(--gray-100);">' +
           '<td style="padding:10px 8px;">' + imgTag + '</td>' +
           '<td style="padding:10px 8px;"><div style="font-size:14px;font-weight:600;">' + esc(_lineTitle) + '</div>' +
-            descHtml + notesHtml +
+            detailBlock +
             (item.shipTo && type !== 'invoice' ? '<div style="font-size:11px;color:var(--teal);margin-top:2px;">📍 ' + esc(item.shipTo) + '</div>' : '') +
-            (item.expenseType && item.expenseType !== 'product' ? '<div style="font-size:10px;margin-top:2px;"><span style="padding:1px 6px;border-radius:8px;background:rgba(200,169,110,0.12);color:var(--gold);font-weight:600;">' + esc(item.expenseType) + '</span></div>' : '') +
+            typeBadgeHtml +
           '</td>' +
           '<td style="padding:10px 8px;font-size:13px;color:var(--gray-500);">' + esc(item.vendor || '') + '</td>' +
           '<td style="padding:10px 8px;text-align:center;font-size:14px;">' + qty + '</td>' +
@@ -1979,7 +2077,7 @@
           '<td style="padding:10px 8px;text-align:right;font-size:13px;color:' + (mkup > 0 ? 'var(--green)' : 'var(--gray-400)') + ';">' + (mkup > 0 ? mkup + '%' : '—') + '</td>' +
           '<td style="padding:10px 8px;text-align:right;font-size:13px;color:var(--gray-400);">' + (ship > 0 ? formatMoney(ship) : '—') + '</td>' +
           '<td style="padding:10px 8px;text-align:center;">' + (isTaxable ? '<span style="color:#5FA56B;font-weight:700;">✓</span>' : '<span style="color:#ccc;">—</span>') + '</td>' +
-          '<td style="padding:10px 8px;text-align:right;font-size:14px;font-weight:600;font-family:monospace;">' + formatMoney(amt) + '</td>' +
+          '<td style="padding:10px 8px;text-align:right;font-size:14px;font-weight:600;font-family:monospace;">' + formatMoney(lineAmtForRow) + '</td>' +
         '</tr>';
       });
       itemsHTML += '</tbody></table></div>';
@@ -2051,8 +2149,8 @@
         '<div style="display:flex;justify-content:flex-end;margin-bottom:20px;">' +
           '<div style="min-width:280px;">' +
             '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--gray-500);margin-bottom:4px;"><span>Subtotal</span><span>' + formatMoney(subtotal) + '</span></div>' +
-            (totalShipping > 0 ? '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--gray-500);margin-bottom:4px;"><span>Shipping</span><span>' + formatMoney(totalShipping) + '</span></div>' : '') +
             '<div style="display:flex;justify-content:space-between;font-size:13px;color:' + (taxRate > 0 ? 'var(--gray-500)' : '#E16A5B') + ';margin-bottom:4px;"><span>Tax' + (taxRate > 0 ? ' (' + taxRate + '% on taxable)' : ' <a onclick="window._forceEditMode=true;navigate(window.location.hash)" style="color:#E16A5B;cursor:pointer;text-decoration:underline;font-size:11px;">set rate →</a>') + '</span><span>' + formatMoney(tax) + '</span></div>' +
+            (totalShipping > 0 ? '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--gray-500);margin-bottom:4px;"><span>Shipping</span><span>' + formatMoney(totalShipping) + '</span></div>' : '') +
             '<div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700;padding-top:8px;border-top:2px solid var(--navy);"><span>Total</span><span>' + formatMoney(grandTotal) + '</span></div>' +
             (totalPaid > 0 ? '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--green);margin-top:4px;"><span>Paid</span><span>-' + formatMoney(totalPaid) + '</span></div>' +
               '<div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;color:' + (balance <= 0 ? 'var(--green)' : 'var(--gold)') + ';margin-top:4px;"><span>Balance Due</span><span>' + formatMoney(balance) + '</span></div>' : '') +
@@ -2366,12 +2464,13 @@
     var clientPhone = docData.clientPhone || docData.phone || docData.contactPhone ||
       proj.clientPhone || proj.phone || proj.contactPhone || (crm && crm.phone) || '';
     var clientAddress = docData.clientAddress || docData.billingAddress || docData.mailingAddress ||
-      docData.streetAddress || docData.address ||
+      docData.streetAddress || docData.address || docData.clientAddressLine1 ||
       proj.clientAddress || proj.billingAddress || proj.mailingAddress ||
-      proj.streetAddress || proj.address || (crm && (crm.address || crm.primaryAddress)) || '';
+      proj.streetAddress || proj.address || proj.clientAddressLine1 ||
+      (crm && (crm.address || crm.primaryAddress || crm.clientAddressLine1 || crm.billingAddress || crm.mailingAddress || crm.streetAddress)) || '';
     var clientCompany = docData.clientCompany || proj.clientCompany || (crm && crm.company) || '';
     var clientAddress2 = docData.clientAddress2 || docData.secondaryAddress ||
-      proj.clientAddress2 || proj.secondaryAddress || (crm && (crm.address2 || crm.secondaryAddress)) || '';
+      proj.clientAddress2 || proj.secondaryAddress || (crm && (crm.address2 || crm.secondaryAddress || crm.clientAddress2)) || '';
     if (!clientName && proj.name && proj.name.includes(' - ')) clientName = proj.name.split(' - ')[0].trim();
 
     var shipToRaw = (docData.shipTo || docData.deliverTo || '').trim() ||
@@ -2385,6 +2484,22 @@
       var _stk = Object.keys(_stSet);
       if (_stk.length === 1) shipToRaw = _stk[0];
       else if (_stk.length > 1) shipToRaw = _stk.join(' · ');
+    }
+
+    var shipToDisplay = shipToRaw;
+    if (type === 'po' && typeof window.resolvePOShipToDisplayText === 'function') {
+      try {
+        var projForShip = Object.assign({}, proj);
+        if (crm) {
+          projForShip.clientName = projForShip.clientName || crm.name || crm.fullName || '';
+          projForShip.clientAddress = projForShip.clientAddress || crm.address || crm.primaryAddress || crm.clientAddressLine1 || crm.billingAddress || crm.mailingAddress || crm.streetAddress || '';
+          projForShip.clientAddress2 = projForShip.clientAddress2 || crm.address2 || crm.secondaryAddress || crm.clientAddress2 || '';
+          projForShip.billingAddress = projForShip.billingAddress || crm.billingAddress || '';
+          projForShip.mailingAddress = projForShip.mailingAddress || crm.mailingAddress || '';
+        }
+        var _shipResolved = window.resolvePOShipToDisplayText(shipToRaw, projForShip, docData);
+        if (_shipResolved && String(_shipResolved).trim()) shipToDisplay = String(_shipResolved).trim();
+      } catch (_eShipRes) {}
     }
 
     var docNum = docData.invoiceNum || docData.number || docData.proposalNum || docData.name || docId.slice(0,8);
@@ -2469,9 +2584,15 @@
       var amt = parseFloat(it.amount) || 0;
       var cost = parseFloat(it.cost) || 0;
       var mkup = parseFloat(it.markupPct) || 0;
+      if (type === 'invoice' && typeof invoiceLineIsDesignServicesNoMarkup === 'function' && invoiceLineIsDesignServicesNoMarkup(it)) mkup = 0;
       var ship = parseFloat(it.shipping) || 0;
       var lineAmt = cost > 0 ? cost * qty * (1 + mkup / 100) : amt;
       var unitPrice = type === 'po' ? (cost || amt/qty) : amt/qty;
+      var displayLineTotal = amt;
+      if (type === 'po') {
+        displayLineTotal = (cost > 0 ? (cost * qty + ship) : amt);
+        displayLineTotal = Math.round(displayLineTotal * 100) / 100;
+      }
       var isTaxable = it.taxable !== false && (it.taxable === true || it.expenseType === 'product' || (!it.expenseType && it.taxable !== false));
 
       subtotal += lineAmt;
@@ -2479,6 +2600,7 @@
       totalShipping += ship;
 
       var isSvc = it.expenseType === 'service' || it.itemType === 'service';
+      if (type === 'invoice' && typeof window.cchInvoiceLineUseServiceStyleInView === 'function' && window.cchInvoiceLineUseServiceStyleInView(it)) isSvc = true;
       var imgTag = '';
       if (_showPremiumImgCol && !isSvc) {
         var imgSrc = '';
@@ -2539,7 +2661,7 @@
         '<td class="r">' + formatMoney(unitPrice) + '</td>' +
         '<td class="r ship">' + (ship > 0 ? formatMoney(ship) : '') + '</td>' +
         '<td style="text-align:center;">' + (isTaxable ? '<span class="tax-yes">✓</span>' : '<span class="tax-no">—</span>') + '</td>' +
-        '<td class="r total-cell">' + formatMoney(amt) + '</td></tr>';
+        '<td class="r total-cell">' + formatMoney(displayLineTotal) + '</td></tr>';
     }
 
     var _thImg = _showPremiumImgCol ? '<th style="width:80px;"></th>' : '';
@@ -2585,6 +2707,14 @@
     totalShipping += parseFloat(docData.docShipping) || 0;
     var taxAmt = taxableSubtotal * (taxRate / 100);
     var grandTotal = subtotal + totalShipping + taxAmt;
+    if (type === 'invoice' && String(docData.status || '').toLowerCase() === 'void') {
+      subtotal = 0;
+      taxableSubtotal = 0;
+      totalShipping = 0;
+      taxAmt = 0;
+      grandTotal = 0;
+      totalPaid = 0;
+    }
 
     // Totals HTML
     var totalsHtml = '<div class="total-row"><span>Subtotal</span><span>' + formatMoney(subtotal) + '</span></div>';
@@ -2606,8 +2736,8 @@
     var memoHtml = _memoSrc ?
       '<div class="memo-block"><div class="memo-label">Terms & Notes</div><div class="memo-text">' + esc(_memoSrc) + '</div></div>' : '';
 
-    var shipToHtml = shipToRaw
-      ? esc(shipToRaw).replace(/\n/g, '<br>')
+    var shipToHtml = shipToDisplay
+      ? esc(shipToDisplay).replace(/\n/g, '<br>')
       : '<span style="color:#5C6B80;font-size:12px;">Set <strong>Project Address</strong> (job site) in Edit Project, or choose ship-to on lines.</span>';
     var billToHtml = typeof window.buildPremiumBillToHtml === 'function'
       ? window.buildPremiumBillToHtml(clientName, clientAddress, clientPhone, clientEmail, clientCompany, clientAddress2)
@@ -2622,7 +2752,7 @@
           return billParts.length ? billParts.join('<br>') : '<span style="color:#bbb;font-size:12px;">Add <strong>client name &amp; billing address</strong> in Edit Project.</span>';
         })();
     var projAddrLine = (proj.projectAddress || proj.address || '').trim();
-    var _shipNorm = (shipToRaw || '').replace(/\s+/g, ' ').trim();
+    var _shipNorm = (shipToDisplay || '').replace(/\s+/g, ' ').trim();
     var _projNorm = projAddrLine.replace(/\s+/g, ' ').trim();
     if (_projNorm && _shipNorm && _projNorm === _shipNorm) projAddrLine = '';
     var projectHtml;
@@ -2639,7 +2769,6 @@
     if (type === 'po') {
       infoSectionHtml = '<div class="info-section info-section-po">' +
         (docData.vendor ? '<div class="info-block"><div class="info-label">Vendor</div><div class="info-value"><strong>' + esc(docData.vendor) + '</strong></div></div>' : '') +
-        '<div class="info-block"><div class="info-label">Project</div><div class="info-value">' + projectHtml + '</div></div>' +
         '<div class="info-block info-block-ship-to"><div class="info-label">Ship To</div><div class="info-value">' + shipToHtml + '</div></div>' +
       '</div>';
     } else {
@@ -2648,6 +2777,10 @@
         '<div class="info-block"><div class="info-label">Project</div><div class="info-value">' + projectHtml + '</div></div>' +
       '</div>';
     }
+
+    var voidBannerPremium = (type === 'invoice' && String(docData.status || '').toLowerCase() === 'void')
+      ? '<div style="margin:12px 0 16px;padding:12px 16px;background:rgba(107,114,128,0.12);border:1px solid rgba(107,114,128,0.35);border-radius:8px;font-size:13px;color:#4B5563;"><strong>VOID</strong> &mdash; Non-billable reference; totals cleared. Trade costs remain on lines.</div>'
+      : '';
 
     // Invoices: date is shown next to project name, not in the navy header.
     var premiumDocDateHtml = (type === 'invoice') ? '' : (dateStr ? '<div class="doc-date">' + esc(dateStr) + '</div>' : '');
@@ -2694,8 +2827,10 @@
       /* Info section */
       '.info-section { display:flex; flex-wrap:wrap; gap:28px 32px; padding:22px 40px; border-bottom:1px solid #E8ECF3; align-items:flex-start; }' +
       '.info-section-invoice .info-block { flex:1 1 220px; min-width:0; max-width:48%; }' +
-      '.info-section-po .info-block-ship-to { margin-left:auto; flex:0 1 280px; min-width:200px; text-align:right; }' +
-      '.info-section-po .info-block-ship-to .info-value { text-align:right; }' +
+      '.info-section-po { justify-content:space-between; }' +
+      '.info-section-po .info-block:first-child { flex:0 1 42%; min-width:0; }' +
+      '.info-section-po .info-block-ship-to { margin-left:auto; flex:1 1 52%; min-width:200px; max-width:100%; text-align:right; }' +
+      '.info-section-po .info-block-ship-to .info-value { text-align:right; white-space:normal; word-wrap:break-word; overflow-wrap:anywhere; }' +
       '.info-block { flex:1 1 160px; min-width:0; }' +
       '.info-label { font-size:9px; text-transform:uppercase; letter-spacing:2px; color:#C4A464; font-weight:700; margin-bottom:6px; }' +
       '.info-value { font-size:13px; color:#1B3352; line-height:1.7; }' +
@@ -2807,6 +2942,8 @@
           '</div>' +
         '</div>' +
         '<div class="gold-line"></div>' +
+
+        voidBannerPremium +
 
         infoSectionHtml +
 

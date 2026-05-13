@@ -81,6 +81,7 @@
       <div class="rule"><strong>Not Billable entries:</strong> Rate → $0 (regardless of system rate)</div>
       <div class="rule"><strong>Duplicate check:</strong> Match on project+member+date+service+hours</div>
       <div class="rule"><strong>Source tag:</strong> All entries tagged <code>source: "houzz-import"</code></div>
+      <div class="rule"><strong>Houzz “Invoice” column:</strong> Stored as <code>invoiceRef</code> and <code>invoiceNumber</code>. Smart Time “Revenue Leakage” still keys off a linked Studio <code>invoiceId</code> (set when you bill from Studio or backfill).</div>
     </div>
   </div>
 </div>
@@ -386,6 +387,8 @@ async function startImport(dryRun = false) {
         source: 'houzz-import',
         importedAt: firebase.firestore.FieldValue.serverTimestamp(),
         invoiceRef: entry.invoiceRef || null,
+        // Mirror Houzz "Invoice" column so Studio lists match the spreadsheet; Smart Time KPIs still need invoiceId to count as invoiced.
+        invoiceNumber: entry.invoiceRef || null,
         invoicedAmount: null,
         invoiceId: null,
       };

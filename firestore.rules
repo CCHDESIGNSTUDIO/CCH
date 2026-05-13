@@ -20,10 +20,39 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Boards + subcollections — open for Clipper (uses API key, no auth)
+    // -------------------------------------------------------------------------
+    // boards/{projectId} — financial subcollections (invoices, proposals, purchaseOrders)
+    //
+    // Writes use isAuth() so any signed-in Studio user can edit line costs and docs.
+    // That still removes anonymous tampering (the old wildcard was allow write: true).
+    //
+    // Top-level /invoices, /proposals, /purchaseOrders (later in this file) stay isAdmin() write —
+    // those paths are legacy; live Studio data is almost always under boards/... .
+    //
+    // Stronger options (not implemented here — need real Auth + data shape):
+    // - Custom claim (e.g. request.auth.token.admin) plus isAdmin() for writes; set claims in Firebase Admin.
+    // - isProjectMember(projectId) using get(/boards/$(projectId)) only if board docs store
+    //   stable member UIDs or emails you can match against request.auth.
+    // - Avoid get() in hot rules if you can; each get() bills a document read per evaluation.
+    //
+    // payments: there is no boards/.../payments subcollection — payments live as fields on docs.
+    // -------------------------------------------------------------------------
+    // Boards: board doc + non-financial subcollections stay permissive for Clipper / room board tools.
     match /boards/{projectId} {
       allow read: if true;
       allow write: if true;
+      match /purchaseOrders/{docId} {
+        allow read: if isAuth();
+        allow write: if isAuth();
+      }
+      match /invoices/{docId} {
+        allow read: if isAuth();
+        allow write: if isAuth();
+      }
+      match /proposals/{docId} {
+        allow read: if isAuth();
+        allow write: if isAuth();
+      }
       match /{sub}/{docId} {
         allow read: if true;
         allow write: if true;

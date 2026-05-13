@@ -1,0 +1,4 @@
+'ðŸ—‚ï¸\x8f'
+0xf0 0x178 0x2014 0x201a 0xef 0xb8 0x8f
+cp1252 ERR UnicodeEncodeError('charmap', 'ðŸ—‚ï¸\x8f', 6, 7, 'character maps to <undefined>')
+latin-1 ERR UnicodeEncodeError('latin-1', 'ðŸ—‚ï¸\x8f', 1, 4, 'ordinal not in range(256)')

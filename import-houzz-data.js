@@ -19,7 +19,11 @@ const path = require('path');
 // ── CONFIG ──
 const PROJECT_ID = 'cch-design-boards';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
-const XLS_PATH = 'C:/Users/cindy/Dropbox/Claude - CCH studio/Houzz FILES/Houzz reports-2870-02-24-2026-15-11-49-044 all transactions.xlsx';
+// Latest full transaction export (see HOUZZ-DATA-README.md). Override without editing:
+//   set HOUZZ_ALL_TXN_XLSX=C:\path\to\your\all transactions.xlsx
+const XLS_PATH =
+  process.env.HOUZZ_ALL_TXN_XLSX ||
+  'C:/Users/cindy/Dropbox/Claude - CCH studio/Houzz FILES/Houzz reports-2870-02-24-2026-15-11-49-044 all transactions.xlsx';
 const IMAGE_MAP_PATH = 'C:/Users/cindy/Dropbox/Claude - CCH studio/extracted_images/houzz_image_map.json';
 const IMAGE_BASE_DIR = 'C:/Users/cindy/Dropbox/Claude - CCH studio/extracted_images';
 const STORAGE_BUCKET = 'cch-design-boards.firebasestorage.app';
@@ -97,6 +101,35 @@ function slugify(name) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .substring(0, 60);
+}
+
+/** Parse Houzz "Payments" cell (number, $ string, or first dollar amount in text). */
+function houzzMoneyCell(v) {
+  if (v === null || v === undefined || v === '') return NaN;
+  if (typeof v === 'number' && !Number.isNaN(v)) return v;
+  const s = String(v).replace(/[$,\s]/g, '').trim();
+  const m = s.match(/-?\d+\.?\d*/);
+  if (!m) return NaN;
+  const n = parseFloat(m[0]);
+  return Number.isNaN(n) ? NaN : n;
+}
+
+/**
+ * Paid amount for a PO row from the All Transactions / Outgoing report.
+ * Prefer explicit Payments column; else derive from Balance vs order total (amount + shipping).
+ */
+function houzzPoPaidAmountFromTxn(po) {
+  const total = (parseFloat(po.amount) || 0) + (parseFloat(po.shipping) || 0);
+  const paidFromCell = houzzMoneyCell(po.payments);
+  if (!Number.isNaN(paidFromCell) && paidFromCell > 0) {
+    return total > 0 ? Math.min(total, paidFromCell) : paidFromCell;
+  }
+  const bal = parseFloat(po.balance);
+  if (!Number.isNaN(bal) && total > 0) {
+    const fromBal = total - bal;
+    if (fromBal >= 0 && fromBal <= total + 0.01) return Math.round(fromBal * 100) / 100;
+  }
+  return 0;
 }
 
 // Project name → Firestore board ID mapping
@@ -393,6 +426,8 @@ async function main() {
         expenseType: 'product'
       };
 
+      const poTotal = po.amount + po.shipping;
+      const paidAmt = houzzPoPaidAmountFromTxn(po);
       const poData = {
         number: po.code,
         name: po.desc || po.code,
@@ -400,7 +435,10 @@ async function main() {
         status: po.status || 'Ordered',
         date: po.date,
         createdAt: po.date,
-        total: po.amount + po.shipping,
+        total: poTotal,
+        paidAmount: paidAmt,
+        payments: paidAmt > 0 ? [{ amount: paidAmt, date: po.date, method: 'Houzz transaction report' }] : [],
+        houzzBalance: po.balance,
         items: [item],
         connectedDocs: po.connectedDocs,
         createdBy: po.createdBy,

@@ -13,6 +13,20 @@ platform/product_library_import.json
 *.env
 .env.*
 
+# Firebase Admin SDK service account keys — NEVER commit these
+service-account.json
+service-account.json/
+*-firebase-adminsdk-*.json
+**/service-account.json/
+**/cch-design-boards-firebase-adminsdk-*.json
+
+# Debug output files (CSVs / JSON reports may contain customer + payment data)
+_debug/*.csv
+_debug/*-manifest.csv
+_debug/*-report.json
+_debug/*-dryrun*.json
+_debug/staging-*.json
+
 # OS files
 .DS_Store
 Thumbs.db

@@ -1,0 +1,45 @@
+============================================================
+PRODUCT <-> PROJECT LINK INVESTIGATION
+============================================================
+
+[1] PROJECTS section — what are the timestamp-named sub-rows?
+  named projects rows: 236 (8 with image)
+  timestamp-named rows: 5113 (0 with image)
+  --> if ts rows have project_id/image data, they are likely room-board records
+
+  Sample timestamp-named rows (which fields are populated):
+    {'PROJECT_NAME': '2019-04-01 07:38:44.85614', 'CREATED_AT': '2019-04-01 07:38:44.85614', 'LAST_UPDATED': 'Master Bedroom', 'PHONE_NUMBER': 'Kipp Lassetter - Park City', 'ADDRESS': 'no'}
+    {'PROJECT_NAME': '2019-04-01 07:38:44.85614', 'CREATED_AT': '2019-04-01 07:38:44.85614', 'LAST_UPDATED': 'Master Bath', 'PHONE_NUMBER': 'Kipp Lassetter - Park City', 'ADDRESS': 'no'}
+    {'PROJECT_NAME': '2019-04-01 07:38:44.85614', 'CREATED_AT': '2019-04-01 07:38:44.85614', 'LAST_UPDATED': 'Lounge', 'PHONE_NUMBER': 'Kipp Lassetter - Park City', 'ADDRESS': 'no'}
+    {'PROJECT_NAME': '2019-04-01 07:38:44.85614', 'CREATED_AT': '2020-01-26 23:11:53.926405', 'LAST_UPDATED': 'Halls & Stairs', 'PHONE_NUMBER': 'Bradbury - Blue Bird', 'ADDRESS': 'yes'}
+    {'PROJECT_NAME': '2019-04-01 07:38:44.85614', 'CREATED_AT': '2020-01-26 23:11:57.741777', 'LAST_UPDATED': 'Laundry', 'PHONE_NUMBER': 'Bradbury - Blue Bird', 'ADDRESS': 'yes'}
+
+[2] INVOICES section — are the 41K extra rows line items with product names?
+  INVOICES columns: ['INVOICE_NUMBER', 'CREATED_AT', 'INVOICE_TYPE', 'CLIENT_NAME', 'CLIENT_EMAIL', 'CLIENT_BILLING_ADDRESS', 'BILLING_DATE', 'SALES_TAX_AMOUNT', 'PROJECT_NAME', 'SENT_AT', 'NOTES', 'REQUEST_DEPOSIT', 'CODE', 'DEPOSIT_SENT_DATE', 'BALANCE_SENT_DATE', 'ALLOW_CREDIT_CARD_PAYMENT', 'ALLOW_ACH_PAYMENT', 'PAYMENT_TERMS', 'INVOICE_DATE', 'PUBLISHED', 'TOTAL_PAYMENT', 'TOTAL_PAID', 'TOTAL_MARKUP', 'CLOSE_DATE', 'DEPOSIT_PERCENTAGE_VALUE', 'SHOW_MARKUP', 'APPROVAL_ONLY', 'REMOVED_DATE', 'SUBTOTAL_DERIVED', 'SHIPPING_COST_DERIVED', 'SHIPPING_COST_WITHOUT_MARKUP_DERIVED', 'SHIPPING_MARKUP_DERIVED', 'TAXES_DERIVED']
+  columns matching TITLE/DESC/ITEM/NAME: ['CLIENT_NAME', 'PROJECT_NAME']
+  Sample 'line item type' rows:
+    invoice=2544860: {'INVOICE_NUMBER': '2544860', 'CREATED_AT': 'Window Treatment Labor', 'INVOICE_TYPE': 'Pieces', 'SALES_TAX_AMOUNT': '643', 'PROJECT_NAME': '1', 'NOTES': 'Material', 'REQUEST_DEPOSIT': '0', 'CODE': '3214.98', 'DEPOSIT_SENT_DATE': '3214.98', 'BALANCE_SENT_DATE': '0', 'ALLOW_CREDIT_CARD_PAYMENT': '3857.98', 'TOTAL_PAYMENT': '20', 'TOTAL_PAID': '0', 'TOTAL_MARKUP': '0', 'DEPOSIT_PERCENTAGE_VALUE': 'no', 'SHOW_MARKUP': 'yes', 'SUBTOTAL_DERIVED': '138454'}
+    invoice=2544860: {'INVOICE_NUMBER': '2544860', 'CREATED_AT': '8486 - PAVILLON SILK', 'INVOICE_TYPE': 'Pieces', 'SALES_TAX_AMOUNT': '15.73', 'PROJECT_NAME': '37', 'NOTES': 'Material', 'REQUEST_DEPOSIT': '0', 'CODE': '1663.15', 'DEPOSIT_SENT_DATE': '44.95', 'BALANCE_SENT_DATE': '0', 'ALLOW_CREDIT_CARD_PAYMENT': '2245.16', 'TOTAL_PAYMENT': '35', 'TOTAL_PAID': '0', 'TOTAL_MARKUP': '0', 'DEPOSIT_PERCENTAGE_VALUE': 'no', 'SHOW_MARKUP': 'yes', 'SUBTOTAL_DERIVED': '16725044'}
+    invoice=2054749: {'INVOICE_NUMBER': '2054749', 'CREATED_AT': 'Bend Large Tall Light', 'INVOICE_TYPE': 'Pieces', 'SALES_TAX_AMOUNT': '98.28', 'PROJECT_NAME': '2', 'NOTES': 'Material', 'REQUEST_DEPOSIT': '0', 'CODE': '982.8', 'DEPOSIT_SENT_DATE': '491.4', 'BALANCE_SENT_DATE': '0', 'ALLOW_CREDIT_CARD_PAYMENT': '1179.36', 'INVOICE_DATE': 'Height: 20"\nWidth: 8"\nExtension: 4"\nBackplate: 7.75" x 14" R', 'TOTAL_PAYMENT': '20', 'TOTAL_PAID': '0', 'TOTAL_MARKUP': '0', 'DEPOSIT_PERCENTAGE_VALUE': 'no', 'SHOW_MARKUP': 'yes', 'REMOVED_DATE': 'Matte Black', 'SUBTOTAL_DERIVED': '15391015'}
+    invoice=2054749: {'INVOICE_NUMBER': '2054749', 'CREATED_AT': 'Molten Pendant Large', 'INVOICE_TYPE': 'Pieces', 'SALES_TAX_AMOUNT': '70', 'PROJECT_NAME': '2', 'NOTES': 'Material', 'REQUEST_DEPOSIT': '0', 'CODE': '400', 'DEPOSIT_SENT_DATE': '200', 'BALANCE_SENT_DATE': '0', 'ALLOW_CREDIT_CARD_PAYMENT': '540', 'INVOICE_DATE': 'Height: 20\nWidth: 9\nDepth: 9\nMax Height: 57.5\nCanopy: 5 in d', 'TOTAL_PAYMENT': '35', 'TOTAL_PAID': '0', 'TOTAL_MARKUP': '0', 'DEPOSIT_PERCENTAGE_VALUE': 'no', 'SHOW_MARKUP': 'yes', 'SUBTOTAL_DERIVED': '15382763'}
+    invoice=2054749: {'INVOICE_NUMBER': '2054749', 'CREATED_AT': 'Precision 28" Bath Light', 'INVOICE_TYPE': 'Pieces', 'SALES_TAX_AMOUNT': '127.08', 'PROJECT_NAME': '4', 'NOTES': 'Material', 'REQUEST_DEPOSIT': '0', 'CODE': '2541.6', 'DEPOSIT_SENT_DATE': '635.4', 'BALANCE_SENT_DATE': '0', 'ALLOW_CREDIT_CARD_PAYMENT': '3049.92', 'INVOICE_DATE': 'Height: 28"\nWidth: 4.25"\nExtension: 2.75"\nBackplate: 4.25" S', 'TOTAL_PAYMENT': '20', 'TOTAL_PAID': '0', 'TOTAL_MARKUP': '0', 'DEPOSIT_PERCENTAGE_VALUE': 'no', 'SHOW_MARKUP': 'yes', 'REMOVED_DATE': 'Antique Brunished brass', 'SUBTOTAL_DERIVED': '15381604'}
+
+[3] FILES section — what kind of file references?
+  FILES columns: ['https://ivy-prod.s3.amazonaws.com/uploads/designer/image/2879/CINDY_9BW_small.jpg?AWSAccessKeyId=AKIARBESUJ5WRYNZ4NM3&Expires=1779883719&Signature=0jzyl5aa5dz2QzjJBUsgV6kY2f0%3D']
+  First 8 file references:
+    ['https://ivy-prod.s3.amazonaws.com/uploads/project/image/175861/exterior.jpg?AWSAccessKeyId=AKIARBESUJ5WRYNZ4NM3&Expires=1779883719&Signature=vyn1F2mnkaXX%2FAyQMERc%2BdFGZ28%3D']
+    ['https://ivy-prod.s3.amazonaws.com/uploads/project/image/107208/IMG_0296.jpg?AWSAccessKeyId=AKIARBESUJ5WRYNZ4NM3&Expires=1779883719&Signature=IdP0W4SNk7vihxSD5HqVpW7fieg%3D']
+    ['https://ivy-prod.s3.amazonaws.com/uploads/project/image/181722/The-Forest-Modern-Christmas-Home-Tour-The-Kitchen.jpg?AWSAccessKeyId=AKIARBESUJ5WRYNZ4NM3&Expires=1779883719&Signature=kFRYl6e1Fu3rrsAoEjts%2BIC%2B38Y%3D']
+    ['https://ivy-prod.s3.amazonaws.com/uploads/project/image/417948/15-2587_1.jpg?AWSAccessKeyId=AKIARBESUJ5WRYNZ4NM3&Expires=1779883719&Signature=5VTpIELGbOX17zd2NCs3UgGuVC8%3D']
+    ['https://ivy-prod.s3.amazonaws.com/uploads/company_logo/image/2426/CCHlogo.jpg?AWSAccessKeyId=AKIARBESUJ5WRYNZ4NM3&Expires=1779883719&Signature=%2FlPRFCZnFZB5zYd1xnxsy9u1aGI%3D']
+    ['https://ivy-uploads.s3.us-west-2.amazonaws.com/2426/attachment/1008195/Lilac_landscape.pdf?AWSAccessKeyId=AKIA2A2RLV6ZHJZOVAIO&Expires=1779883721&Signature=G1gx3Y7L5WgHsF6lrRImvv%2FtjVU%3D']
+    ['https://ivy-uploads.s3.us-west-2.amazonaws.com/2426/attachment/1008195/Lilac_landscape_thumbnail.jpg?AWSAccessKeyId=AKIA2A2RLV6ZHJZOVAIO&Expires=1779883721&Signature=Rn2%2BOzKbZSQtqgiiZV2eKQpZve4%3D']
+    ['https://ivy-uploads.s3.us-west-2.amazonaws.com/2426/attachment/100940/Inv_181265_from_Lighting_In__1_.pdf?AWSAccessKeyId=AKIA2A2RLV6ZHJZOVAIO&Expires=1779883721&Signature=05JLkY9KIfyihDWiwGslhV6BaB8%3D']
+
+[4] CATALOG file column check (re-read header)
+  Catalog columns: ['id', 'name', 'category', 'item_type', 'description', 'vendor_description', 'unit_type', 'quantity', 'vendor_title', 'supplier', 'url', 'materials', 'finish', 'sku', 'manufacturer', 'dimensions', 'notes', 'msrp', 'markup', 'shipping_cost', 'shipping_markup', 'taxable', 'cost', 'image1', 'image2', 'image3', 'image4', 'image5']
+  Project/client/room-like columns in catalog: []
+
+[5] Main PRODUCTS section column check
+  PRODUCTS columns: ['TITLE', 'DESCRIPTION', 'IS_ARCHIVED', 'PRICE', 'MARKUP', 'MANUFACTURER', 'MATERIALS', 'DIMENSIONS', 'NOTES', 'COMPANY_NAME', 'SKU', 'VENDOR_DESCRIPTION', 'FINISH', 'URL', 'MSRP', 'TAXABLE', 'TAX_NAME', 'SUPPLIER_FIRST_NAME', 'SUPPLIER_LAST_NAME']
+  Project/client/room-like columns: []

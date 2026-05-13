@@ -12,11 +12,13 @@
 <style>
   :root{
     --ink:#1A1A1A; --body:#333; --muted:#888; --rule:#999; --hairline:#DDD;
-    --accent:#8B6F47; --bg:#F8F6F2; --field:#FAF7F2; --border:#D9D2C5;
+    --accent:#C4A464; --bg:#f5f7fa; --field:#fafbfc; --border:#cfd6e0;
     --flag:#B8782F; --selected:#1A1A1A;
+    --cch-navy:#1B3352; --cch-navy-deep:#152a45; --cch-gold:#C4A464;
+    --rail-text:rgba(255,255,255,.92); --rail-muted:rgba(255,255,255,.58);
   }
   *{box-sizing:border-box}
-  html,body{margin:0;padding:0;font-family:Calibri,Arial,sans-serif;color:var(--body);background:#F2EFE9}
+  html,body{margin:0;padding:0;font-family:Calibri,Arial,sans-serif;color:var(--body);background:#eef1f6}
   button{font-family:inherit;cursor:pointer}
   header{background:#fff;border-bottom:1px solid var(--hairline);padding:14px 24px;display:flex;align-items:center;gap:24px}
   header h1{margin:0;font-family:Georgia,serif;font-size:22px;color:var(--ink);font-weight:700}
@@ -24,32 +26,51 @@
   .auth-note{margin-left:auto;font-size:11px;color:#555}
   nav.tabs{display:flex;gap:0}
   nav.tabs button{background:transparent;border:none;padding:10px 18px;font-size:11px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;border-bottom:2px solid transparent}
-  nav.tabs button.active{color:var(--ink);border-bottom-color:var(--accent);font-weight:700}
+  nav.tabs button.active{color:var(--cch-navy);border-bottom-color:var(--cch-gold);font-weight:700}
   .builder-shell{display:grid;grid-template-columns:280px minmax(0,1fr);width:100%;min-height:calc(100vh - 64px);align-items:stretch;background:var(--bg)}
   .builder-shell .library-rail{align-self:stretch}
   main#app.builder-main{display:grid;grid-template-columns:minmax(300px,1.1fr) minmax(240px,0.9fr);gap:0;min-width:0;min-height:calc(100vh - 64px)}
-  .library-rail{background:#D8D0C4;border-right:3px solid #6B5344;overflow-y:auto;overflow-x:hidden;padding:12px 10px 80px;display:flex;flex-direction:column;gap:8px;width:280px;min-width:280px;max-width:280px;box-sizing:border-box;flex-shrink:0}
-  .library-rail-boot h3{margin:0 0 6px;font-size:12px;letter-spacing:2px;color:#1A1A1A}
-  .library-rail h3{margin:0;font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:var(--ink);font-weight:700}
-  .library-rail .sub{font-size:10px;color:var(--muted);line-height:1.35;margin-bottom:4px}
-  .lib-rail-select,.lib-rail-filter{width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);background:#fff;font-family:inherit}
+  /* !important: survives stale caches / extensions overriding aside backgrounds */
+  .library-rail,#libraryRail.library-rail{
+    background-color:var(--cch-navy-deep)!important;
+    background-image:linear-gradient(180deg,var(--cch-navy) 0%,var(--cch-navy-deep) 100%)!important;
+    border-right:3px solid var(--cch-gold);overflow-y:auto;overflow-x:hidden;padding:12px 10px 80px;display:flex;flex-direction:column;gap:8px;width:280px;min-width:280px;max-width:280px;box-sizing:border-box;flex-shrink:0;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+    min-height:calc(100vh - 64px);
+    scrollbar-color:rgba(255,255,255,.28) rgba(0,0,0,.2);
+    scrollbar-width:thin
+  }
+  .library-rail::-webkit-scrollbar{width:10px}
+  .library-rail::-webkit-scrollbar-track{background:rgba(0,0,0,.18)}
+  .library-rail::-webkit-scrollbar-thumb{background:rgba(255,255,255,.22);border-radius:5px;border:2px solid transparent;background-clip:padding-box}
+  .library-rail .btn.secondary{
+    background:rgba(255,255,255,.1)!important;color:var(--rail-text)!important;
+    border:1px solid rgba(255,255,255,.22)!important
+  }
+  .library-rail-boot h3{margin:0 0 6px;font-size:12px;letter-spacing:2px;color:var(--rail-text)}
+  .library-rail h3{margin:0;font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:var(--rail-text);font-weight:700}
+  .library-rail .sub{font-size:10px;color:var(--rail-muted);line-height:1.35;margin-bottom:4px}
+  .library-rail-boot p{color:var(--rail-muted);font-size:11px;line-height:1.45;margin:0}
+  .library-rail-boot code{font-size:10px;background:rgba(0,0,0,.25);color:var(--rail-text);padding:1px 5px;border-radius:2px}
+  .lib-rail-select,.lib-rail-filter{width:100%;font-size:12px;padding:6px 8px;border:1px solid rgba(196,164,100,.35);background:rgba(255,255,255,.97);color:var(--ink);font-family:inherit;border-radius:2px}
   .lib-rail-filter{margin-top:2px}
-  .lib-rail-label{font-size:9px;letter-spacing:1.2px;font-weight:700;color:var(--ink);text-transform:uppercase;margin-top:4px}
-  .lib-rail-crumb{font-size:10px;color:var(--muted);word-break:break-word;line-height:1.35;padding:4px 0}
+  .lib-rail-label{font-size:9px;letter-spacing:1.2px;font-weight:700;color:var(--rail-muted);text-transform:uppercase;margin-top:4px}
+  .lib-rail-crumb{font-size:10px;color:var(--rail-muted);word-break:break-word;line-height:1.35;padding:4px 0}
   .lib-rail-folders{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px}
-  .lib-rail-folders .folder-tile{font-size:10px;padding:8px 6px;border:1px solid var(--border);background:#fff;cursor:pointer;text-align:center;line-height:1.2}
-  .lib-rail-folders .folder-tile:hover{border-color:var(--ink)}
+  .lib-rail-folders .folder-tile{font-size:10px;padding:8px 6px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:var(--rail-text);cursor:pointer;text-align:center;line-height:1.2;border-radius:2px}
+  .lib-rail-folders .folder-tile:hover{border-color:var(--cch-gold);background:rgba(255,255,255,.12)}
   .lib-rail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:6px}
   .library-rail .pick-card{border:2px solid transparent;background:#fff;cursor:pointer;display:flex;flex-direction:column;min-width:0}
-  .library-rail .pick-card:hover{border-color:var(--accent)}
+  .library-rail .pick-card:hover{border-color:var(--cch-gold)}
   .library-rail .pick-card img{width:100%;height:68px;object-fit:cover;background:#eee}
   .library-rail .pick-card .label{font-size:8.5px;padding:3px 4px;line-height:1.15;color:var(--body);min-height:28px}
-  .lib-rail-actions{display:flex;flex-direction:column;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--hairline)}
-  .lib-rail-actions .btn-upload{font-size:10px;letter-spacing:1px;padding:8px 10px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;width:100%}
-  .lib-rail-actions .btn-mini{font-size:10px;padding:6px 8px;border:1px solid var(--border);background:#fff;cursor:pointer;width:100%}
-  .lib-rail-empty{font-size:11px;color:var(--muted);font-style:italic;padding:8px 4px}
+  .lib-rail-actions{display:flex;flex-direction:column;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.12)}
+  .lib-rail-actions .btn-upload{font-size:10px;letter-spacing:1px;padding:8px 10px;border:1px solid var(--cch-gold);background:var(--cch-gold);color:var(--cch-navy-deep);cursor:pointer;width:100%;font-weight:700;border-radius:2px}
+  .lib-rail-actions .btn-upload:hover{filter:brightness(1.05)}
+  .lib-rail-actions .btn-mini{font-size:10px;padding:6px 8px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.95);color:var(--ink);cursor:pointer;width:100%;border-radius:2px}
+  .lib-rail-empty{font-size:11px;color:var(--rail-muted);font-style:italic;padding:8px 4px}
   .form-pane{background:#fff;overflow-y:auto;padding:20px 24px 120px;border-right:1px solid var(--hairline);min-width:0}
-  .preview-pane{overflow-y:auto;padding:24px;background:#E8E4DD;min-width:0}
+  .preview-pane{overflow-y:auto;padding:24px;background:#e8ecf2;min-width:0}
   .toolbar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:16px}
   .toolbar .field{margin:0}
   .form-section{margin-bottom:24px;padding-bottom:18px;border-bottom:1px solid var(--hairline)}
@@ -85,6 +106,8 @@
   .picker-modal{width:min(960px,92vw);max-height:86vh;background:#fff;border:1px solid var(--hairline);padding:14px;display:flex;flex-direction:column}
   .picker-modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
   .picker-modal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;overflow:auto}
+  .fabric-pick-thumb{width:76px;height:76px;border:1px solid var(--border);background:var(--field);flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .fabric-pick-thumb img{width:100%;height:100%;object-fit:cover}
   .upload-box{border:2px dashed var(--border);background:var(--field);padding:18px;text-align:center;cursor:pointer;font-size:11px;color:var(--muted);letter-spacing:1px}
   .upload-box.has-img{padding:0;border-style:solid;border-color:var(--ink)}
   .upload-box img{display:block;width:100%;max-height:180px;object-fit:cover}
@@ -108,9 +131,9 @@
   .pp-intent{font-size:11px;font-style:italic;color:var(--body);line-height:1.4;margin-bottom:12px}
   .pp-intent.pp-intent--compact{font-size:9px;line-height:1.25;margin-bottom:8px;max-height:3.75em;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3}
   .pp-specs{font-size:11px;color:var(--body);line-height:1.5}
-  .pp-rendering{background:var(--field);border:1px dashed var(--border);min-height:240px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-style:italic;font-size:11px;overflow:hidden}
-  .preview-body.preview-bedding .pp-rendering{min-height:200px}
-  .pp-rendering img{width:100%;height:100%;object-fit:cover}
+  .pp-rendering{background:var(--field);border:1px dashed var(--border);min-height:200px;max-height:320px;height:260px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-style:italic;font-size:11px;overflow:hidden}
+  .preview-body.preview-bedding .pp-rendering{min-height:180px;max-height:300px;height:220px}
+  .pp-rendering img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;object-position:center}
   .pp-fabric{margin-bottom:10px;display:grid;grid-template-columns:18px 64px 1fr;gap:6px}
   .pp-fabric.pp-fabric--compact{margin-bottom:8px;grid-template-columns:16px 58px 1fr;gap:5px}
   .pp-fabric .lt{font-family:Georgia;font-size:14px;font-weight:700;color:var(--ink)}
@@ -118,19 +141,73 @@
   .pp-fabric .sw{width:64px;height:64px;background:var(--field);border:1px solid var(--border);overflow:hidden}
   .pp-fabric.pp-fabric--compact .sw{width:58px;height:58px}
   .pp-fabric .sw img{width:100%;height:100%;object-fit:cover}
-  .preview-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:0 32px 14px}
+  .preview-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:0 32px 10px}
+  .preview-page.preview-page--windows{height:auto;min-height:720px;padding-bottom:8px}
+  .pp-diag-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding:4px 32px 10px;border-top:1px solid var(--hairline);align-items:stretch}
+  .pp-diag-col{display:flex;flex-direction:column;gap:4px;min-width:0}
+  .pp-diag-col .pp-section{margin-bottom:2px}
+  .pp-meas.pp-meas--in-diag{margin:0;max-height:200px;padding:6px 8px}
+  .pp-diag-frame{border:1px solid var(--border);background:#fafbfd;min-height:140px;max-height:200px;display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--muted);font-size:9px;font-style:italic;text-align:center;padding:6px}
+  .pp-diag-frame img{max-width:100%;max-height:198px;width:auto;height:auto;object-fit:contain}
   .strip-cell .ttl{font-size:10px;letter-spacing:2px;font-weight:700;color:var(--ink);text-transform:uppercase;margin-bottom:4px;padding-bottom:3px;border-bottom:1px solid var(--hairline)}
   .strip-cell .img{height:90px;background:var(--field);border:1px dashed var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:9.5px;font-style:italic}
-  .strip-cell .img img{width:100%;height:100%;object-fit:cover}
+  .strip-cell .img img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;object-position:center}
   .pp-meas{font-size:10px;color:var(--body);padding:0 32px;display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}
   .pp-meas .row{display:flex;justify-content:space-between;border-bottom:1px solid var(--rule);padding:2px 0}
+  .pp-meas.pp-meas--compact{font-size:8px;padding:6px 32px 8px;margin-bottom:8px;max-height:88px;overflow:auto;border:1px dashed var(--border);background:rgba(250,247,242,.85);grid-template-columns:1fr 1fr;gap:4px 10px}
+  .pp-meas.pp-meas--compact .row{border-bottom:none;padding:1px 0;font-size:8px;line-height:1.25}
+  .meas-compact-wrap{border:1px solid var(--hairline);background:var(--field);padding:0;margin-top:4px}
+  .meas-compact-wrap > summary{font-size:10px;letter-spacing:1.2px;font-weight:700;color:var(--ink);text-transform:uppercase;padding:8px 10px;cursor:pointer;list-style:none;user-select:none}
+  .meas-compact-wrap > summary::-webkit-details-marker{display:none}
+  .meas-compact-wrap[open] > summary{border-bottom:1px solid var(--hairline)}
+  .meas-compact-inner{padding:8px 10px 10px}
+  .meas-compact-note{font-size:10px;color:var(--muted);line-height:1.35;margin-bottom:8px}
+  .meas-compact-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 10px}
+  .meas-compact-grid .field{margin-bottom:0;gap:3px}
+  .meas-compact-grid .field label{font-size:8px;letter-spacing:0.5px}
+  .meas-compact-grid .field input{padding:5px 8px;font-size:12px}
   .preview-foot{padding:0 32px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
   .pp-notes-blk{font-size:10px;color:var(--body);line-height:1.4}
   .pp-notes-blk h4{font-size:9.5px;letter-spacing:2px;font-weight:700;margin:0 0 4px;color:var(--ink);text-transform:uppercase;padding-bottom:3px;border-bottom:1px solid var(--hairline)}
   .pp-notes-blk ul{margin:0;padding-left:14px}
-  .pp-cch{position:absolute;right:24px;bottom:18px;text-align:right}
-  .pp-cch .b1{font-family:Georgia;font-size:18px;font-weight:700;color:var(--ink)}
-  .pp-cch .b2{font-size:8px;color:var(--muted);letter-spacing:3px}
+  .pp-cch{
+    position:absolute;right:24px;top:18px;text-align:right;padding:10px 14px 12px;
+    background:linear-gradient(135deg,var(--cch-navy) 0%,var(--cch-navy-deep) 100%);
+    border:1px solid rgba(196,164,100,.35);border-right:3px solid var(--cch-gold);border-radius:2px;
+    box-shadow:0 2px 10px rgba(21,42,69,.2)
+  }
+  .pp-cch .b1{font-family:Georgia;font-size:18px;font-weight:700;color:#fff;letter-spacing:.5px}
+  .pp-cch .b2{font-size:8px;color:rgba(196,164,100,.95);letter-spacing:3px;text-transform:uppercase}
+  @media print {
+    html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    @page { size: letter portrait; margin: 0.45in 0.5in; }
+    .preview-shrink { transform: none !important; margin: 0 !important; }
+    .preview-page {
+      width: 100% !important;
+      max-width: none !important;
+      height: auto !important;
+      min-height: 0 !important;
+      margin: 0 !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+      page-break-after: auto;
+    }
+    .preview-page--windows { min-height: 0 !important; padding-bottom: 10px; }
+    .preview-body { gap: 10px; padding: 12px 0; }
+    .preview-body.preview-bedding .pp-rendering { min-height: 1.65in !important; max-height: 2.75in !important; height: 2.35in !important; }
+    .pp-rendering { min-height: 1.75in; max-height: 2.75in; height: 2.5in; }
+    .pp-rendering img { max-width: 100% !important; max-height: 100% !important; object-fit: contain !important; }
+    .preview-strip { break-inside: avoid-page; page-break-inside: avoid; }
+    .strip-cell .img { height: 0.95in; max-height: 100px; }
+    .strip-cell .img img { object-fit: contain !important; }
+    .pp-diag-row { break-inside: avoid-page; page-break-inside: avoid; }
+    .pp-diag-col { break-inside: avoid-page; page-break-inside: avoid; }
+    .pp-meas.pp-meas--compact,
+    .pp-meas.pp-meas--in-diag { max-height: none !important; overflow: visible !important; }
+    .pp-diag-frame { min-height: 1.1in; max-height: 1.85in; break-inside: avoid-page; page-break-inside: avoid; }
+    .pp-diag-frame img { max-height: 1.75in !important; object-fit: contain !important; }
+    .preview-foot { break-inside: avoid-page; page-break-inside: avoid; }
+  }
   @media (max-width:1200px){
     .builder-shell{grid-template-columns:260px minmax(0,1fr)}
     .library-rail{width:260px;min-width:260px;max-width:260px}
@@ -138,7 +215,7 @@
   @media (max-width:1100px){
     .builder-shell{grid-template-columns:1fr;grid-template-rows:minmax(130px,30vh) auto}
     main#app.builder-main{grid-template-columns:1fr;min-height:0}
-    .library-rail{width:100%;min-width:0;max-width:none;border-right:none;border-bottom:3px solid #6B5344;max-height:30vh}
+    .library-rail{width:100%;min-width:0;max-width:none;border-right:none;border-bottom:3px solid var(--cch-gold);max-height:30vh}
     .form-pane{border-right:none}
     .preview-pane{display:none}
   }
@@ -156,11 +233,30 @@
   <div class="auth-note" id="authNote">Checking sign-in...</div>
 </header>
 
+<!-- Shown only when not signed in (same email & password as CCH Studio). -->
+<section id="builderAuthBar" style="display:block;background:#fff;border-bottom:1px solid var(--hairline);padding:14px 24px;">
+  <div style="max-width:720px;margin:0 auto;">
+    <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Sign in</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+      <div style="flex:1;min-width:180px;">
+        <label style="font-size:10px;font-weight:700;color:#333;display:block;margin-bottom:4px;">Email</label>
+        <input id="builderAuthEmailHeader" type="email" autocomplete="username" placeholder="you@cchdesign.com" style="width:100%;padding:10px 12px;border:1px solid var(--border);font-size:14px;box-sizing:border-box;" />
+      </div>
+      <div style="flex:1;min-width:140px;">
+        <label style="font-size:10px;font-weight:700;color:#333;display:block;margin-bottom:4px;">Password</label>
+        <input id="builderAuthPasswordHeader" type="password" autocomplete="current-password" style="width:100%;padding:10px 12px;border:1px solid var(--border);font-size:14px;box-sizing:border-box;" />
+      </div>
+      <button type="button" id="builderAuthSubmitHeader" class="btn" style="padding:10px 20px;">Sign in</button>
+    </div>
+    <div id="builderAuthErrorHeader" class="notice error" style="display:none;margin-top:12px;"></div>
+  </div>
+</section>
+
 <div id="builderShell" class="builder-shell" style="display:none">
-  <aside class="library-rail" id="libraryRail" aria-label="Image library">
+  <aside class="library-rail" id="libraryRail" aria-label="Image library" style="background-color:#152a45;background-image:linear-gradient(180deg,#1B3352 0%,#152a45 100%);border-right:3px solid #C4A464;">
     <div class="library-rail-inner library-rail-boot" id="libraryRailBoot">
       <h3>IMAGE LIBRARY</h3>
-      <p style="margin:0;font-size:11px;line-height:1.45;color:#444">Pick a Storage folder and thumbnails appear here. If this stays blank after load, check you are signed in and Storage rules allow <code style="font-size:10px">library/</code> reads.</p>
+      <p class="library-rail-boot-msg">Pick a Storage folder and thumbnails appear here. If this stays blank after load, check you are signed in and Storage rules allow <code>library/</code> reads.</p>
     </div>
   </aside>
   <main id="app" class="builder-main" style="display:grid">
@@ -171,10 +267,6 @@
     </section>
   </main>
 </div>
-
-<section id="blocked" style="display:none;padding:40px;max-width:680px;margin:0 auto;">
-  <div class="notice error">Builder is admin-only. Sign in with an approved CCH account in Studio and refresh.</div>
-</section>
 
 <script>
 const CCH_ENV = (function() {
@@ -199,7 +291,45 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 const storage = firebase.storage();
-const ADMIN_EMAILS = ["cindy@cchdesign.com", "cynthia@cchdesign.com", "cynthiacbh@gmail.com"];
+try {
+  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+} catch (e) { console.warn("[Builder Auth] persistence", e); }
+
+(function attachBuilderAuthUi() {
+  async function builderAttemptSignIn() {
+    var eh = document.getElementById("builderAuthEmailHeader");
+    var ph = document.getElementById("builderAuthPasswordHeader");
+    var email = String((eh && eh.value) || "").trim();
+    var pass = String((ph && ph.value) || "");
+    var errH = document.getElementById("builderAuthErrorHeader");
+    if (errH) {
+      errH.style.display = "none";
+      errH.textContent = "";
+    }
+    try {
+      await auth.signInWithEmailAndPassword(email, pass);
+    } catch (e) {
+      var msg = (e && e.message) ? String(e.message) : "Sign-in failed.";
+      var friendly = msg.toLowerCase().indexOf("invalid") >= 0 || msg.toLowerCase().indexOf("wrong") >= 0
+        ? "Invalid email or password."
+        : msg;
+      if (errH) {
+        errH.textContent = friendly;
+        errH.style.display = "block";
+      }
+    }
+  }
+
+  var submitHeader = document.getElementById("builderAuthSubmitHeader");
+  if (submitHeader) submitHeader.addEventListener("click", builderAttemptSignIn);
+
+  var pwh = document.getElementById("builderAuthPasswordHeader");
+  if (pwh) {
+    pwh.addEventListener("keydown", function(ev) {
+      if (ev.key === "Enter") builderAttemptSignIn();
+    });
+  }
+})();
 
 const LIBRARY = {
   windows: { label: "Windows", folder: "windows" },
@@ -248,13 +378,17 @@ const state = {
   inspirationItems: [],
   uiGroup: "windows",
   /** Left rail: browse library/* folders and apply images to pickers */
-  libraryRail: { libKey: "windows", segments: [], q: "", targetPickerId: "" }
+  libraryRail: { libKey: "windows", segments: [], q: "", targetPickerId: "", userPickedFolder: false }
 };
 
-const CAT_CODE = { style: "W", drapery: "W", roman: "W", flatfold: "W", upholstery: "U", bedding: "B", pillows: "P" };
+const CAT_CODE = { style: "W", drapery: "W", roman: "W", flatfold: "W", roller: "W", upholstery: "U", bedding: "B", pillows: "P" };
+function isWindowTreatmentCategory(cat) {
+  return cat === "style" || cat === "drapery" || cat === "roman" || cat === "flatfold" || cat === "roller";
+}
 const WINDOW_TYPES = [
   { id: "style", label: "Style" },
   { id: "flatfold", label: "Flat Fold Shade" },
+  { id: "roller", label: "Roller Shade" },
   { id: "drapery", label: "Drapery Panels" },
   { id: "roman", label: "Roman Shade" }
 ];
@@ -288,6 +422,11 @@ const INTENT_PRESETS = {
     { label: "Pattern Forward", text: "Pattern-forward flat fold with centered motif and precise fold spacing." },
     { label: "Inside Mount Tailored", text: "Inside-mount flat fold for tailored, clean-lined contemporary look." }
   ],
+  roller: [
+    { label: "Solar View", text: "Solar roller for glare control and outward visibility with softened daylight." },
+    { label: "Woven Texture", text: "Woven natural-look roller fabric for warmth and filtered light." },
+    { label: "Blackout Sleep", text: "Blackout roller for bedroom/media light seal and minimal side glow." }
+  ],
   upholstery: [
     { label: "Comfort Daily Use", text: "Custom upholstery balancing comfort, proportion, and durable detailing for daily use." },
     { label: "Formal Contrast Trim", text: "Tailored upholstery with contrast trim and refined silhouette for formal seating." },
@@ -306,7 +445,7 @@ const INTENT_PRESETS = {
   ]
 };
 function currentGroupFromCategory(cat) {
-  if (cat === "style" || cat === "drapery" || cat === "roman" || cat === "flatfold") return "windows";
+  if (cat === "style" || cat === "drapery" || cat === "roman" || cat === "flatfold" || cat === "roller") return "windows";
   if (cat === "upholstery") return "upholstery";
   if (cat === "bedding") return "bedding";
   return "pillows";
@@ -327,13 +466,13 @@ const CATS = {
     title: "STYLE",
     intentDefault: "Select and document the preferred treatment style direction before final detailing.",
     pickers: [
-      { id:"style", label:"Style Reference", category:"windows", filter:["style","drapery","roman","flat","shade"] },
+      { id:"style", label:"Style Reference", category:"windows", filter:["style","drapery","roman","flat","shade","roller"] },
       { id:"hardware", label:"Hardware", category:"windows", filter:["rod","track","hardware","chain"] },
       { id:"welt", label:"Welt / Stitch Detail", category:"welts_stitches" }
     ],
     fabricRoles: [{ id:"A", role:"PRIMARY FABRIC", required:true }],
     specBullets: [
-      { id:"styleType", label:"Style Type", options:["Drapery","Roman Shade","Flat Fold Shade","Layered"] },
+      { id:"styleType", label:"Style Type", options:["Drapery","Roman Shade","Flat Fold Shade","Roller Shade","Layered"] },
       { id:"operation", label:"Operation", options:["Decorative","Operable","Motorized","Manual chain"] },
       { id:"lining", label:"Lining", options:["None","Privacy","Blackout"] },
       { id:"mount", label:"Mount", options:["Wall","Ceiling","Inside","Outside"] }
@@ -400,6 +539,26 @@ const CATS = {
     measurements: ["OPENING W","OPENING H","FINISHED W","FINISHED L","STACK HEIGHT"],
     notesDefault: ["Flat-fold with clean stack.","Align head height with adjacent treatments."],
     fabNotesDefault: ["Pattern centered on shade face.","Folds structured and crisp."]
+  },
+  roller: {
+    title: "ROLLER SHADE",
+    intentDefault: "Roller shade specification: woven, solar, or blackout performance fabric with clean hem and mount detail.",
+    pickers: [
+      { id:"face", label:"Shade face / detail", category:"windows", filter:["roller","shade","solar","woven","blackout","texture"] },
+      { id:"hardware", label:"Lift / Mount", category:"windows", filter:["chain","cord","lift","mount","bracket","cassette"] },
+      { id:"welt", label:"Trim / Banding", category:"welts_stitches" }
+    ],
+    fabricRoles: [{ id:"A", role:"ROLLER FABRIC", required:true }, { id:"B", role:"SIDE CHANNEL / PELMET (optional)", required:false }],
+    specBullets: [
+      { id:"rollerMaterial", label:"Roller shade type", options:["Woven","Solar","Blackout"] },
+      { id:"function", label:"Function", options:["Operable","Decorative non-op"] },
+      { id:"operation", label:"Operation", options:["Continuous loop chain - RH","Continuous loop chain - LH","Cordless","Motorized"] },
+      { id:"lining", label:"Backing / liner", options:["Fabric only","White backing","Matching backing","Unlined"] },
+      { id:"mount", label:"Mount", options:["Inside","Outside","Ceiling recess","Surface mount"] }
+    ],
+    measurements: ["OPENING W","OPENING H","FINISHED W","FINISHED L","ROLL DIAMETER","SIDE GAP"],
+    notesDefault: ["Confirm chain side and stack direction.","Note valance or fascia if applicable."],
+    fabNotesDefault: ["Square cut and level hem.","Confirm openness % for solar.","Workroom to confirm yardage."]
   },
   upholstery: {
     title: "UPHOLSTERY",
@@ -592,6 +751,8 @@ function defaultData(catId) {
     fabNotes: c.fabNotesDefault.slice(),
     renderingUrl: "",
     detailSketchUrl: "",
+    elevationUrl: "",
+    sectionViewUrl: "",
     specAttachments: {},
     swatchUrls: {}
   };
@@ -872,7 +1033,7 @@ function inferSpecLibraryKey(cat, specId) {
   if (id === "pleat") return "pleats";
   if (id === "producttype") return "pillows_bedding";
   if (/welt|edgefinish|facefinish/.test(id)) return "welts_stitches";
-  if (/style|fold|hardware/.test(id) && (cat === "roman" || cat === "flatfold" || cat === "style")) return "windows";
+  if (/style|fold|face|hardware/.test(id) && (cat === "roman" || cat === "flatfold" || cat === "roller" || cat === "style")) return "windows";
   return "windows";
 }
 function startPathForSpecAttachmentLibrary(cat, specId, d) {
@@ -997,43 +1158,91 @@ async function listWorkOrders(projectId) {
   const snap = await db.collection("boards").doc(projectId).collection("workOrders").orderBy("updatedAt", "desc").limit(50).get();
   return snap.docs.map(d => ({ id:d.id, ...d.data() }));
 }
+/**
+ * Project rooms: board.rooms (array or legacy object map) + roomMeta + clip.room,
+ * plus roomBoards / rooms subcollections. Names are whitespace-normalized, deduped case-insensitively,
+ * capped at 200 characters (Studio has no cap; long descriptive room names were previously dropped at 40).
+ */
 async function loadProjectRooms(projectId) {
   if (!projectId) { state.projectRooms = []; return; }
+  const orderedNames = [];
+  const seen = new Set();
+  const MAX_ROOM_NAME = 200;
+  function normRoomStr(raw) {
+    return String(raw || "").replace(/\s+/g, " ").trim();
+  }
+  function pushRoomName(raw) {
+    const name = normRoomStr(raw);
+    if (!name || name.length > MAX_ROOM_NAME) return;
+    const key = name.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    orderedNames.push(name);
+  }
+  function roomFromBoardEntry(r) {
+    if (typeof r === "string") return r;
+    if (r && typeof r === "object") {
+      return r.name || r.displayName || r.roomName || r.room || r.title || r.label || "";
+    }
+    return "";
+  }
   try {
-    const byName = new Map();
-    function addRoom(id, rawName) {
-      const name = String(rawName || "").trim();
-      if (!name) return;
-      const key = name.toLowerCase();
-      if (!byName.has(key)) byName.set(key, { id: id || key, name });
+    const boardRef = db.collection("boards").doc(projectId);
+    const boardDoc = await boardRef.get();
+    const bx = boardDoc.exists ? boardDoc.data() || {} : {};
+    const br = bx.rooms;
+    if (Array.isArray(br)) {
+      br.forEach(r => pushRoomName(roomFromBoardEntry(r)));
+    } else if (br && typeof br === "object") {
+      Object.keys(br).forEach(k => pushRoomName(roomFromBoardEntry(br[k])));
     }
-    const roomBoardsSnap = await db.collection("boards").doc(projectId).collection("roomBoards").limit(300).get();
-    roomBoardsSnap.docs.forEach(d => {
-      const x = d.data() || {};
-      addRoom(d.id, x.name || x.room || x.roomName || x.title || x.label || d.id);
+
+    try {
+      const rmSnap = await boardRef.collection("roomMeta").get();
+      rmSnap.forEach(d => {
+        const x = d.data() || {};
+        pushRoomName(x.name || x.displayName || x.roomName || x.room || x.title || x.label);
+      });
+    } catch (eRm) { console.warn("[Builder] roomMeta", eRm); }
+
+    try {
+      const rbSnap = await boardRef.collection("roomBoards").limit(500).get();
+      rbSnap.forEach(d => {
+        const x = d.data() || {};
+        pushRoomName(x.name || x.displayName || x.room || x.roomName || x.title || x.label || d.id);
+      });
+    } catch (eRb) {}
+
+    try {
+      const roomsSnap = await boardRef.collection("rooms").limit(500).get();
+      roomsSnap.forEach(d => {
+        const x = d.data() || {};
+        pushRoomName(x.name || x.displayName || x.room || x.roomName || x.title || x.label || d.id);
+      });
+    } catch (eR) {}
+
+    let lastClip = null;
+    const clipPage = 500;
+    for (let guard = 0; guard < 80; guard++) {
+      let q = boardRef.collection("clips").limit(clipPage);
+      if (lastClip) q = q.startAfter(lastClip);
+      const clipSnap = await q.get();
+      if (clipSnap.empty) break;
+      clipSnap.forEach(d => {
+        const cr = normRoomStr((d.data() || {}).room);
+        if (cr) pushRoomName(cr);
+      });
+      if (clipSnap.docs.length < clipPage) break;
+      lastClip = clipSnap.docs[clipSnap.docs.length - 1];
+    }
+
+    orderedNames.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+    state.projectRooms = orderedNames.map((name, i) => {
+      const slug = String(name || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "r";
+      return { id: "room:" + i + ":" + slug, name };
     });
-    if (!byName.size) {
-      try {
-        const roomsSnap = await db.collection("boards").doc(projectId).collection("rooms").limit(300).get();
-        roomsSnap.docs.forEach(d => {
-          const x = d.data() || {};
-          addRoom(d.id, x.name || x.room || x.roomName || x.title || x.label || d.id);
-        });
-      } catch (e2) {}
-    }
-    if (!byName.size) {
-      try {
-        const boardDoc = await db.collection("boards").doc(projectId).get();
-        const bx = (boardDoc && boardDoc.data && boardDoc.data()) || {};
-        const fromArray = Array.isArray(bx.rooms) ? bx.rooms : [];
-        fromArray.forEach((r, idx) => {
-          if (typeof r === "string") addRoom(String(idx), r);
-          else if (r && typeof r === "object") addRoom(r.id || String(idx), r.name || r.room || r.title || r.label);
-        });
-      } catch (e3) {}
-    }
-    state.projectRooms = Array.from(byName.values()).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
   } catch (e) {
+    console.warn("[Builder] loadProjectRooms", e);
     state.projectRooms = [];
   }
 }
@@ -1113,6 +1322,14 @@ function autoPickForSpec(cat, specId, specValue) {
   if (cat === "flatfold" && (specId === "function" || specId === "operation" || specId === "mount")) {
     pickBy("fold", /(flat\s*fold|flatfold)/i);
   }
+  if (cat === "roller" && specId === "operation") {
+    if (/continuous|chain/.test(v)) {
+      pickBy("hardware", /(bronze|continuous|chain)/i);
+    }
+  }
+  if (cat === "roller" && (specId === "function" || specId === "operation" || specId === "mount")) {
+    pickBy("face", /(roller|shade|solar|woven|blackout)/i);
+  }
 }
 async function loadWorkrooms() {
   try {
@@ -1155,11 +1372,87 @@ async function addNewWorkroom() {
   d.workroomName = created.name;
   renderForm();
 }
+/** Align with Studio Product Library category labels so Fabric & Trim matching works. */
+const BUILDER_LIBRARY_CAT_NORM = {
+  "Fabric  + Trim": "Fabric & Trim",
+  "Fabric + Trim": "Fabric & Trim",
+  Fabric: "Fabric & Trim",
+  Fabri: "Fabric & Trim",
+  "Furniture & Upholstery": "Furniture",
+  "Mirrors & Accessories": "Accessories",
+  mirror: "Accessories",
+  "Floor Covering": "Flooring",
+  floor: "Flooring",
+  "Stone & Tile": "Tile & Stone",
+  Wall: "Wall Covering",
+  "Appliances  & Plumbing": "Plumbing & Appliances",
+  "Kitchen and Bath": "Plumbing & Appliances",
+  Cushions: "Bedding & Pillows",
+  Architecural: "Architectural",
+  Florals: "Accessories"
+};
+function normalizeBuilderLibraryRow(row) {
+  if (!row || typeof row !== "object") return;
+  const c = row.category;
+  if (c && BUILDER_LIBRARY_CAT_NORM[c]) row.category = BUILDER_LIBRARY_CAT_NORM[c];
+}
+
+function mergeFirestoreDocIntoProductMap(map, doc) {
+  const id = doc.id;
+  const data = doc.data() || {};
+  const prev = map[id] || {};
+  map[id] = Object.assign({}, prev, data, { id });
+}
+
+/**
+ * Studio keeps master rows in `products` and richer copies in `productLibrary` — merge by doc id (same as main app).
+ * Paginates so large catalogs (2000+) are not capped at a single limit().
+ */
 async function loadProductLibrary() {
+  const mergeMap = {};
+  const batchSize = 500;
+  const maxBatchesPerCollection = 120;
   try {
-    const snap = await db.collection("products").limit(1200).get();
-    state.productLibrary = snap.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+    let lastP = null;
+    let lastL = null;
+    let batchNum = 0;
+
+    const snapP0 = await db.collection("products").limit(batchSize).get();
+    snapP0.docs.forEach(d => mergeFirestoreDocIntoProductMap(mergeMap, d));
+    lastP = snapP0.docs.length === batchSize ? snapP0.docs[snapP0.docs.length - 1] : null;
+
+    try {
+      const snapL0 = await db.collection("productLibrary").limit(batchSize).get();
+      snapL0.docs.forEach(d => mergeFirestoreDocIntoProductMap(mergeMap, d));
+      lastL = snapL0.docs.length === batchSize ? snapL0.docs[snapL0.docs.length - 1] : null;
+    } catch (eLib) {
+      lastL = null;
+    }
+
+    while ((lastP || lastL) && batchNum < maxBatchesPerCollection) {
+      batchNum++;
+      if (lastP) {
+        const snap = await db.collection("products").startAfter(lastP).limit(batchSize).get();
+        snap.docs.forEach(d => mergeFirestoreDocIntoProductMap(mergeMap, d));
+        lastP = snap.docs.length === batchSize ? snap.docs[snap.docs.length - 1] : null;
+      }
+      if (lastL) {
+        try {
+          const snap = await db.collection("productLibrary").startAfter(lastL).limit(batchSize).get();
+          snap.docs.forEach(d => mergeFirestoreDocIntoProductMap(mergeMap, d));
+          lastL = snap.docs.length === batchSize ? snap.docs[snap.docs.length - 1] : null;
+        } catch (e2) {
+          lastL = null;
+        }
+      }
+    }
+
+    state.productLibrary = Object.values(mergeMap).map(row => {
+      normalizeBuilderLibraryRow(row);
+      return row;
+    });
   } catch (e) {
+    console.warn("[Builder] loadProductLibrary", e);
     state.productLibrary = [];
   }
 }
@@ -1177,12 +1470,213 @@ async function loadInspirationItems(projectId) {
         sku: x.sku || "",
         width: x.width || x.dimensions || "",
         repeat: x.repeat || x.patternRepeat || "",
-        materials: x.materials || x.content || ""
+        materials: x.materials || x.content || "",
+        category: (x.category || x.type || x.ffeCategory || "").trim()
       };
     }).filter(x => x.imageUrl);
   } catch (e) {
     state.inspirationItems = [];
   }
+}
+
+function getProjectBoardMeta(projectId) {
+  return (state.projects || []).find(pr => pr.id === projectId) || null;
+}
+function productLinkedToProject(p, projectId) {
+  if (!p || !projectId) return false;
+  const pid = String(projectId).trim();
+  if (String(p.projectId || "").trim() === pid) return true;
+  if (String(p.boardId || "").trim() === pid) return true;
+  if (Array.isArray(p.boardIds) && p.boardIds.some(b => String(b) === pid)) return true;
+  if (Array.isArray(p.projectIds) && p.projectIds.some(b => String(b) === pid)) return true;
+  const meta = getProjectBoardMeta(pid);
+  const pname = meta ? String(meta.name || "").trim().toLowerCase() : "";
+  if (pname && String(p.sourceProject || "").trim().toLowerCase() === pname) return true;
+  return false;
+}
+/** Studio Product Library bucket “Fabric & Trim” only (not Window Coverings, Bedding & Pillows, etc.). */
+function categoryIsFabricTrimCatalog(cat) {
+  const t = String(cat || "").trim().toLowerCase().replace(/\s+/g, " ");
+  if (!t) return false;
+  if (t === "fabric" || t === "fabri") return true;
+  if (t === "fabric & trim" || t === "fabric + trim") return true;
+  if (t.includes("fabric") && t.includes("trim")) return true;
+  return false;
+}
+/** Studio-style category: fabric/trim vs hardware for project + catalog picks (broad). */
+function categoryMatchesFabricMaterial(cat) {
+  const s = String(cat || "").trim().toLowerCase();
+  if (!s) return false;
+  if (/\bhardware\b/.test(s) && !/fabric|trim/.test(s)) return false;
+  return /fabric|trim|textile|upholstery|bedding|pillow|window|covering|drapery|roman|roller|shade|sheer|linen|wall covering|custom furniture|custom upholstery|custom window/i.test(s);
+}
+function categoryMatchesHardwareMaterial(cat) {
+  const s = String(cat || "").trim().toLowerCase();
+  if (!s) return false;
+  return /\bhardware\b/.test(s) || /^lighting$/i.test(s) || /appliances?\s*&\s*plumbing/i.test(s);
+}
+function getProductLibraryPickMode(pickerConfig) {
+  const id = String((pickerConfig && pickerConfig.id) || "").toLowerCase();
+  if (id === "hardware") return "hardware";
+  return "fabric";
+}
+function materialMatchesMode(category, mode) {
+  if (mode === "hardware") return categoryMatchesHardwareMaterial(category);
+  return categoryMatchesFabricMaterial(category);
+}
+/**
+ * Project clips (this board) + products linked to the project first, then catalog.
+ * mode: "fabric" | "hardware"
+ * opts.fabricTrimCatalogOnly — fabric mode only: restrict catalog/clips to Studio “Fabric & Trim” bucket.
+ */
+function buildMaterialPickList(projectId, mode, opts) {
+  const fabricTrimOnly = !!(opts && opts.fabricTrimCatalogOnly);
+  const out = [];
+  const seen = new Set();
+  function dedupePush(row, key) {
+    if (!row || !row.imageUrl || seen.has(key)) return;
+    seen.add(key);
+    out.push(row);
+  }
+  function productPassesMode(p) {
+    if (mode === "hardware") return categoryMatchesHardwareMaterial(p.category);
+    if (fabricTrimOnly) return categoryIsFabricTrimCatalog(p.category);
+    return categoryMatchesFabricMaterial(p.category);
+  }
+  function clipPassesMode(catStr) {
+    if (mode === "hardware") return catStr ? materialMatchesMode(catStr, mode) : false;
+    if (!fabricTrimOnly) return catStr ? materialMatchesMode(catStr, mode) : true;
+    if (!catStr) return true;
+    return categoryIsFabricTrimCatalog(catStr);
+  }
+  if (projectId) {
+    (state.inspirationItems || []).forEach(i => {
+      const cat = i.category || "";
+      if (!clipPassesMode(cat)) return;
+      dedupePush({
+        id: "clip:" + i.id,
+        title: i.title,
+        name: i.title,
+        imageUrl: i.imageUrl,
+        vendor: i.vendor,
+        sku: i.sku,
+        width: i.width,
+        repeat: i.repeat,
+        materials: i.materials,
+        category: cat,
+        _fromProject: true
+      }, "clip:" + i.id);
+    });
+    (state.productLibrary || []).forEach(p => {
+      if (!p || !p.imageUrl || !productLinkedToProject(p, projectId)) return;
+      if (!productPassesMode(p)) return;
+      dedupePush(Object.assign({ _fromProject: true }, p), "projprod:" + p.id);
+    });
+  }
+  (state.productLibrary || []).forEach(p => {
+    if (!p || !p.imageUrl || seen.has("prod:" + p.id)) return;
+    if (!productPassesMode(p)) return;
+    if (projectId && productLinkedToProject(p, projectId)) return;
+    dedupePush(Object.assign({ _fromProject: false }, p), "prod:" + p.id);
+  });
+  return out;
+}
+function resolveMaterialProductById(id) {
+  const sid = String(id || "");
+  if (sid.startsWith("clip:")) {
+    const cid = sid.slice(5);
+    const i = (state.inspirationItems || []).find(x => x.id === cid);
+    if (!i) return null;
+    return {
+      id: sid,
+      title: i.title,
+      name: i.title,
+      imageUrl: i.imageUrl,
+      vendor: i.vendor || "",
+      manufacturer: "",
+      sku: i.sku || "",
+      width: i.width || "",
+      repeat: i.repeat || "",
+      materials: i.materials || "",
+      category: i.category || "clip",
+      _clip: true
+    };
+  }
+  return (state.productLibrary || []).find(x => x.id === id) || null;
+}
+
+function applyFabricProductPick(cat, fabricRoleId, pid) {
+  const d = getCatData(cat);
+  if (!d.fabrics[fabricRoleId]) d.fabrics[fabricRoleId] = { vendor: "", sku: "", color: "", width: "", content: "", repeat: "" };
+  const fab = d.fabrics[fabricRoleId];
+  fab.productId = pid || "";
+  fab.vendor = "";
+  fab.sku = "";
+  fab.color = "";
+  fab.width = "";
+  fab.repeat = "";
+  fab.content = "";
+  const swKey = "swatch_" + fabricRoleId;
+  if (!d.swatchUrls) d.swatchUrls = {};
+  delete d.swatchUrls[swKey];
+  if (state.uploads[cat]) delete state.uploads[cat][swKey];
+  if (state.uploadFiles[cat]) delete state.uploadFiles[cat][swKey];
+  d.swatchUrls[swKey] = "";
+  if (!pid) {
+    updatePreview();
+    renderForm();
+    return;
+  }
+  const p = resolveMaterialProductById(pid);
+  if (p) {
+    fab.vendor = p.vendor || p.manufacturer || "";
+    fab.sku = p.sku || "";
+    fab.color = p.finish || p.color || "";
+    fab.width = p.width || p.dimensions || "";
+    fab.repeat = p.repeat || p.patternRepeat || p.vRepeat || "";
+    fab.content = p.materials || p.content || "";
+    if (p.imageUrl) d.swatchUrls[swKey] = p.imageUrl;
+  }
+  updatePreview();
+  renderForm();
+}
+
+function openFabricWorkOrderPickModal(cat, fabricRoleId) {
+  const d = getCatData(cat);
+  const projectId = (d.projectId || "").trim();
+  const rows = buildMaterialPickList(projectId, "fabric", { fabricTrimCatalogOnly: true });
+  const backdrop = el("div", { class:"picker-modal-backdrop" });
+  const modal = el("div", { class:"picker-modal", style:"max-width:min(960px,96vw)" });
+  const head = el("div", { class:"picker-modal-head" },
+    el("div", { style:"font-weight:700" }, "Fabric & Trim"),
+    el("button", { type:"button", class:"btn secondary", onclick: () => backdrop.remove() }, "Close")
+  );
+  const sub = el("div", { style:"font-size:12px;color:#555;margin-bottom:12px;line-height:1.45" },
+    rows.length
+      ? rows.length + " Fabric & Trim items with images — scroll the grid to see all. ★ = on this project."
+      : "Studio category Fabric & Trim only. ★ = saved to this project.");
+  const grid = el("div", { class:"picker-modal-grid", style:"max-height:62vh;overflow-y:auto;-webkit-overflow-scrolling:touch" });
+  if (!rows.length) {
+    grid.append(el("div", { class:"notice" }, "No Fabric & Trim products with images. Check categories in Product Library or add board clips."));
+  }
+  rows.forEach(p => {
+    const title = p.title || p.name || p.sku || p.id;
+    const vendor = p.vendor || p.manufacturer || "";
+    const cap = (p._fromProject ? "★ " : "") + title + (vendor ? " — " + vendor : "");
+    const card = el("div", { class:"pick-card" },
+      el("img", { src: p.imageUrl, alt: title, loading:"lazy" }),
+      el("div", { class:"label" }, cap)
+    );
+    card.addEventListener("click", () => {
+      applyFabricProductPick(cat, fabricRoleId, p.id);
+      backdrop.remove();
+    });
+    grid.append(card);
+  });
+  modal.append(head, sub, grid);
+  backdrop.append(modal);
+  backdrop.addEventListener("click", e => { if (e.target === backdrop) backdrop.remove(); });
+  document.body.append(backdrop);
 }
 
 async function saveWorkOrder(isNewRevision) {
@@ -1227,6 +1721,8 @@ async function saveWorkOrder(isNewRevision) {
     fabNotes: data.fabNotes || [],
     renderingUrl: data.renderingUrl || "",
     detailSketchUrl: data.detailSketchUrl || "",
+    elevationUrl: data.elevationUrl || "",
+    sectionViewUrl: data.sectionViewUrl || "",
     specAttachments: data.specAttachments || {},
     swatchUrls: data.swatchUrls || {},
     revision: Number(data.revision || 1),
@@ -1239,6 +1735,18 @@ async function saveWorkOrder(isNewRevision) {
   if (isNewRevision) data.revision = Number(data.revision || 1) + 1;
   state.workOrdersByProject = await listWorkOrders(projectId);
   renderForm();
+}
+
+async function saveAndCloseBuilder() {
+  await saveWorkOrder(false);
+  // Works when opened from Studio in a separate tab/window.
+  try { window.close(); } catch (e) {}
+  // Fallback if browser blocks close() for non-script-opened tabs.
+  setTimeout(() => {
+    try {
+      if (!window.closed) window.location.href = "/";
+    } catch (e2) {}
+  }, 220);
 }
 
 async function loadWorkOrderById(id) {
@@ -1284,6 +1792,7 @@ async function loadWorkOrderById(id) {
   state.uploadFiles[mergedCat] = {};
   state.category = mergedCat;
   state.uiGroup = currentGroupFromCategory(state.category);
+  if (state.libraryRail) state.libraryRail.userPickedFolder = false;
   document.querySelectorAll("#tabs button").forEach(b => {
     const grp = b.dataset.group || (b.dataset.cat ? currentGroupFromCategory(b.dataset.cat) : "windows");
     b.classList.toggle("active", grp === state.uiGroup);
@@ -1318,6 +1827,7 @@ async function duplicateWorkOrderFromFirestore(projectId, sourceDocId) {
   d.revision = 1;
   d.date = new Date().toLocaleDateString("en-US");
   d.workOrder = nextWorkOrderNumber(d.project, cat, state.workOrdersByProject || []);
+  if (state.libraryRail) state.libraryRail.userPickedFolder = false;
 }
 
 async function applyBuilderQueryParams() {
@@ -1354,6 +1864,14 @@ async function applyBuilderQueryParams() {
 function buildUpload(cat, key, hint) {
   const wrap = el("div", { class:"upload-box" });
   const cur = state.uploads[cat] && state.uploads[cat][key];
+  function clearStoredValue() {
+    const gd = getCatData(cat);
+    if (key === "rendering") gd.renderingUrl = "";
+    else if (key === "detail") gd.detailSketchUrl = "";
+    else if (key === "elevation") gd.elevationUrl = "";
+    else if (key === "sectionView") gd.sectionViewUrl = "";
+    else if (gd.swatchUrls && gd.swatchUrls[key]) delete gd.swatchUrls[key];
+  }
   if (cur) {
     wrap.classList.add("has-img");
     wrap.append(el("img", { src: cur }));
@@ -1361,17 +1879,24 @@ function buildUpload(cat, key, hint) {
       e.preventDefault();
       delete state.uploads[cat][key];
       delete state.uploadFiles[cat][key];
-      if (key === "detail") getCatData(cat).detailSketchUrl = "";
+      clearStoredValue();
       renderForm();
     }}, "Remove")));
   } else {
     const gd = getCatData(cat);
     const existing = key === "rendering" ? (gd.renderingUrl || "")
       : key === "detail" ? (gd.detailSketchUrl || "")
+      : key === "elevation" ? (gd.elevationUrl || "")
+      : key === "sectionView" ? (gd.sectionViewUrl || "")
       : ((gd.swatchUrls || {})[key] || "");
     if (existing) {
       wrap.classList.add("has-img");
       wrap.append(el("img", { src: existing }));
+      wrap.append(el("div", { style:"padding:4px 8px;font-size:10px" }, el("a", { href:"#", class:"clear", onclick: e => {
+        e.preventDefault();
+        clearStoredValue();
+        renderForm();
+      }}, "Remove")));
     } else {
       wrap.append(el("div", {}, hint));
     }
@@ -1408,6 +1933,10 @@ async function uploadPendingAssets(cat, projectId) {
       dest = "boards/" + projectId + "/workOrders/" + workOrderId + "/rendering/" + Date.now() + "-" + key + "." + ext;
     } else if (key === "detail") {
       dest = "boards/" + projectId + "/workOrders/" + workOrderId + "/details/" + Date.now() + "-detail." + ext;
+    } else if (key === "elevation") {
+      dest = "boards/" + projectId + "/workOrders/" + workOrderId + "/elevations/" + Date.now() + "-elevation." + ext;
+    } else if (key === "sectionView") {
+      dest = "boards/" + projectId + "/workOrders/" + workOrderId + "/sections/" + Date.now() + "-section." + ext;
     } else if (key.indexOf("picker_") === 0) {
       const pid = key.slice(7);
       dest = "boards/" + projectId + "/workOrders/" + workOrderId + "/picker_uploads/" + pid + "/" + Date.now() + "-ref." + ext;
@@ -1422,6 +1951,8 @@ async function uploadPendingAssets(cat, projectId) {
     const url = await ref.getDownloadURL();
     if (key === "rendering") d.renderingUrl = url;
     else if (key === "detail") d.detailSketchUrl = url;
+    else if (key === "elevation") d.elevationUrl = url;
+    else if (key === "sectionView") d.sectionViewUrl = url;
     else if (key.indexOf("picker_") === 0) {
       const pid = key.slice(7);
       if (!state.pickers[cat]) state.pickers[cat] = {};
@@ -1473,9 +2004,11 @@ async function buildPicker(cat, pickerConfig) {
     onclick: () => queuePickerImageFromComputer(cat, pickerConfig.id)
   }, "This computer"));
   actions.append(el("button", {
-    type:"button", class:"btn-mini",
+    type:"button",
+    class:"btn-mini",
+    title: getProductLibraryPickMode(pickerConfig) === "hardware" ? "Project clips + Hardware catalog" : "Project clips + Fabric & Trim catalog",
     onclick: () => openPickerModal(cat, pickerConfig, "products")
-  }, "Product Library"));
+  }, "Project library"));
   actions.append(el("button", {
     type:"button", class:"btn-mini",
     onclick: () => openPickerModal(cat, pickerConfig, "inspiration")
@@ -1520,40 +2053,54 @@ function setPickerSelection(cat, pickerId, item) {
 }
 function openPickerModal(cat, pickerConfig, source) {
   let items = [];
+  let pickMode = "fabric";
   const kw = new RegExp((pickerConfig.filter || []).join("|"), "i");
   if (source === "products") {
-    items = (state.productLibrary || []).filter(p => p.imageUrl).map(p => ({
+    const d = getCatData(cat);
+    pickMode = getProductLibraryPickMode(pickerConfig);
+    const rows = buildMaterialPickList((d.projectId || "").trim(), pickMode,
+      pickMode === "fabric" ? { fabricTrimCatalogOnly: true } : undefined);
+    items = rows.map(p => ({
       id: p.id,
       title: p.title || p.name || p.sku || p.id,
-      label: p.title || p.name || p.sku || p.id,
+      label: (p._fromProject ? "★ " : "") + (p.title || p.name || p.sku || p.id),
       imageUrl: p.imageUrl,
       vendor: p.vendor || p.manufacturer || "",
       sku: p.sku || "",
       width: p.width || p.dimensions || "",
       repeat: p.repeat || p.patternRepeat || "",
-      materials: p.materials || p.content || ""
+      materials: p.materials || p.content || "",
+      category: p.category || "",
+      _fromProject: !!p._fromProject
     }));
   } else {
     items = (state.inspirationItems || []).map(i => ({
       id: i.id, title: i.title, label: i.title, imageUrl: i.imageUrl, vendor: i.vendor, sku: i.sku, width: i.width, repeat: i.repeat, materials: i.materials
     }));
   }
-  if (pickerConfig.filter && pickerConfig.filter.length) {
+  if (source !== "products" && pickerConfig.filter && pickerConfig.filter.length) {
     const filtered = items.filter(i => kw.test(String(i.title || "") + " " + String(i.vendor || "")));
     if (filtered.length) items = filtered;
   }
   const backdrop = el("div", { class:"picker-modal-backdrop" });
   const modal = el("div", { class:"picker-modal" });
+  const libTitle = source === "products"
+    ? (pickMode === "hardware" ? "Hardware — project + catalog" : "Fabric & Trim — project + catalog")
+    : "Inspiration";
   const head = el("div", { class:"picker-modal-head" },
-    el("div", { style:"font-weight:700" }, pickerConfig.label + " • " + (source === "products" ? "Product Library" : "Inspiration")),
+    el("div", { style:"font-weight:700" }, pickerConfig.label + " • " + libTitle),
     el("button", { type:"button", class:"btn secondary", onclick: () => backdrop.remove() }, "Close")
   );
   const grid = el("div", { class:"picker-modal-grid" });
-  if (!items.length) grid.append(el("div", { class:"notice" }, "No matching images found."));
+  if (!items.length) {
+    grid.append(el("div", { class:"notice" }, source === "products"
+      ? ("No " + (pickMode === "hardware" ? "Hardware" : "Fabric & Trim") + " items match this filter. Add categories to project clips, link products to this board, or use Inspiration / Storage library.")
+      : "No matching images found."));
+  }
   items.forEach(it => {
     const card = el("div", { class:"pick-card" },
       el("img", { src: it.imageUrl, alt: it.title, loading:"lazy" }),
-      el("div", { class:"label" }, it.title)
+      el("div", { class:"label" }, it.label || it.title)
     );
     card.addEventListener("click", () => {
       setPickerSelection(cat, pickerConfig.id, { ...it, category: source, downloadURL: it.imageUrl, path: source + "/" + it.id });
@@ -1597,30 +2144,46 @@ function openDetailLibraryModal(cat, detailKey, libraryCategory, title) {
   document.body.append(backdrop);
 }
 
+function suggestedLibraryKeyForCategory(cat) {
+  const cfg = CATS[cat] || { pickers: [] };
+  const pickers = cfg.pickers || [];
+  const lr = state.libraryRail;
+  if (lr && lr.targetPickerId) {
+    const picked = pickers.find(p => p.id === lr.targetPickerId);
+    if (picked && picked.category && LIBRARY[picked.category]) return picked.category;
+  }
+  const first = pickers[0];
+  if (first && first.category && LIBRARY[first.category]) return first.category;
+  return "windows";
+}
+/** When user has not manually chosen a Storage folder, keep rail aligned with the active “Apply selection to” slot (not always the first picker — drapery’s first was pleats). */
+function syncLibraryRailToTemplateIfAllowed() {
+  const lr = state.libraryRail;
+  if (!lr || lr.userPickedFolder) return;
+  const cat = state.category;
+  const cfg = CATS[cat] || { pickers: [] };
+  const allRailPickers = (cfg.pickers || []).filter(p => p.category && LIBRARY[p.category]);
+  if (!lr.targetPickerId || !allRailPickers.some(p => p.id === lr.targetPickerId)) {
+    lr.targetPickerId = allRailPickers[0] ? allRailPickers[0].id : "";
+  }
+  const sug = suggestedLibraryKeyForCategory(cat);
+  if (lr.libKey !== sug) {
+    lr.libKey = sug;
+    lr.segments = [];
+  }
+}
+
 async function renderLibraryRail() {
   const rail = document.getElementById("libraryRail");
   if (!rail) return;
-  rail.innerHTML = '<div class="library-rail-inner" style="padding:14px;font-size:12px;color:var(--muted);letter-spacing:.5px">Loading image library…</div>';
-  if (!state.libraryRail) state.libraryRail = { libKey: "windows", segments: [], q: "", targetPickerId: "" };
+  rail.innerHTML = '<div class="library-rail-inner" style="padding:14px;font-size:12px;color:var(--rail-muted);letter-spacing:.5px">Loading image library…</div>';
+  if (!state.libraryRail) state.libraryRail = { libKey: "windows", segments: [], q: "", targetPickerId: "", userPickedFolder: false };
   const lr = state.libraryRail;
   const cat = state.category;
   const cfg = CATS[cat] || { pickers: [] };
-  let pickersForLib = (cfg.pickers || []).filter(p => p.category === lr.libKey);
-  if (!pickersForLib.length && (cfg.pickers || []).length) {
-    const want = cfg.pickers[0].category;
-    if (want && LIBRARY[want] && want !== lr.libKey) {
-      lr.libKey = want;
-      lr.segments = [];
-      lr.targetPickerId = cfg.pickers[0].id;
-      return renderLibraryRail();
-    }
-  }
-  pickersForLib = (cfg.pickers || []).filter(p => p.category === lr.libKey);
-  if (pickersForLib.length) {
-    const ok = pickersForLib.some(p => p.id === lr.targetPickerId);
-    if (!ok) lr.targetPickerId = pickersForLib[0].id;
-  } else {
-    lr.targetPickerId = "";
+  const allRailPickers = (cfg.pickers || []).filter(p => p.category && LIBRARY[p.category]);
+  if (!lr.targetPickerId || !allRailPickers.some(p => p.id === lr.targetPickerId)) {
+    lr.targetPickerId = allRailPickers[0] ? allRailPickers[0].id : "";
   }
   const sub = (lr.segments || []).join("/");
   let files = [];
@@ -1643,7 +2206,7 @@ async function renderLibraryRail() {
   const inner = el("div", { class:"library-rail-inner" });
   inner.append(
     el("h3", {}, "Image library"),
-    el("div", { class:"sub" }, "Browse Storage folders, then click a thumb to prefill the slot below, or upload new images into the current path.")
+    el("div", { class:"sub" }, "Browse Storage folders, then click a thumb to prefill the slot below, or upload new images into the current path. “Apply selection to” jumps to that library; the Storage folder dropdown alone locks the folder until template tab, project, or Reset.")
   );
   const libSel = el("select", { class:"lib-rail-select", "aria-label": "Library category" });
   Object.keys(LIBRARY).forEach(key => {
@@ -1653,8 +2216,11 @@ async function renderLibraryRail() {
     libSel.append(opt);
   });
   libSel.addEventListener("change", e => {
+    lr.userPickedFolder = true;
     lr.libKey = e.target.value || "windows";
     lr.segments = [];
+    const matchFirst = (cfg.pickers || []).find(p => p.category === lr.libKey);
+    if (matchFirst) lr.targetPickerId = matchFirst.id;
     renderLibraryRail();
   });
   inner.append(el("div", { class:"lib-rail-label" }, "Storage folder"), libSel);
@@ -1684,17 +2250,27 @@ async function renderLibraryRail() {
   });
   if (folders.length) inner.append(el("div", { class:"lib-rail-label" }, "Subfolders"), folGrid);
   inner.append(el("div", { class:"lib-rail-label" }, "Apply selection to"));
-  const pickSel = el("select", { class:"lib-rail-select", "aria-label": "Picker slot", disabled: !pickersForLib.length });
-  if (!pickersForLib.length) {
-    pickSel.append(el("option", { value: "" }, "— No slot on this template for " + meta.label + " —"));
+  const pickSel = el("select", { class:"lib-rail-select", "aria-label": "Picker slot", disabled: !allRailPickers.length });
+  if (!allRailPickers.length) {
+    pickSel.append(el("option", { value: "" }, "— No image slots on this template —"));
   } else {
-    pickersForLib.forEach(p => {
-      const opt = el("option", { value: p.id }, p.label);
+    allRailPickers.forEach(p => {
+      const bucket = LIBRARY[p.category] ? LIBRARY[p.category].label : p.category;
+      const opt = el("option", { value: p.id }, p.label + " · " + bucket);
       if (p.id === lr.targetPickerId) opt.selected = true;
       pickSel.append(opt);
     });
   }
-  pickSel.addEventListener("change", e => { lr.targetPickerId = e.target.value || ""; });
+  pickSel.addEventListener("change", e => {
+    lr.targetPickerId = e.target.value || "";
+    const chosen = allRailPickers.find(x => x.id === lr.targetPickerId);
+    if (chosen && chosen.category) {
+      lr.libKey = chosen.category;
+      lr.segments = [];
+      lr.userPickedFolder = false;
+    }
+    renderLibraryRail();
+  });
   inner.append(pickSel);
   const filterInp = el("input", {
     type: "search",
@@ -1728,8 +2304,9 @@ async function renderLibraryRail() {
       el("div", { class:"label" }, img.label)
     );
     card.addEventListener("click", () => {
-      if (!lr.targetPickerId || !pickersForLib.length) {
-        alert("This template has no picker tied to “" + meta.label + "”. Switch the template tab (Windows / Upholstery / …) or choose another library folder.");
+      const appliesHere = (cfg.pickers || []).some(p => p.id === lr.targetPickerId && p.category === lr.libKey);
+      if (!lr.targetPickerId || !appliesHere) {
+        alert("The slot “Apply selection to” must match this Storage folder (e.g. pick Hardware · Windows while browsing library/windows). Change the slot or the Storage folder dropdown.");
         return;
       }
       setPickerSelection(cat, lr.targetPickerId, {
@@ -1751,7 +2328,8 @@ async function renderLibraryRail() {
     if (!f) return;
     try {
       const row = await uploadImageToLibraryFolder(lr.libKey, sub, f);
-      if (row && lr.targetPickerId && pickersForLib.length) {
+      const appliesHere = (cfg.pickers || []).some(p => p.id === lr.targetPickerId && p.category === lr.libKey);
+      if (row && appliesHere) {
         setPickerSelection(cat, lr.targetPickerId, {
           category: lr.libKey,
           storagePath: row.path,
@@ -1798,6 +2376,7 @@ function updatePreview() {
   const pks = state.pickers[cat] || {};
   const root = document.getElementById("preview");
   root.innerHTML = "";
+  root.className = "preview-page" + (isWindowTreatmentCategory(cat) ? " preview-page--windows" : "");
   const hdr = el("div", { class:"pp-header" });
   hdr.append(el("div", { class:"pp-title" }, "WORK ORDER:  ", el("b", {}, tTitle + " "), el("span", { class:"num" }, d.workOrder || tPlaceholder)));
   hdr.append(el("div", { class:"pp-page" }, "PAGE 01 OF 01"));
@@ -1843,7 +2422,7 @@ function updatePreview() {
   const mid = el("div");
   const designLabel = cat === "pillows"
     ? "Pillow Design"
-    : (cat === "upholstery" ? "Upholstery Design" : (cat === "bedding" ? "Bedding Design" : "Window Treatment Design"));
+    : (cat === "upholstery" ? "Upholstery Design" : (cat === "bedding" ? "Bedding Design" : (cat === "roller" ? "Roller Shade Design" : "Window Treatment Design")));
   mid.append(el("div", { class:"pp-section" }, designLabel));
   const rend = el("div", { class:"pp-rendering" });
   if (ups.rendering) rend.append(el("img", { src: ups.rendering }));
@@ -1897,6 +2476,8 @@ function updatePreview() {
     return { title:p.label, sel:pks[p.id] || null, pend };
   });
   while (cells.length < 4) cells.push({ title:"—", sel:null, pend:null });
+  const custom4Src = ups.custom4 || ((d.swatchUrls || {}).custom4 || "");
+  if (custom4Src) cells[3] = { title:"Custom image", sel:{ downloadURL: custom4Src }, pend:null };
   cells.slice(0, 4).forEach(c => {
     const cell = el("div", { class:"strip-cell" });
     cell.append(el("div", { class:"ttl" }, c.title));
@@ -1908,10 +2489,35 @@ function updatePreview() {
     strip.append(cell);
   });
   root.append(strip);
-  const meas = el("div", { class:"pp-meas" });
   const measKeys = visibleMeasurementsForCat(cat, cfg, d);
-  measKeys.forEach(m => meas.append(el("div", { class:"row" }, el("b", {}, m), el("span", {}, d.measurements[m] || "—"))));
-  root.append(meas);
+  if (isWindowTreatmentCategory(cat)) {
+    const diag = el("div", { class:"pp-diag-row" });
+    const colMeas = el("div", { class:"pp-diag-col" });
+    colMeas.append(el("div", { class:"pp-section" }, "Measurements"));
+    const measBox = el("div", { class:"pp-meas pp-meas--compact pp-meas--in-diag" });
+    measKeys.forEach(m => measBox.append(el("div", { class:"row" }, el("b", {}, m), el("span", {}, d.measurements[m] || "—"))));
+    colMeas.append(measBox);
+    const colElev = el("div", { class:"pp-diag-col" });
+    colElev.append(el("div", { class:"pp-section" }, "Elevation — front"));
+    const elevFr = el("div", { class:"pp-diag-frame" });
+    const elevSrc = ups.elevation || d.elevationUrl;
+    if (elevSrc) elevFr.append(el("img", { src: elevSrc, alt: "" }));
+    else elevFr.append("Shop drawing — upload below");
+    colElev.append(elevFr);
+    const colSec = el("div", { class:"pp-diag-col" });
+    colSec.append(el("div", { class:"pp-section" }, "Section view"));
+    const secFr = el("div", { class:"pp-diag-frame" });
+    const secSrc = ups.sectionView || d.sectionViewUrl;
+    if (secSrc) secFr.append(el("img", { src: secSrc, alt: "" }));
+    else secFr.append("Section — upload below");
+    colSec.append(secFr);
+    diag.append(colMeas, colElev, colSec);
+    root.append(diag);
+  } else {
+    const meas = el("div", { class:"pp-meas pp-meas--compact" });
+    measKeys.forEach(m => meas.append(el("div", { class:"row" }, el("b", {}, m), el("span", {}, d.measurements[m] || "—"))));
+    root.append(meas);
+  }
   const foot = el("div", { class:"preview-foot" });
   foot.append(el("div", { class:"pp-notes-blk" }, el("h4", {}, "Notes"), el("ul", {}, ...d.notes.map(n => el("li", {}, n)))));
   foot.append(el("div", { class:"pp-notes-blk" }, el("h4", {}, "Fabrication Notes"), el("ul", {}, ...d.fabNotes.map(n => el("li", {}, n)))));
@@ -1951,8 +2557,22 @@ async function exportPPTX() {
     const p = cfg.pickers[i];
     const sel = pks[p.id];
     if (!sel || !sel.downloadURL) continue;
+    if (i === 3 && (state.uploads[cat] && state.uploads[cat].custom4 || ((d.swatchUrls || {}).custom4 || ""))) continue;
     const dataUri = await urlToDataUri(sel.downloadURL);
     if (dataUri) s.addImage({ data:dataUri, x:0.5 + i*3.1, y:sy, w:2.95, h:1.05, sizing:{ type:"contain", w:2.95, h:1.05 } });
+  }
+  const custom4 = (state.uploads[cat] && state.uploads[cat].custom4) || ((d.swatchUrls || {}).custom4 || "");
+  if (custom4) {
+    const custom4Data = custom4.startsWith("data:") ? custom4 : await urlToDataUri(custom4);
+    if (custom4Data) s.addImage({ data:custom4Data, x:0.5 + 3*3.1, y:sy, w:2.95, h:1.05, sizing:{ type:"contain", w:2.95, h:1.05 } });
+  }
+  if (isWindowTreatmentCategory(cat)) {
+    const elevData = (state.uploads[cat] && state.uploads[cat].elevation) || await urlToDataUri(d.elevationUrl);
+    const secData = (state.uploads[cat] && state.uploads[cat].sectionView) || await urlToDataUri(d.sectionViewUrl);
+    s.addText("ELEVATION (FRONT)", { x:0.5, y:5.12, w:6.2, h:0.18, fontSize:8, bold:true });
+    s.addText("SECTION VIEW", { x:6.85, y:5.12, w:6.2, h:0.18, fontSize:8, bold:true });
+    if (elevData) s.addImage({ data:elevData, x:0.5, y:5.32, w:6.1, h:1.85, sizing:{ type:"contain", w:6.1, h:1.85 } });
+    if (secData) s.addImage({ data:secData, x:6.85, y:5.32, w:6.1, h:1.85, sizing:{ type:"contain", w:6.1, h:1.85 } });
   }
   const fname = "CCH_" + tTitle.replace(/\W+/g, "_") + "_" + (d.workOrder || "WO") + "_" + (d.project || "Project").replace(/\W+/g, "_") + ".pptx";
   try {
@@ -2005,7 +2625,7 @@ function exportPDF() {
   const w = window.open("", "_blank");
   const previewHTML = document.getElementById("preview").outerHTML;
   const styles = Array.from(document.querySelectorAll("style")).map(s => s.outerHTML).join("");
-  w.document.write("<!doctype html><html><head><title>CCH Work Order - Print</title>" + styles + "<style>body{margin:0;background:#fff}.preview-page{box-shadow:none;margin:0;width:13.33in;height:7.5in} @media print {@page { size:13.33in 7.5in; margin:0 }}</style></head><body>" + previewHTML + "</body></html>");
+  w.document.write("<!doctype html><html><head><title>CCH Work Order - Print</title>" + styles + "<style>body{margin:0;background:#fff}.preview-page{box-shadow:none}</style></head><body>" + previewHTML + "</body></html>");
   w.document.close(); w.focus(); setTimeout(() => w.print(), 350);
 }
 
@@ -2023,6 +2643,7 @@ async function renderForm() {
       if (!String(d.address || "").trim()) d.address = pMeta.address || "";
     }
   }
+  syncLibraryRailToTemplateIfAllowed();
   await renderLibraryRail();
   const pane = document.getElementById("formPane");
   pane.innerHTML = "";
@@ -2038,6 +2659,7 @@ async function renderForm() {
   projSel.addEventListener("change", async e => {
     const projectId = e.target.value || "";
     const chosen = state.projects.find(p => p.id === projectId);
+    if (state.libraryRail) state.libraryRail.userPickedFolder = false;
     state.currentWorkOrderId = "";
     state.workOrdersByProject = projectId ? await listWorkOrders(projectId) : [];
     // Keep project metadata in sync across all templates/categories.
@@ -2146,6 +2768,7 @@ async function renderForm() {
     });
     typeSel.addEventListener("change", e => {
       state.category = e.target.value || "drapery";
+      if (state.libraryRail) state.libraryRail.userPickedFolder = false;
       renderForm();
     });
     typeField.append(typeSel);
@@ -2250,10 +2873,18 @@ async function renderForm() {
   const sec3 = el("div", { class:"form-section" });
   sec3.append(el("h2", {}, "Rendering & details"));
   sec3.append(buildUpload(cat, "rendering", "Upload rendering image"));
+  if (isWindowTreatmentCategory(cat)) {
+    sec3.append(el("div", { class:"field", style:"margin-top:14px" }, el("label", {}, "Elevation — front view")));
+    sec3.append(buildUpload(cat, "elevation", "Floor plan, elevation sketch, or photo showing head / mount"));
+    sec3.append(el("div", { class:"field", style:"margin-top:14px" }, el("label", {}, "Section view")));
+    sec3.append(buildUpload(cat, "sectionView", "Cross-section or technical detail drawing"));
+  }
   if (cat === "pillows") {
     sec3.append(el("div", { class:"field", style:"margin-top:14px" }, el("label", {}, "Box / construction detail")));
     sec3.append(buildUpload(cat, "detail", "Upload boxing sketch, detail photo, or dimensions markup"));
   }
+  sec3.append(el("div", { class:"field", style:"margin-top:14px" }, el("label", {}, "4th image box (custom)")));
+  sec3.append(buildUpload(cat, "custom4", "Upload any image for the 4th preview box"));
   pane.append(sec3);
   const sec4 = el("div", { class:"form-section" });
   sec4.append(el("h2", {}, "Design Specs"));
@@ -2436,51 +3067,34 @@ async function renderForm() {
         }
       }, "Remove This Fabric/Trim"));
     }
-    const pickField = el("div", { class:"field" }, el("label", {}, "Pick from Product Library"));
-    const pickSel = el("select", { html:"<option value=''>Select product</option>" });
-    state.productLibrary.slice(0, 800).forEach(p => {
-      const title = p.title || p.name || p.sku || p.id;
-      const vendor = p.vendor || p.manufacturer || "";
-      const opt = el("option", { value: p.id }, escapeHtml(title + (vendor ? " - " + vendor : "")));
-      if (fab.productId === p.id) opt.selected = true;
-      pickSel.append(opt);
-    });
-    pickSel.addEventListener("change", e => {
-      const pid = e.target.value || "";
-      fab.productId = pid;
-      const p = state.productLibrary.find(x => x.id === pid);
-      // Selecting a different fabric product should fully reset auto-fill fields first.
-      fab.vendor = "";
-      fab.sku = "";
-      fab.color = "";
-      fab.width = "";
-      fab.repeat = "";
-      fab.content = "";
-      const swKey = "swatch_" + fr.id;
-      if (!d.swatchUrls) d.swatchUrls = {};
-      delete d.swatchUrls[swKey];
-      delete state.uploads[cat][swKey];
-      delete state.uploadFiles[cat][swKey];
-      // Force empty image state immediately so old swatch cannot persist.
-      d.swatchUrls[swKey] = "";
-      if (!pid) {
-        updatePreview();
-        renderForm();
-        return;
-      }
-      if (p) {
-        fab.vendor = p.vendor || p.manufacturer || "";
-        fab.sku = p.sku || "";
-        fab.color = p.finish || p.color || "";
-        fab.width = p.width || p.dimensions || "";
-        fab.repeat = p.repeat || p.patternRepeat || p.vRepeat || "";
-        fab.content = p.materials || p.content || "";
-        if (p.imageUrl) d.swatchUrls[swKey] = p.imageUrl;
-      }
-      updatePreview();
-      renderForm();
-    });
-    pickField.append(pickSel);
+    const pickField = el("div", { class:"field" }, el("label", {}, "Fabric & Trim (catalog + project)"));
+    const pickedProd = fab.productId ? resolveMaterialProductById(fab.productId) : null;
+    const pickRow = el("div", { style:"display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap" });
+    const thumb = el("div", { class:"fabric-pick-thumb" });
+    if (pickedProd && pickedProd.imageUrl) thumb.append(el("img", { src: pickedProd.imageUrl, alt: "", loading:"lazy" }));
+    else thumb.append(el("span", { style:"font-size:10px;color:#999;padding:8px;text-align:center" }, "Preview"));
+    const pickMeta = el("div", { style:"flex:1;min-width:200px" });
+    pickMeta.append(el("div", { style:"font-weight:700;font-size:14px;color:var(--ink)" },
+      pickedProd ? (pickedProd.title || pickedProd.name || pickedProd.sku || "Selected fabric") : "No fabric selected"));
+    pickMeta.append(el("div", { style:"font-size:11px;color:#666;margin-top:4px;line-height:1.35" },
+      pickedProd
+        ? ((pickedProd.vendor || pickedProd.manufacturer || "") + (pickedProd.category ? " · " + pickedProd.category : ""))
+        : "Opens image grid — Fabric & Trim category only."));
+    const pickBtns = el("div", { style:"display:flex;flex-direction:column;gap:8px;align-items:stretch" });
+    pickBtns.append(el("button", {
+      type: "button",
+      class: "btn secondary",
+      style: "padding:10px 14px;font-size:11px;letter-spacing:1px",
+      onclick: () => openFabricWorkOrderPickModal(cat, fr.id)
+    }, "Browse fabrics (images)"));
+    pickBtns.append(el("button", {
+      type: "button",
+      class: "btn secondary",
+      style: "padding:8px 14px;font-size:10px",
+      onclick: () => applyFabricProductPick(cat, fr.id, "")
+    }, "Clear fabric"));
+    pickRow.append(thumb, pickMeta, pickBtns);
+    pickField.append(pickRow);
     sec.append(pickField);
     sec.append(field("Vendor", "text", fab.vendor, v => { fab.vendor = v; updatePreview(); }));
     sec.append(field("Pattern / SKU", "text", fab.sku, v => { fab.sku = v; updatePreview(); }));
@@ -2495,19 +3109,24 @@ async function renderForm() {
     sec.append(await buildPicker(cat, p));
     pane.append(sec);
   }
-  const sec6 = el("div", { class:"form-section" });
-  sec6.append(el("h2", {}, "Measurements"));
-  const measGrid = el("div", { style:"display:grid;grid-template-columns:1fr 1fr;gap:8px" });
+  const sec6 = el("div", { class:"form-section", style:"padding-bottom:12px;margin-bottom:16px" });
   const measKeysForm = visibleMeasurementsForCat(cat, cfg, d);
+  const measDetails = el("details", { class:"meas-compact-wrap" });
+  measDetails.append(el("summary", {}, "Workroom dimensions"));
+  const measInner = el("div", { class:"meas-compact-inner" });
+  measInner.append(el("div", { class:"meas-compact-note" }, "Optional sizing for the workroom — keep this brief; full shop details can live in fabrication notes."));
   if (cat === "bedding" && !measKeysForm.length) {
-    sec6.append(el("div", { class:"notice", style:"margin-bottom:10px" }, "Measurements appear after you select at least one product type."));
+    measInner.append(el("div", { class:"notice", style:"margin:0;font-size:11px;padding:8px" }, "Dimensions appear after you select at least one product type."));
   }
+  const measGrid = el("div", { class:"meas-compact-grid" });
   measKeysForm.forEach(m => {
-    const inp = el("input", { type:"text", value:d.measurements[m] || "" });
+    const inp = el("input", { type:"text", value:d.measurements[m] || "", placeholder:"—" });
     inp.addEventListener("input", e => { d.measurements[m] = e.target.value; updatePreview(); });
     measGrid.append(el("div", { class:"field" }, el("label", {}, m), inp));
   });
-  sec6.append(measGrid);
+  measInner.append(measGrid);
+  measDetails.append(measInner);
+  sec6.append(measDetails);
   pane.append(sec6);
   const sec7 = el("div", { class:"form-section" });
   sec7.append(el("h2", {}, "Notes & Fabrication"));
@@ -2517,6 +3136,7 @@ async function renderForm() {
   const actions = el("div", { class:"actions" });
   actions.append(
     el("button", { class:"btn secondary", onclick: () => saveWorkOrder(false) }, "Save Draft"),
+    el("button", { class:"btn secondary", onclick: () => saveAndCloseBuilder() }, "Save + Close"),
     el("button", { class:"btn secondary", onclick: () => saveWorkOrder(true) }, "Save New Revision"),
     el("button", { class:"btn secondary", onclick: async () => {
       const pid = (d.projectId || "").trim();
@@ -2526,7 +3146,11 @@ async function renderForm() {
     }, style: state.currentWorkOrderId ? "" : "display:none" }, "Duplicate as new WO"),
     el("button", { class:"btn", onclick: exportPPTX }, "Export PPTX"),
     el("button", { class:"btn secondary", onclick: exportPDF }, "Export PDF"),
-    el("button", { class:"btn secondary", onclick: () => { state.data[cat] = defaultData(cat); state.pickers[cat] = {}; state.uploads[cat] = {}; state.uploadFiles[cat] = {}; state.currentWorkOrderId = ""; renderForm(); } }, "Reset")
+    el("button", { class:"btn secondary", onclick: () => {
+      state.data[cat] = defaultData(cat); state.pickers[cat] = {}; state.uploads[cat] = {}; state.uploadFiles[cat] = {}; state.currentWorkOrderId = "";
+      state.libraryRail = { libKey: "windows", segments: [], q: "", targetPickerId: "", userPickedFolder: false };
+      renderForm();
+    } }, "Reset")
   );
   pane.append(actions);
   updatePreview();
@@ -2539,7 +3163,7 @@ document.getElementById("tabs").addEventListener("click", e => {
   const group = e.target.dataset.group || (e.target.dataset.cat ? currentGroupFromCategory(e.target.dataset.cat) : "windows");
   state.uiGroup = group;
   if (group === "windows") {
-    if (!["style", "drapery", "roman", "flatfold"].includes(state.category)) state.category = "style";
+    if (!["style", "drapery", "roman", "flatfold", "roller"].includes(state.category)) state.category = "style";
   } else if (group === "upholstery") {
     state.category = "upholstery";
   } else if (group === "bedding") {
@@ -2549,36 +3173,33 @@ document.getElementById("tabs").addEventListener("click", e => {
   }
   // Switching template should not carry an old selected work-order context.
   state.currentWorkOrderId = "";
+  if (state.libraryRail) state.libraryRail.userPickedFolder = false;
   const d = getCatData(state.category);
   if (d.projectId) d.workOrder = nextWorkOrderNumber(d.project, state.category, state.workOrdersByProject);
   const _cfg = CATS[state.category];
   const _first = _cfg && _cfg.pickers && _cfg.pickers[0];
-  if (_first && LIBRARY[_first.category] && state.libraryRail) {
-    state.libraryRail.libKey = _first.category;
+  if (_first && state.libraryRail) {
     state.libraryRail.segments = [];
-    state.libraryRail.targetPickerId = _first.id;
+    if (!state.libraryRail.targetPickerId) state.libraryRail.targetPickerId = _first.id;
   }
   renderForm();
 });
 
 auth.onAuthStateChanged(async user => {
   const note = document.getElementById("authNote");
+  const authBar = document.getElementById("builderAuthBar");
+
   if (!user) {
     note.textContent = "Not signed in";
-    document.getElementById("blocked").style.display = "block";
+    if (authBar) authBar.style.display = "block";
     return;
   }
   state.currentUser = user;
-  const isAdmin = ADMIN_EMAILS.includes((user.email || "").toLowerCase());
-  note.textContent = user.email || "";
-  if (!isAdmin) {
-    document.getElementById("blocked").style.display = "block";
-    return;
-  }
+  note.textContent = (user.email || user.uid || "").trim() || "Signed in";
+  if (authBar) authBar.style.display = "none";
   const shell = document.getElementById("builderShell");
   if (shell) shell.style.display = "grid";
   document.getElementById("app").style.display = "grid";
-  document.getElementById("blocked").style.display = "none";
   state.uiGroup = currentGroupFromCategory(state.category);
   document.querySelectorAll("#tabs button").forEach(b => {
     const grp = b.dataset.group || (b.dataset.cat ? currentGroupFromCategory(b.dataset.cat) : "windows");

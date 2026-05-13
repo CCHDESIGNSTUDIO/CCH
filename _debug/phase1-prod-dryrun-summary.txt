@@ -1,0 +1,35 @@
+PHASE 1 DRY-RUN SUMMARY — production /products/ enrichment
+READ-ONLY. NO WRITES PERFORMED.
+Run time: 66.8s
+
+SUMMARY
+  Total production products:               6165
+  Skipped — protected source:              88  (Clipper/manual)
+  Skipped — locked (on a doc):             497
+  Skipped — no Houzz catalog match:        297
+  Skipped — match found but nothing empty: 0
+  WOULD UPDATE:                            5283
+
+IMAGE URL CLASSIFICATION (across ALL 6,165 prod products):
+  empty:                                  454
+  houzz/AWS expiring (refresh candidate): 5220
+  Firebase Storage (preserve):            383
+  Other vendor CDN (preserve):            108
+  invalid/non-http:                       0
+
+FIELD-FILL COUNTS (across all updated products)
+  imageUrl refresh (was empty/aws-expiring): 4855
+  houzzId fill:                              5283
+  vendorUrl fill:                            4603
+  category fill (only if empty):             0
+  dimensions fill:                           1672
+  materials fill:                            725
+  finish fill:                               75
+  manufacturer fill:                         963
+  description fill:                          83
+  vendorDescription fill:                    60
+
+CAVEAT: locked-products check did NOT scan top-level /invoices
+(auth required). Locked count may be undercounted.
+
+Detailed manifest: phase1-prod-dryrun-manifest.csv (5283 rows)

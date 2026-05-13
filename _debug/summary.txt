@@ -1,0 +1,156 @@
+HOUZZ APR 27 EXPORT - SUMMARY
+============================================================
+  COMPANY                  1
+  TEAM_MEMBERS             9
+  ADDRESSES               12
+  CLIENTS                145
+  PRODUCTS            33,617
+  PROJECTS             5,349
+  VENDORS                890
+  INVOICES            49,759
+  TASKS                9,914
+  PURCHASE_ORDERS     21,084
+  FILES                1,178
+
+CLIENTS — sample list:
+  total non-default: 135
+  first 30: Cynthia Holloway, Calvin  Shimano, Sahand, Vaughn Dewitt, Michael Valentine, Douglas Greene, Douglas Greene, Chris Hess, Bernie Scheidner, Ron & Tracey Cloud, Cindy Holloway, Corrine Eikanas, Patty Helberg, Shelley Katke, Venetia Marshall, Dean Daniel, Todd & Marcy Eliassen, Lisi Harrison, Barbara Modlin, Darcy Christal, Kipp & Kristin Lassetter, Susanne Cameron, Tawni & Troy Werline, John Uriostegui, Meichelle Arntz, Brenda Galliardt, Michael & Erin Derk, Jade & Mike Land, Kevin & Jessica Brine, Porsche Santoro
+
+PROJECTS — unique project names:
+  total unique (excl timestamp-named): 137
+    1489 Cantera  (Meichelle Arntz)
+    31 Whitesail  (Sahand)
+    500 Via Heirba  (Josh & Jamie Narva)
+    7225 Bugletrail  (April Bulatao)
+    7255 Bugle Trail  (JU, Deny & Denise Sepaher)
+    860 Woodland  (Todd & Marcy Eliassen)
+    974 Debra Dr.  (Marcy Winbish)
+    Ahern  (Jennifer Ahern)
+    Airosa Santa Barbara  (Patty Helberg)
+    Aitken - 130 Cobblestone  (Wylie & Bette Aitken)
+    Aitken Aitken & Cohn  (Wylie Aitken)
+    Anaheim Ducks- Honda Center  (Honda Center)
+    Andrews - Rockport  (Lynn Andrews)
+    Ann Scarborough - SB  (Ann & Jim Scarborough)
+    Ashleigh Aitken  (Ashleigh Aitken)
+    Avalos - Red Rock  (Louis Avalos)
+    Beck-Castle Rock Cir.  (Cathy Beck)
+    Borgatello - Via Lara  (Theresa Borgatello)
+    Bourdilion -Goldenrod  (Patrick Bourdillion)
+    Bradbury - Blue Bird  (Josh & Lish Bradbury)
+    Bradbury - High Drive  (Josh Sr. Bradbury)
+    Brine - 930 Lilac  (Kevin & Jessica Brine)
+    CCH  (CCH Design)
+    CCH DESIGN INC.'s test project  (Cynthia Holloway)
+    CCH Design Inc.'s First Project  (Cynthia Holloway)
+    CREATED_AT
+    Cameron- Avenida Evita  (Susanne Cameron)
+    Cannon Perdido  (Kashi & Nirvana Anoosheh)
+    Christal Cresta  (Darcy Christal)
+    Cloud - Huntington Beach  (Ron & Tracey Cloud)
+    Cloud - Mustang  (Ron & Tracey Cloud)
+    Cloud - Parker  (Ron & Tracey Cloud)
+    Cloud - Rolling Hills  (Ron & Tracey Cloud)
+    Cloud - Susan  (Ron & Tracey Cloud)
+    Cloud- Mustang
+    Cohen- Culver  (Peggy Cohen)
+    Comrie - Pelican Point  (Laurie Gordon)
+    DELETE  (Renee Alexandre)
+    Daniel  (Dean Daniel)
+    Davis- Carreterra Dr.  (Lauren Davis)
+    Day - 2590 Monaco Drive  (Jana & Dan Day)
+    Derk Bixby Hills  (Michael & Erin Derk)
+    Derk-Giralda Walk  (Michael & Erin Derk)
+    Dewell - SB  (Liz Dewell)
+    Eikanas  (Corrine Eikanas)
+    Elu Ranch  (Cindy Holloway)
+    Escalette - Newport, CA  (Phil Escalette)
+    Finkel - Santa Barbara  (Steve Finkel)
+    Galliardt- Larkstone  (Brenda Galliardt)
+    Gehret  (Pam & Jake Gehret)
+    Gordon - Anaheim CA  (Arthur Gordon)
+    Graves - Ocean Blvd.  (Stuart Graves)
+    Greene- De Anza  (Douglas Greene)
+    Greene- Hixson  (Douglas Greene)
+    Haghighi - Triumphal Way  (Shawn Haghighi)
+    Harris - Port Abbey  (Terese Harris)
+    Harrison  (Lisi Harrison)
+    Heiser- Colgate Circle  (Beatrriz Heiser)
+    Heliotrope Dr  (BJ Magnusen)
+    Helix  (Michael & Erin Derk)
+  ... and 77 more
+
+VENDORS — sample list:
+  total: 890
+  first 30: Rubio Monocoat, Lucent Light Shop, Rejuvenation, Francois & Co, Ferguson, Walker Zanger, TileCraft, Elite Cabinetry, Mapei, Capital Lighting, Strom Living, Newport brass, Faire Fancy Concrete, Fair Mazzega Art & Design, SixPenny, Window Boxes, Nourison Home, Masland, Western Heritage Furniture, English Village Lane, Cooper Classics, Ravenhill Studio, Il Fanale, Remains Lighting Company, Original BTC, Elu, Flambeaux, Oak Fabrics, Pillows By Jean, Bella Notte
+
+INVOICES:
+  unique invoice numbers: 8377
+  total rows (line items + headers): 49759
+  TYPE distribution (top 20):
+    Private: 3185
+    Invoice: 1977
+    Hours: 1581
+    Shared: 747
+    Proposal: 618
+    Retainer: 272
+    Pieces: 246
+    Travel time to and from client: 138
+    30000: 86
+    25000: 81
+    Each: 64
+    40000: 61
+    5000: 54
+    10000: 53
+    2500: 49
+    Travel: time to and from clien: 48
+    Freight Charges will be billed: 47
+    Order mgmt: 45
+    order management: 45
+    travel time to and from client: 39
+  sum TOTAL_PAYMENT (all rows incl line items): $16,961,335.86
+  sum TOTAL_PAID (all rows incl line items): $6,705,867.40
+
+PURCHASE_ORDERS:
+  unique PO numbers: 13700
+  total rows: 21084
+
+PRODUCTS (in main file):
+  active products: 18602 of 33617
+  top manufacturers:
+    Kravet: 71
+    Matteo: 49
+    Designers Guild: 45
+    Perennials: 35
+    Ashley Norton: 29
+    Restoration Hardware: 29
+    Pindler: 25
+    Brunschwig & Fils: 24
+    Romo: 23
+    Samuel & Sons: 21
+    Nom de Plume: 21
+    Bella Notte: 20
+    S&H Rugs: 20
+    Phillip Jefferies: 19
+    Visual Comfort: 19
+
+CATALOG file (catalog-items-with-images):
+  total: 11567 rows, 28 cols
+  item_type: {'Product': 11458, 'Service': 103, 'Labor': 4, 'Material': 1, 'Assembly': 1}
+  with >=1 image: 11028
+  top suppliers:
+    Restoration Hardware: 434
+    Visual Comfort: 425
+    no vendor: 418
+    KRAVET: 417
+    Etsy: 271
+    Schumacher: 267
+    Dovetail: 234
+    Arteriors: 221
+    Pindler & Pindler: 197
+    Hardware Hut: 160
+    Matteo Home: 158
+    CCH Design Inc.: 152
+    Folia - Ralph Lauren: 145
+    Jaipur Rugs: 134
+    Regina Andrews: 131

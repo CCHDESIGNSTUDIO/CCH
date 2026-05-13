@@ -1,0 +1,158 @@
+MED-CONFIDENCE SAMPLES (title exact, vendor differs/missing)
+======================================================================
+(showing 15 of 122 would-write MED matches)
+
+1. Studio: "& satin brass & Brown Cattle Horn Cabinet Handle Pull"
+   Studio vendor: "Mood "   Studio sku: "(none)"
+   Houzz match: "& satin brass & Brown Cattle Horn Cabinet Handle Pull"  vendor: "no vendor"  sku: "(none)"
+   Would set houzzId=33491469, refresh imageUrl
+
+2. Studio: "Antick-Batik-wall-covering-Matthew-Carter"
+   Studio vendor: "Quadrille"   Studio sku: "(none)"
+   Houzz match: "Antick-Batik-wall-covering-Matthew-Carter"  vendor: "no vendor"  sku: "(none)"
+   Would set houzzId=52813294, refresh imageUrl
+
+3. Studio: "Blanket Pom Pom Moroccan Wool Throw"
+   Studio vendor: "Etsy"   Studio sku: "(none)"
+   Houzz match: "Blanket Pom Pom Moroccan Wool Throw"  vendor: "CCH Design Inc."  sku: "(none)"
+   Would set houzzId=33497223, refresh imageUrl
+
+4. Studio: "C2 - 8 Arm Juliet Chandelier"
+   Studio vendor: "Laura Lee Designs"   Studio sku: "(none)"
+   Houzz match: "C2 - 8 Arm Juliet Chandelier"  vendor: "no vendor"  sku: "(none)"
+   Would set houzzId=33493735, refresh imageUrl
+
+5. Studio: "Casa Blanca Chandelier"
+   Studio vendor: "Laura Lee Designs"   Studio sku: "(none)"
+   Houzz match: "Casa Blanca Chandelier"  vendor: "no vendor"  sku: "(none)"
+   Would set houzzId=33500028, refresh imageUrl
+
+6. Studio: "Driftwood finish-DEW"
+   Studio vendor: "Bramble"   Studio sku: "(none)"
+   Houzz match: "Driftwood finish-DEW"  vendor: "no vendor"  sku: "(none)"
+   Would set houzzId=33500559, refresh imageUrl
+
+7. Studio: "F &T - Lido Indigo"
+   Studio vendor: "Kenneth McDonald"   Studio sku: "(none)"
+   Houzz match: "F &T - Lido Indigo"  vendor: "Harsey & Harsey"  sku: "(none)"
+   Would set houzzId=33499866, refresh imageUrl
+
+8. Studio: "FINSTER Beige"
+   Studio vendor: "Patterson Flynn Martin"   Studio sku: "(none)"
+   Houzz match: "FINSTER Beige"  vendor: "PFM"  sku: "(none)"
+   Would set houzzId=33498240, refresh imageUrl
+
+9. Studio: "Insert 16x16"
+   Studio vendor: "PACIFIC COAST FEATHER CUSHION COMPANY"   Studio sku: "(none)"
+   Houzz match: "Insert 16x16*"  vendor: "Nom De Plume"  sku: "(none)"
+   Would set houzzId=33497243, refresh imageUrl
+
+10. Studio: "Insert 24x36"
+   Studio vendor: "PACIFIC COAST FEATHER CUSHION COMPANY"   Studio sku: "(none)"
+   Houzz match: "Insert 24x36*"  vendor: "Nom De Plume"  sku: "(none)"
+   Would set houzzId=33498869, refresh imageUrl
+
+11. Studio: "Medium Wooden Spice Pot Candle"
+   Studio vendor: "CCH Design Inc."   Studio sku: "(none)"
+   Houzz match: "Medium Wooden Spice Pot Candle"  vendor: "Himalayan Candles"  sku: "(none)"
+   Would set houzzId=33493442, refresh imageUrl
+
+12. Studio: "Morris Small Lantern"
+   Studio vendor: "Signature Collection"   Studio sku: "SK 5008AZ-CG"
+   Houzz match: "Morris Small Lantern"  vendor: "Visual Comfort"  sku: "(none)"
+   Would set houzzId=54703326, refresh imageUrl
+
+13. Studio: "Riveria Chandelier"
+   Studio vendor: "Laura Lee Designs"   Studio sku: "(none)"
+   Houzz match: "Riveria Chandelier"  vendor: "no vendor"  sku: "(none)"
+   Would set houzzId=33500029, refresh imageUrl
+
+14. Studio: "S79C - Jasmine Single Sconce"
+   Studio vendor: "Laura Lee Designs"   Studio sku: "(none)"
+   Houzz match: "S79C - Jasmine Single Sconce"  vendor: "no vendor"  sku: "(none)"
+   Would set houzzId=33500031, refresh imageUrl
+
+15. Studio: "Sophia Pendant"
+   Studio vendor: "Laura Lee Designs"   Studio sku: "(none)"
+   Houzz match: "Sophia Pendant"  vendor: "no vendor"  sku: "(none)"
+   Would set houzzId=33493728, refresh imageUrl
+
+
+LOW-CONFIDENCE SAMPLES (title contains / substring match)
+======================================================================
+(showing 15 of 134 would-write LOW matches)
+
+1. Studio: "357 BOX CUP PULL 5 1/2""
+   Studio vendor: "no vendor"   Studio sku: "(none)"
+   Houzz match: "357 BOX CUP PULL"  vendor: "no vendor"  sku: "(none)"
+   Would set houzzId=33491838, refresh imageUrl
+
+2. Studio: "Anatolia Collection"
+   Studio vendor: "Safavieh"   Studio sku: "Design Details:  Color:	Green / Gold Fiber Content:	Wool Pile Construction:	Hand Tufted/Hooked Origin:	China"
+   Houzz match: "Anatolia Collection AN521A Runner"  vendor: "Safavieh"  sku: "AN521A"
+   Would set houzzId=33498165, refresh imageUrl
+
+3. Studio: "Bria Fitted Sheet"
+   Studio vendor: "Bella Notte"   Studio sku: "(none)"
+   Houzz match: "Bria Fitted Sheet - Ready To Sleep"  vendor: "Bella Notte"  sku: "(none)"
+   Would set houzzId=33496662, refresh imageUrl
+
+4. Studio: "Crush Double Linen Throw Blanket - Floss/Moro"
+   Studio vendor: "Hale Mercantile"   Studio sku: "(none)"
+   Houzz match: "Crush Double Linen Throw"  vendor: "Hale Mercantile"  sku: "(none)"
+   Would set houzzId=33497169, refresh imageUrl
+
+5. Studio: "Custom Upholstery- Vallarta"
+   Studio vendor: "Vallarta Blinds"   Studio sku: "(none)"
+   Houzz match: "Custom Upholstery"  vendor: "no vendor"  sku: "(none)"
+   Would set houzzId=33490410, refresh imageUrl
+
+6. Studio: "DOLCE POM POM FRINGE 985-45494-14"
+   Studio vendor: "Thomas Lavin"   Studio sku: "(none)"
+   Houzz match: "DOLCE POM POM FRINGE"  vendor: "Samuel & Son"  sku: "985-45494-14"
+   Would set houzzId=33491231, refresh imageUrl
+
+7. Studio: "GEMMA CANOPY BED-Eastern King Bed"
+   Studio vendor: "Brownstone"   Studio sku: "GM-006"
+   Houzz match: "Gemma Canopy Bed"  vendor: "Brownstone"  sku: "(none)"
+   Would set houzzId=33498760, refresh imageUrl
+
+8. Studio: "Insert 20 x 20"
+   Studio vendor: "Nom De Plume"   Studio sku: "(none)"
+   Houzz match: "Euro Feather Pillow Insert 20" x 20""  vendor: "PACIFIC COAST FEATHER COMPANY"  sku: "(none)"
+   Would set houzzId=33490944, refresh imageUrl
+
+9. Studio: "linen has a rich natural texture."
+   Studio vendor: "Pom Pom"   Studio sku: "(none)"
+   Houzz match: "Natural"  vendor: "Thomas Lavin"  sku: "30P000209"
+   Would set houzzId=33491659, refresh imageUrl
+
+10. Studio: "Nailhead Hello Sailor"
+   Studio vendor: "Perennials"   Studio sku: "620-90"
+   Houzz match: "Nailhead"  vendor: "Harsey & Harsey"  sku: "Royal Blue 620-778"
+   Would set houzzId=33496321, refresh imageUrl
+
+11. Studio: "Pillow Down Inserts 12x16 "
+   Studio vendor: "Nom De Plume"   Studio sku: "(none)"
+   Houzz match: "Pillow Down Inserts"  vendor: "Nom De Plume"  sku: "(none)"
+   Would set houzzId=33496682, refresh imageUrl
+
+12. Studio: "Rug Pad 7/16"
+   Studio vendor: "House of Seance"   Studio sku: "(none)"
+   Houzz match: "Rug Pad"  vendor: "no vendor"  sku: "PADF-810"
+   Would set houzzId=33491129, refresh imageUrl
+
+13. Studio: "SCRIBE SOLID OUTDOOR PILLOW COVER BY KERRY"
+   Studio vendor: "Restoration"   Studio sku: "(none)"
+   Houzz match: "SCRIBE SOLID OUTDOOR PILLOW COVER BY KERRY JOYCE - LUMBAR"  vendor: "Restoration Hardware"  sku: "(none)"
+   Would set houzzId=33498393, refresh imageUrl
+
+14. Studio: "Sei Pillowcase Single- King"
+   Studio vendor: "Matteo Home"   Studio sku: "(none)"
+   Houzz match: "Sei Pillowcase Single"  vendor: "Matteo Home"  sku: "(none)"
+   Would set houzzId=33500121, refresh imageUrl
+
+15. Studio: "Supplies"
+   Studio vendor: "Ganahl Lumber"   Studio sku: "(none)"
+   Houzz match: "100 Mini Clothespins, Wood Clothespins, Gold, Tiny Clothespins, clothes pegs, Small Clothespin, 1" clothespin, crafts supplies diy"  vendor: "Etsy"  sku: "(none)"
+   Would set houzzId=33493414, refresh imageUrl

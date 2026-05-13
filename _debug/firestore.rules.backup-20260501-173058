@@ -1,0 +1,156 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.email == 'cindy@cchdesign.com' ||
+        request.auth.token.email == 'cynthia@cchdesign.com' ||
+        request.auth.token.email == 'cynthiacbh@gmail.com'
+      );
+    }
+
+    // Admin config (QB tokens, etc.) — admin only
+    match /admin/{docId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Boards + subcollections — open for Clipper (uses API key, no auth)
+    match /boards/{projectId} {
+      allow read: if true;
+      allow write: if true;
+      match /{sub}/{docId} {
+        allow read: if true;
+        allow write: if true;
+      }
+    }
+
+    // Settings (vendor list for Clipper)
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Ideabooks (Clipper quick clip)
+    match /ideabooks/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Desktop time logs — agents use API key
+    match /desktopTimeLogs/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Smart Time buckets
+    match /timeBuckets/{docId} {
+      allow read: if true;
+      allow write: if isAuth();
+    }
+
+    // Activity feed
+    match /activity/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Time entries — open read for scripting, auth for write
+    match /timeEntries/{docId} {
+      allow read: if true;
+      allow write: if isAuth();
+    }
+
+    // Financial collections — auth required
+    match /invoices/{docId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+    match /proposals/{docId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+    match /purchaseOrders/{docId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+    // Product master library — Clipper extension saves here with API key only (no Firebase Auth)
+    match /products/{docId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if isAdmin();
+    }
+    // Client directory — Clipper needs read to filter projects; writes stay signed-in users only
+    match /clients/{docId} {
+      allow read: if true;
+      allow write: if isAuth();
+    }
+    // Vendor directory — Clipper needs read + create (“+ New vendor”); edits stay admin-only
+    match /vendors/{docId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+    match /workrooms/{docId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+    match /reports/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth();
+    }
+    match /deliveries/{docId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+    match /notes/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth();
+    }
+    match /searchIndex/{docId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // Bug & feature requests — any authenticated user can submit
+    match /feedbackRequests/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth();
+    }
+
+    // Product library
+    match /productLibrary/{docId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // Doc counters (invoice/PO/proposal auto-numbering)
+    match /docCounters/{docId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // Project tasks & todos
+    match /tasks/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth();
+    }
+
+    // Team & contacts
+    match /team/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth();
+    }
+
+    // Timely logged entries
+    match /timelyEntries/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth();
+    }
+  }
+}
