@@ -2,6 +2,23 @@
 
 Every session that opens this project must read this file first. No need for Cindy to paste context.
 
+---
+
+## ⚠️ CODE GROUNDING PROTOCOL (read first, every turn)
+
+**Authoritative doc:** [Docs/CODE_GROUNDING_PROTOCOL_MH_May13_v1.0.md](Docs/CODE_GROUNDING_PROTOCOL_MH_May13_v1.0.md)
+
+**Hard rule, no exceptions:** No architectural claim, "what the platform does" summary, phased fix table, effort estimate, or "my recommendation" — without a `grep` or file `view` executed THIS turn. Memory is not evidence. User description is not evidence. Skill files are not evidence about current code state.
+
+Required before any such claim:
+1. Grep under **at least three** plausible aliases (rename drift is real — see drift map in the protocol).
+2. **Read the function body** — name in grep output isn't enough.
+3. Trace the call site before claiming unreachability.
+
+On "RELOOK" or "GROUNDING CHECK" from Cindy: stop generating, state the search terms, run them, read the hits, state the corrected finding. No "you're right" apology paragraph — that phrase is a tell the original claim wasn't grounded.
+
+---
+
 ## Project Identity
 - **App:** CCH Design Studio — luxury interior design platform
 - **Stack:** Single-file vanilla HTML/JS + Firebase Firestore + Firebase Hosting
