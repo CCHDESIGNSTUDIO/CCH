@@ -49307,16 +49307,34 @@ async function renderBoardsTab(T, proj) {
       })();
 
       var T = document.getElementById('contentArea');
+      var _cpRoomBoardClipsOut = null;
+      var isOwnerPreview = typeof isCCHStudioStaffSession === 'function' ? isCCHStudioStaffSession() : false;
+      if (!isOwnerPreview) {
+        var _ident = cpReadStoredClientIdentity();
+        if (!_ident) {
+          cpRenderClientIdentityModal(projectId, function() {
+            renderClientPortal(projectId, focusProposalId, forcedPage);
+          });
+          return;
+        }
+        window._cpClientIdentity = _ident;
+      } else {
+        window._cpClientIdentity = null;
+      }
+
       T.innerHTML = '<div style="text-align:center;padding:80px;color:#C4A464;font-family:\'Playfair Display\',Georgia,serif;font-size:24px;">Loading your project...</div>';
 
       var _routeState = cpPortalRouteStateFromHash(projectId);
       if (focusProposalId == null || focusProposalId === '') focusProposalId = _routeState.proposalId || cpPortalFocusProposalIdFromHash();
       var activePage = forcedPage || _routeState.page || 'home';
       if (activePage === 'communications') activePage = 'messages';
+      if (activePage === 'inspiration') activePage = 'inspirations';
+      var inspirationBoardId = _routeState.inspirationBoardId || null;
+      var roomBoardKey = _routeState.roomBoardKey || null;
 
       var isOwner = typeof isCCHStudioStaffSession === 'function' ? isCCHStudioStaffSession() : false;
-      var proj = {}, clips = [], proposals = [], invoices = [], notes = [], ideabooks = [], messages = [], roomMeta = {}, activity = [];
-      var clientDocuments = [], whatsNewItems = [], timeEntries = [];
+      var proj = {}, clips = [], proposals = [], invoices = [], notes = [], ideabooks = [], designBoards = [], messages = [], roomMeta = {}, activity = [];
+      var clientDocuments = [], projectFiles = [], whatsNewItems = [], timeEntries = [];
 
       try {
         var projDoc = await db.collection('boards').doc(projectId).get();
@@ -49324,7 +49342,7 @@ async function renderBoardsTab(T, proj) {
       } catch(e) {}
 
       try {
-        var [clipSnap, propSnap, invSnap, noteSnap, ibSnap, msgSnap, rmSnap, docSnap, wnSnap] = await Promise.all([
+        var [clipSnap, propSnap, invSnap, noteSnap, ibSnap, msgSnap, rmSnap, docSnap, wnSnap, dbSnapCp, fileSnapPortal] = await Promise.all([
           db.collection('boards').doc(projectId).collection('clips').get(),
           db.collection('boards').doc(projectId).collection('proposals').get(),
           db.collection('boards').doc(projectId).collection('invoices').get(),
@@ -49333,7 +49351,9 @@ async function renderBoardsTab(T, proj) {
           db.collection('boards').doc(projectId).collection('messages').orderBy('createdAt','desc').limit(50).get().catch(function(){ return db.collection('boards').doc(projectId).collection('messages').limit(50).get(); }),
           db.collection('boards').doc(projectId).collection('roomMeta').get(),
           db.collection('boards').doc(projectId).collection('clientDocuments').orderBy('createdAt','desc').limit(100).get().catch(function(){ return db.collection('boards').doc(projectId).collection('clientDocuments').limit(100).get(); }),
-          db.collection('boards').doc(projectId).collection('whatsNew').orderBy('createdAt','desc').limit(20).get().catch(function(){ return db.collection('boards').doc(projectId).collection('whatsNew').limit(20).get(); })
+          db.collection('boards').doc(projectId).collection('whatsNew').orderBy('createdAt','desc').limit(20).get().catch(function(){ return db.collection('boards').doc(projectId).collection('whatsNew').limit(20).get(); }),
+          db.collection('boards').doc(projectId).collection('designBoards').get().catch(function() { return null; }),
+          db.collection('boards').doc(projectId).collection('files').orderBy('createdAt','desc').limit(200).get().catch(function(){ return db.collection('boards').doc(projectId).collection('files').limit(200).get(); })
         ]);
         clipSnap.forEach(function(d) { clips.push({ id: d.id, ...d.data() }); });
         propSnap.forEach(function(d) { var p = d.data(); proposals.push({ id: d.id, ...p }); });
@@ -49344,12 +49364,28 @@ async function renderBoardsTab(T, proj) {
         rmSnap.forEach(function(d) { var rm = d.data(); if (rm.name) roomMeta[rm.name] = rm; });
         docSnap.forEach(function(d) { clientDocuments.push({ id: d.id, ...d.data() }); });
         wnSnap.forEach(function(d) { whatsNewItems.push({ id: d.id, ...d.data() }); });
-      } catch(e) {}
+        if (dbSnapCp && typeof dbSnapCp.forEach === 'function') {
+          dbSnapCp.forEach(function(d) { designBoards.push({ id: d.id, ...d.data() }); });
+        }
+        if (fileSnapPortal && typeof fileSnapPortal.forEach === 'function') {
+          fileSnapPortal.forEach(function(d) { projectFiles.push({ id: d.id, ...d.data() }); });
+        }
+      } catch (e) {
+        console.error('[renderClientPortal] portal data Promise.all failed:', e);
+      }
+      var portalMergedDocs = cpBuildMergedPortalDocuments(clientDocuments, projectFiles);
 
       try {
-        var actSnap = await db.collection('activity').where('projectId', '==', projectId).orderBy('createdAt', 'desc').limit(60).get();
+        var actSnap = await db.collection('boards').doc(projectId).collection('activity').orderBy('createdAt', 'desc').limit(60).get();
         actSnap.forEach(function(d) { activity.push({ id: d.id, ...d.data() }); });
-      } catch (e) {}
+      } catch (eBoardAct) {
+        try {
+          var actSnap = await db.collection('activity').where('projectId', '==', projectId).orderBy('createdAt', 'desc').limit(60).get();
+          actSnap.forEach(function(d) { activity.push({ id: d.id, ...d.data() }); });
+        } catch (eTop) {
+          console.warn('[renderClientPortal] activity feed unavailable (board subcollection:', (eBoardAct && eBoardAct.message) || eBoardAct, '; top-level:', (eTop && eTop.message) || eTop, ')');
+        }
+      }
 
       try {
         var teById = {};
@@ -49409,14 +49445,48 @@ async function renderBoardsTab(T, proj) {
       // Filter real products
       var realClips = clips.filter(function(c) { return typeof isRealProduct === 'function' ? isRealProduct(c) : true; });
 
-      // Group by room
-      var byRoom = {};
+      // Portal grids: keep spatial rooms separate from product categories (no longer merge room||category).
+      var byRoomOnly = {};
+      var byCategoryOnly = {};
       realClips.forEach(function(c) {
-        var rm = c.room || c.category || 'General';
-        if (!byRoom[rm]) byRoom[rm] = [];
-        byRoom[rm].push(c);
+        var rk = (String(c.room || '').trim()) || 'Unassigned';
+        if (!byRoomOnly[rk]) byRoomOnly[rk] = [];
+        byRoomOnly[rk].push(c);
+        var ck = (String(c.category || '').trim()) || 'Uncategorized';
+        if (!byCategoryOnly[ck]) byCategoryOnly[ck] = [];
+        byCategoryOnly[ck].push(c);
       });
-      var rooms = Object.keys(byRoom).sort().filter(cpClientVisibleRoomName);
+      function _cpSortPortalKeys(keys, tailKey) {
+        return keys.slice().sort(function(a, b) {
+          if (a === tailKey) return 1;
+          if (b === tailKey) return -1;
+          return String(a).localeCompare(String(b));
+        });
+      }
+      var roomOnlyKeys = _cpSortPortalKeys(Object.keys(byRoomOnly), 'Unassigned').filter(cpClientVisibleRoomName);
+      var categoryKeys = _cpSortPortalKeys(Object.keys(byCategoryOnly), 'Uncategorized');
+      var portalRoomCatMode = (window._cpPortalRoomCatModeByProject && window._cpPortalRoomCatModeByProject[projectId]) || 'rooms';
+      if (portalRoomCatMode !== 'categories') portalRoomCatMode = 'rooms';
+      /** Effective grid mode: user preference, unless that view has no buckets (e.g. rooms filtered out by cpClientVisibleRoomName). */
+      var portalGridMode = portalRoomCatMode;
+      if (portalGridMode === 'rooms' && roomOnlyKeys.length === 0 && categoryKeys.length > 0) portalGridMode = 'categories';
+      else if (portalGridMode === 'categories' && categoryKeys.length === 0 && roomOnlyKeys.length > 0) portalGridMode = 'rooms';
+      var byPortalGrid = portalGridMode === 'categories' ? byCategoryOnly : byRoomOnly;
+      var portalGridKeys = portalGridMode === 'categories' ? categoryKeys : roomOnlyKeys;
+      function _cpBuildRoomCovers(keyArr, bucketMap) {
+        var cov = {};
+        keyArr.forEach(function(rm) {
+          if (roomMeta[rm] && roomMeta[rm].coverImage) cov[rm] = roomMeta[rm].coverImage;
+          else {
+            var list = bucketMap[rm] || [];
+            var img = list.find(function(c) { return c.imageUrl && !String(c.imageUrl).startsWith('data:'); });
+            if (img) cov[rm] = img.imageUrl;
+          }
+        });
+        return cov;
+      }
+      var roomTabCovers = _cpBuildRoomCovers(roomOnlyKeys, byRoomOnly);
+      var portalGridCovers = _cpBuildRoomCovers(portalGridKeys, byPortalGrid);
 
       // Include imported Houzz proposal/invoice references when collection docs are missing.
       var proposalNumSeen = {};
@@ -49465,21 +49535,16 @@ async function renderBoardsTab(T, proj) {
         .concat(proposals.filter(function(p) { return proposalNeedsClientReview(p); }).map(function(p){ return { kind: 'proposal', item: p }; }))
         .concat(_openInvoices.map(function(inv){ return { kind: 'invoice', item: inv }; }));
       var _latestWhatsNew = whatsNewItems[0] || null;
-      /** Concept + inspiration tabs: all ideabooks with client-visible content (not only Niice imports). */
-      var inspirationBoards = cpIdeabooksEligibleForClientHome(ideabooks);
+      var inspirationIdeabooks = ideabooks.filter(cpPortalInspirationIdeabook);
+      inspirationIdeabooks.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+      var conceptIdeabooks = ideabooks.filter(cpPortalConceptIdeabook);
+      designBoards.sort(function(a, b) {
+        return String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''));
+      });
+      var _openForReview = proposals.filter(function(p) { return proposalNeedsClientReview(p); });
 
       // Latest update with progress data
       var latestUpdate = notes.find(function(n) { return n.rooms || n.progress || n.approvals; }) || null;
-
-      // Room covers
-      var roomCovers = {};
-      rooms.forEach(function(rm) {
-        if (roomMeta[rm] && roomMeta[rm].coverImage) roomCovers[rm] = roomMeta[rm].coverImage;
-        else {
-          var img = byRoom[rm].find(function(c) { return c.imageUrl && !c.imageUrl.startsWith('data:'); });
-          if (img) roomCovers[rm] = img.imageUrl;
-        }
-      });
 
       // Stats
       var completedItems = realClips.filter(function(c) { return c.orderStatus === 'Installed' || c.orderStatus === 'Received'; }).length;
@@ -49513,12 +49578,12 @@ async function renderBoardsTab(T, proj) {
         '.cp-top-header-k { font-size:11px; letter-spacing:0.15em; text-transform:uppercase; color:rgba(255,255,255,0.5); font-family:"DM Sans",sans-serif; }' +
         '.cp-top-header-proj { font-size:13px; color:#FFFFFF; font-family:"DM Sans",sans-serif; font-weight:400; }' +
         '.cp-scroll-body { flex:1; overflow-y:auto; min-height:0; -webkit-overflow-scrolling:touch; }' +
-        '.cp-page-pad { padding:32px 40px 60px; }' +
+        '.cp-page-pad { padding:32px clamp(24px,4vw,56px) 60px; max-width:none; }' +
         '.cp-sec-label-jx { font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:0.15em; color:#0A1F3D; font-family:"DM Sans",sans-serif; margin-bottom:16px; padding-bottom:8px; border-bottom:1px solid #E2E2E2; }' +
         '.cp-home-hero-overlay { background:linear-gradient(180deg,rgba(10,31,61,0.15) 0%,rgba(10,31,61,0.65) 100%) !important; }' +
         '.cp-home-hero-text { max-width:none !important; margin:0 !important; padding:0 40px 36px !important; width:100%; }' +
         '.cp-dash-tabs { display:none !important; }' +
-        '.cp-section { max-width: 1000px; margin: 0 auto; padding: 0 16px; }' +
+        '.cp-section { max-width: min(1680px, 100%); margin: 0 auto; padding: 0 clamp(12px,2vw,24px); }' +
         '.cp-section-label { font-family: "DM Sans", sans-serif; font-size: 11px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; color: #6B7280; margin-bottom: 10px; }' +
         '.cp-card { background: #fff; border: 1px solid #E2E2E2; }' +
         '.cp-header { background: #0A1F3D; min-height: 48px; padding: 0; display: flex; align-items: center; }' +
@@ -49528,9 +49593,9 @@ async function renderBoardsTab(T, proj) {
         '.cp-header-project { text-align: right; }' +
         '.cp-header .cp-proj-name { font-family: "Playfair Display", Georgia, serif; font-size: 13px; font-weight: 500; color: #FFFFFF; text-align: right; line-height: 1.25; }' +
         '.cp-header .cp-proj-sub { font-size: 10px; color: rgba(255,255,255,0.45); text-align: right; }' +
-        '.cp-fin-bar { max-width:1000px;margin:0 auto;padding:8px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;font-size:12px;color:#0A1F3D;border-bottom:1px solid #E2E2E2;background:#FAFAFA;font-family:"DM Sans",sans-serif; }' +
+        '.cp-fin-bar { max-width:min(1680px,100%);margin:0 auto;padding:8px clamp(16px,3vw,40px);display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;font-size:12px;color:#0A1F3D;border-bottom:1px solid #E2E2E2;background:#FAFAFA;font-family:"DM Sans",sans-serif; }' +
         '.cp-fin-bar strong { font-family: "JetBrains Mono", ui-monospace, monospace; font-weight: 600; }' +
-        '.cp-welcome-strip { max-width:1000px;margin:0 auto;padding:12px 16px;border-bottom:1px solid #E8ECF3;background:#fff; }' +
+        '.cp-welcome-strip { max-width:min(1680px,100%);margin:0 auto;padding:12px clamp(16px,3vw,40px);border-bottom:1px solid #E8ECF3;background:#fff; }' +
         '.cp-hero { padding: 48px 0 32px; text-align: center; }' +
         '.cp-hero h1 { font-family: "Playfair Display", Georgia, serif; font-size: 36px; font-weight: 400; color: #1B3352; margin: 0 0 8px; }' +
         '.cp-hero p { font-size: 14px; color: #5C6B80; margin: 0; }' +
@@ -49566,13 +49631,20 @@ async function renderBoardsTab(T, proj) {
         '.cp-tl-week { font-size: 12px; font-weight: 700; color: #C4A464; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; margin-top: 16px; }' +
         '.cp-tl-item { padding: 8px 0 8px 20px; border-left: 2px solid #E8ECF3; font-size: 13px; color: #5C6B80; position: relative; }' +
         '.cp-tl-item::before { content: "→"; position: absolute; left: -1px; transform: translateX(-50%); color: #C4A464; font-weight: 700; }' +
-        '.cp-rooms-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; margin-bottom: 40px; }' +
-        '.cp-room-card { overflow: hidden; cursor: pointer; position: relative; }' +
-        '.cp-room-img { width: 100%; aspect-ratio: 1; object-fit: cover; background: linear-gradient(135deg, #E8ECF3, #D4DAE6); min-height: 200px; }' +
-        '.cp-room-overlay { position:absolute;left:0;right:0;bottom:0;padding:10px 14px;background:linear-gradient(180deg,rgba(10,31,61,0) 0%,rgba(10,31,61,0.82) 100%); }' +
-        '.cp-room-name { font-weight:600;font-size:14px;color:#FFFFFF;text-shadow:0 1px 2px rgba(0,0,0,0.28); }' +
-        '.cp-room-count { font-size:11px;color:rgba(255,255,255,0.85); }' +
-        '.cp-products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }' +
+        '.cp-rooms-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; margin-bottom: 40px; align-items: start; }' +
+        '.cp-room-stack { display: flex; flex-direction: column; gap: 0; min-width: 0; align-items: stretch; }' +
+        '.cp-room-stack .cp-expand-room { width: 100%; margin-top: 0; }' +
+        '.cp-room-stack .cp-products-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }' +
+        '.cp-board-list-item { display:flex;flex-direction:column;min-width:0;text-align:left;font-family:\"DM Sans\",sans-serif; }' +
+        '.cp-board-list-title { font-size:14px;font-weight:500;color:#0A1F3D;margin-top:10px;line-height:1.35;padding:0 2px; }' +
+        '.cp-board-list-count { font-size:11px;color:#9CA3AF;margin-top:4px;padding:0 2px 2px; }' +
+        '.cp-card.cp-room-card .cp-board-list-title { padding-left:14px;padding-right:14px; }' +
+        '.cp-card.cp-room-card .cp-board-list-count { padding-left:14px;padding-right:14px;padding-bottom:14px; }' +
+        '.cp-room-card { overflow: visible; cursor: pointer; position: relative; display:flex; flex-direction:column; min-width:0; }' +
+        '.cp-room-thumb { width:100%; aspect-ratio:16/10; overflow:hidden; position:relative; background:linear-gradient(135deg,#E8ECF3,#D4DAE6); }' +
+        '.cp-room-thumb .cp-room-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }' +
+        '.cp-room-thumb .cp-room-img--empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:36px; color:#C4A464; }' +
+        '.cp-products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin-bottom: 24px; }' +
         '.cp-product-card { overflow: hidden; cursor: pointer; }' +
         '.cp-product-img { width: 100%; aspect-ratio: 1; object-fit: cover; background: #FFFFFF; }' +
         '.cp-product-body { padding: 10px 12px; }' +
@@ -49603,7 +49675,7 @@ async function renderBoardsTab(T, proj) {
         '.cp-footer { text-align: center; padding: 24px 0; color: #5C6B80; font-size: 11px; }' +
         '.cp-footer-logo { font-family: "Playfair Display", Georgia, serif; font-size: 20px; color: #C8A97E; margin-bottom: 4px; }' +
         '.cp-owner-bar { background: #0A1F3D; border-bottom: 1px solid rgba(196,164,100,0.25); padding: 10px 0; font-size: 12px; color: #C4A464; }' +
-        '.cp-owner-inner { max-width: 1000px; margin: 0 auto; padding: 0 16px; display: flex; justify-content: space-between; align-items: center; }' +
+        '.cp-owner-inner { max-width: min(1680px, 100%); margin: 0 auto; padding: 0 clamp(16px,3vw,40px); display: flex; justify-content: space-between; align-items: center; }' +
         '.cp-price { }' +
         '.cp-section-block { margin-bottom: 22px; }' +
         '.cp-expand-room { display: none; padding: 16px 0; }' +
@@ -49612,12 +49684,12 @@ async function renderBoardsTab(T, proj) {
         '.cp-side-nav { width:200px; flex-shrink:0; position:sticky; top:8px; align-self:flex-start; padding:4px 0; }' +
         '.cp-side-nav .cp-side-link { display:block; padding:10px 12px; font-size:13px; color:#1B3352; text-decoration:none; border-left:3px solid transparent; background:transparent; border-radius:0; width:100%; text-align:left; cursor:pointer; font-family:inherit; border-top:none;border-right:none;border-bottom:none; }' +
         '.cp-side-nav .cp-side-link:hover { background:#F4F6FA; }' +
-        '.cp-side-nav .cp-side-link.active { border-left-color:#C4A464; font-weight:700; background:#FFFBF5; }' +
+        '.cp-side-nav .cp-side-link.active { border-left-color:#0A1F3D; font-weight:700; background:#FAFAFA; }' +
         '.cp-main-col { flex:1; min-width:0; }' +
-        '.cp-home-hero { position:relative;width:100%;height:280px;overflow:hidden;background:linear-gradient(135deg,#0A1F3D 0%,#132E52 55%,#1E3B62 100%); }' +
+        '.cp-home-hero { position:relative;width:100%;height:clamp(240px,38vh,440px);min-height:240px;overflow:hidden;background:linear-gradient(135deg,#0A1F3D 0%,#132E52 55%,#1E3B62 100%); }' +
         '.cp-home-hero img { width:100%;height:100%;object-fit:cover;display:block; }' +
         '.cp-home-hero-overlay { position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,31,61,0.18) 0%,rgba(10,31,61,0.88) 100%);display:flex;align-items:flex-end; }' +
-        '.cp-home-hero-text { width:100%;max-width:1000px;margin:0 auto;padding:0 16px 24px; }' +
+        '.cp-home-hero-text { width:100%;max-width:min(1680px,100%);margin:0 auto;padding:0 clamp(16px,3vw,40px) 28px; }' +
         '.cp-home-hero-kicker { font-size:11px;font-weight:500;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.82);margin-bottom:8px; }' +
         '.cp-home-hero-title { font-family:"Playfair Display",Georgia,serif;font-size:clamp(28px,4vw,32px);line-height:1.1;color:#fff; }' +
         '.cp-home-hero-sub { font-family:"Playfair Display",Georgia,serif;font-size:22px;line-height:1.2;color:rgba(255,255,255,0.92);font-style:italic;margin-top:4px; }' +
@@ -49636,11 +49708,69 @@ async function renderBoardsTab(T, proj) {
         '.cp-filter-row { display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px; }' +
         '.cp-filter-btn { border:1px solid var(--cp-border);background:#fff;color:var(--cp-text);padding:6px 10px;font-size:12px;cursor:pointer; }' +
         '.cp-filter-btn.active { background:#0A1F3D;color:#fff;border-color:#0A1F3D; }' +
+        '.cp-dy-story-section { width:100%;padding:22px clamp(24px,4vw,56px) 28px;border-bottom:1px solid var(--cp-border);background:#FDFCFA; }' +
+        '.cp-dy-story-collapsed { width:100%;padding:10px clamp(24px,4vw,56px);border-bottom:1px solid var(--cp-border);background:#FAFAFA;display:flex;justify-content:center; }' +
+        '.cp-dy-story-head { display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:16px; }' +
+        '.cp-dy-story-title { font-family:"Playfair Display",Georgia,serif;font-size:22px;color:#0A1F3D;margin:0;font-weight:500; }' +
+        '.cp-dy-story-sub { font-size:12px;color:#6B7280;max-width:760px;margin:8px 0 0;line-height:1.55; }' +
+        '.cp-dy-story-actions { display:flex;flex-wrap:wrap;gap:8px;align-items:center; }' +
+        '.cp-dy-story-empty { font-size:13px;color:#6B7280;margin:0 0 4px; }' +
+        '.cp-dy-story-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px; }' +
+        '.cp-dy-story-card { cursor:pointer;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--cp-border);background:#fff; }' +
+        '.cp-dy-story-img { width:100%;aspect-ratio:16/10;object-fit:cover;display:block;background:#F0F0F0; }' +
+        '.cp-dy-story-img--empty { min-height:120px;background:linear-gradient(135deg,#E8ECF3,#D4DAE6); }' +
+        /* Grid stack (not absolute-only): avoids zero-height tiles in some grid engines when every child is out-of-flow. */
+        '.cp-inspiration-card { position:relative;overflow:hidden;aspect-ratio:1;border:1px solid var(--cp-border);min-width:0;min-height:0;background:#F4F6FA;display:grid;grid-template-columns:1fr;grid-template-rows:1fr;align-content:stretch;align-items:stretch; }' +
+        '.cp-inspiration-card .cp-inspiration-cover-img { grid-area:1/1;width:100%;height:100%;min-width:0;min-height:0;object-fit:cover;display:block;z-index:0;background:#E8ECF3; }' +
+        '.cp-inspiration-card .cp-inspiration-cover-fallback { grid-area:1/1;z-index:0;align-self:stretch;justify-self:stretch;display:none;align-items:center;justify-content:center;font-size:36px;color:#C4A464;background:linear-gradient(135deg,#E8ECF3,#D4DAE6); }' +
+        '.cp-insp-board-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; max-width:1200px; margin:0 auto; }' +
+        '@media (max-width:900px){ .cp-insp-board-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; } }' +
+        '@media (max-width:520px){ .cp-insp-board-grid { grid-template-columns:1fr !important; } }' +
+        '.cp-insp-board-cell { display:flex; flex-direction:column; min-width:0; border:1px solid var(--cp-border); background:#fff; }' +
+        '.cp-insp-board-cell .cp-insp-board-tile { position:relative; overflow:hidden; aspect-ratio:1; border:none; cursor:pointer; background:#FAFAFA; flex-shrink:0; }' +
+        '.cp-insp-board-tile { position:relative; overflow:hidden; aspect-ratio:1; border:1px solid var(--cp-border); cursor:pointer; background:#FAFAFA; }' +
+        '.cp-insp-board-tile img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }' +
+        '.cp-insp-board-caption-block { padding:10px 10px 12px; border-top:1px solid #ECECEC; display:flex; flex-direction:column; gap:6px; flex:1; min-height:0; }' +
+        '.cp-insp-cap-studio { font-size:11px; color:#5C6B80; line-height:1.45; max-height:3.1em; overflow:hidden; }' +
+        '.cp-insp-cap-muted { opacity:0.5; font-style:italic; }' +
+        '.cp-insp-client-note { width:100%; text-align:left; font-size:12px; color:#0A1F3D; background:#FAF9F6; border:1px dashed #C4A464; padding:8px 10px; cursor:pointer; font-family:inherit; line-height:1.4; }' +
+        '.cp-insp-client-note-empty { color:#9CA3AF; border-color:#E2E2E2; }' +
+        '#modalContainer .cp-insp-comments-modal { z-index:120000 !important; }' +
+        '.cp-insp-board-tile .cp-insp-star-btn { position:absolute; bottom:8px; left:8px; z-index:3; width:40px; height:40px; border:2px solid #C4A464; border-radius:50%; background:rgba(255,255,255,0.98); box-shadow:0 2px 10px rgba(10,31,61,0.22); cursor:pointer; font-size:19px; line-height:1; color:#0A1F3D; display:flex; align-items:center; justify-content:center; font-family:inherit; padding:0; }' +
+        '.cp-insp-board-tile .cp-insp-star-btn:hover { background:#fff; color:#C4A464; border-color:#0A1F3D; }' +
+        '.cp-insp-board-tile .cp-insp-star-badge { position:absolute; bottom:8px; left:8px; z-index:2; min-width:34px; height:34px; padding:0 8px; border-radius:17px; background:rgba(255,255,255,0.92); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#C4A464; pointer-events:none; box-shadow:0 2px 6px rgba(10,31,61,0.12); }' +
+        '.cp-insp-board-tile .cp-insp-comment-btn { position:absolute; bottom:8px; right:8px; z-index:2; min-width:38px; height:34px; border:none; border-radius:17px; background:rgba(255,255,255,0.95); box-shadow:0 2px 8px rgba(10,31,61,0.18); cursor:pointer; font-size:12px; font-weight:700; color:#0A1F3D; display:flex; align-items:center; justify-content:center; font-family:inherit; padding:0 10px; gap:4px; }' +
+        '.cp-insp-board-tile .cp-insp-comment-btn:hover { background:#fff; color:#C4A464; }' +
+        '.cp-insp-thread { margin-top:10px; border-top:1px solid #ECECEC; padding-top:10px; max-height:220px; overflow-y:auto; }' +
+        '.cp-insp-cmt { font-size:12px; color:#0A1F3D; margin-bottom:10px; line-height:1.45; }' +
+        '.cp-insp-cmt--studio { opacity:0.92; }' +
+        '.cp-insp-cmt-hd { font-size:11px; color:#6B7280; margin-bottom:4px; }' +
+        '.cp-insp-cmt-body { color:#0A1F3D; }' +
+        '.cp-insp-badge-studio { font-size:9px; text-transform:uppercase; letter-spacing:0.06em; color:#9CA3AF; }' +
+        '.cp-insp-edited { font-size:10px; color:#9CA3AF; }' +
+        '.cp-insp-cmt-act { margin-top:6px; display:flex; gap:10px; }' +
+        '.cp-insp-cmt-link { border:none; background:none; padding:0; font-size:11px; color:#6B7280; cursor:pointer; font-family:inherit; text-decoration:underline; }' +
+        '.cp-insp-cmt-link:hover { color:#0A1F3D; }' +
+        '.cp-insp-compose { margin-top:10px; display:flex; flex-direction:column; gap:8px; }' +
+        '.cp-insp-ta { width:100%; border:1px solid #E2E2E2; padding:8px; font-size:12px; font-family:inherit; resize:vertical; min-height:48px; color:#0A1F3D; }' +
+        '.cp-insp-post-cmt { align-self:flex-start; padding:6px 14px; font-size:12px; font-weight:600; border:1px solid #0A1F3D; background:#0A1F3D; color:#fff; cursor:pointer; font-family:inherit; }' +
+        '.cp-insp-post-cmt:hover { background:#152a4d; }' +
+        '.cp-insp-comments-modal .cp-cmt-row { border-bottom:1px solid #ECECEC; padding:10px 0; }' +
+        '.cp-insp-comments-modal .cp-cmt-meta { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11px; color:#9CA3AF; margin-bottom:4px; }' +
+        '.cp-insp-comments-modal .cp-cmt-actions button { border:none; background:none; color:#6B7280; font-size:11px; cursor:pointer; padding:0 4px; }' +
+        '.cp-insp-comments-modal .cp-cmt-actions button:hover { color:#0A1F3D; }' +
+        '.cp-dy-story-card-body { padding:12px 14px; }' +
+        '.cp-dy-story-card-title { font-size:13px;font-weight:600;color:#0A1F3D; }' +
+        '.cp-dy-story-card-meta { font-size:11px;color:#9CA3AF;margin-top:4px; }' +
         '.cp-progress-toggle { display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px; }' +
         '.cp-hours-table { width:100%;border-collapse:collapse; }' +
         '.cp-hours-table th,.cp-hours-table td { padding:10px 12px;border-bottom:1px solid var(--cp-border-light);font-size:12px; }' +
         '.cp-hours-table tfoot td { font-weight:700;border-top:1px solid var(--cp-border); }' +
         '.cp-prop-num-hit { cursor:pointer; color:#C4A464; font-weight:700; text-decoration:underline; text-underline-offset:2px; background:none; border:none; font:inherit; padding:0; font-family:\"Playfair Display\",Georgia,serif; font-size:16px; }' +
+        '@media (min-width: 1200px) {' +
+          '.cp-rooms-grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; }' +
+          '.cp-dy-story-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }' +
+        '}' +
         '@media (max-width: 900px) {' +
           '.cp-shell-row { flex-direction:column; }' +
           '.cp-left-sidebar { width:100%; min-width:0; border-right:none; border-bottom:1px solid #E2E2E2; }' +
@@ -49674,7 +49804,6 @@ async function renderBoardsTab(T, proj) {
           '<div style="display:flex;gap:8px;">' +
             '<button class="cp-btn cp-btn-outline" style="color:#C4A464;border-color:rgba(196,164,100,0.3);" onclick="cpAdminOpenHeroImageModal(\''+escAttr(projectId)+'\')">Choose Hero Image</button>' +
             '<button class="cp-btn cp-btn-outline" style="color:#C4A464;border-color:rgba(196,164,100,0.3);" onclick="cpAdminOpenWhatsNewModal(\''+escAttr(projectId)+'\')">Post What\'s New</button>' +
-            '<button class="cp-btn cp-btn-outline" style="color:#C4A464;border-color:rgba(196,164,100,0.3);" onclick="cpAdminOpenFeaturedConceptBoardsModal(\''+escAttr(projectId)+'\')">Home concept boards (4)</button>' +
             '<button class="cp-btn cp-btn-outline" style="color:#C4A464;border-color:rgba(196,164,100,0.3);" onclick="cpAdminOpenShareDocumentModal(\''+escAttr(projectId)+'\')">+ Share Document</button>' +
             '<button class="cp-btn cp-btn-outline" style="color:#C4A464;border-color:rgba(196,164,100,0.3);" onclick="copyClientLink(\''+escAttr(projectId)+'\')">🔗 Copy Link</button>' +
             '<button class="cp-btn cp-btn-outline" style="color:#C4A464;border-color:rgba(196,164,100,0.3);" onclick="navigate(\'#/project/'+escAttr(projectId)+'\')">← Back to Studio</button>' +
@@ -49695,58 +49824,32 @@ async function renderBoardsTab(T, proj) {
       }
 
       if (!proposalMissing) {
-        var _siblingProjects = [];
-        try {
-          var _cn = String(proj.clientName || proj.client || '').trim();
-          if (_cn) {
-            var _sibSnap = await db.collection('boards').where('clientName', '==', _cn).get().catch(function(){ return null; });
-            if (_sibSnap) {
-              _sibSnap.forEach(function(sd) {
-                var sp = sd.data() || {};
-                _siblingProjects.push({ id: sd.id, name: sp.name || sd.id });
-              });
-            }
-            if (_siblingProjects.length === 0) {
-              var _sibSnap2 = await db.collection('boards').where('client', '==', _cn).get().catch(function(){ return null; });
-              if (_sibSnap2) {
-                _sibSnap2.forEach(function(sd) {
-                  var sp = sd.data() || {};
-                  _siblingProjects.push({ id: sd.id, name: sp.name || sd.id });
-                });
-              }
-            }
-          }
-        } catch (_se) {}
-        if (!_siblingProjects.some(function(p) { return p.id === projectId; })) {
-          _siblingProjects.push({ id: projectId, name: projName });
-        }
-        _siblingProjects.sort(function(a, b) { return String(a.name || '').localeCompare(String(b.name || '')); });
         var _sbHash = '#/clientview/' + projectId;
         var sbAct = function(slug) {
           if (isProposalRoute) return slug === 'proposals';
           if (slug === 'messages') return activePage === 'messages';
+          if (slug === 'inspirations') return activePage === 'inspirations' || activePage === 'inspirationBoard';
+          if (slug === 'rooms') return activePage === 'rooms' || activePage === 'roomBoard';
           return activePage === slug;
         };
         var _msgBadgeCt = messages.length > 0 ? String(Math.min(messages.length, 9)) : '';
+        var _propReviewBadge = _openForReview.length > 0 ? String(Math.min(_openForReview.length, 99)) : '';
+        var _inspBoardBadge = inspirationIdeabooks.length > 0 ? String(Math.min(inspirationIdeabooks.length, 99)) : '';
+        var _roomBoardBadge = portalGridKeys.length > 0 ? String(Math.min(portalGridKeys.length, 99)) : '';
+        var _designBoardBadge = designBoards.length > 0 ? String(Math.min(designBoards.length, 99)) : '';
         html += '<div class="cp-shell-row"><nav class="cp-left-sidebar" aria-label="Client portal">' +
           '<div class="cp-sb-logo"><div class="cp-sb-logo-top">CCH Design</div><div class="cp-sb-logo-sub">Client Portal</div></div>' +
           '<div class="cp-sb-nav">' +
           '<button type="button" class="cp-sb-item' + (sbAct('home') ? ' active' : '') + '" onclick="navigate(\'' + escAttr(_sbHash) + '\')"><span class="cp-sb-icon">\u2302</span> Home</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('messages') ? ' active' : '') + '" onclick="navigate(\'' + escAttr(_sbHash + '/messages') + '\')"><span class="cp-sb-icon">\u2709</span> Messages' + (_msgBadgeCt ? '<span class="cp-sb-badge">' + esc(_msgBadgeCt) + '</span>' : '') + '</button>' +
-          '<button type="button" class="cp-sb-item' + (sbAct('rooms') ? ' active' : '') + '" onclick="navigate(\'' + escAttr(_sbHash + '/rooms') + '\')"><span class="cp-sb-icon">\u25EB</span> Room Boards</button>' +
-          '<button type="button" class="cp-sb-item' + (sbAct('concepts') ? ' active' : '') + '" onclick="navigate(\'' + escAttr(_sbHash + '/concepts') + '\')"><span class="cp-sb-icon">\u25A7</span> Concept Boards</button>' +
-          '<button type="button" class="cp-sb-item' + (sbAct('inspiration') ? ' active' : '') + '" onclick="navigate(\'' + escAttr(_sbHash + '/inspiration') + '\')"><span class="cp-sb-icon">\u273D</span> Inspiration Boards</button>' +
-          '<button type="button" class="cp-sb-item' + (sbAct('proposals') ? ' active' : '') + '" onclick="navigate(\'' + escAttr(_sbHash + '/proposals') + '\')"><span class="cp-sb-icon">\u25F0</span> Proposals</button>' +
+          '<button type="button" class="cp-sb-item' + (sbAct('inspirations') ? ' active' : '') + '" onclick="navigate(\'' + escAttr(_sbHash + '/inspirations') + '\')"><span class="cp-sb-icon">\u273D</span> Inspirations' + (_inspBoardBadge ? '<span class="cp-sb-badge" title="Inspiration boards">' + esc(_inspBoardBadge) + '</span>' : '') + '</button>' +
+          '<button type="button" class="cp-sb-item' + (sbAct('rooms') ? ' active' : '') + '" onclick="navigate(\'' + escAttr(_sbHash + '/rooms') + '\')"><span class="cp-sb-icon">\u25EB</span> Room Boards' + (_roomBoardBadge ? '<span class="cp-sb-badge" title="Rooms with selections">' + esc(_roomBoardBadge) + '</span>' : '') + '</button>' +
+          '<button type="button" class="cp-sb-item' + (sbAct('concepts') ? ' active' : '') + '" onclick="navigate(\'' + escAttr(_sbHash + '/concepts') + '\')"><span class="cp-sb-icon">\u25B3</span> Designing Your Story</button>' +
+          '<button type="button" class="cp-sb-item' + (sbAct('designboards') ? ' active' : '') + '" onclick="navigate(\'' + escAttr(_sbHash + '/designboards') + '\')"><span class="cp-sb-icon">\u25C6</span> Design Boards' + (_designBoardBadge ? '<span class="cp-sb-badge" title="Presentation boards">' + esc(_designBoardBadge) + '</span>' : '') + '</button>' +
+          '<button type="button" class="cp-sb-item' + (sbAct('proposals') ? ' active' : '') + '" onclick="navigate(\'' + escAttr(_sbHash + '/proposals') + '\')"><span class="cp-sb-icon">\u25F0</span> Proposals' + (_propReviewBadge ? '<span class="cp-sb-badge" title="Awaiting your review">' + esc(_propReviewBadge) + '</span>' : '') + '</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('documents') ? ' active' : '') + '" onclick="navigate(\'' + escAttr(_sbHash + '/documents') + '\')"><span class="cp-sb-icon">\u25A4</span> Documents</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('invoices') ? ' active' : '') + '" onclick="navigate(\'' + escAttr(_sbHash + '/invoices') + '\')"><span class="cp-sb-icon">\u25A6</span> Invoices</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('progress') ? ' active' : '') + '" onclick="navigate(\'' + escAttr(_sbHash + '/progress') + '\')"><span class="cp-sb-icon">\u23F1</span> Time &amp; Progress</button>' +
-          (_siblingProjects.length > 1
-            ? '<div style="margin:14px 16px 6px;font-size:10px;color:#9CA3AF;letter-spacing:0.09em;text-transform:uppercase;">Projects</div>' +
-              _siblingProjects.map(function(sp) {
-                var _activeProj = sp.id === projectId;
-                return '<button type="button" class="cp-sb-item' + (_activeProj ? ' active' : '') + '" onclick="navigate(\'#/clientview/' + escAttr(sp.id) + '\')"><span class="cp-sb-icon">\u25A1</span>' + esc(sp.name) + '</button>';
-              }).join('')
-            : '') +
           '</div><div class="cp-sb-foot">' + esc(projName) + '</div></nav>' +
           '<div class="cp-main-stack">' +
         '<header class="cp-top-header"><div class="cp-top-header-k">CCH Studio Client Portal</div>' + _topProjRight + '</header>' +
@@ -49769,19 +49872,65 @@ async function renderBoardsTab(T, proj) {
           '<div style="font-size:12px;color:#6B7280;margin-top:4px;">The link may be wrong or the document may not be shared with the portal yet.</div>' +
           '<button type="button" class="cp-btn cp-btn-outline" style="margin-top:10px;padding:6px 12px;font-size:12px;" onclick="navigate(\'#/clientview/' + escAttr(projectId) + '/proposals\')">← All proposals</button></div>';
       } else if (isProposalRoute) {
+        // Welcome bar per CLIENT_PORTAL_PROPOSAL_VIEW_BRIEF_MH_Apr24_v1.0 (Phase 1, triggers 1 & 4).
+        // Eyebrow + Playfair title + single "All proposals" back link. No duplicate back button in content area below.
+        var _propWelcomeTitle = esc(focusP.proposalNum || focusP.name || 'Proposal');
+        var _propWelcomeClient = clientName ? ' · Welcome, ' + esc(clientFirst) : '';
         html += '<div class="cp-welcome-strip">' +
-          '<div style="font-size:13px;font-weight:600;color:#0A1F3D;font-family:\'DM Sans\',sans-serif;">Welcome' + (clientName ? ', ' + esc(clientFirst) : '') + '</div>' +
-          '<div style="font-size:12px;color:#6B7280;margin-top:4px;">' +
-          '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 10px;font-size:12px;border-color:#E2E2E2;color:#0A1F3D;" onclick="navigate(\'#/clientview/' + escAttr(projectId) + '/proposals\')">← All proposals</button></div></div>';
+          '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.15em;color:#0A1F3D;font-weight:500;font-family:\'DM Sans\',sans-serif;">Proposal Review</div>' +
+          '<div style="font-family:\'Playfair Display\',serif;font-size:26px;color:#0A1F3D;font-weight:500;line-height:1.2;margin-top:8px;">' + _propWelcomeTitle + _propWelcomeClient + '</div>' +
+          '<div style="margin-top:14px;">' +
+          '<a href="#" onclick="event.preventDefault();navigate(\'#/clientview/' + escAttr(projectId) + '/proposals\');return false;" style="font-family:\'DM Sans\',sans-serif;font-size:13px;color:#0A1F3D;text-decoration:underline;">← All proposals</a>' +
+          '</div></div>';
       } else if (activePage === 'home') {
         html += '<section class="cp-home-hero">' +
-          (_heroUrl ? '<img src="' + escAttr(_heroUrl) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '') +
+          (_heroUrl ? '<img src="' + _escImgSrcAttr(_heroUrl) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '') +
           '<div class="cp-home-hero-overlay"><div class="cp-home-hero-text">' +
             '<div class="cp-home-hero-kicker">Welcome to your Project Dashboard</div>' +
             '<div class="cp-home-hero-title">Designing Your Story</div>' +
             '<div class="cp-home-hero-sub">at ' + esc(projName) + '</div>' +
           '</div></div>' +
         '</section>';
+        if (!proposalMissing && !isProposalRoute) {
+          var _dyHidden = !!(window._cpPortalDesignStoryHiddenByProject && window._cpPortalDesignStoryHiddenByProject[projectId]);
+          var _dyHashConcepts = '#/clientview/' + projectId + '/concepts';
+          if (_dyHidden) {
+            html += '<div class="cp-dy-story-collapsed"><button type="button" class="cp-btn cp-btn-outline" style="font-size:12px;padding:8px 16px;" onclick="cpSetPortalDesignStoryHidden(\'' + escAttr(projectId) + '\',false)">Show Designing Your Story</button></div>';
+          } else {
+            html += '<section class="cp-dy-story-section" aria-label="Designing Your Story"><div class="cp-dy-story-head">' +
+              '<div><h2 class="cp-dy-story-title">Designing Your Story</h2>' +
+              '<p class="cp-dy-story-sub">Deliverables, renderings, drawings, and documents your studio shares as the design develops. PDFs and images marked <strong>Publish to dashboard</strong> on the Documents tab (or when sharing a document) appear here; concept boards open the full Designing Your Story page.</p></div>' +
+              '<div class="cp-dy-story-actions">' +
+              '<button type="button" class="cp-btn cp-btn-outline" style="font-size:11px;padding:6px 12px;" onclick="cpSetPortalDesignStoryHidden(\'' + escAttr(projectId) + '\',true)">Hide section</button>' +
+              '<button type="button" class="cp-btn cp-btn-primary" style="font-size:11px;padding:6px 12px;" onclick="navigate(\'' + escAttr(_dyHashConcepts) + '\')">Open full page</button>' +
+              '</div></div>';
+            var _dySpotlights = cpResolveDesignStorySpotlights(proj, portalMergedDocs);
+            if (!_dySpotlights.length && !conceptIdeabooks.length) {
+              html += '<p class="cp-dy-story-empty">Nothing here yet. Your designer will add boards with images and document links when they are ready to share.</p>';
+            } else {
+              html += '<div class="cp-dy-story-grid">';
+              _dySpotlights.forEach(function(sp) {
+                var openU = escJsStr(sp.url);
+                var thumb = sp.isImage
+                  ? '<img class="cp-dy-story-img" src="' + _escImgSrcAttr(sp.url) + '" alt="" referrerpolicy="no-referrer" onerror="this.style.display=\'none\';">'
+                  : '<div class="cp-dy-story-img cp-dy-story-img--empty" aria-hidden="true" style="display:flex;align-items:center;justify-content:center;font-size:32px;color:#0A1F3D;opacity:0.28;">\u25A3</div>';
+                html += '<div class="cp-dy-story-card" role="button" tabindex="0" onclick="window.open(\'' + openU + '\',\'_blank\',\'noopener\')">' +
+                  thumb +
+                  '<div class="cp-dy-story-card-body"><div class="cp-dy-story-card-title">' + esc(sp.title) + '</div><div class="cp-dy-story-card-meta">Document</div></div></div>';
+              });
+              conceptIdeabooks.forEach(function(ib) {
+                var iu = cpIdeabookCoverUrl(ib);
+                var tit = ib.name || ib.title || 'Board';
+                var ic = cpIdeabookItemCount(ib);
+                html += '<div class="cp-dy-story-card" role="button" tabindex="0" onclick="navigate(\'' + escAttr(_dyHashConcepts) + '\')">' +
+                  (iu ? '<img class="cp-dy-story-img" src="' + _escImgSrcAttr(iu) + '" alt="" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div class="cp-dy-story-img cp-dy-story-img--empty" aria-hidden="true"></div>') +
+                  '<div class="cp-dy-story-card-body"><div class="cp-dy-story-card-title">' + esc(tit) + '</div><div class="cp-dy-story-card-meta">' + ic + ' items</div></div></div>';
+              });
+              html += '</div>';
+            }
+            html += '</section>';
+          }
+        }
       }
 
       if (proposalMissing) {
@@ -49789,53 +49938,346 @@ async function renderBoardsTab(T, proj) {
           '<p style="font-size:14px;color:#5C6B80;margin:0;">Open your dashboard to browse shared proposals and invoices.</p>' +
           '<button type="button" class="cp-btn cp-btn-primary" style="margin-top:14px;" onclick="navigate(\'#/clientview/' + escAttr(projectId) + '\')">Open dashboard</button></div></div>';
       } else if (isProposalRoute) {
-        var _propListHash = '#/clientview/' + projectId + '/proposals';
+        // Per brief trigger 1: duplicate "← All proposals" button removed from here.
+        // Welcome bar above is the single canonical back link.
         html += '<div class="cp-page-pad">' +
-          '<div style="margin-bottom:18px;"><button type="button" class="cp-btn cp-btn-outline" style="padding:6px 12px;font-size:12px;border-color:#E2E2E2;color:#0A1F3D;" onclick="navigate(\'' + escAttr(_propListHash) + '\')">\u2190 All proposals</button></div>' +
-          '<div class="cp-sec-label-jx" style="margin-bottom:18px;">Proposal \u2014 review &amp; approve</div>' +
           cpBuildSingleProposalReviewHtml(projectId, focusP, { panelId: 'cp-proposal-panel', showBanner: true }) +
           cpPortalMessagesHtml(projectId, messages, {}) +
           '</div>';
       } else {
       var _baseHash = '#/clientview/' + projectId;
       var _progressRange = (window._cpProgressRangeByProject && window._cpProgressRangeByProject[projectId]) || 'week';
-      var _openForReview = proposals.filter(function(p) { return proposalNeedsClientReview(p); });
+      _cpRoomBoardClipsOut = null;
 
       html += '<div class="cp-page-pad">';
 
       if (activePage === 'messages') {
         html += cpPortalMessagesHtml(projectId, messages, { fullPage: true });
-      } else if (activePage === 'rooms') {
-        html += '<div class="cp-sec-label-jx">Room Boards</div>';
-        if (!rooms.length) {
-          html += '<div style="font-size:13px;color:#6B7280;font-family:\'DM Sans\',sans-serif;">No room boards yet.</div>';
-        } else {
-          html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px;">';
-          rooms.forEach(function(rm) {
-            var cover = roomCovers[rm];
-            var n = byRoom[rm] ? byRoom[rm].length : 0;
-            html += '<div style="cursor:pointer;" onclick="navigate(\'' + escAttr(_baseHash) + '\');setTimeout(function(){var el=document.getElementById(\\\'cp-anchor-rooms\\\');if(el)el.scrollIntoView({behavior:\\\'smooth\\\'});},200);">' +
-              '<div style="overflow:hidden;aspect-ratio:4/3;margin-bottom:12px;border:1px solid #E2E2E2;">' +
-              (cover ? '<img src="' + escAttr(cover) + '" style="width:100%;height:100%;object-fit:cover;display:block;" referrerpolicy="no-referrer" onerror="this.style.display=\\\'none\\\'">' : '<div style="width:100%;height:100%;min-height:120px;background:#FAFAFA;"></div>') +
-              '</div><div style="font-size:13px;font-weight:500;color:#0A1F3D;font-family:\'DM Sans\',sans-serif;">' + esc(rm) + '</div>' +
-              '<div style="font-size:11px;color:#9CA3AF;margin-top:3px;font-family:\'DM Sans\',sans-serif;">' + n + ' item' + (n !== 1 ? 's' : '') + '</div></div>';
+      } else if (activePage === 'roomBoard' && roomBoardKey) {
+        var _rbRes = cpPortalResolveRoomBoardClips(roomBoardKey, portalGridKeys, byPortalGrid);
+        var _rbCanon = _rbRes.canonicalKey;
+        var _rbList = _rbRes.clips || [];
+        _cpRoomBoardClipsOut = _rbList.slice();
+        var _roomsIdxHash = _baseHash + '/rooms';
+        html += '<div style="margin-bottom:20px;"><button type="button" class="cp-btn cp-btn-outline" style="padding:8px 14px;font-size:12px;border-color:#E2E2E2;color:#0A1F3D;" onclick="navigate(\'' + escAttr(_roomsIdxHash) + '\')">\u2190 All room boards</button></div>' +
+          '<div class="cp-sec-label-jx" style="margin-bottom:8px;">' + esc(_rbCanon || 'Room') + '</div>' +
+          '<p style="font-size:12px;color:#6B7280;margin:0 0 20px;font-family:\'DM Sans\',sans-serif;">' +
+          (_rbList.length ? String(_rbList.length) + ' selection' + (_rbList.length !== 1 ? 's' : '') + '. Tap an item for a large view and to scroll through all images.' : 'No selections in this room for the current view.') +
+          '</p>';
+        if (_rbList.length) {
+          html += '<div class="cp-products-grid">';
+          _rbList.forEach(function(c, _ci) {
+            var _ng = _normalizeClipImagesForTear(c);
+            var _heroU = (_ng.list && _ng.list.length) ? _ng.list[Math.max(0, Math.min(_ng.heroIdx || 0, _ng.list.length - 1))] : String(c.imageUrl || '').trim();
+            html += '<div class="cp-card cp-product-card" role="button" tabindex="0" style="cursor:pointer;" onclick="cpPortalOpenClipGalleryFromRoom(' + _ci + ')">' +
+              (_heroU ? '<img class="cp-product-img" src="' + _escImgSrcAttr(_heroU) + '" onerror="this.style.display=\'none\'">' : '<div class="cp-product-img" style="display:flex;align-items:center;justify-content:center;font-size:32px;color:#C4A464;">🪑</div>') +
+              '<div class="cp-product-body"><div class="cp-product-title">' + esc(c.title || 'Untitled') + '</div><div class="cp-product-vendor">' + esc(c.vendor || '') + '</div>' +
+              (c.clientPrice || c.totalSelling ? '<div class="cp-product-price cp-price">' + formatMoney(parseFloat(c.clientPrice || c.totalSelling) || 0) + '</div>' : '') +
+              '</div></div>';
           });
           html += '</div>';
         }
-      } else if (activePage === 'concepts' || activePage === 'inspiration') {
-        html += '<div class="cp-sec-label-jx" style="margin-bottom:20px;">' + (activePage === 'inspiration' ? 'Inspiration Boards' : 'Concept Boards') + '</div>';
-        if (!inspirationBoards.length) {
-          html += '<div style="font-size:13px;color:#6B7280;font-family:\'DM Sans\',sans-serif;">No concept boards shared yet.</div>';
+      } else if (activePage === 'rooms') {
+        var _rbLabel = portalGridMode === 'categories' ? 'By category' : 'By room';
+        html += '<div class="cp-sec-label-jx" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;">' +
+          '<span>Room Boards <span style="font-size:11px;font-weight:400;color:#9CA3AF;">(' + esc(_rbLabel) + ')</span></span>' +
+          '<div class="cp-filter-row" style="margin:0;">' +
+          '<button type="button" class="cp-filter-btn' + (portalGridMode === 'rooms' ? ' active' : '') + '" onclick="cpSetPortalRoomCatMode(\'' + escAttr(projectId) + '\',\'rooms\')">By room</button>' +
+          '<button type="button" class="cp-filter-btn' + (portalGridMode === 'categories' ? ' active' : '') + '" onclick="cpSetPortalRoomCatMode(\'' + escAttr(projectId) + '\',\'categories\')">By category</button>' +
+          '</div></div>';
+        if (portalRoomCatMode !== portalGridMode && (roomOnlyKeys.length > 0 && categoryKeys.length > 0)) {
+          html += '<p style="font-size:12px;color:#6B7280;margin:0 0 12px;line-height:1.5;">' +
+            (portalGridMode === 'categories'
+              ? 'Showing <strong>by category</strong> because no room names are available for the client room view (some internal buckets are hidden). Use the buttons above to switch.'
+              : 'Showing <strong>by room</strong> because no product categories were found.') +
+            '</p>';
+        }
+        if (!portalGridKeys.length) {
+          html += '<div style="font-size:13px;color:#6B7280;font-family:\'DM Sans\',sans-serif;">No products to show yet. When your studio adds selections to the project, they will appear here.</div>';
+        } else {
+          html += '<div class="cp-rooms-grid">';
+          portalGridKeys.forEach(function(rm) {
+            var cover = portalGridCovers[rm];
+            var _cnt = (byPortalGrid[rm] || []).length;
+            var _emptyTile = portalGridMode === 'categories' ? '\uD83C\uDFF7' : '\uD83C\uDFE0';
+            var _navRoomHash = _baseHash + '/rooms/' + encodeURIComponent(rm);
+            html += '<div class="cp-card cp-room-card cp-board-list-item" role="link" tabindex="0" onclick="navigate(\'' + escAttr(_navRoomHash) + '\')">' +
+              '<div class="cp-room-thumb">' +
+              (cover ? '<img class="cp-room-img" src="'+_escImgSrcAttr(cover)+'" onerror="this.style.display=\'none\'">' : '<div class="cp-room-img--empty">' + _emptyTile + '</div>') +
+              '</div>' +
+              '<div class="cp-board-list-title">' + esc(rm) + '</div>' +
+              '<div class="cp-board-list-count">' + _cnt + ' item' + (_cnt !== 1 ? 's' : '') + '</div>' +
+            '</div>';
+          });
+          html += '</div>';
+        }
+      } else if (activePage === 'inspirationBoard' && inspirationBoardId) {
+        var listHash = '#/clientview/' + projectId + '/inspirations';
+        var ibDetail = inspirationIdeabooks.find(function(x) { return String(x.id) === String(inspirationBoardId); });
+        if (!ibDetail) ibDetail = ideabooks.find(function(x) { return String(x.id) === String(inspirationBoardId); });
+        if (!ibDetail || !cpPortalInspirationIdeabook(ibDetail)) {
+          html += '<div class="cp-page-pad">' +
+            '<button type="button" class="cp-btn cp-btn-outline" style="margin-bottom:16px;padding:8px 14px;font-size:12px;border-color:#E2E2E2;color:#0A1F3D;" onclick="navigate(\'' + escAttr(listHash) + '\')">\u2190 Back to inspirations</button>' +
+            '<div style="font-size:14px;color:#6B7280;font-family:\'DM Sans\',sans-serif;">This inspiration board is not available.</div></div>';
+        } else {
+          var ibUrls = cpCollectIdeabookImageUrls(ibDetail);
+          if (ibUrls.length > 100) ibUrls = ibUrls.slice(0, 100);
+          var ibTit = ibDetail.name || ibDetail.title || 'Inspiration';
+          var encPayload = '';
+          try { encPayload = encodeURIComponent(JSON.stringify(ibUrls)); } catch (_eEnc) { encPayload = ''; }
+          html += '<div class="cp-page-pad">' +
+            '<button type="button" class="cp-btn cp-btn-outline" style="margin-bottom:20px;padding:8px 14px;font-size:12px;border-color:#E2E2E2;color:#0A1F3D;" onclick="navigate(\'' + escAttr(listHash) + '\')">\u2190 Back</button>' +
+            '<div style="text-align:center;padding:12px 0 20px;"><div style="font-family:\'Playfair Display\',serif;font-size:26px;font-weight:400;color:#0A1F3D;letter-spacing:0.06em;text-transform:uppercase;">CCH Design</div></div>' +
+            '<div style="text-align:center;padding:12px 0 24px;border-top:1px solid #E2E2E2;border-bottom:1px solid #E2E2E2;margin-bottom:24px;">' +
+            '<div style="font-family:\'Playfair Display\',Georgia,serif;font-size:22px;font-weight:500;color:#0A1F3D;">' + esc(ibTit) + '</div></div>' +
+            '<p style="font-size:12px;color:#6B7280;font-family:\'DM Sans\',sans-serif;line-height:1.55;margin:-12px 0 20px;text-align:center;max-width:640px;margin-left:auto;margin-right:auto;">When signed in, tap the star on an image to save favorites and leave comments for your designer. <strong>Design Boards</strong> are layout-only — use this <strong>Inspirations</strong> area for reactions.</p>';
+          try {
+            if (typeof ibEnsureIdeabookFeedbackMigrated === 'function') {
+              await ibEnsureIdeabookFeedbackMigrated(projectId, ibDetail.id);
+              var _ibReloadInsp = await db.collection('boards').doc(projectId).collection('ideabooks').doc(ibDetail.id).get();
+              if (_ibReloadInsp.exists) Object.assign(ibDetail, _ibReloadInsp.data());
+            }
+          } catch (_eIbPr) {
+            console.warn('[portal] inspiration feedback migrate', _eIbPr);
+          }
+          var _inspIdent = typeof cpPortalEffectiveClientIdentity === 'function' ? cpPortalEffectiveClientIdentity() : null;
+          var _canInspStar = !!(_inspIdent && String(_inspIdent.email || '').trim());
+          try {
+            var _ibRowsCp = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(ibDetail.images) : [];
+            var _nStarImgCp = 0, _nComTotCp = 0;
+            for (var _sic = 0; _sic < _ibRowsCp.length; _sic++) {
+              var _rwCp = _ibRowsCp[_sic];
+              var _obCp = typeof _rwCp === 'string' ? {} : (_rwCp || {});
+              if (typeof _ibStarCountFromItem === 'function' ? _ibStarCountFromItem(_obCp) > 0 : ((_obCp.stars || 0) > 0)) _nStarImgCp++;
+              _nComTotCp += typeof _ibCommentCountFromItem === 'function' ? _ibCommentCountFromItem(_obCp) : (((_obCp.comments) || []).length);
+            }
+            if (_nStarImgCp || _nComTotCp) {
+              html += '<div style="font-size:12px;color:#6B7280;margin:-8px 0 18px;text-align:center;font-family:\'DM Sans\',sans-serif;line-height:1.6;">' +
+                (_nStarImgCp ? '<span style="margin:0 10px;">\u2605 ' + _nStarImgCp + ' image' + (_nStarImgCp !== 1 ? 's' : '') + ' with stars</span>' : '') +
+                (_nComTotCp ? '<span style="margin:0 10px;">\u2764 ' + _nComTotCp + ' image comment' + (_nComTotCp !== 1 ? 's' : '') + '</span>' : '') +
+                '<span style="display:block;margin-top:8px;font-size:11px;color:#9CA3AF;">Project timeline and announcements: <strong>Home</strong> and <strong>Messages</strong> in this portal.</span></div>';
+            }
+          } catch (_eSummCp) {}
+          var _ibImgRowsLb = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(ibDetail.images) : [];
+          if (!_ibImgRowsLb.length && Array.isArray(ibDetail.items) && ibDetail.items.length) {
+            _ibImgRowsLb = ibDetail.items.slice();
+          }
+          var _visInsp = [];
+          for (var _rix = 0; _rix < _ibImgRowsLb.length; _rix++) {
+            var _rr = _ibImgRowsLb[_rix];
+            var _uPix = _cpIdeabookRowImageUrl(_rr);
+            var _rowBaseIn = '';
+            if (_rr && typeof _rr === 'object' && typeof _ibResolveIdeabookProductPageUrl === 'function') {
+              try { _rowBaseIn = String(_ibResolveIdeabookProductPageUrl(_rr) || '').trim(); } catch (_eRb) { _rowBaseIn = ''; }
+            }
+            if (!_uPix && typeof _resolveImgSrc === 'function') {
+              var _rawPick = '';
+              if (typeof _rr === 'string') _rawPick = String(_rr).trim();
+              else if (_rr && typeof _rr === 'object') _rawPick = String(_rr.imageUrl || _rr.url || _rr.src || _rr.thumb || '').trim();
+              if (_rawPick) {
+                try { _uPix = String(_resolveImgSrc(_rawPick, _rowBaseIn) || '').trim(); } catch (_eR3) { _uPix = ''; }
+              }
+            }
+            if (!_uPix && typeof _resolveImgSrc === 'function') {
+              try { _uPix = String(_resolveImgSrc(String(_rr || ''), _rowBaseIn) || '').trim(); } catch (_eR) { _uPix = ''; }
+            }
+            _uPix = String(_uPix || '').trim();
+            if (!_uPix) continue;
+            var _objR = typeof _rr === 'string' ? {} : (_rr || {});
+            var _matR = typeof _ibMaterializeItemFeedbackRead === 'function' ? _ibMaterializeItemFeedbackRead(typeof _rr === 'string' ? { imageUrl: _rr } : _objR) : { feedback: { stars: [], comments: [] }, caption: '', title: '', clientNote: '' };
+            var _fbR = (_matR && _matR.feedback) ? _matR.feedback : { stars: [], comments: [] };
+            _visInsp.push({
+              imageIndex: _rix,
+              url: _uPix,
+              feedback: _fbR,
+              caption: _matR.caption || _matR.title || '',
+              clientNote: String(_matR.clientNote || '').trim()
+            });
+          }
+          var _encPayLb = '';
+          if (_visInsp.length) {
+            try { _encPayLb = encodeURIComponent(JSON.stringify(_visInsp.map(function(v) { return v.url; }))); } catch (_eEnc2) { _encPayLb = ''; }
+          }
+          if (!ibUrls.length && !_visInsp.length) {
+            html += '<div style="font-size:13px;color:#6B7280;font-family:\'DM Sans\',sans-serif;">No images on this board yet.</div>';
+          } else if (_visInsp.length && _encPayLb) {
+            var encEsc2 = escJsStr(_encPayLb);
+            var secIdJs = escJsStr(String(inspirationBoardId || ''));
+            var pidJs = escJsStr(String(projectId || ''));
+            html += '<div class="cp-insp-board-grid">';
+            for (var _vj = 0; _vj < _visInsp.length; _vj++) {
+              var _cell = _visInsp[_vj];
+              var iuB2 = _cell.url;
+              var _fbC = _cell.feedback || { stars: [], comments: [] };
+              var _cmCount = (_fbC.comments || []).length;
+              var _starCnt = (_fbC.stars || []).length;
+              var _stOn = _canInspStar && _inspIdent && _inspIdent.email && typeof _ibPortalClientStarButtonFilled === 'function'
+                ? _ibPortalClientStarButtonFilled(_ibImgRowsLb[_cell.imageIndex], _inspIdent)
+                : false;
+              var _starBt = '';
+              var _commentBt = '<button type="button" class="cp-insp-comment-btn" title="Jump to comments" aria-label="Comments" onclick="event.preventDefault();event.stopPropagation();void window.cpPortalOpenInspirationComments(\'' + pidJs + '\',\'' + secIdJs + '\',' + _cell.imageIndex + ')">\uD83D\uDCAC' + (_cmCount ? (' ' + _cmCount) : '') + '</button>';
+              if (_canInspStar) {
+                _starBt = '<button type="button" class="cp-insp-star-btn" title="' + (_stOn ? 'Remove your star' : 'Star this image') + '" aria-label="' + (_stOn ? 'Remove star' : 'Star') + '" onclick="event.preventDefault();event.stopPropagation();void window.cpPortalToggleInspirationStar(\'' + pidJs + '\',\'' + secIdJs + '\',' + _cell.imageIndex + ')">' + (_stOn ? '\u2605' : '\u2606') + '</button>';
+              } else if (_starCnt > 0) {
+                _starBt = '<span class="cp-insp-star-badge" title="Stars on this image" aria-hidden="true">\u2605 ' + _starCnt + '</span>';
+              }
+              var _clist = (_fbC.comments || []);
+              var _threadHtml = '';
+              if (_clist.length) {
+                _threadHtml = '<div class="cp-insp-thread">';
+                for (var _tx = 0; _tx < _clist.length; _tx++) {
+                  var _c = _clist[_tx];
+                  var _isDes = _c && _c.authorType === 'designer';
+                  var _nmC = esc(String((_c && _c.authorName) || _c.author || 'CCH'));
+                  var _txC = esc(String((_c && _c.text) || ''));
+                  var _edPart = '';
+                  if (!_isDes && _inspIdent && typeof cpPortalClientOwnsInspirationComment === 'function' && cpPortalClientOwnsInspirationComment(_c, _inspIdent)) {
+                    var _cidJs = escJsStr(String((_c && _c.id) || ('idx:' + _tx)));
+                    _edPart = '<div class="cp-insp-cmt-act">' +
+                      '<button type="button" class="cp-insp-cmt-link" onclick="event.preventDefault();event.stopPropagation();void window.cpPortalEditInspirationComment(\'' + pidJs + '\',\'' + secIdJs + '\',' + _cell.imageIndex + ',\'' + _cidJs + '\')">Edit</button>' +
+                      '<button type="button" class="cp-insp-cmt-link" onclick="event.preventDefault();event.stopPropagation();void window.cpPortalDeleteInspirationComment(\'' + pidJs + '\',\'' + secIdJs + '\',' + _cell.imageIndex + ',\'' + _cidJs + '\')">Delete</button></div>';
+                  }
+                  var _edited = (_c && _c.editedAt) ? ' <span class="cp-insp-edited">(edited)</span>' : '';
+                  _threadHtml += '<div class="cp-insp-cmt' + (_isDes ? ' cp-insp-cmt--studio' : '') + '"><div class="cp-insp-cmt-hd"><strong>' + _nmC + '</strong>' +
+                    (_isDes ? ' <span class="cp-insp-badge-studio">Studio</span>' : '') + _edited + '</div><div class="cp-insp-cmt-body">' + _txC + '</div>' + _edPart + '</div>';
+                }
+                _threadHtml += '</div>';
+              }
+              var _compose = _canInspStar
+                ? ('<div class="cp-insp-compose" data-cp-pid="' + escAttr(String(projectId)) + '" data-cp-sid="' + escAttr(String(inspirationBoardId)) + '" data-cp-idx="' + _cell.imageIndex + '">' +
+                  '<textarea class="cp-insp-ta" maxlength="500" rows="2" placeholder="Add a comment (max 500 characters)…" aria-label="New comment"></textarea>' +
+                  '<button type="button" class="cp-insp-post-cmt" onclick="event.preventDefault();event.stopPropagation();void window.cpPortalPostInspirationCommentFrom(this)">Post</button></div>')
+                : '';
+              var _capLine = String(_cell.caption || '').trim();
+              var _cliNote = String(_cell.clientNote || '').trim();
+              var _capStudioHtml = _capLine
+                ? ('<div class="cp-insp-cap-studio" title="From your design team">' + esc(_capLine) + '</div>')
+                : ('<div class="cp-insp-cap-studio cp-insp-cap-muted">Studio caption (if any) appears here.</div>');
+              var _noteBtnClass = 'cp-insp-client-note' + (_cliNote ? '' : ' cp-insp-client-note-empty');
+              var _noteBtnTxt = _cliNote ? esc(_cliNote) : 'Add your note\u2026';
+              html += '<div class="cp-insp-board-cell">' +
+                '<div class="cp-insp-board-tile" role="button" tabindex="0" onclick="cpProposalLineLightboxOpenFromEncoded(\'' + encEsc2 + '\',' + _vj + ')">' +
+                '<img src="' + _escImgSrcAttr(iuB2) + '" alt="" referrerpolicy="no-referrer" onerror="this.style.opacity=\'0.2\'">' +
+                _starBt +
+                _commentBt +
+                '</div>' +
+                '<div class="cp-insp-board-caption-block">' +
+                _capStudioHtml +
+                '<button type="button" class="' + _noteBtnClass + '" onclick="event.preventDefault();event.stopPropagation();void window.cpPortalSaveInspirationClientNote(\'' + pidJs + '\',\'' + secIdJs + '\',' + _cell.imageIndex + ')">' + _noteBtnTxt + '</button>' +
+                _threadHtml +
+                _compose +
+                '</div></div>';
+            }
+            html += '</div>';
+          } else if (!encPayload) {
+            html += '<div style="font-size:13px;color:#6B7280;font-family:\'DM Sans\',sans-serif;">Could not prepare image viewer.</div>';
+          } else {
+            var encEsc = escJsStr(encPayload);
+            html += '<p style="font-size:12px;color:#6B7280;margin:0 0 14px;line-height:1.5;font-family:\'DM Sans\',sans-serif;">Gallery view. Stars, comments, and notes need image data from the board; ask your studio to re-save the inspiration section if controls are missing.</p>' +
+              '<div class="cp-insp-board-grid">';
+            for (var _ti = 0; _ti < ibUrls.length; _ti++) {
+              var iuB = ibUrls[_ti];
+              html += '<div class="cp-insp-board-tile" role="button" tabindex="0" onclick="cpProposalLineLightboxOpenFromEncoded(\'' + encEsc + '\',' + _ti + ')">' +
+                '<img src="' + _escImgSrcAttr(iuB) + '" alt="" referrerpolicy="no-referrer" onerror="this.style.opacity=\'0.2\'">' +
+                '</div>';
+            }
+            html += '</div>';
+          }
+          html += '</div>';
+        }
+      } else if (activePage === 'inspirations') {
+        html += '<div class="cp-sec-label-jx" style="margin-bottom:20px;">Inspirations</div>' +
+          '<p style="font-size:12px;color:#6B7280;font-family:\'DM Sans\',sans-serif;line-height:1.55;margin:-8px 0 18px;max-width:720px;">Open a board, then an image to view it large. When signed in, use the star to save favorites and add comments for your designer. <strong>Design Boards</strong> in the portal are layout presentations only — starring happens here under <strong>Inspirations</strong>.</p>';
+        if (!inspirationIdeabooks.length) {
+          html += '<div style="font-size:13px;color:#6B7280;font-family:\'DM Sans\',sans-serif;">No inspiration boards shared yet.</div>';
         } else {
           html += '<div style="text-align:center;padding:24px 0 12px;"><div style="font-family:\'Playfair Display\',serif;font-size:28px;font-weight:400;color:#0A1F3D;letter-spacing:0.08em;text-transform:uppercase;">CCH Design</div></div>' +
-            '<div style="text-align:center;padding:16px 0;border-top:1px solid #E2E2E2;border-bottom:1px solid #E2E2E2;margin-bottom:20px;"><span style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#6B7280;font-family:\'DM Sans\',sans-serif;">Concept</span></div>' +
-            '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px;">';
-          inspirationBoards.forEach(function(ib) {
-            var iu = cpIdeabookCoverUrl(ib);
-            var tit = ib.name || ib.title || 'Board';
-            html += '<div style="position:relative;overflow:hidden;aspect-ratio:1;">' +
-              (iu ? '<img src="' + escAttr(iu) + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;filter:grayscale(30%);" referrerpolicy="no-referrer" onerror="this.style.display=\\\'none\\\'">' : '<div style="width:100%;height:100%;background:#F0F0F0;"></div>') +
-              '<div style="position:absolute;inset:0;display:flex;align-items:flex-end;padding:12px;background:linear-gradient(180deg,transparent 40%,rgba(10,31,61,0.55) 100%);"><div style="font-size:12px;color:#fff;font-family:\'DM Sans\',sans-serif;font-weight:500;">' + esc(tit) + '</div></div></div>';
+            '<div style="text-align:center;padding:16px 0;border-top:1px solid #E2E2E2;border-bottom:1px solid #E2E2E2;margin-bottom:20px;"><span style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#6B7280;font-family:\'DM Sans\',sans-serif;">Inspirations</span></div>' +
+            '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">';
+          inspirationIdeabooks.forEach(function(ib) {
+            try {
+              var iu = cpIdeabookCoverUrl(ib);
+              var tit = ib.name || ib.title || 'Board';
+              var _ic = cpIdeabookItemCount(ib);
+              var _inspCardHash = '#/clientview/' + projectId + '/inspirations/' + ib.id;
+              html += '<div class="cp-board-list-item" style="cursor:pointer;" role="link" tabindex="0" onclick="navigate(\'' + escAttr(_inspCardHash) + '\')">' +
+                '<div class="cp-inspiration-card">' +
+                (iu ? '<img class="cp-inspiration-cover-img" src="' + escAttr(String(iu).trim()) + '" alt="" referrerpolicy="no-referrer" style="filter:grayscale(30%);" onerror="this.style.opacity=\'0\';this.style.visibility=\'hidden\';var fb=this.parentNode&&this.parentNode.querySelector(\'.cp-inspiration-cover-fallback\');if(fb){fb.style.display=\'flex\';}">' : '') +
+                '<div class="cp-inspiration-cover-fallback" style="display:' + (iu ? 'none' : 'flex') + ';filter:grayscale(30%);">\u273F</div>' +
+                '</div>' +
+                '<div class="cp-board-list-title">' + esc(tit) + '</div>' +
+                '<div class="cp-board-list-count">' + _ic + ' item' + (_ic !== 1 ? 's' : '') + '</div></div>';
+            } catch (eIb) {
+              console.error('[renderClientPortal] inspiration card skipped:', (ib && ib.id) || ib, eIb);
+            }
+          });
+          html += '</div>';
+        }
+      } else if (activePage === 'concepts') {
+        var _conSpotlights = cpResolveDesignStorySpotlights(proj, portalMergedDocs);
+        html += '<div class="cp-sec-label-jx" style="margin-bottom:20px;">Designing Your Story</div>';
+        if (!_conSpotlights.length && !conceptIdeabooks.length) {
+          html += '<div style="border:1px solid #E2E2E2;padding:48px 32px;text-align:center;background:#FAFAFA;">' +
+            '<div style="font-size:14px;color:#0A1F3D;font-family:\'DM Sans\',sans-serif;font-weight:500;margin-bottom:8px;">Nothing shared here yet.</div>' +
+            '<div style="font-size:13px;color:#6B7280;font-family:\'DM Sans\',sans-serif;line-height:1.6;max-width:480px;margin:0 auto;">Your studio will add boards with deliverables, renderings, drawings, and links to documents as the work progresses.</div>' +
+            '</div>';
+        } else {
+          html += '<div style="text-align:center;padding:24px 0 12px;"><div style="font-family:\'Playfair Display\',serif;font-size:28px;font-weight:400;color:#0A1F3D;letter-spacing:0.08em;text-transform:uppercase;">CCH Design</div></div>' +
+            '<div style="text-align:center;padding:16px 0;border-top:1px solid #E2E2E2;border-bottom:1px solid #E2E2E2;margin-bottom:20px;"><span style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#6B7280;font-family:\'DM Sans\',sans-serif;">Designing Your Story</span></div>';
+          if (_conSpotlights.length) {
+            html += '<div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#9CA3AF;margin-bottom:10px;font-family:\'DM Sans\',sans-serif;">Spotlight documents</div>' +
+              '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:24px;">';
+            _conSpotlights.forEach(function(sp) {
+              var openU = escJsStr(sp.url);
+              var cell = sp.isImage
+                ? '<img src="' + _escImgSrcAttr(sp.url) + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;position:relative;z-index:0;" referrerpolicy="no-referrer">'
+                : '<div style="width:100%;height:100%;min-height:80px;background:#E8ECF3;display:flex;align-items:center;justify-content:center;font-size:28px;color:#0A1F3D;opacity:0.35;">\u25A3</div>';
+              html += '<div style="position:relative;overflow:hidden;aspect-ratio:1;border:1px solid #E2E2E2;min-width:0;cursor:pointer;" role="button" tabindex="0" onclick="window.open(\'' + openU + '\',\'_blank\',\'noopener\')">' + cell +
+                '<div style="position:absolute;inset:0;z-index:1;display:flex;align-items:flex-end;padding:12px;background:linear-gradient(180deg,transparent 40%,rgba(10,31,61,0.55) 100%);pointer-events:none;"><div style="font-size:12px;color:#fff;font-family:\'DM Sans\',sans-serif;font-weight:500;">' + esc(sp.title) + '</div></div></div>';
+            });
+            html += '</div>';
+          }
+          if (conceptIdeabooks.length) {
+            if (_conSpotlights.length) {
+              html += '<div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#9CA3AF;margin-bottom:10px;font-family:\'DM Sans\',sans-serif;">Concept boards</div>';
+            }
+            html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">';
+            conceptIdeabooks.forEach(function(ib) {
+              try {
+                var iu = cpIdeabookCoverUrl(ib);
+                var tit = ib.name || ib.title || 'Board';
+                var _cc = cpIdeabookItemCount(ib);
+                html += '<div class="cp-board-list-item">' +
+                  '<div class="cp-inspiration-card" style="border:1px solid var(--cp-border);">' +
+                  (iu ? '<img class="cp-inspiration-cover-img" src="' + _escImgSrcAttr(iu) + '" alt="" referrerpolicy="no-referrer" style="filter:grayscale(30%);" onerror="this.style.opacity=\'0\';this.style.visibility=\'hidden\';var fb=this.parentNode&&this.parentNode.querySelector(\'.cp-inspiration-cover-fallback\');if(fb){fb.style.display=\'flex\';}">' : '') +
+                  '<div class="cp-inspiration-cover-fallback" style="display:' + (iu ? 'none' : 'flex') + ';filter:grayscale(30%);">\u273F</div>' +
+                  '</div>' +
+                  '<div class="cp-board-list-title">' + esc(tit) + '</div>' +
+                  '<div class="cp-board-list-count">' + _cc + ' item' + (_cc !== 1 ? 's' : '') + '</div></div>';
+              } catch (eIb2) {
+                console.error('[renderClientPortal] concept board card skipped:', (ib && ib.id) || ib, eIb2);
+              }
+            });
+            html += '</div>';
+          }
+        }
+      } else if (activePage === 'designboards') {
+        html += '<div class="cp-sec-label-jx" style="margin-bottom:20px;">Design Boards</div>';
+        if (!designBoards.length) {
+          html += '<div style="font-size:13px;color:#6B7280;font-family:\'DM Sans\',sans-serif;">No design boards yet.</div>';
+        } else {
+          html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;">';
+          designBoards.forEach(function(dbB) {
+            var iu = cpDesignBoardCoverUrl(dbB);
+            var tit = dbB.name || 'Board';
+            var _dbh = '#/clientboard/' + projectId + '/' + dbB.id;
+            var _dbc = Array.isArray(dbB.elements) ? dbB.elements.length : 0;
+            html += '<div class="cp-board-list-item" style="cursor:pointer;" onclick="navigate(\'' + escAttr(_dbh) + '\')">' +
+              '<div style="overflow:hidden;aspect-ratio:4/3;border:1px solid #E2E2E2;">' +
+              (iu ? '<img src="' + _escImgSrcAttr(iu) + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div style="width:100%;height:100%;min-height:140px;background:#FAFAFA;display:flex;align-items:center;justify-content:center;color:#C4A464;font-size:28px;">\u25C6</div>') +
+              '</div>' +
+              '<div class="cp-board-list-title">' + esc(tit) + '</div>' +
+              '<div class="cp-board-list-count">' + _dbc + ' item' + (_dbc !== 1 ? 's' : '') + '</div></div>';
           });
           html += '</div>';
         }
@@ -49848,21 +50290,19 @@ async function renderBoardsTab(T, proj) {
           html += '<div style="border:1px solid #E2E2E2;">';
           _portalProps.forEach(function(p, pi) {
             var _ph = cpProposalPortalHash(projectId, p.id);
-            var _propOpenJs = 'navigate(' + JSON.stringify(_ph) + ')';
             var border = pi < _portalProps.length - 1 ? 'border-bottom:1px solid #F0F0F0;' : '';
             html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 24px;' + border + '">' +
               '<div><div style="font-size:14px;font-weight:600;color:#0A1F3D;font-family:\'DM Sans\',sans-serif;">' + esc(p.proposalNum || p.name || 'Proposal') + '</div>' +
               '<div style="font-size:12px;color:#9CA3AF;margin-top:4px;">' + esc(p.status || '') + '</div></div>' +
-              '<button type="button" class="cp-btn cp-btn-primary" style="padding:8px 16px;font-size:11px;" onclick=' + JSON.stringify(_propOpenJs) + '>Open</button></div>';
+              '<button type="button" class="cp-btn cp-btn-primary" style="padding:8px 16px;font-size:11px;" onclick="navigate(\'' + escAttr(_ph) + '\')">Open</button></div>';
           });
           html += '</div>';
         }
       } else if (activePage === 'invoices') {
         html += '<div class="cp-sec-label-jx">Invoices</div>';
-        var _cpInvGrid = 'minmax(88px,110px) minmax(100px,180px) minmax(0,1fr) minmax(88px,120px) minmax(72px,100px) minmax(96px,140px)';
         html += '<div style="border:1px solid #E2E2E2;margin-top:8px;">' +
-          '<div style="display:grid;grid-template-columns:' + _cpInvGrid + ';gap:8px 12px;padding:12px 24px;background:#FAFAFA;border-bottom:1px solid #E2E2E2;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;color:#9CA3AF;font-family:\'DM Sans\',sans-serif;">' +
-          '<span>Invoice</span><span>Document tag</span><span>Description</span><span>Amount</span><span>Due</span><span style="text-align:right;">Action</span></div>';
+          '<div style="display:grid;grid-template-columns:100px 1fr 120px 100px 140px;padding:12px 24px;background:#FAFAFA;border-bottom:1px solid #E2E2E2;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;color:#9CA3AF;font-family:\'DM Sans\',sans-serif;">' +
+          '<span>Invoice</span><span>Description</span><span>Amount</span><span>Due</span><span style="text-align:right;">Action</span></div>';
         if (!invoices.length) {
           html += '<div style="padding:24px;font-size:13px;color:#6B7280;">No open invoices.</div></div>';
         } else {
@@ -49872,20 +50312,12 @@ async function renderBoardsTab(T, proj) {
             _invTot += invTotal;
             var border = ii < invoices.length - 1 ? 'border-bottom:1px solid #F0F0F0;' : '';
             var qbLink = (inv.qbInvoiceUrl || inv.qbUrl || '').trim();
-            var _invTag = (typeof proposalDocumentTagText === 'function' ? proposalDocumentTagText(inv) : '') || '';
-            var _invDesc = String(inv.memo || inv.shortDescription || inv.projectName || '').trim();
-            var _invPreviewJs = 'if(typeof previewDocument===\'function\')previewDocument(' + JSON.stringify('invoice') + ',' + JSON.stringify(projectId) + ',' + JSON.stringify(inv.id) + ')';
-            var _invActions = '<div style="display:inline-flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;">' +
-              '<button type="button" class="cp-btn cp-btn-primary" style="padding:6px 12px;font-size:11px;" onclick=' + JSON.stringify(_invPreviewJs) + '>Open</button>' +
-              (qbLink ? '<a href="' + escAttr(qbLink) + '" target="_blank" rel="noopener" class="cp-btn cp-btn-primary" style="display:inline-block;padding:6px 12px;font-size:11px;">Pay Now</a>' : '') +
-              '</div>';
-            html += '<div style="display:grid;grid-template-columns:' + _cpInvGrid + ';gap:8px 12px;padding:16px 24px;align-items:center;' + border + '">' +
+            html += '<div style="display:grid;grid-template-columns:100px 1fr 120px 100px 140px;padding:16px 24px;align-items:center;' + border + '">' +
               '<span style="font-size:13px;font-weight:500;color:#0A1F3D;font-family:\'DM Sans\',sans-serif;">' + esc(inv.invoiceNum || inv.name || 'Invoice') + '</span>' +
-              '<span style="font-size:12px;color:#6B7280;font-family:\'DM Sans\',sans-serif;line-height:1.35;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;" title="' + escAttr(_invTag) + '">' + esc(_invTag) + '</span>' +
-              '<span style="font-size:13px;color:#0A1F3D;font-family:\'DM Sans\',sans-serif;line-height:1.35;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">' + esc(_invDesc) + '</span>' +
+              '<span style="font-size:13px;color:#0A1F3D;font-family:\'DM Sans\',sans-serif;">' + esc(inv.memo || inv.projectName || '') + '</span>' +
               '<span style="font-size:13px;font-weight:500;color:#0A1F3D;font-family:\'DM Sans\',sans-serif;">' + formatMoney(invTotal) + '</span>' +
               '<span style="font-size:12px;color:#9CA3AF;font-family:\'DM Sans\',sans-serif;">' + esc(inv.dueDate || inv.due || '') + '</span>' +
-              '<div style="text-align:right;">' + _invActions + '</div></div>';
+              '<div style="text-align:right;">' + (qbLink ? '<a href="' + escAttr(qbLink) + '" target="_blank" rel="noopener" class="cp-btn cp-btn-primary" style="display:inline-block;padding:6px 12px;font-size:11px;">Pay Now</a>' : '<span style="font-size:11px;color:#9CA3AF;">\u2014</span>') + '</div></div>';
           });
           html += '</div>' +
             '<div style="margin-top:20px;padding:16px 24px;border:1px solid #E2E2E2;display:flex;justify-content:space-between;background:#FAFAFA;">' +
@@ -49895,18 +50327,18 @@ async function renderBoardsTab(T, proj) {
       } else if (activePage === 'documents') {
         var docFolderFilt = (window._cpDocFolderFilterByProject && window._cpDocFolderFilterByProject[projectId]) || 'all';
         var folderCounts = {};
-        clientDocuments.forEach(function(d) {
+        portalMergedDocs.forEach(function(d) {
           var k = cpClientDocNormalizedFolder(d);
           folderCounts[k] = (folderCounts[k] || 0) + 1;
         });
-        var docsFiltered = clientDocuments.filter(function(d) {
+        var docsFiltered = portalMergedDocs.filter(function(d) {
           if (docFolderFilt === 'all') return true;
           return cpClientDocNormalizedFolder(d) === docFolderFilt;
         });
         html += '<div class="cp-section-label">Documents for your review</div>' +
           '<div class="cp-card" style="padding:12px 14px;">';
-        if (clientDocuments.length === 0) {
-          html += '<div style="font-size:13px;color:#6B7280;padding:8px 0;">No client documents have been shared yet.</div></div>';
+        if (portalMergedDocs.length === 0) {
+          html += '<div style="font-size:13px;color:#6B7280;padding:8px 0;">No documents yet. Files from <strong>Files &amp; Docs</strong> in the studio and anything shared via <strong>Share Document</strong> will appear here.</div></div>';
         } else {
           html += '<div class="cp-filter-row" style="margin-bottom:12px;">' +
             '<button type="button" class="cp-filter-btn ' + (docFolderFilt === 'all' ? 'active' : '') + '" onclick="window._cpDocFolderFilterByProject=window._cpDocFolderFilterByProject||{};window._cpDocFolderFilterByProject[\'' + escAttr(projectId) + '\']=\'all\';renderClientPortal(\'' + escAttr(projectId) + '\',null,\'documents\')">All</button>';
@@ -49916,28 +50348,49 @@ async function renderBoardsTab(T, proj) {
             html += '<button type="button" class="cp-filter-btn ' + (docFolderFilt === fd ? 'active' : '') + '" onclick="window._cpDocFolderFilterByProject=window._cpDocFolderFilterByProject||{};window._cpDocFolderFilterByProject[\'' + escAttr(projectId) + '\']=\'' + escAttr(fd) + '\';renderClientPortal(\'' + escAttr(projectId) + '\',null,\'documents\')">' + esc(fd) + ' (' + c + ')</button>';
           });
           html += '</div><div style="overflow:auto;margin:0 -14px;padding:0 14px;">' +
-            '<table class="cp-doc-table"><thead><tr><th>Document</th><th>Folder</th><th>Type</th><th>Date</th><th>Actions</th></tr></thead><tbody>';
+            '<table class="cp-doc-table"><thead><tr><th>Document</th><th>Folder</th><th>Type</th><th>Date</th><th>Actions</th>' + (isOwner ? '<th>Dashboard</th>' : '') + '</tr></thead><tbody>';
           if (docsFiltered.length > 0) {
             docsFiltered.forEach(function(d) {
               var dFolder = cpClientDocNormalizedFolder(d);
               var dType = String(d.type || 'Document');
               var dDate = d.createdAt ? new Date(d.createdAt).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : '';
               var dStatus = String(d.status || '').toLowerCase();
+              var isStudio = d._portalKind === 'studioFile';
+              var actions = '';
+              if (d.url) actions += '<a href="' + escAttr(d.url) + '" target="_blank" rel="noopener" class="cp-btn cp-btn-primary" style="display:inline-block;padding:6px 10px;font-size:11px;">Open</a> ';
+              if (isStudio) {
+                actions += '<span style="font-size:11px;color:#9CA3AF;">Studio file</span>';
+              } else if (dStatus === 'pending') {
+                actions += '<button type="button" class="cp-btn cp-btn-outline" style="padding:6px 10px;font-size:11px;" onclick="cpMarkDocumentReviewed(\'' + escAttr(projectId) + '\',\'' + escAttr(d.id) + '\')">Mark Reviewed</button>';
+              } else if (dStatus === 'reviewed') {
+                actions += '<span style="font-size:11px;color:#2E7D32;font-weight:700;">\u2713 Reviewed</span>';
+              } else {
+                actions += '<span style="font-size:11px;color:#6B7280;">Shared</span>';
+              }
+              var dashCell = '';
+              if (isOwner) {
+                var onDash = d.url && cpDocIsOnDesignStory(proj, d);
+                var kindArg = isStudio ? 'studioFile' : 'clientDoc';
+                var idArg = isStudio ? d._studioFileId : d.id;
+                if (d.url) {
+                  dashCell = onDash
+                    ? '<button type="button" class="cp-btn cp-btn-outline" style="padding:6px 10px;font-size:11px;white-space:normal;max-width:140px;" onclick="cpAdminToggleDocDashboardPublish(\'' + escJsStr(projectId) + '\',\'' + escJsStr(kindArg) + '\',\'' + escJsStr(String(idArg)) + '\',false)">Remove from dashboard</button>'
+                    : '<button type="button" class="cp-btn cp-btn-primary" style="padding:6px 10px;font-size:11px;white-space:normal;max-width:140px;" onclick="cpAdminToggleDocDashboardPublish(\'' + escJsStr(projectId) + '\',\'' + escJsStr(kindArg) + '\',\'' + escJsStr(String(idArg)) + '\',true)">Publish to dashboard</button>';
+                } else {
+                  dashCell = '<span style="font-size:11px;color:#9CA3AF;">\u2014</span>';
+                }
+              }
               html += '<tr>' +
                 '<td><div style="font-weight:600;color:#0A1F3D;">' + esc(d.title || d.docNumber || 'Document') + '</div><div style="font-size:11px;color:#6B7280;">' + esc(d.description || d.docNumber || '') + '</div></td>' +
                 '<td>' + esc(dFolder) + '</td>' +
                 '<td>' + esc(dType) + '</td>' +
                 '<td>' + esc(dDate) + '</td>' +
-                '<td>' +
-                  (d.url ? '<a href="' + escAttr(d.url) + '" target="_blank" rel="noopener" class="cp-btn cp-btn-primary" style="display:inline-block;padding:6px 10px;font-size:11px;">Open</a> ' : '') +
-                  (dStatus === 'pending'
-                    ? '<button type="button" class="cp-btn cp-btn-outline" style="padding:6px 10px;font-size:11px;" onclick="cpMarkDocumentReviewed(\'' + escAttr(projectId) + '\',\'' + escAttr(d.id) + '\')">Mark Reviewed</button>'
-                    : '<span style="font-size:11px;color:#2E7D32;font-weight:700;">\u2713 Reviewed</span>') +
-                '</td>' +
+                '<td>' + actions + '</td>' +
+                (isOwner ? '<td style="vertical-align:top;">' + dashCell + '</td>' : '') +
               '</tr>';
             });
           } else {
-            html += '<tr><td colspan="5" style="color:#6B7280;">No documents in this category.</td></tr>';
+            html += '<tr><td colspan="' + (isOwner ? '6' : '5') + '" style="color:#6B7280;">No documents in this category.</td></tr>';
           }
           html += '</tbody></table></div></div>';
         }
@@ -49972,7 +50425,7 @@ async function renderBoardsTab(T, proj) {
         html += '</tbody><tfoot><tr><td>Total</td><td style="text-align:right;">' + (Math.round(totalHours * 10) / 10).toFixed(1) + '</td></tr></tfoot></table></div>';
       } else {
         html += '<div class="cp-sec-label-jx" style="color:#C8A97E;">Action Required</div>';
-        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:40px;font-family:\'DM Sans\',sans-serif;">';
+        html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;margin-bottom:40px;font-family:\'DM Sans\',sans-serif;">';
         html += '<div style="border:1px solid #E2E2E2;padding:24px 28px;">' +
           '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">' +
           '<div style="font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:#0A1F3D;">Documents Pending Approval</div>' +
@@ -49998,14 +50451,10 @@ async function renderBoardsTab(T, proj) {
           _openInvoices.slice(0, 8).forEach(function(inv, ii) {
             var invTotal = parseFloat(inv.total || inv.amount) || 0;
             var qbLink = (inv.qbInvoiceUrl || inv.qbUrl || '').trim();
-            var _miniInvJs = 'if(typeof previewDocument===\'function\')previewDocument(' + JSON.stringify('invoice') + ',' + JSON.stringify(projectId) + ',' + JSON.stringify(inv.id) + ')';
             html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;' + (ii ? 'border-top:1px solid #F0F0F0;' : '') + '">' +
               '<div style="min-width:0;"><div style="font-size:13px;color:#0A1F3D;">' + esc(inv.invoiceNum || inv.name || 'Invoice') + '</div>' +
               '<div style="font-size:11px;color:#9CA3AF;margin-top:2px;">' + esc(inv.status || 'Open') + '</div></div>' +
-              '<div style="display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center;">' +
-              '<button type="button" class="cp-btn cp-btn-primary" style="padding:6px 14px;font-size:11px;" onclick=' + JSON.stringify(_miniInvJs) + '>Open</button>' +
-              (qbLink ? '<a href="' + escAttr(qbLink) + '" target="_blank" rel="noopener" class="cp-btn cp-btn-primary" style="padding:6px 14px;font-size:11px;">Pay Now</a>' : '') +
-              '</div></div>';
+              (qbLink ? '<a href="' + escAttr(qbLink) + '" target="_blank" rel="noopener" class="cp-btn cp-btn-primary" style="padding:6px 14px;font-size:11px;">Pay Now</a>' : '') + '</div>';
           });
           html += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid #E2E2E2;display:flex;justify-content:space-between;font-size:13px;font-weight:500;color:#0A1F3D;">' +
             '<span>Total Outstanding</span><span>' + formatMoney(_invOutstanding) + '</span></div>';
@@ -50014,14 +50463,20 @@ async function renderBoardsTab(T, proj) {
         }
         html += '</div></div>';
         if (_openForReview.length) {
-          html += '<div class="cp-sec-label-jx" style="margin-bottom:12px;">Proposals Awaiting Review</div><div style="border:1px solid #E2E2E2;padding:16px 20px;margin-bottom:40px;">';
-          _openForReview.slice(0, 6).forEach(function(p, pi) {
+          var _pRevN = _openForReview.length;
+          html += '<div class="cp-sec-label-jx" style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">' +
+            '<span>Proposals Awaiting Review</span>' +
+            '<span style="background:#0A1F3D;color:#fff;font-size:12px;font-weight:700;padding:5px 14px;letter-spacing:0.02em;">' + _pRevN + ' pending</span></div>' +
+            '<div style="border:1px solid #E2E2E2;padding:16px 20px;margin-bottom:40px;">';
+          _openForReview.slice(0, 24).forEach(function(p, pi) {
             var _ph = cpProposalPortalHash(projectId, p.id);
-            var _revOpenJs = 'navigate(' + JSON.stringify(_ph) + ')';
             html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;' + (pi ? 'border-top:1px solid #F0F0F0;' : '') + '">' +
               '<div style="font-size:13px;color:#0A1F3D;font-weight:500;">' + esc(p.proposalNum || p.name || 'Proposal') + '</div>' +
-              '<button type="button" class="cp-btn cp-btn-primary" style="padding:6px 14px;font-size:11px;" onclick=' + JSON.stringify(_revOpenJs) + '>Open</button></div>';
+              '<button type="button" class="cp-btn cp-btn-primary" style="padding:6px 14px;font-size:11px;" onclick="navigate(\'' + escAttr(_ph) + '\')">Open</button></div>';
           });
+          if (_pRevN > 24) {
+            html += '<div style="padding:12px 0 0;font-size:12px;color:#6B7280;border-top:1px solid #F0F0F0;">Showing 24 of ' + _pRevN + '. Use <strong>Proposals</strong> in the sidebar for the full list.</div>';
+          }
           html += '</div>';
         }
         if (_latestWhatsNew) {
@@ -50031,25 +50486,27 @@ async function renderBoardsTab(T, proj) {
             '<div style="font-size:11px;color:#9CA3AF;margin-bottom:10px;">' + esc(cpRelativeTimeLabel(_latestWhatsNew.createdAt)) + '</div>' +
             '<div style="font-size:14px;line-height:1.7;color:#0A1F3D;font-weight:300;">' + esc(_latestWhatsNew.text || 'A new project update has been posted.') + '</div></div>';
           if (_latestWhatsNew.photoUrl) {
-            html += '<img src="' + escAttr(_latestWhatsNew.photoUrl) + '" alt="" style="width:200px;height:150px;object-fit:cover;flex-shrink:0;" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">';
+            html += '<img src="' + _escImgSrcAttr(_latestWhatsNew.photoUrl) + '" alt="" style="width:200px;height:150px;object-fit:cover;flex-shrink:0;" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">';
           }
           html += '</div>';
         }
-        var _ibPreview = cpResolveClientHomeConceptBoards(proj, ideabooks);
-        if (_ibPreview.length) {
+        var _inspPrev = inspirationIdeabooks.slice(0, 4);
+        if (_inspPrev.length) {
           html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
-            '<div class="cp-sec-label-jx" style="margin:0;border:none;padding:0;">Concept Boards</div>' +
-            '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 0;font-size:11px;color:#9CA3AF;border:none;text-transform:uppercase;letter-spacing:0.1em;" onclick="navigate(\'' + escAttr(_baseHash + '/concepts') + '\')">View All \u2192</button></div>' +
-            '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:40px;">';
-          _ibPreview.forEach(function(ib) {
+            '<div class="cp-sec-label-jx" style="margin:0;border:none;padding:0;">INSPIRATIONS</div>' +
+            '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 0;font-size:11px;color:#9CA3AF;border:none;text-transform:uppercase;letter-spacing:0.1em;" onclick="navigate(\'' + escAttr(_baseHash + '/inspirations') + '\')">View All \u2192</button></div>' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:20px;margin-bottom:40px;">';
+          _inspPrev.forEach(function(ib) {
             var iu = cpIdeabookCoverUrl(ib);
             var tit = ib.name || ib.title || 'Board';
             var ic = cpIdeabookItemCount(ib);
-            html += '<div style="cursor:pointer;" onclick="navigate(\'' + escAttr(_baseHash + '/concepts') + '\')">' +
-              '<div style="overflow:hidden;aspect-ratio:1;border:1px solid #E2E2E2;">' +
-              (iu ? '<img src="' + escAttr(iu) + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" referrerpolicy="no-referrer">' : '<div style="width:100%;height:100%;background:#FAFAFA;"></div>') +
-              '</div><div style="font-size:12px;font-weight:500;color:#0A1F3D;margin-top:10px;font-family:\'DM Sans\',sans-serif;">' + esc(tit) + '</div>' +
-              '<div style="font-size:11px;color:#9CA3AF;margin-top:2px;">' + ic + ' items</div></div>';
+            var _inspHomeCardHash = _baseHash + '/inspirations/' + ib.id;
+            html += '<div class="cp-board-list-item" style="cursor:pointer;" onclick="navigate(\'' + escAttr(_inspHomeCardHash) + '\')">' +
+              '<div class="cp-inspiration-card" style="border:1px solid var(--cp-border);background:#F4F6FA;">' +
+              (iu ? '<img class="cp-inspiration-cover-img" src="' + escAttr(String(iu).trim()) + '" alt="" referrerpolicy="no-referrer" onerror="this.style.opacity=\'0\';this.style.visibility=\'hidden\';var fb=this.parentNode&&this.parentNode.querySelector(\'.cp-inspiration-cover-fallback\');if(fb){fb.style.display=\'flex\';}">' : '') +
+              '<div class="cp-inspiration-cover-fallback" style="display:' + (iu ? 'none' : 'flex') + ';">\u273F</div>' +
+              '</div><div class="cp-board-list-title">' + esc(tit) + '</div>' +
+              '<div class="cp-board-list-count">' + ic + ' item' + (ic !== 1 ? 's' : '') + '</div></div>';
           });
           html += '</div>';
         }
@@ -50084,33 +50541,44 @@ async function renderBoardsTab(T, proj) {
         html += '</div></div>';
       }
 
-      // --- Your Rooms ---
-      if (rooms.length > 0) {
-        html += '<div id="cp-anchor-rooms" class="cp-section cp-section-block"><div class="cp-section-label">YOUR ROOMS</div><div class="cp-rooms-grid">';
-        rooms.forEach(function(rm, ri) {
-          var cover = roomCovers[rm];
-          html += '<div class="cp-card cp-room-card" onclick="cpToggleRoom('+ri+')">' +
-            (cover ? '<img class="cp-room-img" src="'+escAttr(cover)+'" onerror="this.style.display=\'none\'">' : '<div class="cp-room-img" style="display:flex;align-items:center;justify-content:center;font-size:36px;color:#C4A464;">🏠</div>') +
-            '<div class="cp-room-overlay"><div class="cp-room-name">' + esc(rm) + '</div><div class="cp-room-count">' + byRoom[rm].length + ' item' + (byRoom[rm].length !== 1 ? 's' : '') + '</div></div>' +
+      // --- Your rooms / by category (home) ---
+      if (roomOnlyKeys.length > 0 || categoryKeys.length > 0) {
+        var _gridLabel = portalGridMode === 'categories' ? 'BY CATEGORY' : 'YOUR ROOMS';
+        html += '<div id="cp-anchor-rooms" class="cp-section cp-section-block">' +
+          '<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;">' +
+          '<div class="cp-section-label" style="margin:0;">' + _gridLabel + '</div>' +
+          '<div class="cp-filter-row" style="margin:0;">' +
+          '<button type="button" class="cp-filter-btn' + (portalGridMode === 'rooms' ? ' active' : '') + '" onclick="cpSetPortalRoomCatMode(\'' + escAttr(projectId) + '\',\'rooms\')">By room</button>' +
+          '<button type="button" class="cp-filter-btn' + (portalGridMode === 'categories' ? ' active' : '') + '" onclick="cpSetPortalRoomCatMode(\'' + escAttr(projectId) + '\',\'categories\')">By category</button>' +
+          '</div></div>';
+        if (portalRoomCatMode !== portalGridMode && (roomOnlyKeys.length > 0 && categoryKeys.length > 0)) {
+          html += '<p style="font-size:12px;color:#6B7280;margin:0 0 12px;line-height:1.5;">' +
+            (portalGridMode === 'categories'
+              ? 'Showing <strong>by category</strong> because no room names are available for the client room view (some internal buckets are hidden). Use the buttons above to switch.'
+              : 'Showing <strong>by room</strong> because no product categories were found.') +
+            '</p>';
+        }
+        if (!portalGridKeys.length) {
+          html += '<div class="cp-card" style="padding:20px;font-size:13px;color:#6B7280;">Nothing to display in this view yet.</div></div>';
+        } else {
+        html += '<p style="font-size:12px;color:#6B7280;margin:0 0 14px;line-height:1.5;font-family:\'DM Sans\',sans-serif;">Tap a room to open its board, view selections, and browse all product images.</p>';
+        html += '<div class="cp-rooms-grid">';
+        portalGridKeys.forEach(function(rm) {
+          var cover = portalGridCovers[rm];
+          var _cnt = (byPortalGrid[rm] || []).length;
+          var _emptyTile = portalGridMode === 'categories' ? '\uD83C\uDFF7' : '\uD83C\uDFE0';
+          var _navHomeRm = _baseHash + '/rooms/' + encodeURIComponent(rm);
+          html += '<div class="cp-card cp-room-card cp-board-list-item" role="link" tabindex="0" onclick="navigate(\'' + escAttr(_navHomeRm) + '\')">' +
+            '<div class="cp-room-thumb">' +
+            (cover ? '<img class="cp-room-img" src="'+_escImgSrcAttr(cover)+'" onerror="this.style.display=\'none\'">' : '<div class="cp-room-img--empty">' + _emptyTile + '</div>') +
+            '</div>' +
+            '<div class="cp-board-list-title">' + esc(rm) + '</div>' +
+            '<div class="cp-board-list-count">' + _cnt + ' item' + (_cnt !== 1 ? 's' : '') + '</div>' +
           '</div>';
         });
         html += '</div>';
-
-        // Expandable product grids per room
-        rooms.forEach(function(rm, ri) {
-          html += '<div class="cp-expand-room" id="cpRoom'+ri+'"><div class="cp-section-label">' + esc(rm) + '</div><div class="cp-products-grid">';
-          byRoom[rm].forEach(function(c) {
-            html += '<div class="cp-card cp-product-card" onclick="cvShowProduct(this)" data-title="'+escAttr(c.title||'Untitled')+'" data-vendor="'+escAttr(c.vendor||c.manufacturer||'')+'" data-price="'+(c.clientPrice||c.totalSelling||'')+'" data-img="'+escAttr(c.imageUrl||'')+'" data-sku="'+escAttr(c.sku||'')+'" data-category="'+escAttr(c.category||'')+'" data-finish="'+escAttr(c.finish||'')+'" data-dims="'+escAttr(c.dimensions||'')+'" data-room="'+escAttr(c.room||'')+'" data-clip-id="'+escAttr(c.id||'')+'" data-project-id="'+escAttr(projectId)+'" data-status="'+escAttr(getClipApprovalStatus(c))+'" data-pr="'+escAttr(c.proposalNum||c.houzzProposal||'')+'" data-inv="'+escAttr(c.invoiceNum||c.houzzInvoice||'')+'" data-po="'+escAttr(c.poNum||c.purchaseOrderNum||'')+'">' +
-              (c.imageUrl ? '<img class="cp-product-img" src="'+escAttr(c.imageUrl)+'" onerror="this.style.display=\'none\'">' : '<div class="cp-product-img" style="display:flex;align-items:center;justify-content:center;font-size:32px;color:#C4A464;">🪑</div>') +
-              '<div class="cp-product-body"><div class="cp-product-title">' + esc(c.title || 'Untitled') + '</div><div class="cp-product-vendor">' + esc(c.vendor || '') + '</div>' +
-              (c.clientPrice || c.totalSelling ? '<div class="cp-product-price cp-price">' + formatMoney(parseFloat(c.clientPrice || c.totalSelling) || 0) + '</div>' : '') +
-              '<div style="margin-top:6px;">' + clipApprovalBadgeHtml(c) + '</div>' +
-              clipLinkedDocPillsHtml(c, projectId) +
-              '</div></div>';
-          });
-          html += '</div></div>';
-        });
         html += '</div>';
+        }
       }
       html += '</div>';
       }
@@ -50123,6 +50591,7 @@ async function renderBoardsTab(T, proj) {
       if (!proposalMissing) { html += '</div>'; }
       html += '</div>';
       T.innerHTML = html;
+      window._cpPortalRoomBoardCtx = _cpRoomBoardClipsOut ? { clips: _cpRoomBoardClipsOut.slice() } : null;
     }
 
     // Toggle room product grid
