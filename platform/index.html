@@ -21376,7 +21376,18 @@ async function renderBoardsTab(T, proj) {
 
     async function togglePublished(projectId, docId, newValue, collection) {
       const col = collection || 'proposals';
-      await db.collection('boards').doc(projectId).collection(col).doc(docId).update({ published: newValue });
+      const updates = { published: newValue, updatedAt: new Date().toISOString() };
+      if (newValue === true) {
+        const snap = await db.collection('boards').doc(projectId).collection(col).doc(docId).get();
+        const cur = String(((snap.data() || {}).status) || '').trim();
+        if (col === 'proposals') {
+          if (cur === 'Draft' || cur === 'Sent' || cur === '') updates.status = 'Published';
+        } else if (cur === 'Draft') {
+          updates.status = 'Sent';
+        }
+        updates.publishedAt = new Date().toISOString();
+      }
+      await db.collection('boards').doc(projectId).collection(col).doc(docId).update(updates);
       logDocActivity(projectId, col, docId, newValue ? 'published' : 'unpublished', '');
       showToast(newValue ? 'Published to client dashboard' : 'Unpublished from client dashboard');
       invalidateSearchCache();
