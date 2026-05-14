@@ -1796,7 +1796,44 @@
     .ib-drop-zone .ib-drop-icon { font-size: 28px; opacity: 0.4; margin-bottom: 4px; }
     .ib-drop-zone .ib-drop-hint { font-size: 11px; color: var(--gray-500); margin-top: 2px; }
 
-    /* ===== LIGHTBOX — Full-screen Niice-style detail overlay ===== */
+        /* ===== Inspiration portal CSS (added 2026-05-13) ===== */
+        '.cp-insp-board-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; max-width:1200px; margin:0 auto; }' +
+        '@media (max-width:900px){ .cp-insp-board-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; } }' +
+        '@media (max-width:520px){ .cp-insp-board-grid { grid-template-columns:1fr !important; } }' +
+        '.cp-insp-board-cell { display:flex; flex-direction:column; min-width:0; border:1px solid var(--cp-border); background:#fff; }' +
+        '.cp-insp-board-cell .cp-insp-board-tile { position:relative; overflow:hidden; aspect-ratio:1; border:none; cursor:pointer; background:#FAFAFA; flex-shrink:0; }' +
+        '.cp-insp-board-tile { position:relative; overflow:hidden; aspect-ratio:1; border:1px solid var(--cp-border); cursor:pointer; background:#FAFAFA; }' +
+        '.cp-insp-board-tile img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }' +
+        '.cp-insp-board-caption-block { padding:10px 10px 12px; border-top:1px solid #ECECEC; display:flex; flex-direction:column; gap:6px; flex:1; min-height:0; }' +
+        '.cp-insp-cap-studio { font-size:11px; color:#5C6B80; line-height:1.45; max-height:3.1em; overflow:hidden; }' +
+        '.cp-insp-cap-muted { opacity:0.5; font-style:italic; }' +
+        '.cp-insp-client-note { width:100%; text-align:left; font-size:12px; color:#0A1F3D; background:#FAF9F6; border:1px dashed #C4A464; padding:8px 10px; cursor:pointer; font-family:inherit; line-height:1.4; }' +
+        '.cp-insp-client-note-empty { color:#9CA3AF; border-color:#E2E2E2; }' +
+        '#modalContainer .cp-insp-comments-modal { z-index:120000 !important; }' +
+        '.cp-insp-board-tile .cp-insp-star-btn { position:absolute; bottom:8px; left:8px; z-index:3; width:40px; height:40px; border:2px solid #C4A464; border-radius:50%; background:rgba(255,255,255,0.98); box-shadow:0 2px 10px rgba(10,31,61,0.22); cursor:pointer; font-size:19px; line-height:1; color:#0A1F3D; display:flex; align-items:center; justify-content:center; font-family:inherit; padding:0; }' +
+        '.cp-insp-board-tile .cp-insp-star-btn:hover { background:#fff; color:#C4A464; border-color:#0A1F3D; }' +
+        '.cp-insp-board-tile .cp-insp-star-badge { position:absolute; bottom:8px; left:8px; z-index:2; min-width:34px; height:34px; padding:0 8px; border-radius:17px; background:rgba(255,255,255,0.92); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#C4A464; pointer-events:none; box-shadow:0 2px 6px rgba(10,31,61,0.12); }' +
+        '.cp-insp-board-tile .cp-insp-comment-btn { position:absolute; bottom:8px; right:8px; z-index:2; min-width:38px; height:34px; border:none; border-radius:17px; background:rgba(255,255,255,0.95); box-shadow:0 2px 8px rgba(10,31,61,0.18); cursor:pointer; font-size:12px; font-weight:700; color:#0A1F3D; display:flex; align-items:center; justify-content:center; font-family:inherit; padding:0 10px; gap:4px; }' +
+        '.cp-insp-board-tile .cp-insp-comment-btn:hover { background:#fff; color:#C4A464; }' +
+        '.cp-insp-thread { margin-top:10px; border-top:1px solid #ECECEC; padding-top:10px; max-height:220px; overflow-y:auto; }' +
+        '.cp-insp-cmt { font-size:12px; color:#0A1F3D; margin-bottom:10px; line-height:1.45; }' +
+        '.cp-insp-cmt--studio { opacity:0.92; }' +
+        '.cp-insp-cmt-hd { font-size:11px; color:#6B7280; margin-bottom:4px; }' +
+        '.cp-insp-cmt-body { color:#0A1F3D; }' +
+        '.cp-insp-badge-studio { font-size:9px; text-transform:uppercase; letter-spacing:0.06em; color:#9CA3AF; }' +
+        '.cp-insp-edited { font-size:10px; color:#9CA3AF; }' +
+        '.cp-insp-cmt-act { margin-top:6px; display:flex; gap:10px; }' +
+        '.cp-insp-cmt-link { border:none; background:none; padding:0; font-size:11px; color:#6B7280; cursor:pointer; font-family:inherit; text-decoration:underline; }' +
+        '.cp-insp-cmt-link:hover { color:#0A1F3D; }' +
+        '.cp-insp-compose { margin-top:10px; display:flex; flex-direction:column; gap:8px; }' +
+        '.cp-insp-ta { width:100%; border:1px solid #E2E2E2; padding:8px; font-size:12px; font-family:inherit; resize:vertical; min-height:48px; color:#0A1F3D; }' +
+        '.cp-insp-post-cmt { align-self:flex-start; padding:6px 14px; font-size:12px; font-weight:600; border:1px solid #0A1F3D; background:#0A1F3D; color:#fff; cursor:pointer; font-family:inherit; }' +
+        '.cp-insp-post-cmt:hover { background:#152a4d; }' +
+        '.cp-insp-comments-modal .cp-cmt-row { border-bottom:1px solid #ECECEC; padding:10px 0; }' +
+        '.cp-insp-comments-modal .cp-cmt-meta { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11px; color:#9CA3AF; margin-bottom:4px; }' +
+        '.cp-insp-comments-modal .cp-cmt-actions button { border:none; background:none; color:#6B7280; font-size:11px; cursor:pointer; padding:0 4px; }' +
+        '.cp-insp-comments-modal .cp-cmt-actions button:hover { color:#0A1F3D; }' +
+/* ===== LIGHTBOX — Full-screen Niice-style detail overlay ===== */
     .ib-lightbox-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 2000;
       display: flex; align-items: center; justify-content: center;
@@ -23969,6 +24006,11 @@ async function renderBoardsTab(T, proj) {
 
               <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--gold);margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid rgba(27,51,82,0.1);">Integrations</div>
               <div class="form-group">
+                <label class="form-label">QuickBooks customer Id</label>
+                <input class="form-input" id="epQbCustomerId" value="${escAttr(p.qbCustomerId != null ? String(p.qbCustomerId) : '')}" placeholder="e.g. 2254 from QuickBooks customer URL (nameId=…)">
+                <div style="font-size:11px;color:var(--gray-500);margin-top:4px;">Invoice push uses this first. Open the customer in QuickBooks Online; the browser URL contains <code style="font-size:10px;">nameId=</code> followed by digits — paste only those digits. Leave blank to clear mapping.</div>
+              </div>
+              <div class="form-group">
                 <label class="form-label">Teams channel webhook</label>
                 <div style="display:flex;gap:6px;">
                   <input class="form-input" id="epTeamsWebhook" value="${escAttr(p.teamsWebhookUrl || '')}" placeholder="Webhook URL" style="font-family:var(--font-mono);font-size:11px;flex:1;">
@@ -24105,6 +24147,13 @@ async function renderBoardsTab(T, proj) {
       };
       updates.budget = budParsed != null && !isNaN(budParsed) && budParsed >= 0 ? budParsed : null;
       updates.fee = feeParsed != null && !isNaN(feeParsed) && feeParsed >= 0 ? feeParsed : null;
+      var qbCustRaw = (document.getElementById('epQbCustomerId') && document.getElementById('epQbCustomerId').value || '').trim();
+      if (qbCustRaw && !/^\d+$/.test(qbCustRaw)) {
+        alert('QuickBooks customer Id must be numeric digits only (from QuickBooks when you open the customer — the number after nameId= in the URL).');
+        return;
+      }
+      if (qbCustRaw) updates.qbCustomerId = qbCustRaw;
+      else updates.qbCustomerId = firebase.firestore.FieldValue.delete();
       await db.collection('boards').doc(projectId).update(updates);
       closeModal();
       renderProjectDetail();
@@ -47742,18 +47791,33 @@ async function renderBoardsTab(T, proj) {
     }
 
     function cpPortalRouteStateFromHash(projectId) {
-      var p = (window.location.hash || '').replace(/^#\/?/, '').split('/').filter(Boolean);
-      var out = { page: 'home', proposalId: null };
-      if (p[0] !== 'clientview' || p[1] !== projectId) return out;
-      if (p[2] === 'proposal' && p[3]) {
+      var p = (window.location.hash || '').replace(/^#\/?/, '').split('/').map(function(s) { return String(s || '').trim(); }).filter(Boolean);
+      var out = { page: 'home', proposalId: null, inspirationBoardId: null, roomBoardKey: null };
+      var pid = String(projectId || '').trim();
+      if (String(p[0] || '').toLowerCase() !== 'clientview' || !p[1]) return out;
+      if (String(p[1]).toLowerCase() !== pid.toLowerCase()) return out;
+      if (String(p[2] || '').toLowerCase() === 'proposal' && p[3]) {
         out.proposalId = p[3];
         out.page = 'proposal';
         return out;
       }
-      var slug = p[2];
+      if (String(p[2] || '').toLowerCase() === 'inspirations' && p[3]) {
+        out.inspirationBoardId = String(p[3] || '').trim();
+        out.page = 'inspirationBoard';
+        return out;
+      }
+      if (String(p[2] || '').toLowerCase() === 'rooms' && p[3]) {
+        try { out.roomBoardKey = decodeURIComponent(String(p[3] || '').replace(/\+/g, '%20')); } catch (_eRbk) { out.roomBoardKey = String(p[3] || ''); }
+        out.page = 'roomBoard';
+        return out;
+      }
+      var slug = String(p[2] || '').toLowerCase();
       if (slug === 'documents' || slug === 'communications' || slug === 'messages' || slug === 'progress' || slug === 'home' ||
-          slug === 'rooms' || slug === 'concepts' || slug === 'inspiration' || slug === 'proposals' || slug === 'invoices') {
-        out.page = slug === 'communications' ? 'messages' : slug;
+          slug === 'rooms' || slug === 'concepts' || slug === 'inspiration' || slug === 'inspirations' || slug === 'designboards' ||
+          slug === 'proposals' || slug === 'invoices') {
+        if (slug === 'communications') out.page = 'messages';
+        else if (slug === 'inspiration') out.page = 'inspirations';
+        else out.page = slug;
       }
       return out;
     }
@@ -48002,16 +48066,759 @@ async function renderBoardsTab(T, proj) {
       if (Array.isArray(ib.images)) return ib.images.length;
       return 0;
     }
-    function cpIsInspirationBoard(ib) {
-      if (!ib) return false;
-      var src = String(ib.source || ib.importedFrom || '').toLowerCase();
-      if (src.indexOf('niice') >= 0) return true;
-      if (String(ib.parentBoard || '').trim()) return true;
-      if (Array.isArray(ib.images) && ib.images.some(function(img) {
-        var from = String((img && img.importedFrom) || '').toLowerCase();
-        return from.indexOf('niice') >= 0;
-      })) return true;
+
+    // ════════════════════════════════════════════════════════════
+    // Inspiration portal subsystem (added 2026-05-13).
+    // Source: cch-platform-staging.web.app served HTML.
+    // Surgical: prod-only functions preserved.
+    // ════════════════════════════════════════════════════════════
+    function _cpIdeabookRowImageUrl(row) {
+      if (row == null) return '';
+      if (typeof row === 'string') {
+        var s0 = String(row).trim();
+        if (!s0) return '';
+        if (typeof cchPickPreferredProductImageUrl === 'function') {
+          var p0 = String(cchPickPreferredProductImageUrl({ imageUrl: s0 }) || '').trim();
+          if (p0) return p0;
+        }
+        return s0;
+      }
+      if (typeof row === 'object') {
+        if (typeof cchPickPreferredProductImageUrl === 'function') {
+          var pk = String(cchPickPreferredProductImageUrl(row) || '').trim();
+          if (pk) return pk;
+        }
+        return String(row.imageUrl || row.url || row.src || row.thumbnail || row.photo || row.image || row.originalUrl || row.photoUrl || row.href || row.link || '').trim();
+      }
+      return '';
+    }
+
+    function cpReadStoredClientIdentity() {
+      try {
+        var raw = localStorage.getItem(CP_CLIENT_IDENTITY_LS_KEY);
+        if (!raw) return null;
+        var o = JSON.parse(raw);
+        if (!o || typeof o !== 'object') return null;
+        var nm = String(o.clientName || '').trim();
+        var em = String(o.clientEmail || '').trim();
+        if (!nm || !em) return null;
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return null;
+        return { clientName: nm, clientEmail: em.toLowerCase() };
+      } catch (_e) {
+        return null;
+      }
+    }
+
+    function cpRenderClientIdentityModal(projectId, onComplete) {
+      var T = document.getElementById('contentArea');
+      if (!T) return;
+      var label = cpFormatPortalProjectLabel(projectId);
+      var pidEsc = escAttr(projectId);
+      T.innerHTML =
+        '<div class="cp-ident-wrap" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px 20px;background:#FFFFFF;box-sizing:border-box;">' +
+        '<div class="cp-ident-card" style="width:100%;max-width:420px;border:1px solid #E2E2E2;padding:32px 28px;font-family:\'DM Sans\',-apple-system,sans-serif;">' +
+        '<div style="font-family:\'Playfair Display\',Georgia,serif;font-size:22px;color:#0A1F3D;margin:0 0 8px;line-height:1.25;">Welcome</div>' +
+        '<p style="font-size:13px;color:#6B7280;line-height:1.55;margin:0 0 22px;">Welcome to your project dashboard for <strong style="color:#0A1F3D;">' + esc(label) + '</strong>. So we can follow up on your stars and comments, please share your name and email.</p>' +
+        '<div style="margin-bottom:14px;">' +
+        '<label for="cpIdentName" style="display:block;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#9CA3AF;margin-bottom:6px;">Name</label>' +
+        '<input id="cpIdentName" type="text" autocomplete="name" class="cp-ident-input" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #E2E2E2;border-radius:0;font-size:14px;color:#0A1F3D;background:#fff;" placeholder="Your name">' +
+        '</div>' +
+        '<div style="margin-bottom:22px;">' +
+        '<label for="cpIdentEmail" style="display:block;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#9CA3AF;margin-bottom:6px;">Email</label>' +
+        '<input id="cpIdentEmail" type="email" autocomplete="email" class="cp-ident-input" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #E2E2E2;border-radius:0;font-size:14px;color:#0A1F3D;background:#fff;" placeholder="you@example.com">' +
+        '</div>' +
+        '<div id="cpIdentErr" style="display:none;font-size:12px;color:#B85450;margin-bottom:12px;"></div>' +
+        '<button type="button" id="cpIdentSubmit" class="cp-ident-submit" style="width:100%;padding:12px 16px;background:#0A1F3D;color:#fff;border:none;border-radius:0;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Continue</button>' +
+        '</div></div>';
+      var sub = document.getElementById('cpIdentSubmit');
+      var nmEl = document.getElementById('cpIdentName');
+      var emEl = document.getElementById('cpIdentEmail');
+      var errEl = document.getElementById('cpIdentErr');
+      function showErr(msg) {
+        if (!errEl) return;
+        errEl.style.display = msg ? 'block' : 'none';
+        errEl.textContent = msg || '';
+      }
+      async function submit() {
+        var nm = nmEl && nmEl.value.trim();
+        var em = emEl && emEl.value.trim().toLowerCase();
+        showErr('');
+        if (!nm) { showErr('Please enter your name.'); if (nmEl) nmEl.focus(); return; }
+        if (!em || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { showErr('Please enter a valid email address.'); if (emEl) emEl.focus(); return; }
+        if (sub) { sub.disabled = true; sub.textContent = 'Saving…'; }
+        try {
+          var sid = await cpClientEmailToSessionDocId(em);
+          var now = new Date().toISOString();
+          var sessRef = db.collection('boards').doc(projectId).collection('clientSessions').doc(sid);
+          var existed = (await sessRef.get()).exists;
+          var sessPayload = { clientName: nm, clientEmail: em, lastVisit: now, projectId: projectId };
+          if (!existed) sessPayload.firstVisit = now;
+          await sessRef.set(sessPayload, { merge: true });
+          if (!existed) {
+            var projName = projectId;
+            try {
+              var pd = await db.collection('boards').doc(projectId).get();
+              if (pd.exists) projName = (pd.data().name || pd.data().projectName || projectId);
+            } catch (_p) {}
+            try {
+              await db.collection('activity').add({
+                type: 'client_first_visit',
+                action: 'client_first_visit',
+                description: nm + ' opened the client portal for the first time — ' + projName,
+                projectId: projectId,
+                projectName: projName,
+                user: em,
+                timestamp: now,
+                createdAt: now,
+                read: false,
+                meta: { clientName: nm, clientEmail: em, source: 'client_portal_identity' }
+              });
+            } catch (eAct) {
+              console.warn('[client portal] client_first_visit activity log failed:', (eAct && eAct.message) || eAct);
+            }
+          }
+          try {
+            localStorage.setItem(CP_CLIENT_IDENTITY_LS_KEY, JSON.stringify({ clientName: nm, clientEmail: em, savedAt: now }));
+          } catch (eLs) {
+            console.warn('[client portal] localStorage save failed:', (eLs && eLs.message) || eLs);
+            showToast('Could not save on this device; you may be asked again next visit.', 'warning');
+          }
+          window._cpClientIdentity = { clientName: nm, clientEmail: em };
+          if (typeof onComplete === 'function') onComplete();
+        } catch (e) {
+          console.error('[client portal] identity save failed:', e);
+          showErr((e && e.message) || 'Something went wrong. Please try again.');
+          if (sub) { sub.disabled = false; sub.textContent = 'Continue'; }
+        }
+      }
+      if (sub) sub.onclick = submit;
+      if (emEl) emEl.addEventListener('keydown', function(ev) { if (ev.key === 'Enter') submit(); });
+      if (nmEl) nmEl.addEventListener('keydown', function(ev) { if (ev.key === 'Enter') submit(); });
+      setTimeout(function() { if (nmEl) nmEl.focus(); }, 50);
+    }
+
+    async function cpClientEmailToSessionDocId(email) {
+      email = String(email || '').trim().toLowerCase();
+      if (!email) return 'unknown';
+      try {
+        if (typeof crypto !== 'undefined' && crypto.subtle && typeof TextEncoder !== 'undefined') {
+          var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(email));
+          var hex = Array.from(new Uint8Array(buf)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+          return hex.slice(0, 40);
+        }
+      } catch (_c) {}
+      var h = 5381;
+      for (var i = 0; i < email.length; i++) h = ((h << 5) + h + email.charCodeAt(i)) >>> 0;
+      return 's' + h.toString(16) + '_' + email.length;
+    }
+
+    function cpPortalEffectiveClientIdentity() {
+      var ci = window._cpClientIdentity;
+      if (ci && String(ci.clientEmail || '').trim()) {
+        return {
+          email: String(ci.clientEmail).trim(),
+          name: String((ci.clientName && ci.clientName.trim()) || ci.clientEmail || 'Client').trim(),
+          source: 'portal'
+        };
+      }
+      try {
+        if (typeof currentUser !== 'undefined' && currentUser && String(currentUser.email || '').trim()) {
+          return {
+            email: String(currentUser.email).trim(),
+            name: String((currentUser.displayName && currentUser.displayName.trim()) || currentUser.email || 'Studio').trim(),
+            source: 'studio_session'
+          };
+        }
+      } catch (_eCu) {}
+      return null;
+    }
+
+    function cpFormatPortalProjectLabel(projectId) {
+      return String(projectId || '').split('-').filter(Boolean).map(function(w) {
+        return w.charAt(0).toUpperCase() + w.slice(1);
+      }).join(' ') || 'your project';
+    }
+
+    function cpBuildMergedPortalDocuments(clientDocuments, projectFiles) {
+      var out = [];
+      var seenUrl = {};
+      function _cpDocUrl(row) {
+        return typeof studioProjectFilePublicUrl === 'function' ? studioProjectFilePublicUrl(row) : String((row && row.url) || '').trim();
+      }
+      (clientDocuments || []).forEach(function(d) {
+        if (!d || !d.id) return;
+        var u = _cpDocUrl(d);
+        if (u) seenUrl[u.toLowerCase().split('?')[0]] = true;
+        out.push(Object.assign({}, d, { _portalKind: 'clientDoc' }));
+      });
+      (projectFiles || []).forEach(function(f) {
+        if (!f || !f.id) return;
+        var u = _cpDocUrl(f);
+        if (!u) return;
+        var key = u.toLowerCase().split('?')[0];
+        if (seenUrl[key]) return;
+        seenUrl[key] = true;
+        var nm = String(f.name || 'File').trim() || 'File';
+        out.push({
+          id: 'studiofile:' + f.id,
+          _portalKind: 'studioFile',
+          _studioFileId: f.id,
+          title: nm,
+          description: String(f.note || '').trim(),
+          url: u,
+          folder: f.category || 'Documents',
+          type: f.mimeType || (nm.toLowerCase().indexOf('.pdf') > 0 ? 'application/pdf' : 'file'),
+          status: 'shared',
+          createdAt: f.createdAt || '',
+          docNumber: 'Studio',
+          createdBy: f.addedBy || ''
+        });
+      });
+      out.sort(function(a, b) { return String(b.createdAt || '').localeCompare(String(a.createdAt || '')); });
+      return out;
+    }
+
+    function cpCollectIdeabookImageUrls(ib) {
+      var out = [];
+      if (!ib) return out;
+      var seen = {};
+      function add(u, pageBase) {
+        u = String(u || '').trim();
+        if (!u) return;
+        if (typeof _resolveImgSrc === 'function') u = _resolveImgSrc(u, pageBase);
+        u = String(u || '').trim();
+        if (!u) return;
+        var k = u.split('?')[0].toLowerCase();
+        if (seen[k]) return;
+        seen[k] = true;
+        out.push(u);
+      }
+      var arr = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(ib.images) : [];
+      for (var i = 0; i < arr.length; i++) {
+        var x = arr[i];
+        var one = _cpIdeabookRowImageUrl(x);
+        var rowBase = (x && typeof x === 'object') ? _ibResolveIdeabookProductPageUrl(x) : '';
+        add(one, rowBase);
+      }
+      if (Array.isArray(ib.items)) {
+        for (var ti = 0; ti < ib.items.length; ti++) {
+          var it = ib.items[ti];
+          if (!it) continue;
+          var itBase = _ibResolveIdeabookProductPageUrl(it);
+          add(_cpIdeabookRowImageUrl(it), itBase);
+        }
+      }
+      var slideKeys = ['slides', 'pages', 'files'];
+      for (var sk = 0; sk < slideKeys.length; sk++) {
+        var sl = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(ib[slideKeys[sk]]) : [];
+        for (var si = 0; si < sl.length; si++) {
+          var slItem = sl[si];
+          if (!slItem) continue;
+          var slBase = (slItem && typeof slItem === 'object') ? _ibResolveIdeabookProductPageUrl(slItem) : '';
+          add(_cpIdeabookRowImageUrl(slItem), slBase);
+        }
+      }
+      var gl = typeof _coerceGalleryUrlList === 'function' ? _coerceGalleryUrlList(ib) : [];
+      for (var gi = 0; gi < gl.length; gi++) {
+        var gCell = gl[gi];
+        add(typeof gCell === 'string' ? gCell : _cpIdeabookRowImageUrl(gCell) || String(gCell || '').trim(), '');
+      }
+      return out;
+    }
+
+    function cpPortalResolveRoomBoardClips(rawKey, gridKeys, byGrid) {
+      rawKey = String(rawKey || '').trim();
+      if (!rawKey) return { canonicalKey: '', clips: [] };
+      if (byGrid && byGrid[rawKey]) return { canonicalKey: rawKey, clips: byGrid[rawKey] || [] };
+      var low = rawKey.toLowerCase();
+      for (var _ri = 0; _ri < (gridKeys || []).length; _ri++) {
+        var k = gridKeys[_ri];
+        if (String(k || '').toLowerCase() === low) return { canonicalKey: k, clips: (byGrid && byGrid[k]) ? byGrid[k] : [] };
+      }
+      return { canonicalKey: rawKey, clips: [] };
+    }
+
+    function cpDesignBoardCoverUrl(b) {
+      if (!b) return '';
+      if (typeof getProductImg !== 'function') return '';
+      var fromBoard = getProductImg(b) || '';
+      if (fromBoard) return fromBoard;
+      var els = b.elements || [];
+      for (var i = 0; i < els.length; i++) {
+        var u = getProductImg(els[i]);
+        if (u) return u;
+      }
+      return '';
+    }
+
+    function cpDocIsOnDesignStory(proj, d) {
+      if (!proj || !d) return false;
+      var refs = Array.isArray(proj.clientPortalDesignStory) ? proj.clientPortalDesignStory : [];
+      var isStudio = d._portalKind === 'studioFile';
+      var rid = isStudio ? String(d._studioFileId || '') : String(d.id || '');
+      if (!rid) return false;
+      var wantKind = isStudio ? 'studiofile' : 'clientdoc';
+      return refs.some(function(r) {
+        if (!r || r.id == null) return false;
+        var rk = String(r.kind || 'clientDoc').toLowerCase();
+        if (rk === 'file') rk = 'studiofile';
+        return rk === wantKind && String(r.id) === rid;
+      });
+    }
+
+    function cpResolveDesignStorySpotlights(proj, portalMergedDocs) {
+      var refs = proj && Array.isArray(proj.clientPortalDesignStory) ? proj.clientPortalDesignStory : [];
+      var items = [];
+      var list = portalMergedDocs || [];
+      refs.forEach(function(r) {
+        if (!r) return;
+        var kind = String(r.kind || 'clientDoc').toLowerCase();
+        var rid = String(r.id || '').trim();
+        if (!rid) return;
+        var found = null;
+        if (kind === 'studiofile' || kind === 'file') {
+          found = list.find(function(x) { return x._portalKind === 'studioFile' && String(x._studioFileId) === rid; });
+        } else {
+          found = list.find(function(x) { return x._portalKind === 'clientDoc' && String(x.id) === rid; });
+        }
+        if (found) {
+          var dispUrl = typeof studioProjectFilePublicUrl === 'function' ? studioProjectFilePublicUrl(found) : String(found.url || '').trim();
+          if (dispUrl) {
+            items.push({
+              title: found.title || found.name || 'Document',
+              url: dispUrl,
+              isImage: /\.(jpe?g|png|gif|webp|bmp|svg)($|\?)/i.test(dispUrl) || String(found.type || '').indexOf('image/') === 0
+            });
+          }
+        }
+      });
+      return items;
+    }
+
+    function cpPortalInspirationIdeabook(ib) {
+      if (!ib || ib.hiddenInNav) return false;
+      var t = String(ib.type || ib.boardType || '').toLowerCase().replace(/-/g, '_');
+      if (t === 'design_board' || t === 'designboard') return false;
+      if (t === 'concept_board' || t === 'conceptboard' || t === 'concept') return false;
+      if (_coerceImageIterable(ib.images).length > 0) return true;
+      if (Array.isArray(ib.items) && ib.items.length > 0) return true;
+      if (_coerceGalleryUrlList(ib).length > 0) return true;
       return false;
+    }
+
+    function cpPortalConceptIdeabook(ib) {
+      if (!ib || ib.hiddenInNav) return false;
+      var t = String(ib.type || ib.boardType || '').toLowerCase().replace(/-/g, '_');
+      if (t === 'design_board' || t === 'designboard') return false;
+      return t === 'concept_board' || t === 'conceptboard' || t === 'concept';
+    }
+
+    async function cpPortalToggleInspirationStar(projectId, sectionId, imageIndex) {
+      var ident = cpPortalEffectiveClientIdentity();
+      if (!ident || !ident.email) {
+        if (typeof showToast === 'function') showToast('Please sign in with your name and email from the portal welcome screen.', 'warning');
+        return;
+      }
+      if (window._cpPortalStarBusy) return;
+      window._cpPortalStarBusy = true;
+      try {
+        var idx = parseInt(imageIndex, 10);
+        if (isNaN(idx) || idx < 0) throw new Error('Invalid image');
+        await ibEnsureIdeabookFeedbackMigrated(projectId, sectionId);
+        var docRef = db.collection('boards').doc(projectId).collection('ideabooks').doc(sectionId);
+        var doc = await docRef.get();
+        if (!doc.exists) throw new Error('Board not found');
+        var secData = doc.data() || {};
+        var images = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(secData.images) : [];
+        if (idx >= images.length) throw new Error('Image not found');
+        var item = images[idx];
+        if (typeof item === 'string') item = { imageUrl: item };
+        else item = Object.assign({}, item);
+        item = _ibMaterializeItemFeedbackRead(item);
+        var stars = (item.feedback.stars || []).slice();
+        var lit = typeof _ibPortalClientStarButtonFilled === 'function' ? _ibPortalClientStarButtonFilled(item, ident) : (_ibClientStarIndex(stars, ident.email) >= 0);
+        var wasStarred = lit;
+        if (wasStarred) {
+          var cix = _ibClientStarIndex(stars, ident.email);
+          if (cix >= 0) stars.splice(cix, 1);
+          else if (stars.length === 1) {
+            var x0 = stars[0];
+            var xa = _ibEmailNorm(x0 && x0.authorEmail);
+            var xt = String((x0 && x0.authorType) || '').toLowerCase();
+            if (xt === 'designer' && xa === 'legacy@cch.studio') stars = [];
+            else if ((!xt || xt === 'client') && !xa && String((x0 && x0.authorName) || '').trim().toLowerCase() === String(ident.name || '').trim().toLowerCase()) stars = [];
+          }
+        } else {
+          stars.push({
+            authorEmail: _ibEmailNorm(ident.email),
+            authorName: String(ident.name || ident.email || 'Client').trim(),
+            authorType: 'client',
+            createdAt: new Date().toISOString()
+          });
+        }
+        item.feedback.stars = stars;
+        images[idx] = item;
+        await docRef.update({ images: images });
+        var projName = projectId;
+        try {
+          var pDoc = await db.collection('boards').doc(projectId).get();
+          if (pDoc.exists) projName = (pDoc.data().name || pDoc.data().projectName || projectId);
+        } catch (_eP) {}
+        var secName = secData.name || secData.title || 'Inspiration';
+        var cap = item.caption || item.title || 'image';
+        var em = String(ident.email || '').trim();
+        var nm = String(ident.name || '').trim() || em;
+        var actDesc = wasStarred
+          ? (nm + ' removed a star from "' + cap + '" · ' + secName)
+          : (nm + ' starred "' + cap + '" · ' + secName);
+        try {
+          if (typeof logActivity === 'function') {
+            await logActivity('inspiration', wasStarred ? 'star_removed' : 'star_added', actDesc, projectId, projName, {
+              sectionId: sectionId,
+              imageIndex: idx,
+              imageKey: item.imageKey || '',
+              imageUrl: item.imageUrl || '',
+              boardSectionName: secName,
+              authorType: 'client',
+              authorEmail: em,
+              authorName: nm,
+              source: 'client_portal'
+            }, em);
+          }
+        } catch (eAct) {
+          console.warn('[client portal] inspiration star activity log failed:', (eAct && eAct.message) || eAct);
+        }
+        if (typeof showToast === 'function') showToast(wasStarred ? 'Star removed' : 'Star saved', 'success');
+        await renderClientPortal(projectId);
+      } catch (e) {
+        console.error('[client portal] cpPortalToggleInspirationStar:', e);
+        if (typeof showToast === 'function') showToast((e && e.message) || 'Could not update star', 'error');
+      } finally {
+        window._cpPortalStarBusy = false;
+      }
+    }
+
+
+    function cpPortalFindCommentIndexById(comments, commentId) {
+      var raw = String(commentId || '');
+      var m = /^idx:(\d+)$/.exec(raw);
+      if (m) {
+        var ji = parseInt(m[1], 10);
+        if (!isNaN(ji) && ji >= 0 && ji < comments.length) return ji;
+      }
+      for (var i = 0; i < comments.length; i++) {
+        if (String((comments[i] && comments[i].id) || '') === raw) return i;
+      }
+      var asNum = parseInt(commentId, 10);
+      if (!isNaN(asNum) && asNum >= 0 && asNum < comments.length) return asNum;
+      return -1;
+    }
+
+
+    function cpPortalClientOwnsInspirationComment(c, ident) {
+      if (!c || c.authorType !== 'client' || !ident) return false;
+      var my = _ibEmailNorm(ident.email);
+      var ce = _ibEmailNorm(c.authorEmail);
+      if (my && ce && my === ce) return true;
+      if (!ce) {
+        var a = String(c.authorName || '').trim().toLowerCase();
+        var b = String(ident.name || '').trim().toLowerCase();
+        if (a && b && a === b) return true;
+      }
+      return false;
+    }
+
+
+    async function cpPortalPostInspirationComment(projectId, sectionId, imageIndex) {
+      var input = document.getElementById('cpInspCommentInput');
+      var text = input ? String(input.value || '').trim() : '';
+      await cpPortalPostInspirationCommentWithText(projectId, sectionId, imageIndex, text, input);
+    }
+
+
+    async function cpPortalPostInspirationCommentFrom(btn) {
+      var wrap = btn && btn.closest && btn.closest('.cp-insp-compose');
+      if (!wrap) return;
+      var projectId = wrap.getAttribute('data-cp-pid');
+      var sectionId = wrap.getAttribute('data-cp-sid');
+      var idx = parseInt(wrap.getAttribute('data-cp-idx') || '-1', 10);
+      var ta = wrap.querySelector('.cp-insp-ta');
+      var text = ta ? String(ta.value || '').trim() : '';
+      await cpPortalPostInspirationCommentWithText(projectId, sectionId, idx, text, ta);
+    }
+
+
+    async function cpPortalPostInspirationCommentWithText(projectId, sectionId, imageIndex, text, taEl) {
+      if (!text) return;
+      if (text.length > 500) {
+        if (typeof showToast === 'function') showToast('Comments are limited to 500 characters.', 'warning');
+        return;
+      }
+      var ident = cpPortalEffectiveClientIdentity();
+      if (!ident || !ident.email) return;
+      var idx = parseInt(imageIndex, 10);
+      if (isNaN(idx) || idx < 0) return;
+      await ibEnsureIdeabookFeedbackMigrated(projectId, sectionId);
+      var docRef = db.collection('boards').doc(projectId).collection('ideabooks').doc(sectionId);
+      var doc = await docRef.get();
+      if (!doc.exists) return;
+      var secData = doc.data() || {};
+      secData.id = sectionId;
+      var images = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(secData.images) : [];
+      var item = images[idx];
+      if (!item) return;
+      if (typeof item === 'string') item = { imageUrl: item };
+      else item = Object.assign({}, item);
+      item = _ibMaterializeItemFeedbackRead(item);
+      var now = new Date().toISOString();
+      var authorName = String(ident.name || ident.email || 'Client').trim();
+      var authorEmail = _ibEmailNorm(ident.email);
+      item.feedback.comments.push({
+        id: _ibNewFeedbackCommentId(),
+        text: text,
+        authorEmail: authorEmail,
+        authorName: authorName,
+        authorType: 'client',
+        createdAt: now,
+        editedAt: null
+      });
+      images[idx] = item;
+      await docRef.update({ images: images });
+      var cap = item.caption || item.title || 'image';
+      var secName = secData.name || secData.title || 'Inspiration';
+      if (typeof logActivity === 'function') {
+        var projName = projectId;
+        try {
+          var pDoc = await db.collection('boards').doc(projectId).get();
+          if (pDoc.exists) projName = (pDoc.data().name || pDoc.data().projectName || projectId);
+        } catch (_eP) {}
+        await logActivity('inspiration', 'comment_added', authorName + ' commented on "' + cap + '" · ' + secName + ' — "' + text.slice(0, 80) + '"', projectId, projName, {
+          sectionId: sectionId,
+          imageIndex: idx,
+          imageUrl: item.imageUrl || '',
+          imageKey: item.imageKey || '',
+          boardSectionName: secName,
+          authorType: 'client',
+          authorEmail: authorEmail,
+          authorName: authorName,
+          source: 'client_portal'
+        }, authorEmail);
+      }
+      if (taEl) taEl.value = '';
+      if (typeof showToast === 'function') showToast('Comment posted', 'success');
+      await renderClientPortal(projectId, null, 'inspirationBoard');
+    }
+
+
+    async function cpPortalEditInspirationComment(projectId, sectionId, imageIndex, commentId) {
+      var idx = parseInt(imageIndex, 10);
+      if (isNaN(idx) || idx < 0) return;
+      var ident = cpPortalEffectiveClientIdentity();
+      if (!ident || !ident.email) return;
+      await ibEnsureIdeabookFeedbackMigrated(projectId, sectionId);
+      var docRef = db.collection('boards').doc(projectId).collection('ideabooks').doc(sectionId);
+      var doc = await docRef.get();
+      if (!doc.exists) return;
+      var secData = doc.data() || {};
+      secData.id = sectionId;
+      var images = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(secData.images) : [];
+      var item = images[idx];
+      if (!item) return;
+      if (typeof item === 'string') item = { imageUrl: item };
+      else item = Object.assign({}, item);
+      item = _ibMaterializeItemFeedbackRead(item);
+      var comments = (item.feedback.comments || []).slice();
+      var ci = cpPortalFindCommentIndexById(comments, commentId);
+      if (ci < 0 || ci >= comments.length) return;
+      if (!cpPortalClientOwnsInspirationComment(comments[ci], ident)) {
+        if (typeof showToast === 'function') showToast('You can only edit your own comments.', 'warning');
+        return;
+      }
+      var currentText = String((comments[ci] && comments[ci].text) || '');
+      var next = await cchPrompt('Edit comment:', currentText, 'Edit Comment');
+      if (next == null) return;
+      next = String(next || '').trim();
+      if (!next) return;
+      if (next.length > 500) {
+        if (typeof showToast === 'function') showToast('Comments are limited to 500 characters.', 'warning');
+        return;
+      }
+      comments[ci] = Object.assign({}, comments[ci] || {}, { text: next, editedAt: new Date().toISOString() });
+      item.feedback.comments = comments;
+      images[idx] = item;
+      await docRef.update({ images: images });
+      var nm = String(ident.name || ident.email || 'Client').trim();
+      var cap = item.caption || item.title || 'image';
+      var secName = secData.name || secData.title || 'Inspiration';
+      var ae = _ibEmailNorm(ident.email);
+      if (typeof logActivity === 'function') {
+        var projName = projectId;
+        try {
+          var pDoc = await db.collection('boards').doc(projectId).get();
+          if (pDoc.exists) projName = (pDoc.data().name || pDoc.data().projectName || projectId);
+        } catch (_eP2) {}
+        await logActivity('inspiration', 'comment_edited', nm + ' edited a comment on "' + cap + '" · ' + secName, projectId, projName, {
+          sectionId: sectionId,
+          imageIndex: idx,
+          imageUrl: item.imageUrl || '',
+          imageKey: item.imageKey || '',
+          commentId: String((comments[ci] && comments[ci].id) || ''),
+          authorType: 'client',
+          authorEmail: ae,
+          authorName: nm,
+          source: 'client_portal'
+        }, ae);
+      }
+      if (typeof showToast === 'function') showToast('Comment updated', 'success');
+      await renderClientPortal(projectId, null, 'inspirationBoard');
+    }
+
+
+    async function cpPortalDeleteInspirationComment(projectId, sectionId, imageIndex, commentId) {
+      var ok = await cchConfirm('Delete this comment?', 'Delete Comment', { confirmText: 'Delete' });
+      if (!ok) return;
+      var idx = parseInt(imageIndex, 10);
+      if (isNaN(idx) || idx < 0) return;
+      var ident = cpPortalEffectiveClientIdentity();
+      if (!ident || !ident.email) return;
+      await ibEnsureIdeabookFeedbackMigrated(projectId, sectionId);
+      var docRef = db.collection('boards').doc(projectId).collection('ideabooks').doc(sectionId);
+      var doc = await docRef.get();
+      if (!doc.exists) return;
+      var secData = doc.data() || {};
+      secData.id = sectionId;
+      var images = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(secData.images) : [];
+      var item = images[idx];
+      if (!item) return;
+      if (typeof item === 'string') item = { imageUrl: item };
+      else item = Object.assign({}, item);
+      item = _ibMaterializeItemFeedbackRead(item);
+      var comments = (item.feedback.comments || []).slice();
+      var ci = cpPortalFindCommentIndexById(comments, commentId);
+      if (ci < 0 || ci >= comments.length) return;
+      if (!cpPortalClientOwnsInspirationComment(comments[ci], ident)) {
+        if (typeof showToast === 'function') showToast('You can only delete your own comments.', 'warning');
+        return;
+      }
+      comments.splice(ci, 1);
+      item.feedback.comments = comments;
+      images[idx] = item;
+      await docRef.update({ images: images });
+      var nm = String(ident.name || ident.email || 'Client').trim();
+      var cap = item.caption || item.title || 'image';
+      var secName = secData.name || secData.title || 'Inspiration';
+      var ae = _ibEmailNorm(ident.email);
+      if (typeof logActivity === 'function') {
+        var projName = projectId;
+        try {
+          var pDoc = await db.collection('boards').doc(projectId).get();
+          if (pDoc.exists) projName = (pDoc.data().name || pDoc.data().projectName || projectId);
+        } catch (_eP3) {}
+        await logActivity('inspiration', 'comment_removed', nm + ' deleted a comment on "' + cap + '" · ' + secName, projectId, projName, {
+          sectionId: sectionId,
+          imageIndex: idx,
+          imageUrl: item.imageUrl || '',
+          imageKey: item.imageKey || '',
+          authorType: 'client',
+          authorEmail: ae,
+          authorName: nm,
+          source: 'client_portal'
+        }, ae);
+      }
+      if (typeof showToast === 'function') showToast('Comment deleted', 'success');
+      await renderClientPortal(projectId, null, 'inspirationBoard');
+    }
+
+
+    async function cpPortalOpenInspirationComments(projectId, sectionId, imageIndex) {
+      var ident = cpPortalEffectiveClientIdentity();
+      if (!ident || !ident.email) {
+        if (typeof showToast === 'function') showToast('Please complete your identity first.', 'warning');
+        return;
+      }
+      var idx = parseInt(imageIndex, 10);
+      if (isNaN(idx) || idx < 0) return;
+      setTimeout(function() {
+        try {
+          var cells = document.querySelectorAll('.cp-insp-board-cell');
+          var cell = cells && cells[idx];
+          var ta = cell && cell.querySelector('.cp-insp-ta');
+          if (ta) {
+            ta.focus();
+            ta.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+        } catch (_eF) {}
+      }, 0);
+    }
+
+    async function cpPortalSaveInspirationClientNote(projectId, sectionId, imageIndex) {
+      var ident = cpPortalEffectiveClientIdentity();
+      if (!ident || !ident.email) {
+        if (typeof showToast === 'function') showToast('Please complete your identity first.', 'warning');
+        return;
+      }
+      var idx = parseInt(imageIndex, 10);
+      if (isNaN(idx) || idx < 0) return;
+      var docRef = db.collection('boards').doc(projectId).collection('ideabooks').doc(sectionId);
+      var doc = await docRef.get();
+      if (!doc.exists) return;
+      var secData = doc.data() || {};
+      secData.id = sectionId;
+      var images = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(secData.images) : [];
+      var item = images[idx];
+      if (!item) return;
+      if (typeof item === 'string') item = { imageUrl: item, stars: 0, comments: [] };
+      else item = Object.assign({}, item);
+      var cur = String(item.clientNote || '').trim();
+      var next = await cchPrompt('Your note appears under this image for you and your design team.', cur, 'Your note');
+      if (next == null) return;
+      next = String(next || '').trim();
+      item.clientNote = next;
+      images[idx] = item;
+      try {
+        await docRef.update({ images: images });
+      } catch (eUp) {
+        console.error('[client portal] clientNote save:', eUp);
+        if (typeof showToast === 'function') showToast((eUp && eUp.message) || 'Could not save note', 'error');
+        return;
+      }
+      var cap = item.caption || item.title || 'image';
+      var secName = secData.name || secData.title || 'Inspiration';
+      var nm = String(ident.name || ident.email || 'Client').trim();
+      await cpPortalLogInspirationActivity(projectId, secData, item, idx, next ? 'client_note_set' : 'client_note_clear', nm + (next ? ' updated a note on "' : ' cleared a note on "') + cap + '" · ' + secName);
+      if (typeof showToast === 'function') showToast(next ? 'Note saved' : 'Note cleared', 'success');
+      await renderClientPortal(projectId, null, 'inspirationBoard');
+    }
+
+
+    async function cpPortalLogInspirationActivity(projectId, secData, item, idx, action, description) {
+      try {
+        var ident = cpPortalEffectiveClientIdentity() || {};
+        var em = String(ident.email || ident.clientEmail || '').trim();
+        var projName = projectId;
+        try {
+          var pDoc = await db.collection('boards').doc(projectId).get();
+          if (pDoc.exists) projName = (pDoc.data().name || pDoc.data().projectName || projectId);
+        } catch (_eP) {}
+        if (typeof logActivity === 'function') {
+          await logActivity('inspiration', action, description, projectId, projName, {
+            sectionId: String(secData && secData.id || ''),
+            imageIndex: idx,
+            imageUrl: (item && item.imageUrl) || '',
+            imageKey: (item && item.imageKey) || '',
+            boardSectionName: (secData && (secData.name || secData.title)) || 'Inspiration',
+            authorEmail: em,
+            authorName: String(ident.name || ident.clientName || '').trim(),
+            authorType: 'client',
+            source: 'client_portal'
+          }, em);
+        }
+      } catch (eAct) {
+        console.warn('[client portal] inspiration activity log failed:', (eAct && eAct.message) || eAct);
+      }
+    }
+    function cpIsInspirationBoard(ib) {
+      return cpPortalInspirationIdeabook(ib) || cpPortalConceptIdeabook(ib);
     }
 
     /** Ideabooks that can appear on the client portal (has content, not hidden from Studio nav). */
@@ -48977,22 +49784,255 @@ async function renderBoardsTab(T, proj) {
           });
           html += '</div>';
         }
-      } else if (activePage === 'concepts' || activePage === 'inspiration') {
-        html += '<div class="cp-sec-label-jx" style="margin-bottom:20px;">' + (activePage === 'inspiration' ? 'Inspiration Boards' : 'Concept Boards') + '</div>';
-        if (!inspirationBoards.length) {
-          html += '<div style="font-size:13px;color:#6B7280;font-family:\'DM Sans\',sans-serif;">No concept boards shared yet.</div>';
+      } else if (activePage === 'inspirationBoard' && inspirationBoardId) {
+        var listHash = '#/clientview/' + projectId + '/inspirations';
+        var ibDetail = inspirationIdeabooks.find(function(x) { return String(x.id) === String(inspirationBoardId); });
+        if (!ibDetail) ibDetail = ideabooks.find(function(x) { return String(x.id) === String(inspirationBoardId); });
+        if (!ibDetail || !cpPortalInspirationIdeabook(ibDetail)) {
+          html += '<div class="cp-page-pad">' +
+            '<button type="button" class="cp-btn cp-btn-outline" style="margin-bottom:16px;padding:8px 14px;font-size:12px;border-color:#E2E2E2;color:#0A1F3D;" onclick="navigate(\'' + escAttr(listHash) + '\')">\u2190 Back to inspirations</button>' +
+            '<div style="font-size:14px;color:#6B7280;font-family:\'DM Sans\',sans-serif;">This inspiration board is not available.</div></div>';
+        } else {
+          var ibUrls = cpCollectIdeabookImageUrls(ibDetail);
+          if (ibUrls.length > 100) ibUrls = ibUrls.slice(0, 100);
+          var ibTit = ibDetail.name || ibDetail.title || 'Inspiration';
+          var encPayload = '';
+          try { encPayload = encodeURIComponent(JSON.stringify(ibUrls)); } catch (_eEnc) { encPayload = ''; }
+          html += '<div class="cp-page-pad">' +
+            '<button type="button" class="cp-btn cp-btn-outline" style="margin-bottom:20px;padding:8px 14px;font-size:12px;border-color:#E2E2E2;color:#0A1F3D;" onclick="navigate(\'' + escAttr(listHash) + '\')">\u2190 Back</button>' +
+            '<div style="text-align:center;padding:12px 0 20px;"><div style="font-family:\'Playfair Display\',serif;font-size:26px;font-weight:400;color:#0A1F3D;letter-spacing:0.06em;text-transform:uppercase;">CCH Design</div></div>' +
+            '<div style="text-align:center;padding:12px 0 24px;border-top:1px solid #E2E2E2;border-bottom:1px solid #E2E2E2;margin-bottom:24px;">' +
+            '<div style="font-family:\'Playfair Display\',Georgia,serif;font-size:22px;font-weight:500;color:#0A1F3D;">' + esc(ibTit) + '</div></div>' +
+            '<p style="font-size:12px;color:#6B7280;font-family:\'DM Sans\',sans-serif;line-height:1.55;margin:-12px 0 20px;text-align:center;max-width:640px;margin-left:auto;margin-right:auto;">When signed in, tap the star on an image to save favorites and leave comments for your designer. <strong>Design Boards</strong> are layout-only — use this <strong>Inspirations</strong> area for reactions.</p>';
+          try {
+            if (typeof ibEnsureIdeabookFeedbackMigrated === 'function') {
+              await ibEnsureIdeabookFeedbackMigrated(projectId, ibDetail.id);
+              var _ibReloadInsp = await db.collection('boards').doc(projectId).collection('ideabooks').doc(ibDetail.id).get();
+              if (_ibReloadInsp.exists) Object.assign(ibDetail, _ibReloadInsp.data());
+            }
+          } catch (_eIbPr) {
+            console.warn('[portal] inspiration feedback migrate', _eIbPr);
+          }
+          var _inspIdent = typeof cpPortalEffectiveClientIdentity === 'function' ? cpPortalEffectiveClientIdentity() : null;
+          var _canInspStar = !!(_inspIdent && String(_inspIdent.email || '').trim());
+          try {
+            var _ibRowsCp = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(ibDetail.images) : [];
+            var _nStarImgCp = 0, _nComTotCp = 0;
+            for (var _sic = 0; _sic < _ibRowsCp.length; _sic++) {
+              var _rwCp = _ibRowsCp[_sic];
+              var _obCp = typeof _rwCp === 'string' ? {} : (_rwCp || {});
+              if (typeof _ibStarCountFromItem === 'function' ? _ibStarCountFromItem(_obCp) > 0 : ((_obCp.stars || 0) > 0)) _nStarImgCp++;
+              _nComTotCp += typeof _ibCommentCountFromItem === 'function' ? _ibCommentCountFromItem(_obCp) : (((_obCp.comments) || []).length);
+            }
+            if (_nStarImgCp || _nComTotCp) {
+              html += '<div style="font-size:12px;color:#6B7280;margin:-8px 0 18px;text-align:center;font-family:\'DM Sans\',sans-serif;line-height:1.6;">' +
+                (_nStarImgCp ? '<span style="margin:0 10px;">\u2605 ' + _nStarImgCp + ' image' + (_nStarImgCp !== 1 ? 's' : '') + ' with stars</span>' : '') +
+                (_nComTotCp ? '<span style="margin:0 10px;">\u2764 ' + _nComTotCp + ' image comment' + (_nComTotCp !== 1 ? 's' : '') + '</span>' : '') +
+                '<span style="display:block;margin-top:8px;font-size:11px;color:#9CA3AF;">Project timeline and announcements: <strong>Home</strong> and <strong>Messages</strong> in this portal.</span></div>';
+            }
+          } catch (_eSummCp) {}
+          var _ibImgRowsLb = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(ibDetail.images) : [];
+          if (!_ibImgRowsLb.length && Array.isArray(ibDetail.items) && ibDetail.items.length) {
+            _ibImgRowsLb = ibDetail.items.slice();
+          }
+          var _visInsp = [];
+          for (var _rix = 0; _rix < _ibImgRowsLb.length; _rix++) {
+            var _rr = _ibImgRowsLb[_rix];
+            var _uPix = _cpIdeabookRowImageUrl(_rr);
+            var _rowBaseIn = '';
+            if (_rr && typeof _rr === 'object' && typeof _ibResolveIdeabookProductPageUrl === 'function') {
+              try { _rowBaseIn = String(_ibResolveIdeabookProductPageUrl(_rr) || '').trim(); } catch (_eRb) { _rowBaseIn = ''; }
+            }
+            if (!_uPix && typeof _resolveImgSrc === 'function') {
+              var _rawPick = '';
+              if (typeof _rr === 'string') _rawPick = String(_rr).trim();
+              else if (_rr && typeof _rr === 'object') _rawPick = String(_rr.imageUrl || _rr.url || _rr.src || _rr.thumb || '').trim();
+              if (_rawPick) {
+                try { _uPix = String(_resolveImgSrc(_rawPick, _rowBaseIn) || '').trim(); } catch (_eR3) { _uPix = ''; }
+              }
+            }
+            if (!_uPix && typeof _resolveImgSrc === 'function') {
+              try { _uPix = String(_resolveImgSrc(String(_rr || ''), _rowBaseIn) || '').trim(); } catch (_eR) { _uPix = ''; }
+            }
+            _uPix = String(_uPix || '').trim();
+            if (!_uPix) continue;
+            var _objR = typeof _rr === 'string' ? {} : (_rr || {});
+            var _matR = typeof _ibMaterializeItemFeedbackRead === 'function' ? _ibMaterializeItemFeedbackRead(typeof _rr === 'string' ? { imageUrl: _rr } : _objR) : { feedback: { stars: [], comments: [] }, caption: '', title: '', clientNote: '' };
+            var _fbR = (_matR && _matR.feedback) ? _matR.feedback : { stars: [], comments: [] };
+            _visInsp.push({
+              imageIndex: _rix,
+              url: _uPix,
+              feedback: _fbR,
+              caption: _matR.caption || _matR.title || '',
+              clientNote: String(_matR.clientNote || '').trim()
+            });
+          }
+          var _encPayLb = '';
+          if (_visInsp.length) {
+            try { _encPayLb = encodeURIComponent(JSON.stringify(_visInsp.map(function(v) { return v.url; }))); } catch (_eEnc2) { _encPayLb = ''; }
+          }
+          if (!ibUrls.length && !_visInsp.length) {
+            html += '<div style="font-size:13px;color:#6B7280;font-family:\'DM Sans\',sans-serif;">No images on this board yet.</div>';
+          } else if (_visInsp.length && _encPayLb) {
+            var encEsc2 = escJsStr(_encPayLb);
+            var secIdJs = escJsStr(String(inspirationBoardId || ''));
+            var pidJs = escJsStr(String(projectId || ''));
+            html += '<div class="cp-insp-board-grid">';
+            for (var _vj = 0; _vj < _visInsp.length; _vj++) {
+              var _cell = _visInsp[_vj];
+              var iuB2 = _cell.url;
+              var _fbC = _cell.feedback || { stars: [], comments: [] };
+              var _cmCount = (_fbC.comments || []).length;
+              var _starCnt = (_fbC.stars || []).length;
+              var _stOn = _canInspStar && _inspIdent && _inspIdent.email && typeof _ibPortalClientStarButtonFilled === 'function'
+                ? _ibPortalClientStarButtonFilled(_ibImgRowsLb[_cell.imageIndex], _inspIdent)
+                : false;
+              var _starBt = '';
+              var _commentBt = '<button type="button" class="cp-insp-comment-btn" title="Jump to comments" aria-label="Comments" onclick="event.preventDefault();event.stopPropagation();void window.cpPortalOpenInspirationComments(\'' + pidJs + '\',\'' + secIdJs + '\',' + _cell.imageIndex + ')">\uD83D\uDCAC' + (_cmCount ? (' ' + _cmCount) : '') + '</button>';
+              if (_canInspStar) {
+                _starBt = '<button type="button" class="cp-insp-star-btn" title="' + (_stOn ? 'Remove your star' : 'Star this image') + '" aria-label="' + (_stOn ? 'Remove star' : 'Star') + '" onclick="event.preventDefault();event.stopPropagation();void window.cpPortalToggleInspirationStar(\'' + pidJs + '\',\'' + secIdJs + '\',' + _cell.imageIndex + ')">' + (_stOn ? '\u2605' : '\u2606') + '</button>';
+              } else if (_starCnt > 0) {
+                _starBt = '<span class="cp-insp-star-badge" title="Stars on this image" aria-hidden="true">\u2605 ' + _starCnt + '</span>';
+              }
+              var _clist = (_fbC.comments || []);
+              var _threadHtml = '';
+              if (_clist.length) {
+                _threadHtml = '<div class="cp-insp-thread">';
+                for (var _tx = 0; _tx < _clist.length; _tx++) {
+                  var _c = _clist[_tx];
+                  var _isDes = _c && _c.authorType === 'designer';
+                  var _nmC = esc(String((_c && _c.authorName) || _c.author || 'CCH'));
+                  var _txC = esc(String((_c && _c.text) || ''));
+                  var _edPart = '';
+                  if (!_isDes && _inspIdent && typeof cpPortalClientOwnsInspirationComment === 'function' && cpPortalClientOwnsInspirationComment(_c, _inspIdent)) {
+                    var _cidJs = escJsStr(String((_c && _c.id) || ('idx:' + _tx)));
+                    _edPart = '<div class="cp-insp-cmt-act">' +
+                      '<button type="button" class="cp-insp-cmt-link" onclick="event.preventDefault();event.stopPropagation();void window.cpPortalEditInspirationComment(\'' + pidJs + '\',\'' + secIdJs + '\',' + _cell.imageIndex + ',\'' + _cidJs + '\')">Edit</button>' +
+                      '<button type="button" class="cp-insp-cmt-link" onclick="event.preventDefault();event.stopPropagation();void window.cpPortalDeleteInspirationComment(\'' + pidJs + '\',\'' + secIdJs + '\',' + _cell.imageIndex + ',\'' + _cidJs + '\')">Delete</button></div>';
+                  }
+                  var _edited = (_c && _c.editedAt) ? ' <span class="cp-insp-edited">(edited)</span>' : '';
+                  _threadHtml += '<div class="cp-insp-cmt' + (_isDes ? ' cp-insp-cmt--studio' : '') + '"><div class="cp-insp-cmt-hd"><strong>' + _nmC + '</strong>' +
+                    (_isDes ? ' <span class="cp-insp-badge-studio">Studio</span>' : '') + _edited + '</div><div class="cp-insp-cmt-body">' + _txC + '</div>' + _edPart + '</div>';
+                }
+                _threadHtml += '</div>';
+              }
+              var _compose = _canInspStar
+                ? ('<div class="cp-insp-compose" data-cp-pid="' + escAttr(String(projectId)) + '" data-cp-sid="' + escAttr(String(inspirationBoardId)) + '" data-cp-idx="' + _cell.imageIndex + '">' +
+                  '<textarea class="cp-insp-ta" maxlength="500" rows="2" placeholder="Add a comment (max 500 characters)…" aria-label="New comment"></textarea>' +
+                  '<button type="button" class="cp-insp-post-cmt" onclick="event.preventDefault();event.stopPropagation();void window.cpPortalPostInspirationCommentFrom(this)">Post</button></div>')
+                : '';
+              var _capLine = String(_cell.caption || '').trim();
+              var _cliNote = String(_cell.clientNote || '').trim();
+              var _capStudioHtml = _capLine
+                ? ('<div class="cp-insp-cap-studio" title="From your design team">' + esc(_capLine) + '</div>')
+                : ('<div class="cp-insp-cap-studio cp-insp-cap-muted">Studio caption (if any) appears here.</div>');
+              var _noteBtnClass = 'cp-insp-client-note' + (_cliNote ? '' : ' cp-insp-client-note-empty');
+              var _noteBtnTxt = _cliNote ? esc(_cliNote) : 'Add your note\u2026';
+              html += '<div class="cp-insp-board-cell">' +
+                '<div class="cp-insp-board-tile" role="button" tabindex="0" onclick="cpProposalLineLightboxOpenFromEncoded(\'' + encEsc2 + '\',' + _vj + ')">' +
+                '<img src="' + _escImgSrcAttr(iuB2) + '" alt="" referrerpolicy="no-referrer" onerror="this.style.opacity=\'0.2\'">' +
+                _starBt +
+                _commentBt +
+                '</div>' +
+                '<div class="cp-insp-board-caption-block">' +
+                _capStudioHtml +
+                '<button type="button" class="' + _noteBtnClass + '" onclick="event.preventDefault();event.stopPropagation();void window.cpPortalSaveInspirationClientNote(\'' + pidJs + '\',\'' + secIdJs + '\',' + _cell.imageIndex + ')">' + _noteBtnTxt + '</button>' +
+                _threadHtml +
+                _compose +
+                '</div></div>';
+            }
+            html += '</div>';
+          } else if (!encPayload) {
+            html += '<div style="font-size:13px;color:#6B7280;font-family:\'DM Sans\',sans-serif;">Could not prepare image viewer.</div>';
+          } else {
+            var encEsc = escJsStr(encPayload);
+            html += '<p style="font-size:12px;color:#6B7280;margin:0 0 14px;line-height:1.5;font-family:\'DM Sans\',sans-serif;">Gallery view. Stars, comments, and notes need image data from the board; ask your studio to re-save the inspiration section if controls are missing.</p>' +
+              '<div class="cp-insp-board-grid">';
+            for (var _ti = 0; _ti < ibUrls.length; _ti++) {
+              var iuB = ibUrls[_ti];
+              html += '<div class="cp-insp-board-tile" role="button" tabindex="0" onclick="cpProposalLineLightboxOpenFromEncoded(\'' + encEsc + '\',' + _ti + ')">' +
+                '<img src="' + _escImgSrcAttr(iuB) + '" alt="" referrerpolicy="no-referrer" onerror="this.style.opacity=\'0.2\'">' +
+                '</div>';
+            }
+            html += '</div>';
+          }
+          html += '</div>';
+        }
+      } else if (activePage === 'inspirations') {
+        html += '<div class="cp-sec-label-jx" style="margin-bottom:20px;">Inspirations</div>' +
+          '<p style="font-size:12px;color:#6B7280;font-family:\'DM Sans\',sans-serif;line-height:1.55;margin:-8px 0 18px;max-width:720px;">Open a board, then an image to view it large. When signed in, use the star to save favorites and add comments for your designer. <strong>Design Boards</strong> in the portal are layout presentations only — starring happens here under <strong>Inspirations</strong>.</p>';
+        if (!inspirationIdeabooks.length) {
+          html += '<div style="font-size:13px;color:#6B7280;font-family:\'DM Sans\',sans-serif;">No inspiration boards shared yet.</div>';
         } else {
           html += '<div style="text-align:center;padding:24px 0 12px;"><div style="font-family:\'Playfair Display\',serif;font-size:28px;font-weight:400;color:#0A1F3D;letter-spacing:0.08em;text-transform:uppercase;">CCH Design</div></div>' +
-            '<div style="text-align:center;padding:16px 0;border-top:1px solid #E2E2E2;border-bottom:1px solid #E2E2E2;margin-bottom:20px;"><span style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#6B7280;font-family:\'DM Sans\',sans-serif;">Concept</span></div>' +
-            '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px;">';
-          inspirationBoards.forEach(function(ib) {
-            var iu = cpIdeabookCoverUrl(ib);
-            var tit = ib.name || ib.title || 'Board';
-            html += '<div style="position:relative;overflow:hidden;aspect-ratio:1;">' +
-              (iu ? '<img src="' + escAttr(iu) + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;filter:grayscale(30%);" referrerpolicy="no-referrer" onerror="this.style.display=\\\'none\\\'">' : '<div style="width:100%;height:100%;background:#F0F0F0;"></div>') +
-              '<div style="position:absolute;inset:0;display:flex;align-items:flex-end;padding:12px;background:linear-gradient(180deg,transparent 40%,rgba(10,31,61,0.55) 100%);"><div style="font-size:12px;color:#fff;font-family:\'DM Sans\',sans-serif;font-weight:500;">' + esc(tit) + '</div></div></div>';
+            '<div style="text-align:center;padding:16px 0;border-top:1px solid #E2E2E2;border-bottom:1px solid #E2E2E2;margin-bottom:20px;"><span style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#6B7280;font-family:\'DM Sans\',sans-serif;">Inspirations</span></div>' +
+            '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">';
+          inspirationIdeabooks.forEach(function(ib) {
+            try {
+              var iu = cpIdeabookCoverUrl(ib);
+              var tit = ib.name || ib.title || 'Board';
+              var _ic = cpIdeabookItemCount(ib);
+              var _inspCardHash = '#/clientview/' + projectId + '/inspirations/' + ib.id;
+              html += '<div class="cp-board-list-item" style="cursor:pointer;" role="link" tabindex="0" onclick="navigate(\'' + escAttr(_inspCardHash) + '\')">' +
+                '<div class="cp-inspiration-card">' +
+                (iu ? '<img class="cp-inspiration-cover-img" src="' + escAttr(String(iu).trim()) + '" alt="" referrerpolicy="no-referrer" style="filter:grayscale(30%);" onerror="this.style.opacity=\'0\';this.style.visibility=\'hidden\';var fb=this.parentNode&&this.parentNode.querySelector(\'.cp-inspiration-cover-fallback\');if(fb){fb.style.display=\'flex\';}">' : '') +
+                '<div class="cp-inspiration-cover-fallback" style="display:' + (iu ? 'none' : 'flex') + ';filter:grayscale(30%);">\u273F</div>' +
+                '</div>' +
+                '<div class="cp-board-list-title">' + esc(tit) + '</div>' +
+                '<div class="cp-board-list-count">' + _ic + ' item' + (_ic !== 1 ? 's' : '') + '</div></div>';
+            } catch (eIb) {
+              console.error('[renderClientPortal] inspiration card skipped:', (ib && ib.id) || ib, eIb);
+            }
           });
           html += '</div>';
+        }
+      } else if (activePage === 'concepts') {
+        var _conSpotlights = cpResolveDesignStorySpotlights(proj, portalMergedDocs);
+        html += '<div class="cp-sec-label-jx" style="margin-bottom:20px;">Designing Your Story</div>';
+        if (!_conSpotlights.length && !conceptIdeabooks.length) {
+          html += '<div style="border:1px solid #E2E2E2;padding:48px 32px;text-align:center;background:#FAFAFA;">' +
+            '<div style="font-size:14px;color:#0A1F3D;font-family:\'DM Sans\',sans-serif;font-weight:500;margin-bottom:8px;">Nothing shared here yet.</div>' +
+            '<div style="font-size:13px;color:#6B7280;font-family:\'DM Sans\',sans-serif;line-height:1.6;max-width:480px;margin:0 auto;">Your studio will add boards with deliverables, renderings, drawings, and links to documents as the work progresses.</div>' +
+            '</div>';
+        } else {
+          html += '<div style="text-align:center;padding:24px 0 12px;"><div style="font-family:\'Playfair Display\',serif;font-size:28px;font-weight:400;color:#0A1F3D;letter-spacing:0.08em;text-transform:uppercase;">CCH Design</div></div>' +
+            '<div style="text-align:center;padding:16px 0;border-top:1px solid #E2E2E2;border-bottom:1px solid #E2E2E2;margin-bottom:20px;"><span style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#6B7280;font-family:\'DM Sans\',sans-serif;">Designing Your Story</span></div>';
+          if (_conSpotlights.length) {
+            html += '<div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#9CA3AF;margin-bottom:10px;font-family:\'DM Sans\',sans-serif;">Spotlight documents</div>' +
+              '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:24px;">';
+            _conSpotlights.forEach(function(sp) {
+              var openU = escJsStr(sp.url);
+              var cell = sp.isImage
+                ? '<img src="' + _escImgSrcAttr(sp.url) + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;position:relative;z-index:0;" referrerpolicy="no-referrer">'
+                : '<div style="width:100%;height:100%;min-height:80px;background:#E8ECF3;display:flex;align-items:center;justify-content:center;font-size:28px;color:#0A1F3D;opacity:0.35;">\u25A3</div>';
+              html += '<div style="position:relative;overflow:hidden;aspect-ratio:1;border:1px solid #E2E2E2;min-width:0;cursor:pointer;" role="button" tabindex="0" onclick="window.open(\'' + openU + '\',\'_blank\',\'noopener\')">' + cell +
+                '<div style="position:absolute;inset:0;z-index:1;display:flex;align-items:flex-end;padding:12px;background:linear-gradient(180deg,transparent 40%,rgba(10,31,61,0.55) 100%);pointer-events:none;"><div style="font-size:12px;color:#fff;font-family:\'DM Sans\',sans-serif;font-weight:500;">' + esc(sp.title) + '</div></div></div>';
+            });
+            html += '</div>';
+          }
+          if (conceptIdeabooks.length) {
+            if (_conSpotlights.length) {
+              html += '<div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#9CA3AF;margin-bottom:10px;font-family:\'DM Sans\',sans-serif;">Concept boards</div>';
+            }
+            html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">';
+            conceptIdeabooks.forEach(function(ib) {
+              try {
+                var iu = cpIdeabookCoverUrl(ib);
+                var tit = ib.name || ib.title || 'Board';
+                var _cc = cpIdeabookItemCount(ib);
+                html += '<div class="cp-board-list-item">' +
+                  '<div class="cp-inspiration-card" style="border:1px solid var(--cp-border);">' +
+                  (iu ? '<img class="cp-inspiration-cover-img" src="' + _escImgSrcAttr(iu) + '" alt="" referrerpolicy="no-referrer" style="filter:grayscale(30%);" onerror="this.style.opacity=\'0\';this.style.visibility=\'hidden\';var fb=this.parentNode&&this.parentNode.querySelector(\'.cp-inspiration-cover-fallback\');if(fb){fb.style.display=\'flex\';}">' : '') +
+                  '<div class="cp-inspiration-cover-fallback" style="display:' + (iu ? 'none' : 'flex') + ';filter:grayscale(30%);">\u273F</div>' +
+                  '</div>' +
+                  '<div class="cp-board-list-title">' + esc(tit) + '</div>' +
+                  '<div class="cp-board-list-count">' + _cc + ' item' + (_cc !== 1 ? 's' : '') + '</div></div>';
+              } catch (eIb2) {
+                console.error('[renderClientPortal] concept board card skipped:', (ib && ib.id) || ib, eIb2);
+              }
+            });
+            html += '</div>';
+          }
         }
       } else if (activePage === 'proposals') {
         html += '<div class="cp-sec-label-jx">Proposals</div>';
