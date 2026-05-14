@@ -49084,6 +49084,27 @@ async function renderBoardsTab(T, proj) {
       cpProposalLineLightboxRender();
     };
 
+    /** Client portal proposal line — open gallery (all normalized URLs). */
+    window.cpProposalLineLightboxOpen = function(urls, startIdx) {
+      if (!urls || !urls.length) return;
+      window._cpLbUrls = urls;
+      var n = urls.length;
+      var i = parseInt(startIdx, 10);
+      if (isNaN(i)) i = 0;
+      window._cpLbIdx = Math.max(0, Math.min(i, n - 1));
+      cpProposalLineLightboxRender();
+    };
+
+    /** Client portal inspiration grid — `enc` is encodeURIComponent(JSON.stringify(urls)). */
+    window.cpProposalLineLightboxOpenFromEncoded = function(enc, startIdx) {
+      if (!enc) return;
+      var dec;
+      try { dec = decodeURIComponent(String(enc)); } catch (e0) { return; }
+      var urls = typeof cchTryParseJson === 'function' ? cchTryParseJson(dec, 'cp inspiration lightbox urls') : null;
+      if (!urls || !urls.length) return;
+      window.cpProposalLineLightboxOpen(urls, startIdx);
+    };
+
     /** One proposal: banner, line table with approve/decline, subtotal/grand total, final approve. */
     function cpBuildSingleProposalReviewHtml(projectId, p, opts) {
       opts = opts || {};
