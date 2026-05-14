@@ -1,11 +1,9 @@
 @echo off
 echo ============================================
 echo   CCH Studio - Deploy to STAGING only
-echo   (cch-platform-staging.web.app)
+echo   Target: https://cch-platform-staging.web.app
+echo   Firebase project: cch-studio-staging
 echo ============================================
-echo.
-echo If this fails with "site not found", complete one-time setup:
-echo   See STAGING-HOSTING-SETUP.md
 echo.
 
 where firebase >nul 2>nul
@@ -22,11 +20,26 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
-firebase deploy --only hosting:platform-staging
+REM Deploy target `platform` against the staging Firebase project.
+REM Target `platform` resolves to site cch-platform-staging under
+REM cch-studio-staging (see .firebaserc).
+firebase deploy --only hosting:platform --project staging
+
+set DEPLOY_EXIT=%ERRORLEVEL%
+
 echo.
 echo ============================================
-echo   Staging deploy complete (if no errors above)
-echo   Open: https://cch-platform-staging.web.app
-echo   Hard refresh: Ctrl+Shift+R
+if %DEPLOY_EXIT% EQU 0 (
+    echo   Staging deploy complete.
+    echo   Open:   https://cch-platform-staging.web.app
+    echo   Refresh: Ctrl+Shift+R
+    echo.
+    echo   Verify the orange STAGING banner is visible
+    echo   before you consider this build "tested."
+) else (
+    echo   Staging deploy FAILED. Check errors above.
+    echo   Do NOT proceed to production until this is green.
+)
 echo ============================================
 pause
+exit /b %DEPLOY_EXIT%

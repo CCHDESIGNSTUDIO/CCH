@@ -1796,50 +1796,49 @@
     .ib-drop-zone .ib-drop-icon { font-size: 28px; opacity: 0.4; margin-bottom: 4px; }
     .ib-drop-zone .ib-drop-hint { font-size: 11px; color: var(--gray-500); margin-top: 2px; }
 
-    /* ===== Client portal — inspiration list cards & board detail (must be valid CSS; was accidentally pasted as JS strings) ===== */
-    .cp-board-list-item { display: flex; flex-direction: column; min-width: 0; text-align: left; font-family: "DM Sans", sans-serif; }
-    .cp-board-list-title { font-size: 14px; font-weight: 500; color: #0A1F3D; margin-top: 10px; line-height: 1.35; padding: 0 2px; }
-    .cp-board-list-count { font-size: 11px; color: #9CA3AF; margin-top: 4px; padding: 0 2px 2px; }
-    .cp-inspiration-card { position: relative; overflow: hidden; aspect-ratio: 1; border: 1px solid var(--cp-border, #E2E2E2); min-width: 0; min-height: 0; background: #F4F6FA; display: grid; grid-template-columns: 1fr; grid-template-rows: 1fr; align-content: stretch; align-items: stretch; }
-    .cp-inspiration-card .cp-inspiration-cover-img { grid-area: 1 / 1; width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: cover; display: block; z-index: 0; background: #E8ECF3; }
-    .cp-inspiration-card .cp-inspiration-cover-fallback { grid-area: 1 / 1; z-index: 0; align-self: stretch; justify-self: stretch; display: none; align-items: center; justify-content: center; font-size: 36px; color: #C4A464; background: linear-gradient(135deg, #E8ECF3, #D4DAE6); }
-    .cp-insp-board-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; max-width: 1200px; margin: 0 auto; }
-    @media (max-width: 900px) { .cp-insp-board-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
-    @media (max-width: 520px) { .cp-insp-board-grid { grid-template-columns: 1fr !important; } }
-    .cp-insp-board-cell { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--cp-border, #E2E2E2); background: #fff; }
-    .cp-insp-board-cell .cp-insp-board-tile { position: relative; overflow: hidden; aspect-ratio: 1; border: none; cursor: pointer; background: #FAFAFA; flex-shrink: 0; }
-    .cp-insp-board-tile { position: relative; overflow: hidden; aspect-ratio: 1; border: 1px solid var(--cp-border, #E2E2E2); cursor: pointer; background: #FAFAFA; }
-    .cp-insp-board-tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
-    .cp-insp-board-caption-block { padding: 10px 10px 12px; border-top: 1px solid #ECECEC; display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; }
-    .cp-insp-cap-studio { font-size: 11px; color: #5C6B80; line-height: 1.45; max-height: 3.1em; overflow: hidden; }
-    .cp-insp-cap-muted { opacity: 0.5; font-style: italic; }
-    .cp-insp-client-note { width: 100%; text-align: left; font-size: 12px; color: #0A1F3D; background: #FAF9F6; border: 1px dashed #C4A464; padding: 8px 10px; cursor: pointer; font-family: inherit; line-height: 1.4; }
-    .cp-insp-client-note-empty { color: #9CA3AF; border-color: #E2E2E2; }
-    #modalContainer .cp-insp-comments-modal { z-index: 120000 !important; }
-    .cp-insp-board-tile .cp-insp-star-btn { position: absolute; bottom: 8px; left: 8px; z-index: 3; width: 40px; height: 40px; border: 2px solid #C4A464; border-radius: 50%; background: rgba(255, 255, 255, 0.98); box-shadow: 0 2px 10px rgba(10, 31, 61, 0.22); cursor: pointer; font-size: 19px; line-height: 1; color: #0A1F3D; display: flex; align-items: center; justify-content: center; font-family: inherit; padding: 0; }
-    .cp-insp-board-tile .cp-insp-star-btn:hover { background: #fff; color: #C4A464; border-color: #0A1F3D; }
-    .cp-insp-board-tile .cp-insp-star-badge { position: absolute; bottom: 8px; left: 8px; z-index: 2; min-width: 34px; height: 34px; padding: 0 8px; border-radius: 17px; background: rgba(255, 255, 255, 0.92); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #C4A464; pointer-events: none; box-shadow: 0 2px 6px rgba(10, 31, 61, 0.12); }
-    .cp-insp-board-tile .cp-insp-comment-btn { position: absolute; bottom: 8px; right: 8px; z-index: 2; min-width: 38px; height: 34px; border: none; border-radius: 17px; background: rgba(255, 255, 255, 0.95); box-shadow: 0 2px 8px rgba(10, 31, 61, 0.18); cursor: pointer; font-size: 12px; font-weight: 700; color: #0A1F3D; display: flex; align-items: center; justify-content: center; font-family: inherit; padding: 0 10px; gap: 4px; }
-    .cp-insp-board-tile .cp-insp-comment-btn:hover { background: #fff; color: #C4A464; }
-    .cp-insp-thread { margin-top: 10px; border-top: 1px solid #ECECEC; padding-top: 10px; max-height: 220px; overflow-y: auto; }
-    .cp-insp-cmt { font-size: 12px; color: #0A1F3D; margin-bottom: 10px; line-height: 1.45; }
-    .cp-insp-cmt--studio { opacity: 0.92; }
-    .cp-insp-cmt-hd { font-size: 11px; color: #6B7280; margin-bottom: 4px; }
-    .cp-insp-cmt-body { color: #0A1F3D; }
-    .cp-insp-badge-studio { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: #9CA3AF; }
-    .cp-insp-edited { font-size: 10px; color: #9CA3AF; }
-    .cp-insp-cmt-act { margin-top: 6px; display: flex; gap: 10px; }
-    .cp-insp-cmt-link { border: none; background: none; padding: 0; font-size: 11px; color: #6B7280; cursor: pointer; font-family: inherit; text-decoration: underline; }
-    .cp-insp-cmt-link:hover { color: #0A1F3D; }
-    .cp-insp-compose { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
-    .cp-insp-ta { width: 100%; border: 1px solid #E2E2E2; padding: 8px; font-size: 12px; font-family: inherit; resize: vertical; min-height: 48px; color: #0A1F3D; }
-    .cp-insp-post-cmt { align-self: flex-start; padding: 6px 14px; font-size: 12px; font-weight: 600; border: 1px solid #0A1F3D; background: #0A1F3D; color: #fff; cursor: pointer; font-family: inherit; }
-    .cp-insp-post-cmt:hover { background: #152a4d; }
-    .cp-insp-comments-modal .cp-cmt-row { border-bottom: 1px solid #ECECEC; padding: 10px 0; }
-    .cp-insp-comments-modal .cp-cmt-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; color: #9CA3AF; margin-bottom: 4px; }
-    .cp-insp-comments-modal .cp-cmt-actions button { border: none; background: none; color: #6B7280; font-size: 11px; cursor: pointer; padding: 0 4px; }
-    .cp-insp-comments-modal .cp-cmt-actions button:hover { color: #0A1F3D; }
-
+        /* ===== Inspiration portal CSS (added 2026-05-13) ===== */
+        '.cp-board-list-item { display:flex;flex-direction:column;min-width:0;text-align:left;font-family:\"DM Sans\",sans-serif; }' +
+        '.cp-board-list-title { font-size:14px;font-weight:500;color:#0A1F3D;margin-top:10px;line-height:1.35;padding:0 2px; }' +
+        '.cp-board-list-count { font-size:11px;color:#9CA3AF;margin-top:4px;padding:0 2px 2px; }' +
+        '.cp-inspiration-card { position:relative;overflow:hidden;aspect-ratio:1;border:1px solid var(--cp-border);min-width:0;min-height:0;background:#F4F6FA;display:grid;grid-template-columns:1fr;grid-template-rows:1fr;align-content:stretch;align-items:stretch; }' +
+        '.cp-inspiration-card .cp-inspiration-cover-img { grid-area:1/1;width:100%;height:100%;min-width:0;min-height:0;object-fit:cover;display:block;z-index:0;background:#E8ECF3; }' +
+        '.cp-inspiration-card .cp-inspiration-cover-fallback { grid-area:1/1;z-index:0;align-self:stretch;justify-self:stretch;display:none;align-items:center;justify-content:center;font-size:36px;color:#C4A464;background:linear-gradient(135deg,#E8ECF3,#D4DAE6); }' +
+        '.cp-insp-board-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; max-width:1200px; margin:0 auto; }' +
+        '@media (max-width:900px){ .cp-insp-board-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; } }' +
+        '@media (max-width:520px){ .cp-insp-board-grid { grid-template-columns:1fr !important; } }' +
+        '.cp-insp-board-cell { display:flex; flex-direction:column; min-width:0; border:1px solid var(--cp-border); background:#fff; }' +
+        '.cp-insp-board-cell .cp-insp-board-tile { position:relative; overflow:hidden; aspect-ratio:1; border:none; cursor:pointer; background:#FAFAFA; flex-shrink:0; }' +
+        '.cp-insp-board-tile { position:relative; overflow:hidden; aspect-ratio:1; border:1px solid var(--cp-border); cursor:pointer; background:#FAFAFA; }' +
+        '.cp-insp-board-tile img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }' +
+        '.cp-insp-board-caption-block { padding:10px 10px 12px; border-top:1px solid #ECECEC; display:flex; flex-direction:column; gap:6px; flex:1; min-height:0; }' +
+        '.cp-insp-cap-studio { font-size:11px; color:#5C6B80; line-height:1.45; max-height:3.1em; overflow:hidden; }' +
+        '.cp-insp-cap-muted { opacity:0.5; font-style:italic; }' +
+        '.cp-insp-client-note { width:100%; text-align:left; font-size:12px; color:#0A1F3D; background:#FAF9F6; border:1px dashed #C4A464; padding:8px 10px; cursor:pointer; font-family:inherit; line-height:1.4; }' +
+        '.cp-insp-client-note-empty { color:#9CA3AF; border-color:#E2E2E2; }' +
+        '#modalContainer .cp-insp-comments-modal { z-index:120000 !important; }' +
+        '.cp-insp-board-tile .cp-insp-star-btn { position:absolute; bottom:8px; left:8px; z-index:3; width:40px; height:40px; border:2px solid #C4A464; border-radius:50%; background:rgba(255,255,255,0.98); box-shadow:0 2px 10px rgba(10,31,61,0.22); cursor:pointer; font-size:19px; line-height:1; color:#0A1F3D; display:flex; align-items:center; justify-content:center; font-family:inherit; padding:0; }' +
+        '.cp-insp-board-tile .cp-insp-star-btn:hover { background:#fff; color:#C4A464; border-color:#0A1F3D; }' +
+        '.cp-insp-board-tile .cp-insp-star-badge { position:absolute; bottom:8px; left:8px; z-index:2; min-width:34px; height:34px; padding:0 8px; border-radius:17px; background:rgba(255,255,255,0.92); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#C4A464; pointer-events:none; box-shadow:0 2px 6px rgba(10,31,61,0.12); }' +
+        '.cp-insp-board-tile .cp-insp-comment-btn { position:absolute; bottom:8px; right:8px; z-index:2; min-width:38px; height:34px; border:none; border-radius:17px; background:rgba(255,255,255,0.95); box-shadow:0 2px 8px rgba(10,31,61,0.18); cursor:pointer; font-size:12px; font-weight:700; color:#0A1F3D; display:flex; align-items:center; justify-content:center; font-family:inherit; padding:0 10px; gap:4px; }' +
+        '.cp-insp-board-tile .cp-insp-comment-btn:hover { background:#fff; color:#C4A464; }' +
+        '.cp-insp-thread { margin-top:10px; border-top:1px solid #ECECEC; padding-top:10px; max-height:220px; overflow-y:auto; }' +
+        '.cp-insp-cmt { font-size:12px; color:#0A1F3D; margin-bottom:10px; line-height:1.45; }' +
+        '.cp-insp-cmt--studio { opacity:0.92; }' +
+        '.cp-insp-cmt-hd { font-size:11px; color:#6B7280; margin-bottom:4px; }' +
+        '.cp-insp-cmt-body { color:#0A1F3D; }' +
+        '.cp-insp-badge-studio { font-size:9px; text-transform:uppercase; letter-spacing:0.06em; color:#9CA3AF; }' +
+        '.cp-insp-edited { font-size:10px; color:#9CA3AF; }' +
+        '.cp-insp-cmt-act { margin-top:6px; display:flex; gap:10px; }' +
+        '.cp-insp-cmt-link { border:none; background:none; padding:0; font-size:11px; color:#6B7280; cursor:pointer; font-family:inherit; text-decoration:underline; }' +
+        '.cp-insp-cmt-link:hover { color:#0A1F3D; }' +
+        '.cp-insp-compose { margin-top:10px; display:flex; flex-direction:column; gap:8px; }' +
+        '.cp-insp-ta { width:100%; border:1px solid #E2E2E2; padding:8px; font-size:12px; font-family:inherit; resize:vertical; min-height:48px; color:#0A1F3D; }' +
+        '.cp-insp-post-cmt { align-self:flex-start; padding:6px 14px; font-size:12px; font-weight:600; border:1px solid #0A1F3D; background:#0A1F3D; color:#fff; cursor:pointer; font-family:inherit; }' +
+        '.cp-insp-post-cmt:hover { background:#152a4d; }' +
+        '.cp-insp-comments-modal .cp-cmt-row { border-bottom:1px solid #ECECEC; padding:10px 0; }' +
+        '.cp-insp-comments-modal .cp-cmt-meta { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11px; color:#9CA3AF; margin-bottom:4px; }' +
+        '.cp-insp-comments-modal .cp-cmt-actions button { border:none; background:none; color:#6B7280; font-size:11px; cursor:pointer; padding:0 4px; }' +
+        '.cp-insp-comments-modal .cp-cmt-actions button:hover { color:#0A1F3D; }' +
 /* ===== LIGHTBOX — Full-screen Niice-style detail overlay ===== */
     .ib-lightbox-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 2000;
@@ -7672,26 +7671,6 @@
     function _ibEmailNorm(e) {
       return String(e || '').trim().toLowerCase();
     }
-    /**
-     * Firestore sometimes stores arrays as maps { "0": row, "1": row }. Stars/comments must be real arrays
-     * for _ibFeedbackShapeOk; otherwise migration treated shape as invalid and rebuilt from legacy fields only,
-     * which could wipe client portal stars/comments that lived under feedback.* as maps.
-     */
-    function _ibCoerceStarOrCommentArray(val) {
-      if (Array.isArray(val)) return val.filter(function(x) { return x != null; });
-      if (val && typeof val === 'object') {
-        var keys = Object.keys(val);
-        if (keys.length && keys.every(function(k) { return /^(0|[1-9]\d*)$/.test(k); })) {
-          return keys
-            .map(function(k) { return { i: parseInt(k, 10), v: val[k] }; })
-            .sort(function(a, b) { return a.i - b.i; })
-            .map(function(o) { return o.v; })
-            .filter(function(x) { return x != null; });
-        }
-        if (keys.length) return Object.values(val).filter(function(x) { return x != null; });
-      }
-      return [];
-    }
     function _ibDesignerCtxForMigration() {
       try {
         if (typeof currentUser !== 'undefined' && currentUser && currentUser.email) {
@@ -7747,16 +7726,6 @@
     function _ibMaterializeItemFeedbackRead(item) {
       if (typeof item === 'string') item = { imageUrl: item };
       else item = Object.assign({}, item);
-      if (item.feedback && typeof item.feedback === 'object') {
-        var _st = item.feedback.stars;
-        var _cm = item.feedback.comments;
-        if (!Array.isArray(_st) || !Array.isArray(_cm)) {
-          item.feedback = Object.assign({}, item.feedback, {
-            stars: _ibCoerceStarOrCommentArray(_st),
-            comments: _ibCoerceStarOrCommentArray(_cm)
-          });
-        }
-      }
       if (!_ibFeedbackShapeOk(item.feedback)) item.feedback = _ibBuildFeedbackFromLegacyItem(item, _ibDesignerCtxForMigration());
       return item;
     }
@@ -7856,17 +7825,6 @@
         for (var i = 0; i < imgs.length; i++) {
           var row = imgs[i];
           var item = typeof row === 'string' ? { imageUrl: row } : Object.assign({}, row);
-          if (item.feedback && typeof item.feedback === 'object') {
-            var _stM = item.feedback.stars;
-            var _cmM = item.feedback.comments;
-            if (!Array.isArray(_stM) || !Array.isArray(_cmM)) {
-              item.feedback = Object.assign({}, item.feedback, {
-                stars: _ibCoerceStarOrCommentArray(_stM),
-                comments: _ibCoerceStarOrCommentArray(_cmM)
-              });
-              changed = true;
-            }
-          }
           var needFb = !_ibFeedbackShapeOk(item.feedback);
           var gk = sid + ':' + i;
           var needKey = !item.imageKey;
@@ -7885,11 +7843,7 @@
           }
           out.push(item);
         }
-        if (out.length !== imgs.length) {
-          console.error('[ideabooks] feedback migrate skipped: image row count mismatch', { projectId: pid, sectionId: sid, in: imgs.length, out: out.length });
-        } else if (imgs.length && changed) {
-          await ref.update({ images: out });
-        }
+        if (imgs.length && changed) await ref.update({ images: out });
         window._ibFeedbackMigratedCache[cacheKey] = true;
       })();
       try {
@@ -7964,23 +7918,11 @@
           var _aHost = document.createElement('a');
           _aHost.href = url;
           if (String(_aHost.hostname || '').toLowerCase() === String(location.hostname).toLowerCase()) {
-            // Pathname only — matching query blobs caused false positives (tokens like format=auto, is/image,
-            // media/catalog inside unrelated paths or encoded storage keys rewrote good URLs to vendor hosts).
-            var _pnSeg = String(_aHost.pathname || '');
-            try {
-              var _pnDec = decodeURIComponent(_pnSeg);
-              if (_pnDec) _pnSeg = _pnDec;
-            } catch (_ePnDec) {}
-            var pn = _pnSeg.toLowerCase();
-            var _vendorOnApp = /^\/format-auto(\/|$)/i.test(pn) ||
-              /^\/format=(auto|pjpg|webp)(\/|$)/i.test(pn) ||
-              /^\/media\/catalog\//i.test(pn) ||
-              /^\/pub\/media\//i.test(pn) ||
-              /^\/is\/image\//i.test(pn);
+            var _pHost = String(_aHost.pathname || '').toLowerCase();
+            var _vendorOnApp = (_pHost.indexOf('/format-auto/') >= 0 || _pHost.indexOf('/format=auto/') >= 0 || /\/format=(auto|pjpg|webp)\//i.test(_pHost) ||
+              _pHost.indexOf('/media/catalog/') >= 0 || _pHost.indexOf('/is/image/') >= 0);
             if (_vendorOnApp) {
-              var _pathBasesApp = [
-                'https://www.hubbardtonforge.com/',
-                'https://hubbardtonforge.com/',
+              var _rb = [
                 'https://www.restorationhardware.com/',
                 'https://restorationhardware.com/',
                 'https://www.rh.com/',
@@ -7988,9 +7930,9 @@
               ];
               var _tailH = String(_aHost.pathname || '') + String(_aHost.search || '') + String(_aHost.hash || '');
               var _tailNorm = _tailH.charAt(0) === '/' ? _tailH : '/' + _tailH;
-              for (var _ri = 0; _ri < _pathBasesApp.length; _ri++) {
+              for (var _ri = 0; _ri < _rb.length; _ri++) {
                 try {
-                  var _uOut = new URL(_tailNorm, _pathBasesApp[_ri]).href;
+                  var _uOut = new URL(_tailNorm, _rb[_ri]).href;
                   if (_uOut) return _uOut;
                 } catch (_eRh) {}
               }
@@ -14070,11 +14012,14 @@ async function renderBoardsTab(T, proj) {
 
       let sections = [];
       try {
-        const s = await db.collection('boards').doc(proj.id).collection('ideabooks').get();
-        s.forEach(d => sections.push({ id: d.id, ...d.data() }));
-        sections.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
-      } catch (e2) {
-        console.warn('[ideabooks] load sections:', e2);
+        const s = await db.collection('boards').doc(proj.id).collection('ideabooks').orderBy('order','asc').get();
+        s.forEach(d => sections.push({id:d.id,...d.data()}));
+      } catch(e){
+        try {
+          const s = await db.collection('boards').doc(proj.id).collection('ideabooks').get();
+          s.forEach(d => sections.push({id:d.id,...d.data()}));
+          sections.sort((a,b) => (a.order||0)-(b.order||0));
+        } catch(e2){}
       }
 
       var hashSectionId = _ibIdeabookSectionIdFromHash(proj.id);
@@ -14182,7 +14127,7 @@ async function renderBoardsTab(T, proj) {
         var updated = formatDate(s.updatedAt || s.createdAt);
         var sidEsc = escJsStr(s.id);
         var thumb = cover
-          ? '<img class="ib-p2-card-cover" src="' + _escImgSrcAttr(cover) + '" alt="" loading="lazy" referrerpolicy="no-referrer">'
+          ? '<img class="ib-p2-card-cover" src="' + escAttr(cover) + '" alt="" loading="lazy">'
           : '<div class="ib-p2-card-cover" style="display:flex;align-items:center;justify-content:center;color:#d4d4d8;font-size:40px;line-height:1;">◆</div>';
         var topicLine = (isStyleLib && s.topic) ? '<div style="font-size:11px;color:var(--gold);font-weight:600;margin-top:2px;">' + esc(String(s.topic)) + '</div>' : '';
         return '<button type="button" class="ib-p2-card" onclick="navigate(\'#/project/' + pidEsc + '/ideabooks/' + sidEsc + '\')">' + thumb +
@@ -17480,10 +17425,9 @@ async function renderBoardsTab(T, proj) {
       var pid = sel.value;
       target.innerHTML = '<option value="">Loading...</option>';
       try {
-        var snap = await db.collection('boards').doc(pid).collection('ideabooks').get();
+        var snap = await db.collection('boards').doc(pid).collection('ideabooks').orderBy('order').get();
         var opts = [];
-        snap.forEach(function(d) { opts.push({ id: d.id, name: d.data().name || 'Untitled', order: d.data().order || 0 }); });
-        opts.sort(function(a, b) { return a.order - b.order; });
+        snap.forEach(function(d) { opts.push({ id: d.id, name: d.data().name || 'Untitled' }); });
         if (opts.length === 0) {
           target.innerHTML = '<option value="">— No boards yet — check "Create new" below —</option>';
           target.disabled = true;
@@ -48122,15 +48066,11 @@ async function renderBoardsTab(T, proj) {
     }
     function cpIdeabookItemCount(ib) {
       if (!ib) return 0;
-      var nItems = Array.isArray(ib.items) ? ib.items.length : 0;
-      var nProd = Array.isArray(ib.products) ? ib.products.length : 0;
-      var nImg = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(ib.images).length : (Array.isArray(ib.images) ? ib.images.length : 0);
-      var derived = Math.max(nItems, nProd, nImg);
-      if (ib.itemCount != null) {
-        var stored = parseInt(ib.itemCount, 10) || 0;
-        return Math.max(stored, derived);
-      }
-      return derived;
+      if (ib.itemCount != null) return parseInt(ib.itemCount, 10) || 0;
+      if (Array.isArray(ib.items)) return ib.items.length;
+      if (Array.isArray(ib.products)) return ib.products.length;
+      if (Array.isArray(ib.images)) return ib.images.length;
+      return 0;
     }
 
     // ════════════════════════════════════════════════════════════
@@ -48475,9 +48415,8 @@ async function renderBoardsTab(T, proj) {
     function cpPortalConceptIdeabook(ib) {
       if (!ib || ib.hiddenInNav) return false;
       var t = String(ib.type || ib.boardType || '').toLowerCase().replace(/-/g, '_');
-      // Design / concept tier: Firestore often uses design_board; portal "Designing Your Story" must include it.
-      return t === 'design_board' || t === 'designboard' ||
-        t === 'concept_board' || t === 'conceptboard' || t === 'concept';
+      if (t === 'design_board' || t === 'designboard') return false;
+      return t === 'concept_board' || t === 'conceptboard' || t === 'concept';
     }
 
     async function cpPortalToggleInspirationStar(projectId, sectionId, imageIndex) {
@@ -49120,8 +49059,7 @@ async function renderBoardsTab(T, proj) {
       inner.style.cssText = 'position:relative;max-width:96vw;max-height:92vh;display:flex;flex-direction:column;align-items:center;cursor:default;';
       inner.addEventListener('click', function(ev) { ev.stopPropagation(); });
       var closeTop = '<button type="button" style="position:absolute;top:-40px;right:0;background:transparent;border:none;color:#fff;font-size:28px;line-height:1;cursor:pointer;padding:4px 10px;" aria-label="Close" onclick="event.stopPropagation();cpProposalLineLightboxClose()">&times;</button>';
-      var _lbSrc = typeof _escImgSrcAttr === 'function' ? _escImgSrcAttr(urls[idx]) : escAttr(urls[idx]);
-      var imgHtml = '<img src="' + _lbSrc + '" alt="" style="max-width:96vw;max-height:calc(92vh - 100px);object-fit:contain;border-radius:0;display:block;" referrerpolicy="no-referrer">';
+      var imgHtml = '<img src="' + escAttr(urls[idx]) + '" alt="" style="max-width:96vw;max-height:calc(92vh - 100px);object-fit:contain;border-radius:0;display:block;" referrerpolicy="no-referrer">';
       var navHtml = '';
       if (urls.length > 1) {
         navHtml = '<div style="display:flex;gap:14px;align-items:center;margin-top:14px;flex-wrap:wrap;justify-content:center;">' +
@@ -49381,18 +49319,7 @@ async function renderBoardsTab(T, proj) {
       } catch(e) {}
 
       try {
-        // Use allSettled: one failing sub-read (index, rules, network) must not wipe ideabooks/clips/etc.
-        // Promise.all + empty catch caused "No inspiration boards" when e.g. `files` or `notes` query failed alone.
-        var _cpEmptySnap = { forEach: function() {} };
-        function _cpSnapFromSettled(st, label) {
-          if (st.status === 'fulfilled') return st.value;
-          var err = st.reason;
-          try {
-            console.warn('[client portal] load ' + label + ':', (err && err.message) || err);
-          } catch (_eL) {}
-          return _cpEmptySnap;
-        }
-        var _cpSettled = await Promise.allSettled([
+        var [clipSnap, propSnap, invSnap, noteSnap, ibSnap, msgSnap, rmSnap, docSnap, wnSnap] = await Promise.all([
           db.collection('boards').doc(projectId).collection('clips').get(),
           db.collection('boards').doc(projectId).collection('proposals').get(),
           db.collection('boards').doc(projectId).collection('invoices').get(),
@@ -49401,19 +49328,8 @@ async function renderBoardsTab(T, proj) {
           db.collection('boards').doc(projectId).collection('messages').orderBy('createdAt','desc').limit(50).get().catch(function(){ return db.collection('boards').doc(projectId).collection('messages').limit(50).get(); }),
           db.collection('boards').doc(projectId).collection('roomMeta').get(),
           db.collection('boards').doc(projectId).collection('clientDocuments').orderBy('createdAt','desc').limit(100).get().catch(function(){ return db.collection('boards').doc(projectId).collection('clientDocuments').limit(100).get(); }),
-          db.collection('boards').doc(projectId).collection('whatsNew').orderBy('createdAt','desc').limit(20).get().catch(function(){ return db.collection('boards').doc(projectId).collection('whatsNew').limit(20).get(); }),
-          db.collection('boards').doc(projectId).collection('files').orderBy('createdAt', 'desc').limit(150).get().catch(function(){ return db.collection('boards').doc(projectId).collection('files').limit(150).get(); })
+          db.collection('boards').doc(projectId).collection('whatsNew').orderBy('createdAt','desc').limit(20).get().catch(function(){ return db.collection('boards').doc(projectId).collection('whatsNew').limit(20).get(); })
         ]);
-        var clipSnap = _cpSnapFromSettled(_cpSettled[0], 'clips');
-        var propSnap = _cpSnapFromSettled(_cpSettled[1], 'proposals');
-        var invSnap = _cpSnapFromSettled(_cpSettled[2], 'invoices');
-        var noteSnap = _cpSnapFromSettled(_cpSettled[3], 'notes');
-        var ibSnap = _cpSnapFromSettled(_cpSettled[4], 'ideabooks');
-        var msgSnap = _cpSnapFromSettled(_cpSettled[5], 'messages');
-        var rmSnap = _cpSnapFromSettled(_cpSettled[6], 'roomMeta');
-        var docSnap = _cpSnapFromSettled(_cpSettled[7], 'clientDocuments');
-        var wnSnap = _cpSnapFromSettled(_cpSettled[8], 'whatsNew');
-        var fileSnap = _cpSnapFromSettled(_cpSettled[9], 'files');
         clipSnap.forEach(function(d) { clips.push({ id: d.id, ...d.data() }); });
         propSnap.forEach(function(d) { var p = d.data(); proposals.push({ id: d.id, ...p }); });
         invSnap.forEach(function(d) { var inv = d.data(); invoices.push({ id: d.id, ...inv }); });
@@ -49426,15 +49342,8 @@ async function renderBoardsTab(T, proj) {
         msgSnap.forEach(function(d) { messages.push({ id: d.id, ...d.data() }); });
         rmSnap.forEach(function(d) { var rm = d.data(); if (rm.name) roomMeta[rm.name] = rm; });
         docSnap.forEach(function(d) { clientDocuments.push({ id: d.id, ...d.data() }); });
-        var projectFiles = [];
-        fileSnap.forEach(function(d) { projectFiles.push({ id: d.id, ...d.data() }); });
-        portalMergedDocs = typeof cpBuildMergedPortalDocuments === 'function'
-          ? cpBuildMergedPortalDocuments(clientDocuments, projectFiles)
-          : [];
         wnSnap.forEach(function(d) { whatsNewItems.push({ id: d.id, ...d.data() }); });
-      } catch(e) {
-        try { console.warn('[client portal] portal batch outer:', (e && e.message) || e); } catch (_eO) {}
-      }
+      } catch(e) {}
 
       try {
         var actSnap = await db.collection('activity').where('projectId', '==', projectId).orderBy('createdAt', 'desc').limit(60).get();
@@ -49815,7 +49724,6 @@ async function renderBoardsTab(T, proj) {
         var sbAct = function(slug) {
           if (isProposalRoute) return slug === 'proposals';
           if (slug === 'messages') return activePage === 'messages';
-          if (slug === 'inspiration') return activePage === 'inspirations' || activePage === 'inspirationBoard';
           return activePage === slug;
         };
         var _msgBadgeCt = messages.length > 0 ? String(Math.min(messages.length, 9)) : '';
@@ -50104,7 +50012,7 @@ async function renderBoardsTab(T, proj) {
               var _inspCardHash = '#/clientview/' + projectId + '/inspirations/' + ib.id;
               html += '<div class="cp-board-list-item" style="cursor:pointer;" role="link" tabindex="0" onclick="navigate(\'' + escAttr(_inspCardHash) + '\')">' +
                 '<div class="cp-inspiration-card">' +
-                (iu ? '<img class="cp-inspiration-cover-img" src="' + _escImgSrcAttr(iu) + '" alt="" referrerpolicy="no-referrer" style="filter:grayscale(30%);" onerror="this.style.opacity=\'0\';this.style.visibility=\'hidden\';var fb=this.parentNode&&this.parentNode.querySelector(\'.cp-inspiration-cover-fallback\');if(fb){fb.style.display=\'flex\';}">' : '') +
+                (iu ? '<img class="cp-inspiration-cover-img" src="' + escAttr(String(iu).trim()) + '" alt="" referrerpolicy="no-referrer" style="filter:grayscale(30%);" onerror="this.style.opacity=\'0\';this.style.visibility=\'hidden\';var fb=this.parentNode&&this.parentNode.querySelector(\'.cp-inspiration-cover-fallback\');if(fb){fb.style.display=\'flex\';}">' : '') +
                 '<div class="cp-inspiration-cover-fallback" style="display:' + (iu ? 'none' : 'flex') + ';filter:grayscale(30%);">\u273F</div>' +
                 '</div>' +
                 '<div class="cp-board-list-title">' + esc(tit) + '</div>' +
@@ -50361,30 +50269,17 @@ async function renderBoardsTab(T, proj) {
         }
         var _ibPreview = cpResolveClientHomeConceptBoards(proj, ideabooks);
         if (_ibPreview.length) {
-          // Home strip may show Niice/inspiration boards — links must NOT all go to /concepts (that page is design-story only).
-          var _inspListHash = _baseHash + '/inspiration';
-          function _cpHomeInspirationTileNavigate(ib) {
-            if (!ib || !ib.id) return _inspListHash;
-            if (typeof cpPortalInspirationIdeabook === 'function' && cpPortalInspirationIdeabook(ib)) {
-              return _baseHash + '/inspirations/' + String(ib.id);
-            }
-            if (typeof cpPortalConceptIdeabook === 'function' && cpPortalConceptIdeabook(ib)) {
-              return _baseHash + '/concepts';
-            }
-            return _inspListHash;
-          }
           html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
             '<div class="cp-sec-label-jx" style="margin:0;border:none;padding:0;">Inspiration Boards</div>' +
-            '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 0;font-size:11px;color:#9CA3AF;border:none;text-transform:uppercase;letter-spacing:0.1em;" onclick="navigate(\'' + escAttr(_inspListHash) + '\')">View All \u2192</button></div>' +
+            '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 0;font-size:11px;color:#9CA3AF;border:none;text-transform:uppercase;letter-spacing:0.1em;" onclick="navigate(\'' + escAttr(_baseHash + '/concepts') + '\')">View All \u2192</button></div>' +
             '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:40px;">';
           _ibPreview.forEach(function(ib) {
             var iu = cpIdeabookCoverUrl(ib);
             var tit = ib.name || ib.title || 'Board';
             var ic = cpIdeabookItemCount(ib);
-            var _tileNav = _cpHomeInspirationTileNavigate(ib);
-            html += '<div style="cursor:pointer;" onclick="navigate(\'' + escAttr(_tileNav) + '\')">' +
+            html += '<div style="cursor:pointer;" onclick="navigate(\'' + escAttr(_baseHash + '/concepts') + '\')">' +
               '<div style="overflow:hidden;aspect-ratio:1;border:1px solid #E2E2E2;">' +
-              (iu ? '<img src="' + _escImgSrcAttr(iu) + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" referrerpolicy="no-referrer">' : '<div style="width:100%;height:100%;background:#FAFAFA;"></div>') +
+              (iu ? '<img src="' + escAttr(iu) + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" referrerpolicy="no-referrer">' : '<div style="width:100%;height:100%;background:#FAFAFA;"></div>') +
               '</div><div style="font-size:12px;font-weight:500;color:#0A1F3D;margin-top:10px;font-family:\'DM Sans\',sans-serif;">' + esc(tit) + '</div>' +
               '<div style="font-size:11px;color:#9CA3AF;margin-top:2px;">' + ic + ' items</div></div>';
           });

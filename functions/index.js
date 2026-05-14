@@ -657,12 +657,12 @@ async function runPushInvoiceToQBCore(projectId, docId, sendEmail) {
 
   const projSnap = await db.collection("boards").doc(projectId).get();
   const proj = projSnap.exists ? projSnap.data() : {};
-  const clientName = proj.clientName || invoice.clientName || "";
   const clientEmail = proj.clientEmail || invoice.clientEmail || "";
+  const displayNameCandidates = qbCustomerDisplayNameCandidates(proj, invoice, projectId);
 
-  if (!clientName) {
+  if (!displayNameCandidates.length) {
     throw new functions.https.HttpsError("failed-precondition",
-      "Client name is required. Set the client name on the project before pushing to QB.");
+      "Set the project name and/or client name on the project (or qbCustomerId under Integrations) before pushing to QuickBooks.");
   }
 
   if (!invoice.items || invoice.items.length === 0) {
@@ -678,7 +678,15 @@ async function runPushInvoiceToQBCore(projectId, docId, sendEmail) {
   try {
     const { accessToken, realmId } = await getQBAccessToken();
 
-    const customerId = await findOrCreateCustomer(accessToken, realmId, clientName, clientEmail);
+    const projRef = db.collection("boards").doc(projectId);
+    const customerId = await resolveQbCustomerIdForPush(
+      accessToken,
+      realmId,
+      displayNameCandidates,
+      clientEmail,
+      projRef,
+      proj
+    );
 
     const QB_ITEMS = { product: "7718", designFee: "7719", shipping: "7720", tax: "7721", reimbursable: "7722", subcontractor: "7723", sample: "7724" };
 
@@ -813,28 +821,155 @@ async function runPushInvoiceToQBCore(projectId, docId, sendEmail) {
   }
 }
 
-// ─── FIND OR CREATE CUSTOMER ─────────────────────────────────────
-async function findOrCreateCustomer(accessToken, realmId, clientName, clientEmail) {
-  if (!clientName) throw new functions.https.HttpsError("invalid-argument", "Client name is required");
+// Ordered QuickBooks Customer DisplayName tries: project/job labels first (QB often uses
+// "7225 Bugletrail" or "Green Hixon"), then person client name. Deduped case-insensitively.
+function qbCustomerDisplayNameCandidates(proj, invoice, projectId) {
+  const out = [];
+  const seen = new Set();
+  function add(raw) {
+    const t = String(raw || "").trim();
+    if (!t) return;
+    const k = t.toLowerCase();
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push(t);
+  }
+  const p = proj || {};
+  const inv = invoice || {};
+  const clientLower = String(p.clientName || inv.clientName || inv.client || "").trim().toLowerCase();
 
-  const searchName = clientName.replace(/'/g, "\\'");
-  const query = `select * from Customer where DisplayName = '${searchName}'`;
+  add(p.name);
+  add(p.projectName);
+  add(inv.projectName);
+  add(p.title);
+  add(p.slug);
+
+  const pn = String(p.name || "").trim();
+  if (pn) {
+    const parts = pn
+      .split(/\s*[\u2013\u2014\-]\s*/)
+      .map(s => s.trim())
+      .filter(Boolean);
+    if (parts.length > 1) {
+      // Avoid "Client - Green Hixon" matching QB "Client" before "Green Hixon": try longer /
+      // job-code-like segments before short segments that may equal a person name.
+      const sorted = parts.slice().sort((a, b) => {
+        const da = /^\d/.test(a);
+        const db = /^\d/.test(b);
+        if (da !== db) return da ? -1 : 1;
+        const la = a.toLowerCase();
+        const lb = b.toLowerCase();
+        const ea = clientLower && la === clientLower;
+        const eb = clientLower && lb === clientLower;
+        if (ea !== eb) return ea ? 1 : -1;
+        return b.length - a.length;
+      });
+      sorted.forEach(add);
+    }
+  }
+
+  add(p.clientName);
+  add(inv.clientName);
+  add(inv.client);
+  if (out.length === 0 && projectId) {
+    add(String(projectId).replace(/-/g, " "));
+  }
+  return out;
+}
+
+// ─── RESOLVE QB CUSTOMER (no auto-create) ────────────────────────
+// 1) boards/{projectId}.qbCustomerId (numeric QB Id) wins.
+// 2) Else try each DisplayName candidate (project name before client name) against QuickBooks;
+//    on first match persist qbCustomerId on the board.
+// 3) Else failed-precondition — Studio must not create new QB customers from a push.
+async function resolveQbCustomerIdForPush(accessToken, realmId, displayNameCandidates, clientEmail, projRef, proj) {
+  const candidates = Array.isArray(displayNameCandidates)
+    ? displayNameCandidates.map(c => String(c || "").trim()).filter(Boolean)
+    : [];
+
+  const existingQbId = proj && proj.qbCustomerId != null ? String(proj.qbCustomerId).trim() : "";
+  if (existingQbId && /^\d+$/.test(existingQbId)) {
+    return existingQbId;
+  }
+
+  if (!candidates.length) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "No project or client names available to match a QuickBooks customer."
+    );
+  }
+
+  for (const tryDisplay of candidates) {
+    const searchName = tryDisplay.replace(/'/g, "\\'");
+    const query = `select * from Customer where DisplayName = '${searchName}'`;
+    const searchResult = await qbApiCall("GET",
+      "query?query=" + encodeURIComponent(query), accessToken, realmId);
+
+    if (searchResult.QueryResponse && searchResult.QueryResponse.Customer &&
+        searchResult.QueryResponse.Customer.length > 0) {
+      const id = searchResult.QueryResponse.Customer[0].Id;
+      if (projRef) {
+        await projRef.update({ qbCustomerId: id }).catch(() => {});
+      }
+      return id;
+    }
+  }
+
+  throw new functions.https.HttpsError(
+    "failed-precondition",
+    "QuickBooks: no customer is linked to this project. Creating new QuickBooks customers from Studio is disabled. " +
+      "Set qbCustomerId on the project (Integrations), or use a QuickBooks customer DisplayName that matches the " +
+      "project name or client name. Names tried (in order): " +
+      candidates.slice(0, 8).map(c => "\"" + c + "\"").join(", ") +
+      (candidates.length > 8 ? " …" : "") + "."
+  );
+}
+
+// ─── RESOLVE QB VENDOR (no auto-create) ──────────────────────────
+// 1) vendors collection doc where name == PO vendor string and qbVendorId set.
+// 2) Else exact Vendor DisplayName in QuickBooks; on match persist qbVendorId on that vendor doc.
+// 3) Else failed-precondition.
+async function resolveQbVendorIdForPush(accessToken, realmId, vendorName) {
+  const vn = (vendorName || "").trim();
+  if (!vn) {
+    throw new functions.https.HttpsError("invalid-argument", "Vendor name is required");
+  }
+
+  let vendorDocRef = null;
+  try {
+    const vs = await db.collection("vendors").where("name", "==", vn).limit(1).get();
+    if (!vs.empty) {
+      vendorDocRef = vs.docs[0].ref;
+      const vd = vs.docs[0].data() || {};
+      const qid = vd.qbVendorId != null ? String(vd.qbVendorId).trim() : "";
+      if (qid && /^\d+$/.test(qid)) {
+        return qid;
+      }
+    }
+  } catch (e) {
+    console.warn("[resolveQbVendorIdForPush] Firestore vendors lookup:", e && e.message);
+  }
+
+  const searchName = vn.replace(/'/g, "\\'");
+  const query = `select * from Vendor where DisplayName = '${searchName}'`;
   const searchResult = await qbApiCall("GET",
     "query?query=" + encodeURIComponent(query), accessToken, realmId);
 
-  if (searchResult.QueryResponse && searchResult.QueryResponse.Customer &&
-      searchResult.QueryResponse.Customer.length > 0) {
-    return searchResult.QueryResponse.Customer[0].Id;
+  if (searchResult.QueryResponse && searchResult.QueryResponse.Vendor &&
+      searchResult.QueryResponse.Vendor.length > 0) {
+    const id = searchResult.QueryResponse.Vendor[0].Id;
+    if (vendorDocRef) {
+      await vendorDocRef.update({ qbVendorId: id }).catch(() => {});
+    }
+    return id;
   }
 
-  // Not found — create new customer
-  const newCustomer = {
-    DisplayName: clientName,
-    PrimaryEmailAddr: clientEmail ? { Address: clientEmail } : undefined
-  };
-
-  const created = await qbApiCall("POST", "customer", accessToken, realmId, newCustomer);
-  return created.Customer.Id;
+  throw new functions.https.HttpsError(
+    "failed-precondition",
+    "QuickBooks: no vendor is linked for \"" + vn + "\". Creating new QuickBooks vendors from Studio is disabled. " +
+      "In Studio → Vendors → Edit this vendor (name must match the PO vendor field exactly) and set QuickBooks vendor Id, " +
+      "or create the vendor in QuickBooks with DisplayName exactly matching the PO vendor name."
+  );
 }
 
 // ─── PUSH INVOICE → QB (callable: requires CCH Firebase sign-in on allow-list) ──
@@ -1246,19 +1381,7 @@ exports.pushPOToQB = qbRuntime.https.onCall(
 
   try {
   const { accessToken, realmId } = await getQBAccessToken();
-  const searchName = vendorName.replace(/'/g, "\\'");
-  const query = `select * from Vendor where DisplayName = '${searchName}'`;
-  const searchResult = await qbApiCall("GET",
-    "query?query=" + encodeURIComponent(query), accessToken, realmId);
-
-  let vendorId;
-  if (searchResult.QueryResponse && searchResult.QueryResponse.Vendor &&
-      searchResult.QueryResponse.Vendor.length > 0) {
-    vendorId = searchResult.QueryResponse.Vendor[0].Id;
-  } else {
-    const created = await qbApiCall("POST", "vendor", accessToken, realmId, { DisplayName: vendorName });
-    vendorId = created.Vendor.Id;
-  }
+  const vendorId = await resolveQbVendorIdForPush(accessToken, realmId, vendorName);
 
   // Studio QB Item IDs for PO expense mapping
   const QB_ITEMS_PO = { product: "7718", shipping: "7720", tax: "7721", sample: "7724", subcontractor: "7723" };

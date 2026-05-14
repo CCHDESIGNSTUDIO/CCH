@@ -100,29 +100,143 @@ async function qbApiCall(method, endpoint, accessToken, body) {
   return data;
 }
 
-// ─── FIND OR CREATE CUSTOMER ─────────────────────────────────────
-async function findOrCreateCustomer(accessToken, clientName, clientEmail) {
-  if (!clientName) throw new functions.https.HttpsError("invalid-argument", "Client name is required");
+// Ordered QuickBooks Customer DisplayName tries (see Functions/index.js).
+function qbCustomerDisplayNameCandidates(proj, invoice, projectId) {
+  const out = [];
+  const seen = new Set();
+  function add(raw) {
+    const t = String(raw || "").trim();
+    if (!t) return;
+    const k = t.toLowerCase();
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push(t);
+  }
+  const p = proj || {};
+  const inv = invoice || {};
+  const clientLower = String(p.clientName || inv.clientName || inv.client || "").trim().toLowerCase();
 
-  // Search by name first
-  const searchName = clientName.replace(/'/g, "\\'");
-  const query = `select * from Customer where DisplayName = '${searchName}'`;
+  add(p.name);
+  add(p.projectName);
+  add(inv.projectName);
+  add(p.title);
+  add(p.slug);
+
+  const pn = String(p.name || "").trim();
+  if (pn) {
+    const parts = pn
+      .split(/\s*[\u2013\u2014\-]\s*/)
+      .map(s => s.trim())
+      .filter(Boolean);
+    if (parts.length > 1) {
+      const sorted = parts.slice().sort((a, b) => {
+        const da = /^\d/.test(a);
+        const db = /^\d/.test(b);
+        if (da !== db) return da ? -1 : 1;
+        const la = a.toLowerCase();
+        const lb = b.toLowerCase();
+        const ea = clientLower && la === clientLower;
+        const eb = clientLower && lb === clientLower;
+        if (ea !== eb) return ea ? 1 : -1;
+        return b.length - a.length;
+      });
+      sorted.forEach(add);
+    }
+  }
+
+  add(p.clientName);
+  add(inv.clientName);
+  add(inv.client);
+  if (out.length === 0 && projectId) {
+    add(String(projectId).replace(/-/g, " "));
+  }
+  return out;
+}
+
+// ─── RESOLVE QB CUSTOMER (no auto-create) ────────────────────────
+async function resolveQbCustomerIdForPush(accessToken, displayNameCandidates, clientEmail, projRef, proj) {
+  const candidates = Array.isArray(displayNameCandidates)
+    ? displayNameCandidates.map(c => String(c || "").trim()).filter(Boolean)
+    : [];
+
+  const existingQbId = proj && proj.qbCustomerId != null ? String(proj.qbCustomerId).trim() : "";
+  if (existingQbId && /^\d+$/.test(existingQbId)) {
+    return existingQbId;
+  }
+
+  if (!candidates.length) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "No project or client names available to match a QuickBooks customer."
+    );
+  }
+
+  for (const tryDisplay of candidates) {
+    const searchName = tryDisplay.replace(/'/g, "\\'");
+    const query = `select * from Customer where DisplayName = '${searchName}'`;
+    const searchResult = await qbApiCall("GET",
+      "query?query=" + encodeURIComponent(query), accessToken);
+
+    if (searchResult.QueryResponse && searchResult.QueryResponse.Customer &&
+        searchResult.QueryResponse.Customer.length > 0) {
+      const id = searchResult.QueryResponse.Customer[0].Id;
+      if (projRef) {
+        await projRef.update({ qbCustomerId: id }).catch(() => {});
+      }
+      return id;
+    }
+  }
+
+  throw new functions.https.HttpsError(
+    "failed-precondition",
+    "QuickBooks: no customer is linked to this project. Creating new QuickBooks customers from Studio is disabled. " +
+      "Set qbCustomerId on the project (board), or match DisplayName in QuickBooks. Names tried (in order): " +
+      candidates.slice(0, 8).map(c => "\"" + c + "\"").join(", ") +
+      (candidates.length > 8 ? " …" : "") + "."
+  );
+}
+
+// ─── RESOLVE QB VENDOR (no auto-create) — legacy functions file ──
+async function resolveQbVendorIdForPush(accessToken, vendorName) {
+  const vn = (vendorName || "").trim();
+  if (!vn) {
+    throw new functions.https.HttpsError("invalid-argument", "Vendor name is required on the PO");
+  }
+
+  let vendorDocRef = null;
+  try {
+    const vs = await db.collection("vendors").where("name", "==", vn).limit(1).get();
+    if (!vs.empty) {
+      vendorDocRef = vs.docs[0].ref;
+      const vd = vs.docs[0].data() || {};
+      const qid = vd.qbVendorId != null ? String(vd.qbVendorId).trim() : "";
+      if (qid && /^\d+$/.test(qid)) {
+        return qid;
+      }
+    }
+  } catch (e) {
+    console.warn("[resolveQbVendorIdForPush] Firestore:", e && e.message);
+  }
+
+  const searchName = vn.replace(/'/g, "\\'");
+  const query = `select * from Vendor where DisplayName = '${searchName}'`;
   const searchResult = await qbApiCall("GET",
     "query?query=" + encodeURIComponent(query), accessToken);
 
-  if (searchResult.QueryResponse && searchResult.QueryResponse.Customer &&
-      searchResult.QueryResponse.Customer.length > 0) {
-    return searchResult.QueryResponse.Customer[0].Id;
+  if (searchResult.QueryResponse && searchResult.QueryResponse.Vendor &&
+      searchResult.QueryResponse.Vendor.length > 0) {
+    const id = searchResult.QueryResponse.Vendor[0].Id;
+    if (vendorDocRef) {
+      await vendorDocRef.update({ qbVendorId: id }).catch(() => {});
+    }
+    return id;
   }
 
-  // Not found — create new customer
-  const newCustomer = {
-    DisplayName: clientName,
-    PrimaryEmailAddr: clientEmail ? { Address: clientEmail } : undefined
-  };
-
-  const created = await qbApiCall("POST", "customer", accessToken, newCustomer);
-  return created.Customer.Id;
+  throw new functions.https.HttpsError(
+    "failed-precondition",
+    "QuickBooks: no vendor is linked for \"" + vn + "\". Set qbVendorId on the vendor in Studio, " +
+      "or match DisplayName in QuickBooks exactly. Creating vendors from a PO push is disabled."
+  );
 }
 
 // ─── PUSH INVOICE → QB (with Payment Request email) ─────────────
@@ -153,13 +267,18 @@ exports.pushInvoiceToQB = functions.https.onCall(async (data, context) => {
   const accessToken = await getAccessToken();
 
   // Get project info for client details
-  const projSnap = await db.collection("boards").doc(projectId).get();
+  const projRef = db.collection("boards").doc(projectId);
+  const projSnap = await projRef.get();
   const proj = projSnap.exists ? projSnap.data() : {};
-  const clientName = proj.clientName || invoice.clientName || "Unknown Client";
   const clientEmail = proj.clientEmail || invoice.clientEmail || "";
+  const displayNameCandidates = qbCustomerDisplayNameCandidates(proj, invoice, projectId);
 
-  // Find or create customer in QB
-  const customerId = await findOrCreateCustomer(accessToken, clientName, clientEmail);
+  if (!displayNameCandidates.length) {
+    throw new functions.https.HttpsError("failed-precondition",
+      "Set the project name and/or client name before pushing to QuickBooks, or set qbCustomerId on the board.");
+  }
+
+  const customerId = await resolveQbCustomerIdForPush(accessToken, displayNameCandidates, clientEmail, projRef, proj);
 
   // Build QB Invoice
   // Use "Description only" lines (SalesItemLineDetail with a generic service item)
@@ -255,23 +374,8 @@ exports.pushPOToQB = functions.https.onCall(async (data, context) => {
 
   const accessToken = await getAccessToken();
 
-  // For POs, the vendor is the "customer" equivalent
-  const vendorName = po.vendor || po.vendorName || "Unknown Vendor";
-  // Search for vendor
-  const searchName = vendorName.replace(/'/g, "\\'");
-  const query = `select * from Vendor where DisplayName = '${searchName}'`;
-  const searchResult = await qbApiCall("GET",
-    "query?query=" + encodeURIComponent(query), accessToken);
-
-  let vendorId;
-  if (searchResult.QueryResponse && searchResult.QueryResponse.Vendor &&
-      searchResult.QueryResponse.Vendor.length > 0) {
-    vendorId = searchResult.QueryResponse.Vendor[0].Id;
-  } else {
-    // Create vendor
-    const created = await qbApiCall("POST", "vendor", accessToken, { DisplayName: vendorName });
-    vendorId = created.Vendor.Id;
-  }
+  const vendorName = po.vendor || po.vendorName || "";
+  const vendorId = await resolveQbVendorIdForPush(accessToken, vendorName);
 
   const lineItems = (po.items || []).map((item, idx) => ({
     LineNum: idx + 1,

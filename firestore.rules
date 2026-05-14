@@ -14,91 +14,173 @@ service cloud.firestore {
       );
     }
 
+    // --- Client portal (no Firebase Auth): narrow helpers ---
+    // Published proposals: clients may run multi-field updates from the portal UI
+    // (line approvals, totals, activityLog arrayUnion). Full field-level parity with
+    // the app is not expressible here; tighten further with Callable + auth when ready.
+    function portalPublishedProposalUpdate() {
+      return !isAuth()
+        && resource.data.published == true
+        && request.resource.data.published == true;
+    }
+
+    function portalProposalSeenUpdate() {
+      return !isAuth()
+        && resource.data.published == true
+        && request.resource.data.published == true
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'clientPortalSeenAt', 'updatedAt']);
+    }
+
+    function portalClientMessageCreate() {
+      return !isAuth()
+        && request.resource.data.keys().hasAll(['text', 'author', 'from', 'createdAt', 'type'])
+        && request.resource.data.keys().hasOnly(['text', 'author', 'from', 'createdAt', 'type'])
+        && request.resource.data.author == 'Client'
+        && request.resource.data.from == 'client'
+        && request.resource.data.type == 'client';
+    }
+
+    function portalClientDocumentReviewUpdate() {
+      return !isAuth()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'reviewedAt', 'updatedAt']);
+    }
+
+    function portalActivityCreate() {
+      return !isAuth()
+        && request.resource.data.user == 'Client'
+        && request.resource.data.type == 'proposal'
+        && request.resource.data.keys().hasAll(['type', 'action', 'description', 'projectId', 'user', 'timestamp'])
+        && request.resource.data.meta is map;
+    }
+
     // Admin config (QB tokens, etc.) — admin only
     match /admin/{docId} {
       allow read: if isAdmin();
       allow write: if isAdmin();
     }
 
-    // -------------------------------------------------------------------------
-    // boards/{projectId} — financial subcollections (invoices, proposals, purchaseOrders)
-    //
-    // Writes use isAuth() so any signed-in Studio user can edit line costs and docs.
-    // That still removes anonymous tampering (the old wildcard was allow write: true).
-    //
-    // Top-level /invoices, /proposals, /purchaseOrders (later in this file) stay isAdmin() write —
-    // those paths are legacy; live Studio data is almost always under boards/... .
-    //
-    // Stronger options (not implemented here — need real Auth + data shape):
-    // - Custom claim (e.g. request.auth.token.admin) plus isAdmin() for writes; set claims in Firebase Admin.
-    // - isProjectMember(projectId) using get(/boards/$(projectId)) only if board docs store
-    //   stable member UIDs or emails you can match against request.auth.
-    // - Avoid get() in hot rules if you can; each get() bills a document read per evaluation.
-    //
-    // payments: there is no boards/.../payments subcollection — payments live as fields on docs.
-    // -------------------------------------------------------------------------
-    // Boards: board doc + non-financial subcollections stay permissive for Clipper / room board tools.
+    // boards/{projectId} — project document (not subcollections)
     match /boards/{projectId} {
+      // Client portal loads the board doc without auth (index.html renderClientPortal / renderClientView).
       allow read: if true;
-      allow write: if true;
+      // All board-document field writes in Studio are signed-in (invoiceCount, clipCount, etc.).
+      allow write: if isAuth();
+
+      // Financial subcollections — Studio must be signed in. No catch-all OR that bypasses this.
       match /purchaseOrders/{docId} {
         allow read: if isAuth();
         allow write: if isAuth();
       }
       match /invoices/{docId} {
-        allow read: if isAuth();
+        allow read: if true;
         allow write: if isAuth();
       }
       match /proposals/{docId} {
+        allow read: if true;
+        allow create, delete: if isAuth();
+        allow update: if isAuth()
+          || portalProposalSeenUpdate()
+          || portalPublishedProposalUpdate();
+      }
+
+      // Portal-visible / Studio subcollections (explicit list — no public wildcard)
+      match /clips/{docId} {
+        allow read: if true;
+        allow write: if isAuth();
+      }
+      match /ideabooks/{docId} {
+        allow read: if true;
+        allow write: if isAuth();
+      }
+      match /notes/{docId} {
+        allow read: if true;
+        allow write: if isAuth();
+      }
+      match /tasks/{docId} {
         allow read: if isAuth();
         allow write: if isAuth();
       }
-      match /{sub}/{docId} {
+      match /messages/{docId} {
         allow read: if true;
-        allow write: if true;
+        allow create: if isAuth() || portalClientMessageCreate();
+        allow update, delete: if isAuth();
+      }
+      match /roomMeta/{docId} {
+        allow read: if true;
+        allow write: if isAuth();
+      }
+      match /files/{docId} {
+        allow read: if true;
+        allow write: if isAuth();
+      }
+      match /workOrders/{docId} {
+        allow read: if isAuth();
+        allow write: if isAuth();
+      }
+      match /designBoards/{docId} {
+        allow read: if isAuth();
+        allow write: if isAuth();
+      }
+      match /projectNotes/{docId} {
+        allow read: if isAuth();
+        allow write: if isAuth();
+      }
+      match /clientDocuments/{docId} {
+        allow read: if true;
+        allow create: if isAuth();
+        allow update: if isAuth() || portalClientDocumentReviewUpdate();
+        allow delete: if isAuth();
+      }
+      match /whatsNew/{docId} {
+        allow read: if true;
+        allow write: if isAuth();
       }
     }
 
-    // Settings (vendor list for Clipper)
+    // settings/* — was public read/write; counters + rates + integrations are sensitive.
     match /settings/{docId} {
-      allow read: if true;
-      allow write: if true;
+      allow read: if isAuth();
+      allow write: if isAuth() && (
+        docId == 'docCounters' ||
+        docId == 'serviceRates' ||
+        docId == 'integrations'
+      );
     }
 
-    // Ideabooks (Clipper quick clip)
+    // Legacy top-level ideabooks (renderClientView reads index.html ~49405). Studio uses boards/.../ideabooks.
     match /ideabooks/{docId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    // Desktop time logs — agents use API key
-    match /desktopTimeLogs/{docId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    // Smart Time buckets
-    match /timeBuckets/{docId} {
       allow read: if true;
       allow write: if isAuth();
     }
 
-    // Activity feed
-    match /activity/{docId} {
-      allow read: if true;
-      allow write: if true;
+    // Desktop time logs — Smart Time / import push from signed-in Studio only.
+    match /desktopTimeLogs/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth();
     }
 
-    // Time entries — open read for scripting, auth for write
+    match /timeBuckets/{docId} {
+      allow read: if isAuth() && resource.data.email == request.auth.token.email;
+      allow write: if isAuth() && request.resource.data.email == request.auth.token.email;
+    }
+
+    // Activity: global read still wide (portal + dashboard). Writes: Studio or narrow client rows.
+    match /activity/{docId} {
+      allow read: if true;
+      allow create: if isAuth() || portalActivityCreate();
+      allow update, delete: if isAuth();
+    }
+
     match /timeEntries/{docId} {
       allow read: if true;
       allow write: if isAuth();
     }
 
-    // Financial collections — auth required
     match /invoices/{docId} {
       allow read: if isAuth();
-      allow write: if isAdmin();
+      allow write: if isAuth();
     }
     match /proposals/{docId} {
       allow read: if isAuth();
@@ -106,78 +188,93 @@ service cloud.firestore {
     }
     match /purchaseOrders/{docId} {
       allow read: if isAuth();
-      allow write: if isAdmin();
+      allow write: if isAuth();
     }
-    // Product master library — Clipper extension saves here with API key only (no Firebase Auth)
+
     match /products/{docId} {
       allow read: if true;
       allow create, update: if true;
       allow delete: if isAdmin();
     }
-    // Client directory — Clipper needs read to filter projects; writes stay signed-in users only
+
     match /clients/{docId} {
-      allow read: if true;
+      allow read: if isAuth();
       allow write: if isAuth();
     }
-    // Vendor directory — Clipper needs read + create (“+ New vendor”); edits stay admin-only
+
     match /vendors/{docId} {
       allow read: if true;
+      // Clipper "New vendor" from extension may have no Firebase user — keep open create.
       allow create: if true;
-      allow update, delete: if isAdmin();
+      // Studio users maintain vendor contact + QuickBooks mapping (qbVendorId).
+      allow update: if isAuth();
+      allow delete: if isAdmin();
     }
+
     match /workrooms/{docId} {
       allow read: if isAuth();
       allow write: if isAdmin();
     }
+
     match /reports/{docId} {
       allow read: if isAuth();
       allow write: if isAuth();
     }
+
     match /deliveries/{docId} {
       allow read: if isAuth();
       allow write: if isAdmin();
     }
+
     match /notes/{docId} {
       allow read: if isAuth();
       allow write: if isAuth();
     }
-    match /searchIndex/{docId} {
+
+    match /_searchIndex/{docId} {
       allow read: if isAuth();
       allow write: if isAdmin();
     }
 
-    // Bug & feature requests — any authenticated user can submit
     match /feedbackRequests/{docId} {
       allow read: if isAuth();
       allow write: if isAuth();
     }
 
-    // Product library
+    // Studio writes productLibrary heavily; align rule with app (was admin-only write).
     match /productLibrary/{docId} {
       allow read: if isAuth();
-      allow write: if isAdmin();
+      allow write: if isAuth();
     }
 
-    // Doc counters (invoice/PO/proposal auto-numbering)
+    // Counters live in settings/docCounters in app; deny stray top-level docCounters client access.
     match /docCounters/{docId} {
-      allow read: if isAuth();
-      allow write: if isAdmin();
+      allow read, write: if false;
     }
 
-    // Project tasks & todos
     match /tasks/{docId} {
       allow read: if isAuth();
       allow write: if isAuth();
     }
 
-    // Team & contacts
     match /team/{docId} {
       allow read: if isAuth();
       allow write: if isAuth();
     }
 
-    // Timely logged entries
     match /timelyEntries/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth();
+    }
+
+    // Used by Studio sync UIs (index.html) — was missing from rules (default deny).
+    match /projects/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth();
+    }
+
+    // Internal briefings (index.html ~5938+) — was missing from rules.
+    match /briefings/{docId} {
       allow read: if isAuth();
       allow write: if isAuth();
     }

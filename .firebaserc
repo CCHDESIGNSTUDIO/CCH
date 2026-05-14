@@ -1,9 +1,10 @@
 {
+  "_comment": "DEFAULT IS STAGING. Production requires explicit `firebase use production` or `--project cch-design-boards`. See STOP-READ-FIRST.md.",
   "projects": {
-    "default": "cch-design-boards",
+    "default": "cch-studio-staging",
+    "staging": "cch-studio-staging",
     "production": "cch-design-boards",
-    "prod": "cch-design-boards",
-    "staging": "cch-studio-staging"
+    "prod": "cch-design-boards"
   },
   "targets": {
     "cch-design-boards": {

@@ -1,37 +1,25 @@
 @echo off
-echo ============================================
-echo   CCH Studio - Firebase Deploy
-echo ============================================
 echo.
-
-:: Check if firebase is installed
-where firebase >nul 2>nul
-if %ERRORLEVEL% NEQ 0 (
-    echo Firebase CLI not found. Installing...
-    npm install -g firebase-tools
-    echo.
-    echo Firebase installed. You need to login first:
-    echo   firebase login
-    echo.
-    echo Then run this script again.
-    pause
-    exit /b
-)
-
-:: Check if logged in
-firebase projects:list >nul 2>nul
-if %ERRORLEVEL% NEQ 0 (
-    echo Not logged in to Firebase. Logging in...
-    firebase login
-    echo.
-)
-
-echo Deploying production hosting: platform (cch-platform.web.app)...
+echo ================================================================
+echo                                                                .
+echo   DEPLOY.bat has been DISABLED as of May 13, 2026.             .
+echo                                                                .
+echo   Reason: too many production deploys were happening without   .
+echo   staging tests, including the Apr 20 outage.                  .
+echo                                                                .
+echo   Use one of these instead:                                    .
+echo                                                                .
+echo     DEPLOY-STAGING.bat                                         .
+echo         -- Default. Ships to cch-platform-staging.web.app.     .
+echo         -- Always start here.                                  .
+echo                                                                .
+echo     DEPLOY-PRODUCTION-DANGER.bat                               .
+echo         -- Only after staging is tested AND Cindy approves.    .
+echo         -- Requires typed confirmation.                        .
+echo                                                                .
+echo   Read STOP-READ-FIRST.md before any deploy.                   .
+echo                                                                .
+echo ================================================================
 echo.
-firebase deploy --only hosting:platform
-echo.
-echo ============================================
-echo   Deploy complete!
-echo   Check: https://cch-platform.web.app
-echo ============================================
 pause
+exit /b 1
