@@ -48085,22 +48085,11 @@ async function renderBoardsTab(T, proj) {
     // RESTORED 2026-05-13 from commit 84c1b0b (deleted in 7e57f74).
     // Client portal inspiration star/comment system + helpers.
     // ════════════════════════════════════════════════════════════
-      function _cpBuildRoomCovers(keyArr, bucketMap) {
-        var cov = {};
-        keyArr.forEach(function(rm) {
-          if (roomMeta[rm] && roomMeta[rm].coverImage) cov[rm] = roomMeta[rm].coverImage;
-          else {
-            var list = bucketMap[rm] || [];
-            var img = list.find(function(c) { return c.imageUrl && !String(c.imageUrl).startsWith('data:'); });
-            if (img) cov[rm] = img.imageUrl;
-          }
-        });
-        return cov;
-      }
-
-      function _cpDocUrl(row) {
-        return typeof studioProjectFilePublicUrl === 'function' ? studioProjectFilePublicUrl(row) : String((row && row.url) || '').trim();
-      }
+    // Note: _cpBuildRoomCovers, _cpDocUrl, and _cpSortPortalKeys are nested
+    // helpers defined inside their parent functions (renderClientPortal,
+    // cpBuildMergedPortalDocuments). They reference closure variables
+    // (roomMeta, etc.) so they CANNOT be top-level — Part 1 of the
+    // 2026-05-13 restoration wrongly extracted them; removed 2026-05-13.
 
     function _cpIdeabookRowImageUrl(row) {
       if (row == null) return '';
@@ -48122,14 +48111,6 @@ async function renderBoardsTab(T, proj) {
       }
       return '';
     }
-
-      function _cpSortPortalKeys(keys, tailKey) {
-        return keys.slice().sort(function(a, b) {
-          if (a === tailKey) return 1;
-          if (b === tailKey) return -1;
-          return String(a).localeCompare(String(b));
-        });
-      }
 
     function cpReadStoredClientIdentity() {
       try {
