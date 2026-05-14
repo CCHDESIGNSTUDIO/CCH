@@ -49275,6 +49275,8 @@ async function renderBoardsTab(T, proj) {
       if (focusProposalId == null || focusProposalId === '') focusProposalId = _routeState.proposalId || cpPortalFocusProposalIdFromHash();
       var activePage = forcedPage || _routeState.page || 'home';
       if (activePage === 'communications') activePage = 'messages';
+      var inspirationBoardId = _routeState.inspirationBoardId || null;
+      var roomBoardKey = _routeState.roomBoardKey || null;
 
       var isOwner = typeof isCCHStudioStaffSession === 'function' ? isCCHStudioStaffSession() : false;
       var proj = {}, clips = [], proposals = [], invoices = [], notes = [], ideabooks = [], messages = [], roomMeta = {}, activity = [];
@@ -49302,6 +49304,10 @@ async function renderBoardsTab(T, proj) {
         invSnap.forEach(function(d) { var inv = d.data(); invoices.push({ id: d.id, ...inv }); });
         noteSnap.forEach(function(d) { notes.push({ id: d.id, ...d.data() }); });
         ibSnap.forEach(function(d) { ideabooks.push({ id: d.id, ...d.data() }); });
+        // Filters used by inspiration / concept render blocks (required by staging-imported render)
+        var inspirationIdeabooks = ideabooks.filter(cpPortalInspirationIdeabook);
+        inspirationIdeabooks.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+        var conceptIdeabooks = ideabooks.filter(cpPortalConceptIdeabook);
         msgSnap.forEach(function(d) { messages.push({ id: d.id, ...d.data() }); });
         rmSnap.forEach(function(d) { var rm = d.data(); if (rm.name) roomMeta[rm.name] = rm; });
         docSnap.forEach(function(d) { clientDocuments.push({ id: d.id, ...d.data() }); });
@@ -50233,7 +50239,7 @@ async function renderBoardsTab(T, proj) {
         var _ibPreview = cpResolveClientHomeConceptBoards(proj, ideabooks);
         if (_ibPreview.length) {
           html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
-            '<div class="cp-sec-label-jx" style="margin:0;border:none;padding:0;">Concept Boards</div>' +
+            '<div class="cp-sec-label-jx" style="margin:0;border:none;padding:0;">Inspiration Boards</div>' +
             '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 0;font-size:11px;color:#9CA3AF;border:none;text-transform:uppercase;letter-spacing:0.1em;" onclick="navigate(\'' + escAttr(_baseHash + '/concepts') + '\')">View All \u2192</button></div>' +
             '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:40px;">';
           _ibPreview.forEach(function(ib) {
