@@ -49281,6 +49281,10 @@ async function renderBoardsTab(T, proj) {
       var isOwner = typeof isCCHStudioStaffSession === 'function' ? isCCHStudioStaffSession() : false;
       var proj = {}, clips = [], proposals = [], invoices = [], notes = [], ideabooks = [], messages = [], roomMeta = {}, activity = [];
       var clientDocuments = [], whatsNewItems = [], timeEntries = [];
+      // Safe defaults at top of function — render paths reference these even if try{} below throws.
+      var inspirationIdeabooks = [];
+      var conceptIdeabooks = [];
+      var portalMergedDocs = [];
 
       try {
         var projDoc = await db.collection('boards').doc(projectId).get();
@@ -49304,10 +49308,10 @@ async function renderBoardsTab(T, proj) {
         invSnap.forEach(function(d) { var inv = d.data(); invoices.push({ id: d.id, ...inv }); });
         noteSnap.forEach(function(d) { notes.push({ id: d.id, ...d.data() }); });
         ibSnap.forEach(function(d) { ideabooks.push({ id: d.id, ...d.data() }); });
-        // Filters used by inspiration / concept render blocks (required by staging-imported render)
-        var inspirationIdeabooks = ideabooks.filter(cpPortalInspirationIdeabook);
+        // Reassign filters after ideabooks is populated (declared at top of fn with safe defaults).
+        inspirationIdeabooks = ideabooks.filter(cpPortalInspirationIdeabook);
         inspirationIdeabooks.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
-        var conceptIdeabooks = ideabooks.filter(cpPortalConceptIdeabook);
+        conceptIdeabooks = ideabooks.filter(cpPortalConceptIdeabook);
         msgSnap.forEach(function(d) { messages.push({ id: d.id, ...d.data() }); });
         rmSnap.forEach(function(d) { var rm = d.data(); if (rm.name) roomMeta[rm.name] = rm; });
         docSnap.forEach(function(d) { clientDocuments.push({ id: d.id, ...d.data() }); });
@@ -49702,7 +49706,7 @@ async function renderBoardsTab(T, proj) {
           '<button type="button" class="cp-sb-item' + (sbAct('home') ? ' active' : '') + '" onclick="navigate(\'' + escAttr(_sbHash) + '\')"><span class="cp-sb-icon">\u2302</span> Home</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('messages') ? ' active' : '') + '" onclick="navigate(\'' + escAttr(_sbHash + '/messages') + '\')"><span class="cp-sb-icon">\u2709</span> Messages' + (_msgBadgeCt ? '<span class="cp-sb-badge">' + esc(_msgBadgeCt) + '</span>' : '') + '</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('rooms') ? ' active' : '') + '" onclick="navigate(\'' + escAttr(_sbHash + '/rooms') + '\')"><span class="cp-sb-icon">\u25EB</span> Room Boards</button>' +
-          '<button type="button" class="cp-sb-item' + (sbAct('concepts') ? ' active' : '') + '" onclick="navigate(\'' + escAttr(_sbHash + '/concepts') + '\')"><span class="cp-sb-icon">\u25A7</span> Concept Boards</button>' +
+          // Concept Boards nav item removed 2026-05-13 per Cindy \u2014 to be re-added when type='concept_board' ideabooks exist.
           '<button type="button" class="cp-sb-item' + (sbAct('inspiration') ? ' active' : '') + '" onclick="navigate(\'' + escAttr(_sbHash + '/inspiration') + '\')"><span class="cp-sb-icon">\u273D</span> Inspiration Boards</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('proposals') ? ' active' : '') + '" onclick="navigate(\'' + escAttr(_sbHash + '/proposals') + '\')"><span class="cp-sb-icon">\u25F0</span> Proposals</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('documents') ? ' active' : '') + '" onclick="navigate(\'' + escAttr(_sbHash + '/documents') + '\')"><span class="cp-sb-icon">\u25A4</span> Documents</button>' +
