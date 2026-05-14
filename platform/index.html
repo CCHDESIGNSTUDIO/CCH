@@ -47821,17 +47821,32 @@ async function renderBoardsTab(T, proj) {
 
     function cpPortalRouteStateFromHash(projectId) {
       var p = (window.location.hash || '').replace(/^#\/?/, '').split('/').filter(Boolean);
-      var out = { page: 'home', proposalId: null };
-      if (p[0] !== 'clientview' || p[1] !== projectId) return out;
-      if (p[2] === 'proposal' && p[3]) {
+      var out = { page: 'home', proposalId: null, inspirationBoardId: null, roomBoardKey: null };
+      var pid = String(projectId || '').trim();
+      if (String(p[0] || '').toLowerCase() !== 'clientview' || !p[1]) return out;
+      if (String(p[1]).toLowerCase() !== pid.toLowerCase()) return out;
+      if (String(p[2] || '').toLowerCase() === 'proposal' && p[3]) {
         out.proposalId = p[3];
         out.page = 'proposal';
         return out;
       }
-      var slug = p[2];
+      if (String(p[2] || '').toLowerCase() === 'inspirations' && p[3]) {
+        out.inspirationBoardId = String(p[3] || '').trim();
+        out.page = 'inspirationBoard';
+        return out;
+      }
+      if (String(p[2] || '').toLowerCase() === 'rooms' && p[3]) {
+        try { out.roomBoardKey = decodeURIComponent(String(p[3] || '').replace(/\+/g, '%20')); } catch (_eRbk) { out.roomBoardKey = String(p[3] || ''); }
+        out.page = 'roomBoard';
+        return out;
+      }
+      var slug = String(p[2] || '').toLowerCase();
       if (slug === 'documents' || slug === 'communications' || slug === 'messages' || slug === 'progress' || slug === 'home' ||
-          slug === 'rooms' || slug === 'concepts' || slug === 'inspiration' || slug === 'proposals' || slug === 'invoices') {
-        out.page = slug === 'communications' ? 'messages' : slug;
+          slug === 'rooms' || slug === 'concepts' || slug === 'inspiration' || slug === 'inspirations' || slug === 'designboards' ||
+          slug === 'proposals' || slug === 'invoices') {
+        if (slug === 'communications') out.page = 'messages';
+        else if (slug === 'inspiration') out.page = 'inspirations';
+        else out.page = slug;
       }
       return out;
     }
