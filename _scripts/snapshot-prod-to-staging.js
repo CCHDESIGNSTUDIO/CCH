@@ -76,40 +76,46 @@ const COLLECTION_FILTER = (() => {
 })();
 
 // ---------------------------------------------------------------------------
-// Init both admin SDKs as separate named apps so they don't collide
+// Load keys once; validate project_id from JSON (Admin SDK may not set
+// app.options.projectId when only a credential is supplied).
 
-const prodApp = admin.initializeApp({
-  credential: admin.credential.cert(require(PROD_KEY))
-}, 'prodApp');
+const prodKeyJson = require(PROD_KEY);
+const stagingKeyJson = require(STAGING_KEY);
 
-const stagingApp = admin.initializeApp({
-  credential: admin.credential.cert(require(STAGING_KEY))
-}, 'stagingApp');
-
-const prodDb    = prodApp.firestore();
-const stagingDb = stagingApp.firestore();
-
-// ---------------------------------------------------------------------------
-// Hard safety check: the staging key MUST point at the staging project.
-
-if (stagingApp.options.projectId !== STAGING_PROJECT) {
+if (stagingKeyJson.project_id !== STAGING_PROJECT) {
   console.error('');
-  console.error('FATAL: staging admin SDK is initialized against project');
-  console.error('       "' + stagingApp.options.projectId + '"');
+  console.error('FATAL: staging service account JSON has project_id');
+  console.error('       "' + stagingKeyJson.project_id + '"');
   console.error('       Expected: "' + STAGING_PROJECT + '"');
   console.error('       Aborting before any writes.');
   console.error('');
   process.exit(2);
 }
-if (prodApp.options.projectId !== PROD_PROJECT) {
+if (prodKeyJson.project_id !== PROD_PROJECT) {
   console.error('');
-  console.error('FATAL: prod admin SDK is initialized against project');
-  console.error('       "' + prodApp.options.projectId + '"');
+  console.error('FATAL: prod service account JSON has project_id');
+  console.error('       "' + prodKeyJson.project_id + '"');
   console.error('       Expected: "' + PROD_PROJECT + '"');
   console.error('       Aborting.');
   console.error('');
   process.exit(2);
 }
+
+// ---------------------------------------------------------------------------
+// Init both admin SDKs as separate named apps so they don't collide
+
+const prodApp = admin.initializeApp({
+  credential: admin.credential.cert(prodKeyJson),
+  projectId: prodKeyJson.project_id
+}, 'prodApp');
+
+const stagingApp = admin.initializeApp({
+  credential: admin.credential.cert(stagingKeyJson),
+  projectId: stagingKeyJson.project_id
+}, 'stagingApp');
+
+const prodDb    = prodApp.firestore();
+const stagingDb = stagingApp.firestore();
 
 // ---------------------------------------------------------------------------
 // Counters

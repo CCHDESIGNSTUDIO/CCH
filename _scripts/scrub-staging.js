@@ -62,20 +62,24 @@ const APPLY         = argv.includes('--apply');
 const SCRUB_VENDORS = argv.includes('--scrub-vendors');
 
 // ---------------------------------------------------------------------------
-// Init + hard safety check
+// Init + hard safety check (project_id from key JSON; Admin SDK may not
+// set app.options.projectId when only a credential is supplied).
 
-const stagingApp = admin.initializeApp({
-  credential: admin.credential.cert(require(STAGING_KEY))
-});
+const stagingKeyJson = require(STAGING_KEY);
 
-if (stagingApp.options.projectId !== STAGING_PROJECT) {
+if (stagingKeyJson.project_id !== STAGING_PROJECT) {
   console.error('');
   console.error('FATAL: scrub-staging.js can only run against ' + STAGING_PROJECT + '.');
-  console.error('       This SDK is initialized against "' + stagingApp.options.projectId + '".');
+  console.error('       The staging key has project_id "' + stagingKeyJson.project_id + '".');
   console.error('       Aborting.');
   console.error('');
   process.exit(2);
 }
+
+const stagingApp = admin.initializeApp({
+  credential: admin.credential.cert(stagingKeyJson),
+  projectId: stagingKeyJson.project_id
+});
 
 const db = stagingApp.firestore();
 
