@@ -55,6 +55,60 @@ service cloud.firestore {
         && request.resource.data.meta is map;
     }
 
+    // Room-board clips = furnishing products only (Studio + Clipper). Admin SDK / imports bypass rules.
+    function clipStr(d, k) {
+      return (k in d && d[k] is string) ? d[k] : '';
+    }
+    function clipLower(d, k) {
+      return clipStr(d, k).lower().trim();
+    }
+    function clipBoardForbiddenKinds(d) {
+      let lk = clipLower(d, 'libraryItemKind').replace(' ', '_');
+      let ik = clipLower(d, 'itemKind').replace(' ', '_');
+      return lk == 'expense' || lk == 'labor' || lk == 'design_service' || lk == 'designservice' || lk == 'service'
+        || ik == 'expense' || ik == 'labor' || ik == 'design_service' || ik == 'designservice' || ik == 'service';
+    }
+    function clipBoardForbiddenExpenseType(d) {
+      let et = clipLower(d, 'expenseType');
+      return et == 'expense' || et == 'other_expense' || et == 'labor' || et == 'service'
+        || et == 'shipping' || et == 'handling' || et == 'sales_tax' || et == 'discount';
+    }
+    function clipBoardForbiddenLineMeta(d) {
+      let lt = clipLower(d, 'lineType').replace(' ', '_');
+      let ity = clipLower(d, 'itemType').replace(' ', '_');
+      let cc = clipLower(d, 'cchLineCategory').replace(' ', '_');
+      return lt == 'design_service' || lt == 'designservice' || lt == 'labor' || lt == 'expense'
+        || ity == 'labor' || ity == 'expense' || ity == 'service'
+        || cc == 'design_service' || cc == 'designservice' || cc == 'labor' || cc == 'expense';
+    }
+    function clipBoardForbiddenTitle(d) {
+      let t = clipLower(d, 'title');
+      return t == 'expense' || t == 'expenses' || t == 'labor' || t == 'labour' || t == 'services' || t == 'service'
+        || t == 'design service' || t == 'design services' || t == 'time billing' || t == 'design fee' || t == 'design fees';
+    }
+    function clipBoardForbiddenCatOrRoom(d) {
+      let c = clipLower(d, 'category');
+      let r = clipLower(d, 'room');
+      return c == 'expense' || c == 'expenses' || c == 'labor' || c == 'time billing' || c == 'time track' || c == 'time tracking'
+        || c == 'design fees' || c == 'design services' || c == 'blended design fees' || c == 'blended design services'
+        || c == 'consultation' || c == 'project management' || c == 'pass-through' || c == 'passthrough'
+        || c == 'freight' || c == 'shipping' || c == 'client admin' || c == 'client project services'
+        || c == 'professional services' || c == 'design service' || c == 'service' || c == 'services' || c == 'fees' || c == 'fee'
+        || r == 'expense' || r == 'expenses' || r == 'labor' || r == 'time billing' || r == 'time track' || r == 'time tracking'
+        || r == 'design fees' || r == 'design services' || r == 'blended design fees' || r == 'blended design services'
+        || r == 'consultation' || r == 'project management' || r == 'pass-through' || r == 'passthrough'
+        || r == 'freight' || r == 'shipping' || r == 'client admin' || r == 'client project services'
+        || r == 'professional services' || r == 'design service' || r == 'service' || r == 'services' || r == 'fees' || r == 'fee';
+    }
+    function clipBoardWriteOk(d) {
+      return d is map
+        && !clipBoardForbiddenKinds(d)
+        && !clipBoardForbiddenExpenseType(d)
+        && !clipBoardForbiddenLineMeta(d)
+        && !clipBoardForbiddenTitle(d)
+        && !clipBoardForbiddenCatOrRoom(d);
+    }
+
     // Admin config (QB tokens, etc.) — admin only
     match /admin/{docId} {
       allow read: if isAdmin();
@@ -88,7 +142,9 @@ service cloud.firestore {
       // Portal-visible / Studio subcollections (explicit list — no public wildcard)
       match /clips/{docId} {
         allow read: if true;
-        allow write: if isAuth();
+        allow create: if isAuth() && clipBoardWriteOk(request.resource.data);
+        allow update: if isAuth() && clipBoardWriteOk(request.resource.data);
+        allow delete: if isAuth();
       }
       match /ideabooks/{docId} {
         allow read: if true;
@@ -134,6 +190,10 @@ service cloud.firestore {
         allow delete: if isAuth();
       }
       match /whatsNew/{docId} {
+        allow read: if true;
+        allow write: if isAuth();
+      }
+      match /heroImages/{docId} {
         allow read: if true;
         allow write: if isAuth();
       }

@@ -75,6 +75,95 @@
     return String(t).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, ' ');
   }
 
+  /** Document tag for lists — never falls back to memo/notes. */
+  window.documentTagDisplayText = window.documentTagDisplayText || function(doc) {
+    if (!doc) return '';
+    if (typeof window.proposalDocumentTagText === 'function') return window.proposalDocumentTagText(doc);
+    var s = String(doc.shortDescription || '').trim();
+    if (s) return s;
+    var d = doc.documentTags;
+    if (d != null) {
+      if (Array.isArray(d)) {
+        var j = d.map(function(x) { return String(x || '').trim(); }).filter(Boolean).join(', ');
+        if (j) return j;
+      } else if (String(d).trim()) return String(d).trim();
+    }
+    var t = doc.tags;
+    if (t != null) {
+      if (Array.isArray(t)) {
+        var tj = t.map(function(x) { return String(x || '').trim(); }).filter(Boolean).join(', ');
+        if (tj) return tj;
+      } else if (String(t).trim()) return String(t).trim();
+    }
+    return '';
+  };
+
+  /** Dropdown trigger beside doc # — lists all project proposals, invoices, POs. */
+  window.cchConnectedDocsTitleBtn = function(projectId, docType, docId, docNum) {
+    var jsType = docType === 'po' ? 'po' : (docType === 'invoice' ? 'invoice' : 'proposal');
+    return '<button type="button" class="btn btn-secondary btn-sm cch-conn-docs-btn" style="font-size:11px;padding:4px 10px;margin-left:8px;vertical-align:middle;flex-shrink:0;" ' +
+      'onclick="event.stopPropagation();showConnectedDocs(\'' + cchEscJsStr(projectId) + '\',\'' + jsType + '\',\'' + cchEscJsStr(docId) + '\',\'' + cchEscJsStr(docNum || '') + '\',this)" ' +
+      'title="Linked proposal, invoice, and POs for this document">▾ Connected docs</button>';
+  };
+
+  /** PO-style Summary / Document Tags / Memo — read-only or editable (uses docEdit* save handlers). */
+  window.cchDocTagsMemoBlockHTML = function(docData, opts) {
+    opts = opts || {};
+    var tagsRaw = docData.documentTags != null ? docData.documentTags : docData.tags;
+    var tagsVal = Array.isArray(tagsRaw) ? tagsRaw.join(', ') : String(tagsRaw || '');
+    var memoVal = String(docData.memo || docData.notes || '');
+    if (opts.editable) {
+      var _pid = opts.projectId ? String(opts.projectId).replace(/'/g, "\\'") : '';
+      var _prid = opts.proposalId ? String(opts.proposalId).replace(/'/g, "\\'") : '';
+      var _blurFlush = (_pid && _prid)
+        ? ('onblur="if(typeof flushProposalDocMetaSave===\'function\')flushProposalDocMetaSave(\'' + _pid + '\',\'' + _prid + '\').catch(function(){});"')
+        : 'onblur="if(typeof flushProposalDocMetaSave===\'function\')flushProposalDocMetaSave().catch(function(){});"';
+      return '<div class="cch-doc-tags-memo-block" style="background:#FFFFFF;padding:18px 24px;margin-bottom:20px;border:1px solid rgba(196,164,100,0.08);">' +
+        '<div style="margin-bottom:14px;">' +
+          '<div style="font-size:12px;font-weight:700;margin-bottom:6px;color:var(--gold);letter-spacing:0.3px;">Summary (lists &amp; email subject)</div>' +
+          '<input class="form-input" id="docEditShortDescription" maxlength="200" value="' + escAttr(docData.shortDescription || '') + '" placeholder="Short line for project list &amp; client email subject" oninput="typeof docEditUpdateShortDescription===\'function\'&&docEditUpdateShortDescription()" ' + _blurFlush + ' style="font-size:12px;color:#1B3352;">' +
+        '</div>' +
+        '<div style="margin-bottom:12px;">' +
+          '<div style="font-size:12px;font-weight:700;margin-bottom:6px;color:var(--gold);letter-spacing:0.3px;">Document Tags</div>' +
+          '<input class="form-input" id="docEditTags" value="' + escAttr(tagsVal) + '" placeholder="e.g. Accessories, Phase 1 — Smith bath" oninput="typeof docEditUpdateTags===\'function\'&&docEditUpdateTags()" ' + _blurFlush + ' style="font-size:12px;color:#1B3352;">' +
+        '</div>' +
+        '<div style="margin-bottom:8px;">' +
+          '<div style="font-size:12px;font-weight:700;margin-bottom:6px;color:var(--gold);letter-spacing:0.3px;">Memo</div>' +
+          '<textarea class="form-textarea" id="docEditMemo" rows="3" placeholder="Internal notes (not shown in Document tags column)..." oninput="typeof docEditUpdateMemo===\'function\'&&docEditUpdateMemo()" ' + _blurFlush + ' style="font-size:12px;color:#1B3352;">' + esc(memoVal) + '</textarea>' +
+        '</div>' +
+        (opts.hint ? '<p style="font-size:11px;color:#5C6B80;margin:0;line-height:1.45;">' + opts.hint + '</p>' : '') +
+        '</div>';
+    }
+    var summary = String(docData.shortDescription || '').trim();
+    var tags = String(tagsVal || '').trim();
+    var memo = String(memoVal || '').trim();
+    var dash = '<span style="color:var(--gray-300);">—</span>';
+    var row = function(label, val) {
+      return '<div style="margin-bottom:12px;">' +
+        '<div style="font-size:12px;font-weight:700;margin-bottom:4px;color:var(--gold);letter-spacing:0.3px;">' + label + '</div>' +
+        '<div style="font-size:13px;color:#1B3352;line-height:1.5;white-space:pre-wrap;">' + (val ? esc(val) : dash) + '</div></div>';
+    };
+    return '<div class="cch-doc-tags-memo-block" style="background:#FFFFFF;padding:18px 24px;margin-bottom:20px;border:1px solid rgba(196,164,100,0.08);">' +
+      row('Summary (lists &amp; email subject)', summary) +
+      row('Document Tags', tags) +
+      row('Memo', memo) +
+      (opts.hint ? '<p style="font-size:11px;color:#5C6B80;margin:0;line-height:1.45;">' + opts.hint + '</p>' : '') +
+      '</div>';
+  };
+
+  // Flush proposal Summary/Tags/Memo when leaving edit route without Done editing
+  var _cchPropMetaLastHash = window.location.hash || '';
+  window.addEventListener('hashchange', function() {
+    var prev = _cchPropMetaLastHash;
+    var next = window.location.hash || '';
+    _cchPropMetaLastHash = next;
+    if (prev.indexOf('/proposal/') < 0 || prev.indexOf('/edit') < 0) return;
+    if (next.indexOf('/edit') >= 0) return;
+    if (typeof window.flushProposalDocMetaSave !== 'function') return;
+    if (!window._docEdit || window._docEdit.collection !== 'proposals') return;
+    window.flushProposalDocMetaSave(window._docEdit.projectId, window._docEdit.docId).catch(function() {});
+  });
+
   // ============================================================
   // 1. CSS FIXES — inject styles for visual bugs
   // ============================================================
@@ -392,35 +481,47 @@
 
   function cchPropMoreItem(label, jsAfterClose, danger) {
     var col = danger ? '#B91C1C' : '#1B3352';
-    var st = 'display:block;width:100%;text-align:left;padding:9px 16px;border:none;background:#fff;cursor:pointer;font-size:13px;color:' + col + ';font-family:var(--font-body);';
+    var st = 'display:block;width:100%;text-align:left;padding:9px 14px;border:none;border-radius:6px;background:#fff;cursor:pointer;font-size:13px;color:' + col + ';font-family:var(--font-body);font-weight:500;';
     return '<button type="button" style="' + st + '" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'#fff\'" onclick="cchClosePropMoreDd();' + jsAfterClose + '">' + label + '</button>';
   }
 
-  function cchProposalMoreMenuWrap(projectId, proposalId, isEdit, invDis, tearJs, hasMyItems) {
-    var invBtn = '<button type="button" style="display:block;width:100%;text-align:left;padding:9px 16px;border:none;background:#fff;cursor:pointer;font-size:13px;color:#1B3352;font-family:var(--font-body);" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'#fff\'" ' + invDis + ' onclick="cchClosePropMoreDd();convertProposalToInvoice(\'' + projectId + '\',\'' + proposalId + '\')">🧾 Start Invoice</button>';
+  function cchProposalMoreMenuWrap(projectId, proposalId, isEdit, invDis, tearJs, hasMyItems, isPublished) {
+    var invBtn = '<button type="button" style="display:block;width:100%;text-align:left;padding:9px 14px;border:none;border-radius:6px;background:#fff;cursor:pointer;font-size:13px;color:#1B3352;font-family:var(--font-body);font-weight:500;" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'#fff\'" ' + invDis + ' onclick="cchClosePropMoreDd();convertProposalToInvoice(\'' + projectId + '\',\'' + proposalId + '\')">Start Invoice</button>';
+    var publishLabel = isPublished ? 'Unpublish from Dashboard' : 'Publish to Client Dashboard';
+    var publishJs = "togglePublished('" + projectId + "','" + proposalId + "'," + (isPublished ? 'false' : 'true') + ",'proposals')";
     var inner = '';
     if (isEdit) {
-      inner = cchPropMoreItem('🕐 Timeline', "toggleDocTimeline('" + projectId + "','proposals','" + proposalId + "')") +
-        cchPropMoreItem('📋 Edit details', "editProposalMeta('" + projectId + "','" + proposalId + "')") +
+      inner = (hasMyItems ? cchPropMoreItem('My Items', 'toggleMyItemsPanel()') : '') +
+        cchPropMoreItem('Done editing', "cchProposalDoneEditing('" + projectId + "','" + proposalId + "')") +
+        cchPropMoreItem('Preview / PDF', "previewDocument('proposal','" + projectId + "','" + proposalId + "')") +
+        cchPropMoreItem('Document tag / details', "editProposalMeta('" + projectId + "','" + proposalId + "')") +
+        cchPropMoreItem('Send to client', "sendProposalToClient('" + projectId + "','" + proposalId + "')") +
+        cchPropMoreItem(publishLabel, publishJs) +
+        cchPropMoreItem('Document timeline', "toggleDocTimeline('" + projectId + "','proposals','" + proposalId + "')") +
+        cchPropMoreItem('Tear Sheets', tearJs) +
         invBtn +
-        cchPropMoreItem('📦 Generate POs by Vendor', "generatePOsFromDoc('" + projectId + "','proposals','" + proposalId + "')") +
-        cchPropMoreItem('📄 Tear Sheets', tearJs) +
-        cchPropMoreItem('🖨️ Print / PDF', "printProposal('" + projectId + "','" + proposalId + "')");
-      inner = (hasMyItems ? cchPropMoreItem('📌 My Items', 'toggleMyItemsPanel()') : '') + inner +
-        cchPropMoreItem('🗑️ Delete proposal', "deleteProposal('" + projectId + "','" + proposalId + "')", true);
+        cchPropMoreItem('Generate POs by Vendor', "generatePOsFromDoc('" + projectId + "','proposals','" + proposalId + "')") +
+        cchPropMoreItem('Duplicate proposal', "duplicateProposalAsCopy('" + projectId + "','" + proposalId + "')") +
+        cchPropMoreItem('Link Documents', "linkDocModal('" + projectId + "','proposals','" + proposalId + "')") +
+        cchPropMoreItem('Delete proposal', "deleteProposal('" + projectId + "','" + proposalId + "')", true);
     } else {
-      inner = invBtn +
-        cchPropMoreItem('📦 Create Purchase Orders', "generatePOsFromDoc('" + projectId + "','proposals','" + proposalId + "')") +
-        cchPropMoreItem('📄 View Tear Sheets', tearJs) +
-        cchPropMoreItem('📥 Download PDF', "printProposal('" + projectId + "','" + proposalId + "')") +
-        cchPropMoreItem('🕐 View document timeline', "toggleDocTimeline('" + projectId + "','proposals','" + proposalId + "')") +
-        cchPropMoreItem('📤 Unpublish', "togglePublished('" + projectId + "','" + proposalId + "',false)") +
-        cchPropMoreItem('📋 Duplicate proposal', "duplicateProposalAsCopy('" + projectId + "','" + proposalId + "')") +
-        cchPropMoreItem('🗑️ Delete proposal', "deleteProposal('" + projectId + "','" + proposalId + "')", true);
+      inner = cchPropMoreItem('Edit proposal', "navigate('#/project/" + projectId + "/proposal/" + proposalId + "/edit')") +
+        cchPropMoreItem('Document tag / details', "editProposalMeta('" + projectId + "','" + proposalId + "')") +
+        cchPropMoreItem('Preview / PDF', "previewDocument('proposal','" + projectId + "','" + proposalId + "')") +
+        cchPropMoreItem('Send to client', "sendProposalToClient('" + projectId + "','" + proposalId + "')") +
+        cchPropMoreItem(publishLabel, publishJs) +
+        cchPropMoreItem('Document timeline', "toggleDocTimeline('" + projectId + "','proposals','" + proposalId + "')") +
+        cchPropMoreItem('Tear Sheets', tearJs) +
+        invBtn +
+        cchPropMoreItem('Generate POs by Vendor', "generatePOsFromDoc('" + projectId + "','proposals','" + proposalId + "')") +
+        cchPropMoreItem('Duplicate proposal', "duplicateProposalAsCopy('" + projectId + "','" + proposalId + "')") +
+        cchPropMoreItem('Link Documents', "linkDocModal('" + projectId + "','proposals','" + proposalId + "')") +
+        cchPropMoreItem('Close legacy (hide attention)', "closeProposalAsLegacy('" + projectId + "','" + proposalId + "')") +
+        cchPropMoreItem('Delete proposal', "deleteProposal('" + projectId + "','" + proposalId + "')", true);
     }
     return '<div class="cch-prop-more-wrap" style="position:relative;display:inline-block;vertical-align:middle;z-index:500;">' +
-      '<button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation();var w=this.closest(\'.cch-prop-more-wrap\');var m=w&&w.querySelector(\'.cch-prop-more-dd\');if(!m)return;m.style.display=m.style.display===\'block\'?\'none\':\'block\';">More ▾</button>' +
-      '<div class="cch-prop-more-dd" onclick="event.stopPropagation()" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;min-width:240px;background:#fff;border:1px solid rgba(27,51,82,0.12);border-radius:8px;box-shadow:0 12px 36px rgba(27,51,82,0.14);z-index:600;padding:4px 0;">' + inner + '</div></div>';
+      '<button type="button" class="btn btn-secondary btn-sm" style="font-weight:700;" onclick="event.stopPropagation();var w=this.closest(\'.cch-prop-more-wrap\');var m=w&&w.querySelector(\'.cch-prop-more-dd\');if(!m)return;m.style.display=m.style.display===\'block\'?\'none\':\'block\';">Options ▾</button>' +
+      '<div class="cch-prop-more-dd" onclick="event.stopPropagation()" style="display:none;position:absolute;right:0;top:100%;margin-top:7px;min-width:260px;background:#fff;border:1px solid rgba(27,51,82,0.12);border-radius:8px;box-shadow:0 14px 36px rgba(27,51,82,0.16);z-index:600;padding:6px;">' + inner + '</div></div>';
   }
   window.cchProposalMoreMenuWrap = cchProposalMoreMenuWrap;
 
@@ -467,8 +568,8 @@
     }
 
     var tearJs = "generateTearSheetsFromDoc('" + escA(projectId) + "','proposals','" + escA(proposalId) + "','" + escA(projName) + "')";
-    var moreView = cchProposalMoreMenuWrap(projectId, proposalId, false, invDis, tearJs, false);
-    var moreEdit = cchProposalMoreMenuWrap(projectId, proposalId, true, invDis, tearJs, !!myItemsBtn);
+    var moreView = cchProposalMoreMenuWrap(projectId, proposalId, false, invDis, tearJs, false, !!prop.published);
+    var moreEdit = cchProposalMoreMenuWrap(projectId, proposalId, true, invDis, tearJs, !!myItemsBtn, !!prop.published);
 
     var invMsgs = (invGate && invGate.msgs && invGate.msgs.length) ? invGate.msgs.join(' ') : 'Complete client approvals before converting.';
     var invTitleAttr = invOk ? '' : (' title="' + escA(invMsgs) + '"');
@@ -480,9 +581,7 @@
 
     if (!isEdit) {
       setTopbarActions(
-        '<button class="btn btn-secondary btn-sm" onclick="previewDocument(\'proposal\',\'' + projectId + '\',\'' + proposalId + '\')">👁️ Preview</button>' +
-        '<button class="btn btn-secondary btn-sm" onclick="' + tearJs + '">📄 Tear Sheets</button>' +
-        '<button class="btn btn-primary btn-sm" onclick="navigate(\'#/project/' + projectId + '/proposal/' + proposalId + '/edit\')">✏️ Edit line items</button>' +
+        '<button class="btn btn-primary btn-sm" onclick="navigate(\'#/project/' + projectId + '/proposal/' + proposalId + '/edit\')">Edit Proposal</button>' +
         approveForClientBtn +
         '<button class="btn btn-primary btn-sm" onclick="sendProposalToClient(\'' + projectId + '\',\'' + proposalId + '\')">📧 Email client</button>' +
         convertGold +
@@ -491,7 +590,7 @@
       cchApplyProposalViewOnlyDOM(wrap, projectId, proposalId);
     } else {
       setTopbarActions(
-        '<button class="btn btn-secondary btn-sm" onclick="navigate(\'#/project/' + projectId + '/proposal/' + proposalId + '\')">✓ Done editing</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="cchProposalDoneEditing(\'' + projectId + '\',\'' + proposalId + '\')">✓ Done editing</button>' +
         '<button class="btn btn-secondary btn-sm" onclick="previewDocument(\'proposal\',\'' + projectId + '\',\'' + proposalId + '\')">👁️ Preview</button>' +
         '<button class="btn btn-primary btn-sm" onclick="' + addItemOnclick + '">+ Add item</button>' +
         approveForClientBtn +
@@ -563,6 +662,9 @@
   // ============================================================
   var _origConvertProposalToInvoice = window.convertProposalToInvoice;
   window.convertProposalToInvoice = async function(projectId, proposalId) {
+    var prop = null;
+    var rawItems = [];
+    var sourceForInvoice = [];
     function _isGroupRow(it) {
       return it && it.lineKind === 'group';
     }
@@ -572,26 +674,34 @@
       if (s === 'approved' || s === 'declined' || s === 'pending') return s;
       return 'pending';
     }
+    function _lineApprovedForInvoice(it) {
+      if (_isGroupRow(it)) return false;
+      if (typeof getProposalLineApprovalStatus === 'function') {
+        return getProposalLineApprovalStatus(it) === 'approved';
+      }
+      return _lineApprovalState(it) === 'approved';
+    }
+    function _lineEligibleForInvoice(it) {
+      if (!_lineApprovedForInvoice(it)) return false;
+      if (typeof proposalLineIsInvoiced === 'function' && proposalLineIsInvoiced(it, prop)) return false;
+      return true;
+    }
     try {
       var propDoc = await db.collection('boards').doc(projectId).collection('proposals').doc(proposalId).get();
       if (!propDoc.exists || !propDoc.data()) {
         if (typeof cchAlert === 'function') await cchAlert('Proposal not found', 'Convert to Invoice');
         return;
       }
-      var prop = propDoc.data();
-      var rawItems = prop.items || [];
+      prop = propDoc.data();
+      rawItems = (typeof coerceProposalDocItemsArray === 'function')
+        ? coerceProposalDocItemsArray(prop.items)
+        : (Array.isArray(prop.items) ? prop.items : []);
       var productLines = rawItems.filter(function(it) { return !_isGroupRow(it); });
-      /** Prefer shared helpers so gates match the proposal UI and legacy approved/declined flags work. */
-      function _lineApprovedForInvoice(it) {
-        if (_isGroupRow(it)) return false;
-        if (typeof getProposalLineApprovalStatus === 'function') {
-          return getProposalLineApprovalStatus(it) === 'approved';
-        }
-        return _lineApprovalState(it) === 'approved';
-      }
       var gateMsgs = [];
-      if (prop.linkedInvoiceId || String(prop.status || '').toLowerCase() === 'invoiced') {
-        gateMsgs.push('This proposal is already linked to an invoice. Use the Invoices tab, or duplicate the proposal if you need another bill.');
+      var stLc = String(prop.status || '').trim().toLowerCase();
+      var hasUninvoicedApproved = productLines.some(_lineEligibleForInvoice);
+      if ((prop.linkedInvoiceId || stLc === 'invoiced') && !hasUninvoicedApproved) {
+        gateMsgs.push('Every approved line on this proposal is already on an invoice. Open the linked invoice, or duplicate the proposal for another bill.');
       }
       if (gateMsgs.length === 0 && typeof proposalInvoiceGateSummary === 'function') {
         var _pg = proposalInvoiceGateSummary(prop, rawItems);
@@ -607,15 +717,20 @@
         });
         if (pendingN > 0) gateMsgs.push(pendingN + ' line(s) still Pending — set each to Approved or Declined.');
         if (approvedN < 1 && productLines.length > 0) gateMsgs.push('At least one line must be Approved to invoice.');
+        if (!prop.clientApprovedTotalAt) gateMsgs.push('Click Approve for Client after all line decisions are set.');
       }
       if (gateMsgs.length > 0) {
         if (typeof cchAlert === 'function') await cchAlert('Cannot create invoice yet:\n\n• ' + gateMsgs.join('\n• '), 'Convert to Invoice');
         return;
       }
 
-      var sourceForInvoice = rawItems.filter(function(item) { return _lineApprovedForInvoice(item); });
+      sourceForInvoice = rawItems.filter(_lineEligibleForInvoice);
+      if (sourceForInvoice.length === 0) {
+        if (typeof cchAlert === 'function') await cchAlert('No approved, uninvoiced lines to copy. Approve lines that are not already on an invoice.', 'Convert to Invoice');
+        return;
+      }
       var skipped = productLines.length - sourceForInvoice.length;
-      var _convMsg = 'Create a new Invoice from this proposal?\n\n• ' + sourceForInvoice.length + ' approved line(s) will be copied.\n' + (skipped > 0 ? '• ' + skipped + ' line(s) skipped (not Approved).\n' : '') + '\nImages and pricing will transfer for each copied line.';
+      var _convMsg = 'Create a new Invoice from this proposal?\n\n• ' + sourceForInvoice.length + ' approved line(s) will be copied.\n' + (skipped > 0 ? '• ' + skipped + ' line(s) skipped (not approved or already invoiced).\n' : '') + '\nImages and pricing will transfer for each copied line.';
       if (typeof cchConfirm !== 'function') return;
       if (!(await cchConfirm(_convMsg, 'Convert to Invoice', { confirmText: 'Create Invoice' }))) return;
     } catch (eGate) {
@@ -651,7 +766,12 @@
       });
 
       var total = items.reduce(function(s, i) { return s + (parseFloat(i.amount) || 0); }, 0);
-      var invNum = await window.getNextDocNumber('INV');
+      var _nextInv = (typeof getNextDocNumber === 'function') ? getNextDocNumber : window.getNextDocNumber;
+      if (typeof _nextInv !== 'function') {
+        if (typeof cchAlert === 'function') await cchAlert('Invoice numbering is unavailable. Refresh the page and try again.', 'Convert to Invoice');
+        return;
+      }
+      var invNum = await _nextInv('INV');
 
       // Get client info from proposal, then project
       var projDoc = await db.collection('boards').doc(projectId).get();
@@ -716,11 +836,20 @@
         }]
       });
 
-      // Update proposal with link back
+      var invoicedAt = new Date().toISOString();
+      var updatedProposalItems = rawItems.map(function(item) {
+        if (_isGroupRow(item)) return item;
+        if (!_lineEligibleForInvoice(item)) return item;
+        return Object.assign({}, item, { invoicedOnInvoiceId: invRef.id, invoicedAt: invoicedAt });
+      });
+      var propAfterInv = { status: 'Invoiced', linkedInvoiceId: invRef.id, items: updatedProposalItems };
+      var stillOpen = typeof proposalHasEditableUninvoicedLines === 'function' && proposalHasEditableUninvoicedLines(propAfterInv);
       await db.collection('boards').doc(projectId).collection('proposals').doc(proposalId).update({
-        status: 'Invoiced',
+        status: stillOpen ? 'Partially Invoiced' : 'Invoiced',
         linkedInvoiceId: invRef.id,
-        linkedInvoiceNum: invNum
+        linkedInvoiceNum: invNum,
+        items: updatedProposalItems,
+        updatedAt: invoicedAt
       });
 
       if (typeof logDocActivity === 'function') {
@@ -788,6 +917,9 @@
   window.renderProposalsTab = async function(T, proj) {
     // Call original to render the base
     await _origRenderProposalsTab.call(this, T, proj);
+
+    // Financial summary cards belong on the main dashboard, not the project detail tabs.
+    if (window._cchShowProposalSummaryBand !== true) return;
 
     // Now inject summary band at top
     var proposals = [];
@@ -1054,43 +1186,63 @@
 
   // ============================================================
   // 10. Fix: Vendor dropdown populated from project clips/team
-  // Enhanced _piVendorOptions builder
+  // Visible autocomplete on Edit Line Item (piVendor)
   // ============================================================
-  window._cachedVendors = null;
+  window._cachedVendorsByProject = window._cachedVendorsByProject || {};
 
   window.loadProjectVendors = async function(projectId) {
-    if (window._cachedVendors) return window._cachedVendors;
+    var pid = String(projectId || '').trim();
+    if (!pid) return [];
+    if (window._cachedVendorsByProject[pid]) return window._cachedVendorsByProject[pid];
     var vendors = new Set();
+    function addVendor(v) {
+      v = String(v || '').trim();
+      if (v) vendors.add(v);
+    }
     try {
-      // From project clips
-      var clipSnap = await db.collection('boards').doc(projectId).collection('clips').get();
+      var clipSnap = await db.collection('boards').doc(pid).collection('clips').get();
       clipSnap.forEach(function(d) {
         var cd = d.data() || {};
-        var v = cd.vendor;
-        if (v) vendors.add(v.trim());
+        addVendor(cd.vendor);
       });
-    } catch(e) {}
+    } catch (e) { console.warn('[vendors] clips', e); }
     try {
-      // From vendors collection
-      var vendSnap = await db.collection('vendors').limit(500).get();
+      var vendSnap = await db.collection('vendors').limit(3000).get();
       vendSnap.forEach(function(d) {
         var vd = d.data() || {};
-        var v = vd.name || vd.company;
-        if (v) vendors.add(v.trim());
+        addVendor(vd.name || vd.company || vd.vendor);
       });
-    } catch(e) {}
+    } catch (e) { console.warn('[vendors] vendors collection', e); }
     try {
-      // From team contacts
+      var pSnap = await db.collection('products').limit(3000).get();
+      pSnap.forEach(function(d) {
+        var pd = d.data() || {};
+        addVendor(pd.vendor || pd.manufacturer);
+      });
+    } catch (e) { console.warn('[vendors] products', e); }
+    try {
       var teamSnap = await db.collection('team').get();
       teamSnap.forEach(function(d) {
         var t = d.data() || {};
-        if (t.role === 'vendor' && (t.name || t.company)) {
-          vendors.add((t.name || t.company).trim());
-        }
+        if (t.role === 'vendor') addVendor(t.name || t.company);
       });
-    } catch(e) {}
-    window._cachedVendors = Array.from(vendors).sort();
-    return window._cachedVendors;
+    } catch (e) { console.warn('[vendors] team', e); }
+    try {
+      var docCols = ['proposals', 'invoices', 'purchaseOrders'];
+      for (var ci = 0; ci < docCols.length; ci++) {
+        var snap = await db.collection('boards').doc(pid).collection(docCols[ci]).limit(120).get();
+        snap.forEach(function(d) {
+          var data = d.data() || {};
+          addVendor(data.vendor);
+          (data.items || []).forEach(function(it) { addVendor(it && it.vendor); });
+        });
+      }
+    } catch (e) { console.warn('[vendors] project docs', e); }
+    var list = Array.from(vendors).sort(function(a, b) {
+      return a.localeCompare(b, undefined, { sensitivity: 'base' });
+    });
+    window._cachedVendorsByProject[pid] = list;
+    return list;
   };
 
   window.buildVendorDatalist = function(vendors) {
@@ -1099,13 +1251,81 @@
     if (existing) existing.remove();
     var dl = document.createElement('datalist');
     dl.id = dlId;
-    vendors.forEach(function(v) {
+    (vendors || []).forEach(function(v) {
       var opt = document.createElement('option');
       opt.value = v;
       dl.appendChild(opt);
     });
     document.body.appendChild(dl);
     return dlId;
+  };
+
+  /** Visible vendor picker under #piVendor (Edit Line Item modal). */
+  window.attachPiVendorAutocomplete = async function(projectId) {
+    var input = document.getElementById('piVendor');
+    if (!input || input.dataset.vendorPicker === '1') return;
+    input.dataset.vendorPicker = '1';
+    var wrap = input.parentElement;
+    if (!wrap) return;
+    if (window.getComputedStyle(wrap).position === 'static') wrap.style.position = 'relative';
+
+    var panel = document.getElementById('piVendorDropdown');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'piVendorDropdown';
+      panel.setAttribute('role', 'listbox');
+      panel.style.cssText = 'display:none;position:absolute;left:0;right:0;top:calc(100% + 2px);z-index:6000;max-height:240px;overflow-y:auto;background:#fff;border:1px solid rgba(27,51,82,0.18);box-shadow:0 10px 28px rgba(0,0,0,0.14);';
+      wrap.appendChild(panel);
+    }
+
+    var vendors = [];
+    try {
+      vendors = await window.loadProjectVendors(projectId);
+    } catch (e) {
+      console.warn('[attachPiVendorAutocomplete]', e);
+    }
+    if (vendors.length && typeof window.buildVendorDatalist === 'function') {
+      input.setAttribute('list', window.buildVendorDatalist(vendors));
+    }
+    input.setAttribute('autocomplete', 'off');
+
+    function renderPanel(query) {
+      var q = String(query || '').trim().toLowerCase();
+      var matches = vendors.filter(function(v) {
+        return !q || String(v).toLowerCase().indexOf(q) >= 0;
+      }).slice(0, 50);
+      if (!matches.length) {
+        panel.style.display = 'none';
+        panel.innerHTML = q
+          ? '<div style="padding:10px 12px;font-size:12px;color:#6B7280;">No matching vendors — type to use a new name.</div>'
+          : '';
+        if (!q) panel.style.display = 'none';
+        else panel.style.display = 'block';
+        return;
+      }
+      panel.innerHTML = matches.map(function(v) {
+        return '<button type="button" class="pi-vendor-opt" data-v="' + escAttr(v) + '" style="display:block;width:100%;text-align:left;padding:9px 12px;border:none;border-bottom:1px solid rgba(27,51,82,0.06);background:#fff;cursor:pointer;font-size:13px;color:#1B3352;">' + esc(v) + '</button>';
+      }).join('');
+      panel.style.display = 'block';
+      panel.querySelectorAll('.pi-vendor-opt').forEach(function(btn) {
+        btn.onmousedown = function(ev) { ev.preventDefault(); };
+        btn.onclick = function() {
+          input.value = btn.getAttribute('data-v') || btn.textContent || '';
+          panel.style.display = 'none';
+        };
+        btn.onmouseenter = function() { btn.style.background = '#F4F6FA'; };
+        btn.onmouseleave = function() { btn.style.background = '#fff'; };
+      });
+    }
+
+    input.addEventListener('focus', function() { renderPanel(input.value); });
+    input.addEventListener('input', function() { renderPanel(input.value); });
+    input.addEventListener('keydown', function(ev) {
+      if (ev.key === 'Escape') panel.style.display = 'none';
+    });
+    input.addEventListener('blur', function() {
+      setTimeout(function() { panel.style.display = 'none'; }, 220);
+    });
   };
 
 
@@ -1227,22 +1447,30 @@
     var proMatch = hash.match(/#\/project\/([^/]+)\/proposal\/([^/]+)/);
     if (!poMatch && !invMatch2 && !proMatch) return;
 
-    // Wait for page to render, then inject badges
+    // Wait for page to render, then inject connected-docs dropdown + linked badges
     setTimeout(function() {
       try {
         var headerH1 = document.querySelector('#contentArea h1');
-        if (!headerH1 || !headerH1.parentElement) return;
-        if (headerH1.parentElement.querySelector('.linked-doc-badges-area')) return;
+        if (!headerH1) return;
         var docData = window._docEdit && window._docEdit.docData;
         if (!docData) return;
         var projectId = poMatch ? poMatch[1] : invMatch2 ? invMatch2[1] : proMatch[1];
+        var docId = poMatch ? poMatch[2] : invMatch2 ? invMatch2[2] : proMatch[2];
         var docType = poMatch ? 'po' : invMatch2 ? 'invoice' : 'proposal';
-        var badgesHTML = renderLinkedDocBadges(projectId, docData, docType);
-        if (badgesHTML) {
-          var badgesDiv = document.createElement('div');
-          badgesDiv.className = 'linked-doc-badges-area';
-          badgesDiv.innerHTML = badgesHTML;
-          headerH1.parentElement.appendChild(badgesDiv);
+        var docNum = docData.invoiceNum || docData.number || docData.proposalNum || docData.name || docId.slice(0, 8);
+        var titleRow = headerH1.parentElement;
+        if (titleRow && !titleRow.querySelector('.cch-conn-docs-btn') && typeof window.cchConnectedDocsTitleBtn === 'function') {
+          titleRow.insertAdjacentHTML('beforeend', window.cchConnectedDocsTitleBtn(projectId, docType, docId, docNum));
+        }
+        var badgeHost = titleRow && titleRow.parentElement ? titleRow.parentElement : headerH1.parentElement;
+        if (badgeHost && !badgeHost.querySelector('.linked-doc-badges-area')) {
+          var badgesHTML = renderLinkedDocBadges(projectId, docData, docType);
+          if (badgesHTML) {
+            var badgesDiv = document.createElement('div');
+            badgesDiv.className = 'linked-doc-badges-area';
+            badgesDiv.innerHTML = badgesHTML;
+            badgeHost.appendChild(badgesDiv);
+          }
         }
       } catch(e) { console.warn('Badge injection:', e); }
     }, 800);
@@ -1280,47 +1508,37 @@
 
 
   // ============================================================
-  // 16. Fix: editProposalItem modal — add vendor datalist + better ship-to
-  // Patch the original to attach vendor autocomplete after modal opens
+  // 16–17. editProposalItem / addProposalLineItem — vendor picker after modal
+  // editDocLineItem is async; fixed timing via retry until #piVendor exists
   // ============================================================
+  function _schedulePiVendorPicker(projectId) {
+    var pid = String(projectId || '').trim();
+    var tries = 0;
+    function attempt() {
+      tries++;
+      var el = document.getElementById('piVendor');
+      if (el && typeof window.attachPiVendorAutocomplete === 'function') {
+        void window.attachPiVendorAutocomplete(pid);
+        return;
+      }
+      if (tries < 40) setTimeout(attempt, 100);
+    }
+    setTimeout(attempt, 0);
+  }
+
   var _origEditProposalItem = window.editProposalItem;
   if (_origEditProposalItem) {
     window.editProposalItem = function(projectId, proposalId, idx) {
       _origEditProposalItem.call(this, projectId, proposalId, idx);
-      // After modal renders, attach vendor datalist
-      setTimeout(function() {
-        var vendorInput = document.getElementById('piVendor');
-        if (vendorInput && !vendorInput.getAttribute('list')) {
-          loadProjectVendors(projectId).then(function(vendors) {
-            if (vendors.length > 0) {
-              var dlId = buildVendorDatalist(vendors);
-              vendorInput.setAttribute('list', dlId);
-            }
-          });
-        }
-      }, 300);
+      _schedulePiVendorPicker(projectId);
     };
   }
 
-
-  // ============================================================
-  // 17. Fix: addProposalLineItem — also attach vendor datalist
-  // ============================================================
   var _origAddProposalLineItem = window.addProposalLineItem;
   if (_origAddProposalLineItem) {
     window.addProposalLineItem = function(projectId, proposalId) {
       _origAddProposalLineItem.call(this, projectId, proposalId);
-      setTimeout(function() {
-        var vendorInput = document.getElementById('piVendor');
-        if (vendorInput && !vendorInput.getAttribute('list')) {
-          loadProjectVendors(projectId).then(function(vendors) {
-            if (vendors.length > 0) {
-              var dlId = buildVendorDatalist(vendors);
-              vendorInput.setAttribute('list', dlId);
-            }
-          });
-        }
-      }, 300);
+      _schedulePiVendorPicker(projectId);
     };
   }
 
@@ -1740,14 +1958,34 @@
   // 25. Publish = client dashboard visibility only (do NOT set Sent)
   // ============================================================
   var _origTogglePublished = window.togglePublished;
+  /** Client-facing invoice/proposal PDF header — firm address only (no personal name). */
+  function cchPremiumDocCompanyInfoHtml() {
+    return '2481 N. Riverside Dr. · Santa Ana, CA 92706<br>(949) 497-7979 · cindy@cchdesign.com<br>www.cchdesign.com';
+  }
+
+  /** Preview badge: published invoices should not show Draft when visible on the client portal. */
+  function cchInvoiceClientDisplayStatus(docData) {
+    var st = String((docData && docData.status) || '').trim() || 'Draft';
+    if (docData && docData.published) {
+      var sl = st.toLowerCase();
+      if (!sl || sl === 'draft') return 'Published';
+    }
+    return st;
+  }
+
   window.togglePublished = async function(projectId, docId, newValue, collection) {
     var col = collection || 'proposals';
-    if (newValue === true && col === 'invoices') {
+    if (col === 'invoices') {
       try {
-        await db.collection('boards').doc(projectId).collection(col).doc(docId).set({
-          publishedAt: new Date().toISOString()
-        }, { merge: true });
-      } catch(e) { console.warn('publishedAt stamp failed:', e); }
+        if (newValue === true) {
+          var snap = await db.collection('boards').doc(projectId).collection(col).doc(docId).get();
+          var cur = snap.exists ? (snap.data() || {}) : {};
+          var patch = { published: true, publishedAt: new Date().toISOString() };
+          var st = String(cur.status || '').trim();
+          if (!st || st.toLowerCase() === 'draft') patch.status = 'Published';
+          await db.collection('boards').doc(projectId).collection(col).doc(docId).set(patch, { merge: true });
+        }
+      } catch(e) { console.warn('invoice publish patch failed:', e); }
     }
     return _origTogglePublished.call(this, projectId, docId, newValue, collection);
   };
@@ -1841,11 +2079,17 @@
   // ============================================================
   window.renderDocViewPage = function(type, projectId, docId, docData, items, projData) {
     var T = document.getElementById('contentArea');
-    var projName = projData.name || projectId;
     var collection = type === 'invoice' ? 'invoices' : type === 'po' ? 'purchaseOrders' : 'proposals';
+    window._docEdit = { type: type, projectId: projectId, docId: docId, collection: collection, docData: docData, items: items };
+    var projName = projData.name || projectId;
     var typeLabel = type === 'invoice' ? 'Invoice' : type === 'po' ? 'Purchase Order' : 'Proposal';
     var backTab = type === 'invoice' ? 'invoices' : type === 'po' ? 'pos' : 'proposals';
     var docNum = docData.invoiceNum || docData.number || docData.proposalNum || docData.name || docId.slice(0,8);
+    if (type === 'invoice') {
+      window._docViewInvoiceCtx = { projectId: projectId, docId: docId, collection: collection };
+    } else {
+      window._docViewInvoiceCtx = null;
+    }
 
     // Client info — match common project / CRM field names
     var clientName = docData.clientName || docData.client || docData.billingContactName ||
@@ -1880,7 +2124,7 @@
           lineAmt = (cost > 0 ? cost * qty * (1 + mkup / 100) : amt);
         }
         subtotal += lineAmt;
-        var isTaxable = i.taxable !== false && (i.taxable === true || i.expenseType === 'product' || (!i.expenseType && i.taxable !== false));
+        var isTaxable = (typeof window.cchInvoiceLineIsTaxable === 'function') ? window.cchInvoiceLineIsTaxable(i) : (i.taxable !== false && (i.taxable === true || i.expenseType === 'product' || (!i.expenseType && i.taxable !== false)));
         if (isTaxable) taxableSubtotal += lineAmt;
         totalShipping += ship;
       });
@@ -1901,6 +2145,12 @@
       : {};
 
     var statusBadge = docData.status ? '<span class="badge badge-' + (docData.status || 'draft').toLowerCase().replace(/\s+/g, '-') + '" style="font-size:13px;padding:6px 14px;">' + esc(docData.status) + '</span>' : '';
+    var statusHeaderHtml = (type === 'proposal' && typeof window.proposalStatusSelectHtml === 'function')
+      ? '<div style="text-align:right;"><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--gray-400);font-weight:600;margin-bottom:4px;">Status</div>' +
+        window.proposalStatusSelectHtml(projectId, docId, docData.status || 'Draft') +
+        (docData.published ? '<div style="margin-top:6px;"><span class="badge badge-published" style="font-size:10px;"><span class="badge-icon">✓</span> On client portal</span></div>' : '') +
+        '</div>'
+      : '<div style="margin-bottom:8px;">' + statusBadge + '</div>';
 
     var _canPushQBView = (typeof userCanPushToQB === 'function' ? userCanPushToQB() : false);
     var qbRealId = (typeof getQbId === 'function' ? getQbId(docData) : (docData.qbDocId || null));
@@ -1951,21 +2201,51 @@
     var _nextPublished = !docData.published;
     var _pubLabel = docData.published ? '🔒 Unpublish from Dashboard' : '🌐 Publish to Client Dashboard';
 
-    setTopbarActions(
-      '<button class="btn btn-secondary btn-sm" onclick="toggleDocTimeline(\'' + projectId + '\',\'' + collection + '\',\'' + docId + '\')">🕐 Timeline</button>' +
+    var _viewTopbar = '<button class="btn btn-secondary btn-sm" onclick="toggleDocTimeline(\'' + projectId + '\',\'' + collection + '\',\'' + docId + '\')">🕐 Timeline</button>' +
       '<button class="btn btn-secondary btn-sm" onclick="navigate(\'#/project/' + projectId + '/' + backTab + '\')">← Back</button>' +
-      ((type === 'invoice' || type === 'proposal') ? (
+      '<button class="btn btn-secondary btn-sm" onclick="previewDocument(\'' + type + '\',\'' + projectId + '\',\'' + docId + '\')">👁️ Preview</button>';
+    if (type === 'invoice') {
+      _viewTopbar += '<button class="btn btn-secondary btn-sm" onclick="sendInvoiceToClient(\'' + projectId + '\',\'' + docId + '\')">📧 Send</button>' +
+        '<button class="btn btn-primary btn-sm" onclick="window._forceEditMode=true;navigate(window.location.hash)" style="background:#1B3352;color:#EDE8E0;">✏️ Edit line items &amp; notes</button>' +
+        '<div style="position:relative;display:inline-block;margin-left:4px;">' +
+        '<button class="btn btn-secondary btn-sm" onclick="var m=this.nextElementSibling;m.style.display=m.style.display===\'block\'?\'none\':\'block\'">More ▾</button>' +
+        '<div style="display:none;position:absolute;right:0;top:100%;margin-top:4px;background:#fff;border:1px solid rgba(27,51,82,0.12);box-shadow:0 8px 24px rgba(0,0,0,0.12);min-width:220px;z-index:60;padding:4px 0;">' +
+        '<button type="button" style="display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;" onclick="setDocGroupView(\'invoice\',\'' + projectId + '\',\'' + docId + '\',\'room\');this.parentElement.style.display=\'none\'">By Room</button>' +
+        '<button type="button" style="display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;" onclick="setDocGroupView(\'invoice\',\'' + projectId + '\',\'' + docId + '\',\'category\');this.parentElement.style.display=\'none\'">By Category</button>' +
+        '<button type="button" style="display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;" onclick="generatePOsFromDoc(\'' + projectId + '\',\'invoices\',\'' + docId + '\');this.parentElement.style.display=\'none\'">📦 Generate POs by Vendor</button>' +
+        '<button type="button" style="display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;" onclick="togglePublished(\'' + cchEscJsStr(projectId) + '\',\'' + cchEscJsStr(docId) + '\',' + (_nextPublished ? 'true' : 'false') + ',\'' + cchEscJsStr(collection) + '\');this.parentElement.style.display=\'none\'">' + _pubLabel + '</button>' +
+        '<button type="button" style="display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;color:var(--red);" onclick="' + _delViewOnclick + ';this.parentElement.style.display=\'none\'">🗑️ Delete</button>' +
+        '</div></div>';
+      if (qbViewTopBtn) _viewTopbar += qbViewTopBtn;
+    } else {
+      _viewTopbar += ((type === 'proposal') ? (
         '<button class="btn btn-secondary btn-sm" style="' + (docGroupMode === 'room' ? 'background:#1B3352;color:#EDE8E0;border-color:#1B3352;' : '') + '" onclick="setDocGroupView(\'' + type + '\',\'' + projectId + '\',\'' + docId + '\',\'room\')">By Room</button>' +
         '<button class="btn btn-secondary btn-sm" style="' + (docGroupMode === 'category' ? 'background:#1B3352;color:#EDE8E0;border-color:#1B3352;' : '') + '" onclick="setDocGroupView(\'' + type + '\',\'' + projectId + '\',\'' + docId + '\',\'category\')">By Category</button>'
       ) : '') +
-      '<button class="btn btn-secondary btn-sm" onclick="previewDocument(\'' + type + '\',\'' + projectId + '\',\'' + docId + '\')">👁️ Preview</button>' +
-      (type === 'invoice' ? '<button class="btn btn-secondary btn-sm" onclick="sendInvoiceToClient(\'' + projectId + '\',\'' + docId + '\')">📧 Send</button>' : '') +
       '<button class="btn btn-secondary btn-sm" onclick="togglePublished(\'' + cchEscJsStr(projectId) + '\',\'' + cchEscJsStr(docId) + '\',' + (_nextPublished ? 'true' : 'false') + ',\'' + cchEscJsStr(collection) + '\')">' + _pubLabel + '</button>' +
-      qbViewTopBtn +
-      _delViewBtn +
-      (type === 'invoice' ? '<button type="button" class="btn btn-primary btn-sm" onclick="window.cchOpenInvoiceAddItemSidebar(\'' + cchEscJsStr(projectId) + '\',\'' + cchEscJsStr(docId) + '\')" style="background:#1B3352;color:#EDE8E0;">+ Add item</button>' : '') +
-      '<button class="btn btn-primary btn-sm" onclick="window._forceEditMode=true;navigate(window.location.hash)" style="background:#1B3352;color:#EDE8E0;">✏️ Edit ' + typeLabel + '</button>'
-    );
+      qbViewTopBtn + _delViewBtn +
+      '<button class="btn btn-primary btn-sm" onclick="window._forceEditMode=true;navigate(window.location.hash)" style="background:#1B3352;color:#EDE8E0;">✏️ Edit ' + typeLabel + '</button>';
+    }
+    setTopbarActions(_viewTopbar);
+
+    function cchDocItemLineIndex(allItems, item) {
+      for (var i = 0; i < allItems.length; i++) {
+        if (allItems[i] === item) return i;
+      }
+      var t = String(item.title || '').trim();
+      var v = String(item.vendor || '').trim();
+      var a = String(parseFloat(item.amount) || 0);
+      for (var j = 0; j < allItems.length; j++) {
+        var x = allItems[j];
+        if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(x)) continue;
+        if (String(x.title || '').trim() === t && String(x.vendor || '').trim() === v &&
+            String(parseFloat(x.amount) || 0) === a) return j;
+      }
+      return -1;
+    }
+
+    var _showLineTagCol = type === 'invoice' || type === 'proposal';
+    var _invTableColspan = type === 'invoice' ? 11 : (type === 'proposal' ? 10 : 9);
 
     // Build items HTML
     var itemsHTML = '';
@@ -1988,6 +2268,8 @@
           '<th style="width:80px;padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;"></th>' +
           '<th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Item</th>' +
           '<th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Vendor</th>' +
+          (_showLineTagCol ? '<th style="padding:8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;width:52px;" title="Optional label: fixture, fabric/trim, builder code">Tag</th>' : '') +
+          (type === 'invoice' ? '<th style="padding:8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;width:64px;">Notes</th>' : '') +
           '<th style="padding:8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Qty</th>' +
           '<th style="padding:8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Cost</th>' +
           '<th style="padding:8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Markup</th>' +
@@ -2005,7 +2287,7 @@
         var lineAmtForRow = (type === 'invoice' && typeof window.invoiceLineAmountForTotals === 'function')
           ? window.invoiceLineAmountForTotals(item).lineAmt
           : (cost > 0 ? cost * qty * (1 + mkup / 100) : amt);
-        var isTaxable = item.taxable !== false && (item.taxable === true || item.expenseType === 'product' || (!item.expenseType && item.taxable !== false));
+        var isTaxable = (typeof window.cchInvoiceLineIsTaxable === 'function') ? window.cchInvoiceLineIsTaxable(item) : (item.taxable !== false && (item.taxable === true || item.expenseType === 'product' || (!item.expenseType && item.taxable !== false)));
         var isSvcRow = item.expenseType === 'service' || item.itemType === 'service';
         if (type === 'invoice' && typeof window.cchInvoiceLineUseServiceStyleInView === 'function' && window.cchInvoiceLineUseServiceStyleInView(item)) {
           isSvcRow = true;
@@ -2013,30 +2295,61 @@
         var imgTag;
         if (type === 'invoice' && isSvcRow) {
           imgTag = '<div style="width:64px;height:64px;background:transparent;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--gray-300);border:1px dashed var(--gray-200);">—</div>';
-        } else if (item.imageUrl) {
-          imgTag = '<img src="' + _escImgSrcAttr(item.imageUrl) + '" style="width:64px;height:64px;object-fit:cover;border-radius:4px;" onerror="this.style.display=\'none\'" referrerpolicy="no-referrer">';
         } else {
-          imgTag = '<div style="width:64px;height:64px;background:var(--gray-50);display:flex;align-items:center;justify-content:center;font-size:24px;border-radius:4px;">📦</div>';
+          var _thumbUrl = (typeof window.getInvoiceLineDisplayImageUrl === 'function'
+            ? window.getInvoiceLineDisplayImageUrl(item)
+            : (typeof window.getProposalLineHeroImageUrl === 'function' ? window.getProposalLineHeroImageUrl(item) : ''))
+            || item.imageUrl || '';
+          if (_thumbUrl) {
+            imgTag = '<img src="' + _escImgSrcAttr(_thumbUrl) + '" style="width:64px;height:64px;object-fit:cover;border-radius:4px;" onerror="this.style.display=\'none\'" referrerpolicy="no-referrer">';
+          } else {
+            imgTag = '<div style="width:64px;height:64px;background:var(--gray-50);display:flex;align-items:center;justify-content:center;font-size:24px;border-radius:4px;">📦</div>';
+          }
         }
-        var lineNotes = (item.lineNotes || item.notes || '').trim();
+        var lineTag = (typeof window.cchLineTagText === 'function') ? window.cchLineTagText(item) : '';
+        var lineNotes = (typeof window.cchLineNotesBodyText === 'function')
+          ? window.cchLineNotesBodyText(item)
+          : ((typeof window.cchLineExplicitNotesText === 'function')
+            ? window.cchLineExplicitNotesText(item)
+            : String(item.lineNotes || '').trim());
         var descRaw = item.description || '';
         if (type === 'invoice' && typeof window.sanitizeInvoicePreviewLineText === 'function') {
           descRaw = window.sanitizeInvoicePreviewLineText(descRaw);
           lineNotes = window.sanitizeInvoicePreviewLineText(lineNotes);
+          if (lineTag) lineTag = window.sanitizeInvoicePreviewLineText(lineTag);
         }
         var _nl = lineNotes ? String(lineNotes).split(/\r?\n/).map(function(l) { return l.trim(); }).filter(Boolean) : [];
         var noteLineCount = _nl.length;
         var descTrim = String(descRaw || '').trim();
-        var expandDetail = type === 'invoice' && (noteLineCount > 1 || descTrim.length > 200);
-        var descHtmlInner = descTrim ? '<div style="font-size:12px;color:var(--gray-400);margin-top:2px;white-space:pre-wrap;">' + esc(descRaw) + '</div>' : '';
+        var expandDetail = type === 'invoice' ? (descTrim.length > 200) : false;
+        var descHtmlInner = descTrim ? '<div style="margin-top:6px;"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Description</div><div style="font-size:12px;color:var(--gray-400);margin-top:2px;white-space:pre-wrap;line-height:1.45;">' + esc(descRaw) + '</div></div>' : '';
         var notesHtmlInner = '';
-        if (lineNotes) {
+        if (lineNotes && type !== 'invoice') {
           if (_nl.length <= 1) {
-            notesHtmlInner = '<div style="font-size:11px;color:var(--gray-500);margin-top:4px;white-space:pre-wrap;line-height:1.45;">' + esc(lineNotes) + '</div>';
+            notesHtmlInner = '<div style="margin-top:6px;"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Notes</div><div style="font-size:11px;color:var(--gray-500);margin-top:2px;white-space:pre-wrap;line-height:1.45;">' + esc(lineNotes) + '</div></div>';
           } else {
-            notesHtmlInner = '<ul style="font-size:11px;color:var(--gray-500);margin:6px 0 0 1.1em;padding:0;line-height:1.45;list-style:disc;">' +
-              _nl.map(function(l) { return '<li style="margin:2px 0;">' + esc(l) + '</li>'; }).join('') + '</ul>';
+            notesHtmlInner = '<div style="margin-top:6px;"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Notes</div><ul style="font-size:11px;color:var(--gray-500);margin:4px 0 0 1.1em;padding:0;line-height:1.45;list-style:disc;">' +
+              _nl.map(function(l) { return '<li style="margin:2px 0;">' + esc(l) + '</li>'; }).join('') + '</ul></div>';
           }
+        }
+        var lineIdx = (type === 'invoice') ? cchDocItemLineIndex(items, item) : -1;
+        var invNoteBtnHtml = '';
+        var invNoteRowHtml = '';
+        if (type === 'invoice' && lineIdx >= 0) {
+          var _pe = cchEscJsStr(projectId);
+          var _de = cchEscJsStr(docId);
+          invNoteBtnHtml = '<button type="button" class="btn btn-sm" style="padding:4px 7px;font-size:10px;line-height:1.1;min-width:58px;color:#1B3352;border:1px solid rgba(196,164,100,0.45);background:#FFFDF8;" title="' + escAttr(lineNotes ? lineNotes : 'Add line-item notes shown under the description') + '" onclick="event.stopPropagation();toggleInvoiceLineNotes(' + lineIdx + ')">' + (lineNotes ? 'Notes ▾' : '+ Notes') + '</button>';
+          invNoteRowHtml = '<tr id="invLineNotesRow' + lineIdx + '" class="inv-line-notes-row" style="display:none;background:#FFFDF8;">' +
+            '<td colspan="' + _invTableColspan + '" style="padding:10px 12px;border-top:1px solid rgba(196,164,100,0.18);border-bottom:1px solid rgba(196,164,100,0.18);">' +
+              '<div style="display:grid;grid-template-columns:120px minmax(0,1fr) auto;gap:10px;align-items:start;">' +
+                '<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;padding-top:8px;">Line notes</div>' +
+                '<textarea id="invLineNotesText' + lineIdx + '" class="form-textarea" rows="3" placeholder="Application / install notes (not the fixture tag)." style="min-height:64px;font-size:12px;line-height:1.45;background:#fff;">' + esc(lineNotes) + '</textarea>' +
+                '<div style="display:flex;gap:6px;align-items:center;padding-top:2px;">' +
+                  '<button type="button" class="btn btn-primary btn-sm" onclick="event.stopPropagation();saveInvoiceLineNotes(\'' + _pe + '\',\'' + _de + '\',' + lineIdx + ')">Save</button>' +
+                  '<button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation();toggleInvoiceLineNotes(' + lineIdx + ')">Close</button>' +
+                '</div>' +
+              '</div>' +
+            '</td></tr>';
         }
         var detailBlock = '';
         if (expandDetail) {
@@ -2072,13 +2385,15 @@
             typeBadgeHtml +
           '</td>' +
           '<td style="padding:10px 8px;font-size:13px;color:var(--gray-500);">' + esc(item.vendor || '') + '</td>' +
+          (_showLineTagCol ? '<td style="padding:10px 8px;text-align:center;vertical-align:middle;font-size:12px;font-weight:700;color:#1B3352;">' + esc(lineTag || '—') + '</td>' : '') +
+          (type === 'invoice' ? '<td style="padding:10px 8px;text-align:center;vertical-align:middle;">' + invNoteBtnHtml + '</td>' : '') +
           '<td style="padding:10px 8px;text-align:center;font-size:14px;">' + qty + '</td>' +
           '<td style="padding:10px 8px;text-align:right;font-size:13px;font-family:monospace;">' + (cost > 0 ? formatMoney(cost) : '—') + '</td>' +
           '<td style="padding:10px 8px;text-align:right;font-size:13px;color:' + (mkup > 0 ? 'var(--green)' : 'var(--gray-400)') + ';">' + (mkup > 0 ? mkup + '%' : '—') + '</td>' +
           '<td style="padding:10px 8px;text-align:right;font-size:13px;color:var(--gray-400);">' + (ship > 0 ? formatMoney(ship) : '—') + '</td>' +
           '<td style="padding:10px 8px;text-align:center;">' + (isTaxable ? '<span style="color:#5FA56B;font-weight:700;">✓</span>' : '<span style="color:#ccc;">—</span>') + '</td>' +
           '<td style="padding:10px 8px;text-align:right;font-size:14px;font-weight:600;font-family:monospace;">' + formatMoney(lineAmtForRow) + '</td>' +
-        '</tr>';
+        '</tr>' + invNoteRowHtml;
       });
       itemsHTML += '</tbody></table></div>';
     });
@@ -2102,39 +2417,92 @@
         '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);margin-bottom:6px;">Notes</div>' +
         '<div style="font-size:13px;color:var(--gray-600);line-height:1.6;">' + esc(docData.memo || docData.notes || '') + '</div></div>' : '';
 
+    var docAttachments = docData.attachments || [];
+    var attachmentsViewHTML = '';
+    if ((type === 'invoice' || type === 'po') && docAttachments.length > 0) {
+      attachmentsViewHTML = '<div style="margin-top:16px;padding:16px;background:var(--gray-50);border-radius:0;">' +
+        '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);margin-bottom:10px;">Attachments</div>' +
+        docAttachments.map(function(att) {
+          var nm = esc(att.name || 'File');
+          var u = String(att.url || '').trim();
+          if (u) {
+            return '<div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(0,0,0,0.06);">' +
+              '<span style="color:var(--gray-700);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:12px;">' + nm + '</span>' +
+              '<a href="' + escAttr(u) + '" target="_blank" rel="noopener" style="color:var(--teal);font-weight:600;flex-shrink:0;">Open</a></div>';
+          }
+          return '<div style="font-size:13px;padding:6px 0;color:var(--gray-500);">' + nm + '</div>';
+        }).join('') +
+        '</div>';
+    }
+
+    var _connBtn = typeof window.cchConnectedDocsTitleBtn === 'function'
+      ? window.cchConnectedDocsTitleBtn(projectId, type, docId, docNum) : '';
+    var _tagsMemoBlock = typeof window.cchDocTagsMemoBlockHTML === 'function'
+      ? window.cchDocTagsMemoBlockHTML(docData, { hint: type === 'invoice' ? 'Edit in <strong>Edit line items &amp; notes</strong> (Summary, Document Tags, Memo).' : '' })
+      : '';
+
     T.innerHTML =
       '<div style="max-width:900px;margin:0 auto;">' +
         // Header
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;">' +
-          '<div>' +
-            '<h1 style="font-size:24px;font-weight:700;font-family:var(--font-display);color:var(--text-primary);margin-bottom:6px;">' + typeLabel + ' ' + esc(docNum) + '</h1>' +
+          '<div style="min-width:0;flex:1;">' +
+            '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:6px;">' +
+            '<h1 style="font-size:24px;font-weight:700;font-family:var(--font-display);color:var(--text-primary);margin:0;">' + typeLabel + ' ' + esc(docNum) + '</h1>' +
+            _connBtn +
+            '</div>' +
             '<div style="color:var(--gray-400);font-size:13px;">' +
               esc(projName) + (docData.vendor ? ' · ' + esc(docData.vendor) : '') +
               (type !== 'invoice' && (docData.date || docData.createdAt) ? ' · ' + formatDate(docData.date || docData.createdAt) : '') +
             '</div>' +
-            ((docData.shortDescription && String(docData.shortDescription).trim()) ? '<div style="font-size:14px;color:#5C6B80;margin-top:10px;line-height:1.45;max-width:720px;">' + esc(String(docData.shortDescription).trim()) + '</div>' : '') +
             (linkedHTML ? '<div style="margin-top:8px;">' + linkedHTML + '</div>' : '') +
           '</div>' +
           '<div style="text-align:right;">' +
-            '<div style="margin-bottom:8px;">' + statusBadge + '</div>' +
+            statusHeaderHtml +
             '<div style="font-size:30px;font-weight:700;color:' + (balance <= 0 && totalPaid > 0 ? 'var(--green)' : 'var(--text-primary)') + ';font-family:var(--font-mono);">' + formatMoney(balance > 0 ? balance : grandTotal) + '</div>' +
             (totalPaid > 0 ? '<div style="font-size:11px;color:var(--gray-400);">of ' + formatMoney(grandTotal) + ' total</div>' : '<div style="font-size:11px;color:var(--gray-400);">' + items.length + ' items</div>') +
           '</div>' +
         '</div>' +
 
-        // Client info card
-        (clientName || clientEmail || clientPhone || clientAddress ? '<div style="background:#FFFFFF;padding:20px 24px;margin-bottom:20px;border:1px solid rgba(200,185,154,0.08);">' +
-          '<div style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gray-400);font-weight:600;margin-bottom:10px;">Bill To</div>' +
-          '<div style="font-size:14px;">' +
-            (typeof window.buildPremiumBillToHtml === 'function' ? window.buildPremiumBillToHtml(clientName, clientAddress, clientPhone, clientEmail, clientCompany, clientAddress2) : (
-              (clientName ? '<strong>' + esc(clientName) + '</strong><br>' : '') +
-              (clientCompany ? esc(clientCompany) + '<br>' : '') +
-              (clientAddress ? esc(clientAddress) + '<br>' : '') +
-              (clientAddress2 ? esc(clientAddress2) + '<br>' : '') +
-              (clientPhone ? esc(clientPhone) + '<br>' : '') +
-              (clientEmail ? esc(clientEmail) : '')
-            )) +
-          '</div></div>' : '') +
+        // Invoice details (view mode — client, dates; Houzz-style: not on line-item edit screen)
+        (type === 'invoice' ? (function() {
+          var invDateRaw = docData.date || docData.createdAt || '';
+          var invDateStr = invDateRaw && typeof formatDate === 'function' ? formatDate(invDateRaw) : '';
+          var dueVal = String(docData.dueDate || '').trim();
+          if (dueVal && dueVal.indexOf('T') >= 0) dueVal = dueVal.slice(0, 10);
+          return '<div style="background:#FFFFFF;padding:20px 24px;margin-bottom:20px;border:1px solid rgba(200,185,154,0.08);">' +
+            '<div style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gray-400);font-weight:600;margin-bottom:14px;">Invoice details</div>' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px 20px;margin-bottom:16px;font-size:13px;color:#5C6B80;">' +
+              (invDateStr ? '<div><span style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:#9CA3AF;display:block;margin-bottom:4px;">Invoice date</span><strong style="color:#1B3352;">' + esc(invDateStr) + '</strong></div>' : '') +
+              '<div><span style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:#9CA3AF;display:block;margin-bottom:4px;">Due date</span>' +
+                '<input type="date" class="form-input" id="docViewDueDate" value="' + escAttr(dueVal) + '" onchange="docViewSaveDueDate()" style="font-size:13px;padding:6px 10px;max-width:200px;"></div>' +
+            '</div>' +
+            '<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:#9CA3AF;margin-bottom:8px;">Bill to</div>' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">' +
+              '<div><label style="font-size:11px;color:#1B3352;font-weight:600;display:block;margin-bottom:4px;">Client name</label><input class="form-input" id="docViewClientName" value="' + escAttr(clientName) + '" onchange="docViewSaveClient()" style="font-size:13px;padding:8px 10px;"></div>' +
+              '<div><label style="font-size:11px;color:#1B3352;font-weight:600;display:block;margin-bottom:4px;">Company</label><input class="form-input" id="docViewClientCompany" value="' + escAttr(clientCompany) + '" onchange="docViewSaveClient()" style="font-size:13px;padding:8px 10px;"></div>' +
+              '<div><label style="font-size:11px;color:#1B3352;font-weight:600;display:block;margin-bottom:4px;">Email</label><input class="form-input" id="docViewClientEmail" value="' + escAttr(clientEmail) + '" onchange="docViewSaveClient()" style="font-size:13px;padding:8px 10px;"></div>' +
+              '<div><label style="font-size:11px;color:#1B3352;font-weight:600;display:block;margin-bottom:4px;">Phone</label><input class="form-input" id="docViewClientPhone" value="' + escAttr(clientPhone) + '" onchange="docViewSaveClient()" style="font-size:13px;padding:8px 10px;"></div>' +
+              '<div style="grid-column:span 2;"><label style="font-size:11px;color:#1B3352;font-weight:600;display:block;margin-bottom:4px;">Address</label><input class="form-input" id="docViewClientAddress" value="' + escAttr(clientAddress) + '" onchange="docViewSaveClient()" style="font-size:13px;padding:8px 10px;"></div>' +
+              '<div style="grid-column:span 2;"><label style="font-size:11px;color:#1B3352;font-weight:600;display:block;margin-bottom:4px;">Address line 2</label><input class="form-input" id="docViewClientAddress2" value="' + escAttr(clientAddress2) + '" onchange="docViewSaveClient()" style="font-size:13px;padding:8px 10px;"></div>' +
+            '</div>' +
+            '<p style="font-size:11px;color:#5C6B80;margin-top:12px;line-height:1.45;">Changes save to the project and this invoice. Use <strong>Edit line items &amp; notes</strong> for line items, Summary, Document Tags, and Memo.</p>' +
+          '</div>';
+        })() : (
+          (clientName || clientEmail || clientPhone || clientAddress ? '<div style="background:#FFFFFF;padding:20px 24px;margin-bottom:20px;border:1px solid rgba(200,185,154,0.08);">' +
+            '<div style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gray-400);font-weight:600;margin-bottom:10px;">Bill To</div>' +
+            '<div style="font-size:14px;">' +
+              (typeof window.buildPremiumBillToHtml === 'function' ? window.buildPremiumBillToHtml(clientName, clientAddress, clientPhone, clientEmail, clientCompany, clientAddress2) : (
+                (clientName ? '<strong>' + esc(clientName) + '</strong><br>' : '') +
+                (clientCompany ? esc(clientCompany) + '<br>' : '') +
+                (clientAddress ? esc(clientAddress) + '<br>' : '') +
+                (clientAddress2 ? esc(clientAddress2) + '<br>' : '') +
+                (clientPhone ? esc(clientPhone) + '<br>' : '') +
+                (clientEmail ? esc(clientEmail) : '')
+              )) +
+            '</div></div>' : '')
+        )) +
+
+        _tagsMemoBlock +
 
         // Items
         '<div style="background:#FFFFFF;padding:20px 24px;margin-bottom:20px;border:1px solid rgba(200,185,154,0.08);">' +
@@ -2158,11 +2526,11 @@
         '</div>' +
 
         paymentsHTML +
-        memoHTML +
+        attachmentsViewHTML +
 
         // Action buttons at bottom
         '<div style="margin-top:24px;padding:16px;background:var(--gray-50);display:flex;gap:12px;flex-wrap:wrap;align-items:center;">' +
-          '<button class="btn btn-primary" style="font-size:14px;padding:10px 24px;background:#1B3352;color:#EDE8E0;" onclick="window._forceEditMode=true;navigate(window.location.hash)">✏️ Edit ' + typeLabel + '</button>' +
+          '<button class="btn btn-primary" style="font-size:14px;padding:10px 24px;background:#1B3352;color:#EDE8E0;" onclick="window._forceEditMode=true;navigate(window.location.hash)">✏️ ' + (type === 'invoice' ? 'Edit line items & notes' : ('Edit ' + typeLabel)) + '</button>' +
           '<button class="btn btn-secondary" style="font-size:14px;padding:10px 20px;" onclick="sendInvoiceToClient(\'' + projectId + '\',\'' + docId + '\')">📧 Send to Client</button>' +
           '<button class="btn btn-secondary" style="font-size:14px;padding:10px 20px;" onclick="previewDocument(\'' + type + '\',\'' + projectId + '\',\'' + docId + '\')">👁️ Preview / PDF</button>' +
           '<button class="btn btn-secondary" style="font-size:14px;padding:10px 20px;" onclick="quickRecordPayment(\'' + projectId + '\',\'' + collection + '\',\'' + docId + '\')">💳 Record Payment</button>' +
@@ -2431,8 +2799,11 @@
   var _origPreviewDocument = window.previewDocument;
   window.previewDocument = async function(type, projectId, docId) {
     // Save any unsaved edits first
-    if (window._docEdit && window._docEdit.docId === docId) {
-      try { await window.docEditSave(); } catch(e) {}
+    if (window._docEdit && window._docEdit.docId === docId && window._docEdit.projectId === projectId) {
+      try {
+        if (typeof window.docEditSyncLineItemsFromDom === 'function') window.docEditSyncLineItemsFromDom();
+        await window.docEditSave();
+      } catch(e) {}
     }
 
     var collection = type === 'invoice' ? 'invoices' : type === 'po' ? 'purchaseOrders' : 'proposals';
@@ -2503,7 +2874,9 @@
     }
 
     var docNum = docData.invoiceNum || docData.number || docData.proposalNum || docData.name || docId.slice(0,8);
-    var docDate = docData.date || docData.createdAt || '';
+    var docDate = type === 'po'
+      ? (docData.date || docData.issueDate || docData.orderDate || docData.poDate || docData.createdAt || '')
+      : (docData.date || docData.createdAt || '');
     function premiumFormatDocDate(raw) {
       if (raw == null || raw === '') return '';
       if (typeof raw.toDate === 'function') {
@@ -2542,16 +2915,16 @@
     var subtotal = 0, taxableSubtotal = 0, totalShipping = 0;
     // Show thumbnails on invoices too when product images exist (Houzz-style printouts).
     var _showPremiumImgCol = true;
-    var _premiumGroupColSpan = type === 'po' ? 8 : type === 'invoice' ? 6 : 7;
+    var _premiumGroupColSpan = type === 'po' ? 7 : type === 'invoice' ? 5 : 6;
     var _hasProposalSectionGroups = type === 'proposal' && items.some(function(it) { return it && it.lineKind === 'group'; });
-    /** Colgroup keeps thead/body columns aligned (fixed layout + width only on tbody broke alignment). */
+    /** One Item column (thumb + text in a grid) — avoids squeezing text when tag/notes add height. */
     var _premiumColgroup = '';
     if (type === 'invoice') {
-      _premiumColgroup = '<colgroup><col class="pc-thumb"><col class="pc-item"><col class="pc-qty"><col class="pc-money"><col class="pc-money"><col class="pc-tax"><col class="pc-money"></colgroup>';
+      _premiumColgroup = '<colgroup><col class="pc-item"><col class="pc-qty"><col class="pc-money"><col class="pc-money"><col class="pc-tax"><col class="pc-money"></colgroup>';
     } else if (type === 'po') {
-      _premiumColgroup = '<colgroup><col class="pc-thumb"><col class="pc-item"><col class="pc-vendor"><col class="pc-qty"><col class="pc-money"><col class="pc-money"><col class="pc-tax"><col class="pc-money"></colgroup>';
+      _premiumColgroup = '<colgroup><col class="pc-item"><col class="pc-vendor"><col class="pc-qty"><col class="pc-money"><col class="pc-money"><col class="pc-tax"><col class="pc-money"></colgroup>';
     } else {
-      _premiumColgroup = '<colgroup><col class="pc-thumb"><col class="pc-item"><col class="pc-qty"><col class="pc-money"><col class="pc-money"><col class="pc-tax"><col class="pc-money"></colgroup>';
+      _premiumColgroup = '<colgroup><col class="pc-item"><col class="pc-qty"><col class="pc-money"><col class="pc-money"><col class="pc-tax"><col class="pc-money"></colgroup>';
     }
 
     function _fmtIsoLong(iso) {
@@ -2579,6 +2952,34 @@
       }).join('') + '</ul>';
     }
 
+    /** Invoice/proposal preview/PDF: lineTag + lineNotes body (no vendor under item). */
+    function _invoicePreviewTagNotesHtml(it) {
+      it = it || {};
+      var tagLine = (typeof window.cchLineTagText === 'function') ? window.cchLineTagText(it) : '';
+      var notesBody = (typeof window.cchLineNotesBodyText === 'function') ? window.cchLineNotesBodyText(it) : '';
+      if (type === 'invoice' && typeof window.sanitizeInvoicePreviewLineText === 'function') {
+        if (tagLine) tagLine = window.sanitizeInvoicePreviewLineText(tagLine);
+        if (notesBody) notesBody = window.sanitizeInvoicePreviewLineText(notesBody);
+      }
+      if (!tagLine && !notesBody) return '';
+      var html = '';
+      if (tagLine) {
+        html += '<div class="prop-line-detail-stack" style="margin-top:6px;"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Tag</div>' +
+          '<div class="item-desc item-desc-multiline line-notes" style="font-weight:600;">' + esc(tagLine) + '</div></div>';
+      }
+      if (notesBody) {
+        var nLines = String(notesBody).split(/\r?\n/).map(function(l) { return l.trim(); }).filter(Boolean);
+        html += '<div class="prop-line-detail-stack" style="margin-top:4px;"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Notes</div>';
+        if (nLines.length === 1) {
+          html += '<div class="item-desc item-desc-multiline line-notes">' + esc(nLines[0]) + '</div>';
+        } else {
+          html += '<ul class="line-notes-ul">' + nLines.map(function(l) { return '<li>' + esc(l) + '</li>'; }).join('') + '</ul>';
+        }
+        html += '</div>';
+      }
+      return html;
+    }
+
     function _premiumAppendLineRow(it) {
       var qty = parseFloat(it.qty) || 1;
       var amt = parseFloat(it.amount) || 0;
@@ -2586,14 +2987,16 @@
       var mkup = parseFloat(it.markupPct) || 0;
       if (type === 'invoice' && typeof invoiceLineIsDesignServicesNoMarkup === 'function' && invoiceLineIsDesignServicesNoMarkup(it)) mkup = 0;
       var ship = parseFloat(it.shipping) || 0;
-      var lineAmt = cost > 0 ? cost * qty * (1 + mkup / 100) : amt;
-      var unitPrice = type === 'po' ? (cost || amt/qty) : amt/qty;
+      var lineAmt = type === 'po'
+        ? ((cost > 0) ? (cost * qty) : 0)
+        : (cost > 0 ? cost * qty * (1 + mkup / 100) : amt);
+      var unitPrice = type === 'po' ? ((cost > 0) ? cost : (qty > 0 ? amt / qty : 0)) : amt / qty;
       var displayLineTotal = amt;
       if (type === 'po') {
-        displayLineTotal = (cost > 0 ? (cost * qty + ship) : amt);
+        displayLineTotal = (cost > 0 ? (cost * qty + ship) : ship);
         displayLineTotal = Math.round(displayLineTotal * 100) / 100;
       }
-      var isTaxable = it.taxable !== false && (it.taxable === true || it.expenseType === 'product' || (!it.expenseType && it.taxable !== false));
+      var isTaxable = (typeof window.cchInvoiceLineIsTaxable === 'function') ? window.cchInvoiceLineIsTaxable(it) : (it.taxable !== false && (it.taxable === true || it.expenseType === 'product' || (!it.expenseType && it.taxable !== false)));
 
       subtotal += lineAmt;
       if (isTaxable) taxableSubtotal += lineAmt;
@@ -2617,8 +3020,11 @@
           imgTag = '<img src="' + _escImgSrcAttr(imgSrc) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">';
         }
       }
-      var imgCell = _showPremiumImgCol ? '<td class="img-cell">' + imgTag + '</td>' : '';
-      var _rawNotes = (it.lineNotes || it.notes) || '';
+      var imgBlock = '';
+      if (_showPremiumImgCol && imgTag) {
+        imgBlock = '<div class="cch-premium-item-thumb">' + imgTag + '</div>';
+      }
+      var _rawNotes = (typeof window.cchLineExplicitNotesText === 'function') ? window.cchLineExplicitNotesText(it) : ((it.lineNotes || '') || '');
       var _rawDesc = (it.description || '');
       if (type === 'invoice' && typeof window.sanitizeInvoicePreviewLineText === 'function') {
         _rawNotes = window.sanitizeInvoicePreviewLineText(_rawNotes);
@@ -2636,7 +3042,7 @@
           periodHtml = '<div class="item-svc-period">Service date: ' + esc(p0) + '</div>';
         }
       }
-      var notesUnder = _lineNotesHtml(_rawNotes);
+      var notesUnder = (type === 'invoice' || type === 'proposal') ? _invoicePreviewTagNotesHtml(it) : _lineNotesHtml(_rawNotes);
       var _poLineNote = (typeof cchLineAdditionalNotesText === 'function')
         ? cchLineAdditionalNotesText(it)
         : (String(it.additionalNotes || it.workroomNote || '').trim());
@@ -2648,14 +3054,21 @@
       if (descBody && lineLabel && descBody.toLowerCase().indexOf(String(lineLabel).toLowerCase()) === 0) {
         descBody = descBody.slice(lineLabel.length).replace(/^\s*\([^)]*\)\s*/, '').replace(/^\s*[\u2014—\-]\s*/, '').trim();
       }
-      itemsHtml += '<tr>' + imgCell +
-        '<td class="line-item-main"><strong>' + esc(lineLabel) + '</strong>' +
-        (descBody ? '<div class="item-desc item-desc-multiline">' + esc(descBody) + '</div>' : '') +
-        periodHtml +
-        notesUnder +
-        workroomUnder +
-        (it.vendor && type !== 'po' ? '<div class="item-vendor">' + esc(it.vendor) + '</div>' : '') +
-        '</td>' +
+      var itemInner =
+        '<div class="cch-premium-item-grid' + (imgBlock ? '' : ' cch-premium-item-grid--no-thumb') + '">' +
+          imgBlock +
+          '<div class="cch-premium-item-text">' +
+            '<strong>' + esc(lineLabel) + '</strong>' +
+            '<div class="prop-line-detail-stack">' +
+            (descBody ? '<div style="margin-top:6px;"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Description</div><div class="item-desc item-desc-multiline">' + esc(descBody) + '</div></div>' : '') +
+            periodHtml +
+            notesUnder +
+            '</div>' +
+            workroomUnder +
+            (it.vendor && type !== 'po' && type !== 'invoice' ? '<div class="item-vendor">' + esc(it.vendor) + '</div>' : '') +
+          '</div>' +
+        '</div>';
+      itemsHtml += '<tr><td class="line-item-main">' + itemInner + '</td>' +
         (type === 'po' ? '<td class="vendor-cell">' + esc(it.vendor||'') + '</td>' : '') +
         '<td style="text-align:center;">' + qty + '</td>' +
         '<td class="r">' + formatMoney(unitPrice) + '</td>' +
@@ -2664,11 +3077,10 @@
         '<td class="r total-cell">' + formatMoney(displayLineTotal) + '</td></tr>';
     }
 
-    var _thImg = _showPremiumImgCol ? '<th style="width:80px;"></th>' : '';
     var _thItemLabel = type === 'invoice' ? 'Service' : 'Item';
     if (_hasProposalSectionGroups) {
       itemsHtml += '<div class="room-section"><div class="room-header"><span>Items</span><span></span></div>' +
-        '<table>' + _premiumColgroup + '<thead><tr>' + _thImg + '<th>' + _thItemLabel + '</th>' +
+        '<table class="cch-premium-items-table">' + _premiumColgroup + '<thead><tr><th>' + _thItemLabel + '</th>' +
         (type === 'po' ? '<th>Vendor</th>' : '') +
         '<th style="text-align:center;">Qty</th>' +
         '<th class="r">Price</th>' +
@@ -2688,7 +3100,7 @@
         var catItems = grouped[cat];
         var catTotal = catItems.reduce(function(s,i) { return s + (parseFloat(i.amount)||0); }, 0);
         itemsHtml += '<div class="room-section"><div class="room-header"><span>' + esc(cat) + '</span><span>' + formatMoney(catTotal) + '</span></div>' +
-          '<table>' + _premiumColgroup + '<thead><tr>' + _thImg + '<th>' + _thItemLabel + '</th>' +
+          '<table class="cch-premium-items-table">' + _premiumColgroup + '<thead><tr><th>' + _thItemLabel + '</th>' +
           (type === 'po' ? '<th>Vendor</th>' : '') +
           '<th style="text-align:center;">Qty</th>' +
           '<th class="r">Price</th>' +
@@ -2790,7 +3202,7 @@
     // Build the premium preview
     var win = window.open('', '_blank');
     win.document.write('<!DOCTYPE html><html><head><title>' + esc(typeLabel + ' ' + docNum) + '</title>' +
-      '<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">' +
+      '<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">' +
       '<style>' +
       '*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }' +
       'html, body { height:100%; }' +
@@ -2845,15 +3257,20 @@
       '.room-header { display:flex; justify-content:space-between; align-items:center; padding:8px 0 6px; border-bottom:2px solid #1B3352; margin-bottom:4px; }' +
       '.room-header span:first-child { font-size:11px; text-transform:uppercase; letter-spacing:2px; color:#C4A464; font-weight:700; }' +
       '.room-header span:last-child { font-size:12px; color:#5C6B80; font-weight:600; font-family:"DM Sans"; }' +
-      'table { width:100%; border-collapse:collapse; table-layout:fixed; }' +
-      'col.pc-thumb { width:72px; }' +
-      'col.pc-item { width:44%; }' +
-      'col.pc-qty { width:9%; }' +
-      'col.pc-vendor { width:13%; }' +
-      'col.pc-money { width:10%; }' +
-      'col.pc-tax { width:7%; }' +
+      'table.cch-premium-items-table { width:100%; border-collapse:collapse; table-layout:fixed; }' +
+      'col.pc-item { width:54%; }' +
+      'col.pc-qty { width:8%; }' +
+      'col.pc-vendor { width:11%; }' +
+      'col.pc-money { width:9%; }' +
+      'col.pc-tax { width:6%; }' +
       'th, td { min-width:0; }' +
-      'td.line-item-main { word-wrap:break-word; overflow-wrap:anywhere; }' +
+      'td.line-item-main { word-wrap:break-word; overflow-wrap:break-word; vertical-align:top; }' +
+      '.cch-premium-item-grid { display:grid; grid-template-columns:80px minmax(0,1fr); gap:14px; align-items:start; width:100%; box-sizing:border-box; }' +
+      '.cch-premium-item-grid--no-thumb { grid-template-columns:minmax(0,1fr); }' +
+      '.cch-premium-item-thumb { width:80px; flex-shrink:0; }' +
+      '.cch-premium-item-thumb img { width:80px; height:80px; object-fit:cover; border-radius:2px; display:block; }' +
+      '.cch-premium-item-text { min-width:0; width:100%; max-width:100%; }' +
+      '.prop-line-detail-stack { width:100%; min-width:0; max-width:100%; box-sizing:border-box; }' +
       'th { text-align:left; padding:8px 6px; font-size:9px; text-transform:uppercase; letter-spacing:1px; color:#5C6B80; font-weight:600; border-bottom:1px solid #E8ECF3; background:#F4F6FA; }' +
       'th.r { text-align:right; }' +
       'td { padding:10px 6px; border-bottom:1px solid #E8ECF3; font-size:13px; vertical-align:middle; }' +
@@ -2861,10 +3278,10 @@
       'td.total-cell { font-weight:600; }' +
       'td.ship { color:#5C6B80; }' +
       'td.vendor-cell { color:#5C6B80; font-size:12px; }' +
-      'td.img-cell img { width:64px; height:64px; object-fit:cover; border-radius:2px; }' +
+      'td.img-cell img { width:80px; height:80px; object-fit:cover; border-radius:2px; }' +
       'td strong { font-size:13px; display:block; }' +
       '.item-desc { font-size:11px; color:#5C6B80; margin-top:2px; }' +
-      '.item-desc-multiline { white-space:pre-wrap; word-break:break-word; overflow-wrap:anywhere; line-height:1.5; max-width:100%; margin-top:6px; font-size:11px; }' +
+      '.item-desc-multiline { white-space:pre-wrap; word-break:break-word; overflow-wrap:break-word; line-height:1.5; width:100%; max-width:100%; margin-top:6px; font-size:11px; }' +
       '.item-svc-period { font-size:10px;color:#8B7355;margin-top:6px;font-weight:600;letter-spacing:0.2px; }' +
       '.line-notes-ul { margin:6px 0 0 1.1em;padding:0;list-style:disc;color:#5C6B80;font-size:11px;line-height:1.45; }' +
       '.line-notes-ul li { margin:3px 0; }' +
@@ -2897,12 +3314,12 @@
       '@media print { .toolbar{display:none!important;} .print-hint-screen{display:none!important;} body{background:white;display:block;min-height:auto;} .page{min-height:auto;box-shadow:none;flex:none;} .page-body{flex:none;} .doc-footer{position:relative;margin-top:16px;} }' +
       '@page { margin:0.5in; }' +
 
-      /* Tear sheet pages */
+      /* Tear sheet pages (preview only — scoped; do not inject _getTearSheetCSSRedesign; it overrides body/toolbar) */
       '.ts-page { page-break-before:always; padding:48px; }' +
       '.ts-header { display:flex; justify-content:space-between; align-items:center; padding-bottom:16px; border-bottom:2px solid #1B3352; margin-bottom:24px; }' +
       '.ts-logo { font-family:"Cormorant Garamond",serif; font-size:28px; font-weight:700; color:#1B3352; letter-spacing:3px; }' +
       '.ts-body { display:grid; grid-template-columns:1fr 1fr; gap:32px; }' +
-      '.ts-img { width:100%; aspect-ratio:1; object-fit:cover; }' +
+      '.ts-img { width:100%; aspect-ratio:1; object-fit:contain; background:#FAFAF8; }' +
       '.ts-title { font-family:"Cormorant Garamond",serif; font-size:26px; font-weight:600; color:#1B3352; margin-bottom:4px; }' +
       '.ts-room { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:#C8B99A; font-weight:600; margin-bottom:20px; }' +
       '.ts-spec { display:flex; padding:6px 0; border-bottom:1px solid #f0efeb; }' +
@@ -2932,13 +3349,13 @@
           '<div class="logo-block">' +
             '<div class="logo-cch">CCH</div>' +
             '<div class="logo-sub">Design Inc</div>' +
-            '<div class="company-info">Cindy Holloway<br>2481 N. Riverside Dr. · Santa Ana, CA 92706<br>(949) 497-7979 · cindy@cchdesign.com<br>www.cchdesign.com</div>' +
+            '<div class="company-info">' + cchPremiumDocCompanyInfoHtml() + '</div>' +
           '</div>' +
           '<div class="doc-meta">' +
             premiumDocTypeHtml +
             '<div class="doc-num">' + esc(docNum) + '</div>' +
             premiumDocDateHtml +
-            '<div class="doc-status">' + esc(docData.status||'Draft') + '</div>' +
+            '<div class="doc-status">' + esc(type === 'invoice' ? cchInvoiceClientDisplayStatus(docData) : (docData.status || 'Draft')) + '</div>' +
           '</div>' +
         '</div>' +
         '<div class="gold-line"></div>' +
@@ -2975,10 +3392,10 @@
         }
       } catch (eIm) {}
       if (!_heroImg) _heroImg = String(item.imageUrl || item.image || '').trim();
+      if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(item)) return;
       if (!item.title && !_heroImg) return;
       var qty = parseFloat(item.qty) || 1;
       var amt = parseFloat(item.amount) || 0;
-      var cost = parseFloat(item.cost) || 0;
       win.document.write(
         '<div class="page ts-page">' +
           '<div class="ts-header">' +

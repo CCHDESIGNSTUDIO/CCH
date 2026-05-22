@@ -30,10 +30,17 @@
 
   global.CCH_PRODUCT_CATEGORIES_MASTER = MASTER.slice();
 
-  /** Section headers / mistakes — not FFE types (use Room field instead). */
+  /** Section headers, billing types, and mistakes — not FFE product categories (use Room or billing flows instead). */
   var NOT_FFE_CATEGORY_LABEL = new Set([
     'rooms', 'room boards', 'room board', 'spaces', 'space',
-    'by room', 'by category', 'all rooms'
+    'by room', 'by category', 'all rooms',
+    'labor', 'labour', 'expense', 'expenses', 'services', 'service',
+    'cch design service', 'cch design services', 'cch project management',
+    'custom labor', 'design services', 'blended design services', 'consultation',
+    'installation charges', 'freight', 'postage & printing', 'transaction fees',
+    'time billing', 'hourly', 'retainer', 'design fee', 'design fees',
+    'cch admin', 'shipping', 'handling', 'sales tax', 'discount', 'other expense',
+    'professional services', 'project management', 'design fee - rates are already set in smart time'
   ]);
 
   /**

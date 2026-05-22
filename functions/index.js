@@ -1,5 +1,5 @@
-/** v1 API (runWith, classic https.onCall/onRequest). Default firebase-functions v7+ export is v2-only — no runWith. */
-const functions = require("firebase-functions/v1");
+/** Gen2 Cloud Functions (matches production deploy — Gen1 manifest caused "Cannot set CPU" errors). */
+const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
 admin.initializeApp();
@@ -73,15 +73,17 @@ const TIMELY_CLIENT_SECRET = "f71829f106a93ce3e692b7f392d457a6d95bec579932095fa3
 const TIMELY_REDIRECT_URI = "https://cch-platform.web.app";
 const TIMELY_ACCOUNT_ID = "874495";
 
-exports.healthCheck = functions.https.onCall(
-  { invoker: "public" },
-  (request) => {
-    return { status: "ok", timestamp: new Date().toISOString() };
-  }
-);
+const REGION = "us-central1";
+const CORS_STUDIO = "https://cch-platform.web.app";
+const HTTP_STUDIO = { region: REGION, cors: CORS_STUDIO, invoker: "public" };
+const CALLABLE_PUBLIC = { region: REGION, invoker: "public" };
+
+exports.healthCheck = onCall(CALLABLE_PUBLIC, (request) => {
+  return { status: "ok", timestamp: new Date().toISOString() };
+});
 
 // Exchange Timely OAuth code for access token
-exports.timelyAuth = functions.https.onRequest(async (req, res) => {
+exports.timelyAuth = onRequest(HTTP_STUDIO, async (req, res) => {
   res.set("Access-Control-Allow-Origin", "https://cch-platform.web.app");
   res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.set("Access-Control-Allow-Headers", "Content-Type");
@@ -124,8 +126,65 @@ exports.timelyAuth = functions.https.onRequest(async (req, res) => {
   }
 });
 
+/** Refresh Timely OAuth access token (stored on settings/timely). */
+async function refreshTimelyAccessToken(fetch, refreshToken) {
+  const resp = await fetch("https://api.timelyapp.com/1.1/oauth/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: TIMELY_CLIENT_ID,
+      client_secret: TIMELY_CLIENT_SECRET,
+      refresh_token: refreshToken
+    }).toString()
+  });
+  const data = await resp.json();
+  if (!resp.ok || data.error || !data.access_token) {
+    throw new Error(data.error_description || data.error || "Timely token refresh failed");
+  }
+  await db.collection("settings").doc("timely").set({
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token || refreshToken,
+    expiresIn: data.expires_in,
+    tokenType: data.token_type,
+    refreshedAt: new Date().toISOString()
+  }, { merge: true });
+  return data.access_token;
+}
+
+/** Paginate Timely /events — default API page size is small; without this, only the first page syncs. */
+async function fetchAllTimelyEvents(fetch, accountId, accessToken, startDate, endDate) {
+  const perPage = 1000;
+  let page = 1;
+  const all = [];
+  for (;;) {
+    const url = `https://api.timelyapp.com/1.1/${accountId}/events?since=${encodeURIComponent(startDate)}&upto=${encodeURIComponent(endDate)}&page=${page}&per_page=${perPage}`;
+    const resp = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (resp.status === 401) {
+      const err = new Error("Token expired");
+      err.status = 401;
+      throw err;
+    }
+    if (!resp.ok) {
+      const body = await resp.text();
+      throw new Error(`Timely API ${resp.status}: ${body.slice(0, 300)}`);
+    }
+    const batch = await resp.json();
+    const rows = Array.isArray(batch) ? batch : (batch && Array.isArray(batch.events) ? batch.events : []);
+    if (!rows.length) break;
+    all.push(...rows);
+    if (rows.length < perPage) break;
+    page++;
+    if (page > 50) {
+      console.warn("[Timely Sync] Stopped after 50 pages (" + all.length + " events)");
+      break;
+    }
+  }
+  return all;
+}
+
 // Pull time entries from Timely API
-exports.timelySyncEntries = functions.https.onRequest(async (req, res) => {
+exports.timelySyncEntries = onRequest(HTTP_STUDIO, async (req, res) => {
   res.set("Access-Control-Allow-Origin", "https://cch-platform.web.app");
   res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.set("Access-Control-Allow-Headers", "Content-Type");
@@ -134,27 +193,35 @@ exports.timelySyncEntries = functions.https.onRequest(async (req, res) => {
   try {
     const tokenDoc = await db.collection("settings").doc("timely").get();
     if (!tokenDoc.exists) return res.status(400).json({ error: "Timely not connected" });
-    const { accessToken, accountId } = tokenDoc.data();
+    const tokenData = tokenDoc.data();
+    let accessToken = tokenData.accessToken;
+    const accountId = tokenData.accountId || TIMELY_ACCOUNT_ID;
+    const refreshToken = tokenData.refreshToken;
 
     const startDate = req.body.startDate || new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
     const endDate = req.body.endDate || new Date().toISOString().slice(0, 10);
 
     const fetch = (await import("node-fetch")).default;
-    const resp = await fetch(`https://api.timelyapp.com/1.1/${accountId}/events?since=${startDate}&upto=${endDate}`, {
-      headers: { "Authorization": `Bearer ${accessToken}` }
-    });
-    if (resp.status === 401) return res.status(401).json({ error: "Token expired — reconnect Timely" });
-    const entries = await resp.json();
+    let entries;
+    try {
+      entries = await fetchAllTimelyEvents(fetch, accountId, accessToken, startDate, endDate);
+    } catch (syncErr) {
+      if (syncErr.status === 401 && refreshToken) {
+        accessToken = await refreshTimelyAccessToken(fetch, refreshToken);
+        entries = await fetchAllTimelyEvents(fetch, accountId, accessToken, startDate, endDate);
+      } else if (syncErr.status === 401) {
+        return res.status(401).json({ error: "Token expired — reconnect Timely in Settings" });
+      } else {
+        throw syncErr;
+      }
+    }
 
     const boardsArr = await loadBoardsLookupForTimely();
 
-    // Write each entry to Firestore
     let saved = 0;
     for (const entry of entries) {
+      if (!entry || entry.id == null) continue;
       const docId = "timely-" + entry.id;
-      // Timely API v1.1: duration is in entry.duration object
-      // { total_seconds, total_hours, total_minutes, hours, minutes, seconds }
-      // The top-level entry.hours field is always 0 — ignore it
       const dur = entry.duration || {};
       const durSecs = parseFloat(dur.total_seconds) || 0;
       const hoursVal = parseFloat(dur.total_hours) || (durSecs / 3600) || (parseFloat(dur.total_minutes) / 60) || 0;
@@ -182,7 +249,17 @@ exports.timelySyncEntries = functions.https.onRequest(async (req, res) => {
       saved++;
     }
 
-    return res.status(200).json({ status: "ok", fetched: entries.length, saved: saved, startDate, endDate });
+    const monthPrefix = endDate.slice(0, 7);
+    const currentMonthFetched = entries.filter((e) => String(e.day || "").startsWith(monthPrefix)).length;
+    return res.status(200).json({
+      status: "ok",
+      fetched: entries.length,
+      saved,
+      startDate,
+      endDate,
+      currentMonth: monthPrefix,
+      currentMonthFetched
+    });
   } catch (err) {
     console.error("[Timely Sync] Error:", err);
     return res.status(500).json({ error: err.message });
@@ -190,7 +267,7 @@ exports.timelySyncEntries = functions.https.onRequest(async (req, res) => {
 });
 
 // Timely webhook — receives hours:created, hours:updated events
-exports.timelyWebhook = functions.https.onRequest(async (req, res) => {
+exports.timelyWebhook = onRequest(HTTP_STUDIO, async (req, res) => {
   // Accept GET for Timely verification ping
   if (req.method === "GET") {
     return res.status(200).send("OK");
@@ -305,11 +382,14 @@ const QB_OAUTH_REDIRECTS = new Set([
 
 const QB_REDIRECT_URI_DEFAULT = "https://cch-platform.web.app/qbauth.html";
 const QB_SECRET_NAMES = ["QB_CLIENT_ID", "QB_CLIENT_SECRET"];
-const qbRuntime = functions.runWith({ secrets: QB_SECRET_NAMES });
+const QB_HTTP = { region: REGION, cors: CORS_STUDIO, secrets: QB_SECRET_NAMES, invoker: "public" };
+const QB_CALLABLE = { region: REGION, secrets: QB_SECRET_NAMES, invoker: "public" };
+const QB_BATCH_CALLABLE = { ...QB_CALLABLE, timeoutSeconds: 300, memory: "512MiB" };
+const TIMELY_BACKFILL_CALLABLE = { region: REGION, timeoutSeconds: 540, memory: "512MiB" };
 
 function ensureQbSecrets() {
   if (!QB_CLIENT_ID || !QB_CLIENT_SECRET) {
-    throw new functions.https.HttpsError(
+    throw new HttpsError(
       "failed-precondition",
       "QuickBooks secrets missing. Set QB_CLIENT_ID and QB_CLIENT_SECRET in Firebase Functions secrets."
     );
@@ -317,7 +397,7 @@ function ensureQbSecrets() {
 }
 
 // ─── QB OAUTH: Start authorization flow ─────────────────────────
-exports.qbAuthStart = qbRuntime.https.onRequest(async (req, res) => {
+exports.qbAuthStart = onRequest(QB_HTTP, async (req, res) => {
   ensureQbSecrets();
   const state = Math.random().toString(36).substring(2, 15);
   await db.collection("admin").doc("qb_oauth_state").set({ state, createdAt: new Date().toISOString() });
@@ -334,14 +414,12 @@ exports.qbAuthStart = qbRuntime.https.onRequest(async (req, res) => {
 });
 
 // ─── QB OAUTH: Exchange code for tokens (callable from frontend) ──
-exports.qbAuthCallback = qbRuntime.https.onCall(
-  { invoker: "public" },
-  async (request) => {
+exports.qbAuthCallback = onCall(QB_CALLABLE, async (request) => {
   assertQbAdmin(request);
   ensureQbSecrets();
 
   const { code, realmId, redirectUri } = request.data || {};
-  if (!code) throw new functions.https.HttpsError("invalid-argument", "Authorization code required");
+  if (!code) throw new HttpsError("invalid-argument", "Authorization code required");
 
   const redirect = (redirectUri && QB_OAUTH_REDIRECTS.has(String(redirectUri).trim()))
     ? String(redirectUri).trim()
@@ -365,7 +443,7 @@ exports.qbAuthCallback = qbRuntime.https.onCall(
 
   if (!tokenRes.ok) {
     const err = await tokenRes.text();
-    throw new functions.https.HttpsError("internal", "Token exchange failed: " + err);
+    throw new HttpsError("internal", "Token exchange failed: " + err);
   }
 
   const tokens = await tokenRes.json();
@@ -388,7 +466,7 @@ async function getQBAccessToken() {
   const qbDoc = await db.collection("admin").doc("qb").get();
   const config = qbDoc.data();
   if (!config || !config.refreshToken) {
-    throw new functions.https.HttpsError("failed-precondition",
+    throw new HttpsError("failed-precondition",
       "QuickBooks not connected. Add refreshToken to Firestore admin/qb document.");
   }
 
@@ -409,7 +487,7 @@ async function getQBAccessToken() {
 
   if (!res.ok) {
     const err = await res.text();
-    throw new functions.https.HttpsError("internal", "Token refresh failed: " + err);
+    throw new HttpsError("internal", "Token refresh failed: " + err);
   }
 
   const tokens = await res.json();
@@ -445,7 +523,7 @@ async function qbApiCall(method, endpoint, accessToken, realmId, body) {
 
   if (data.Fault) {
     const errMsg = data.Fault.Error ? data.Fault.Error.map(e => e.Message + " (" + e.Detail + ")").join("; ") : "Unknown QB error";
-    throw new functions.https.HttpsError("internal", "QB API Error: " + errMsg);
+    throw new HttpsError("internal", "QB API Error: " + errMsg);
   }
 
   return data;
@@ -461,11 +539,11 @@ const QB_ADMIN_EMAILS = [
 /** Gen2 https.onCall invokes (request) — auth is on request, payload on request.data (not v1's context). */
 function assertQbAdmin(request) {
   if (!request || !request.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "Sign in required");
+    throw new HttpsError("unauthenticated", "Sign in required");
   }
   const email = (request.auth.token.email || "").toLowerCase();
   if (!QB_ADMIN_EMAILS.includes(email)) {
-    throw new functions.https.HttpsError(
+    throw new HttpsError(
       "permission-denied",
       "Only billing admins can use QuickBooks from CCH Studio."
     );
@@ -481,11 +559,11 @@ const QB_PUSH_EMAILS = QB_ADMIN_EMAILS.concat([
 
 function assertQbPushAllowed(request) {
   if (!request || !request.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "Sign in required");
+    throw new HttpsError("unauthenticated", "Sign in required");
   }
   const email = (request.auth.token.email || "").toLowerCase();
   if (!QB_PUSH_EMAILS.includes(email)) {
-    throw new functions.https.HttpsError(
+    throw new HttpsError(
       "permission-denied",
       "You are not authorized to push documents to QuickBooks."
     );
@@ -496,17 +574,15 @@ function assertQbPushAllowed(request) {
  * One-shot / dry-run: set CCH `projectId` on all `timelyEntries` from `project` name (Admin only).
  * Call from Studio signed in as billing admin: httpsCallable with `{ apply: false }` then `{ apply: true }`.
  */
-exports.backfillTimelyEntriesProjectId = functions
-  .runWith({ timeoutSeconds: 540, memory: "512MB" })
-  .https.onCall(async (data, context) => {
-    if (!context.auth || !context.auth.token.email) {
-      throw new functions.https.HttpsError("unauthenticated", "Sign in required");
+exports.backfillTimelyEntriesProjectId = onCall(TIMELY_BACKFILL_CALLABLE, async (request) => {
+    if (!request.auth || !request.auth.token.email) {
+      throw new HttpsError("unauthenticated", "Sign in required");
     }
-    const email = String(context.auth.token.email).toLowerCase();
+    const email = String(request.auth.token.email).toLowerCase();
     if (!QB_ADMIN_EMAILS.includes(email)) {
-      throw new functions.https.HttpsError("permission-denied", "Billing admin only");
+      throw new HttpsError("permission-denied", "Billing admin only");
     }
-    const apply = !!(data && data.apply);
+    const apply = !!(request.data && request.data.apply);
     const boardsArr = await loadBoardsLookupForTimely();
     let checked = 0;
     let skippedNoProject = 0;
@@ -593,7 +669,7 @@ async function beginQbDocumentPush(docRef) {
   return db.runTransaction(async (transaction) => {
     const snap = await transaction.get(docRef);
     if (!snap.exists) {
-      throw new functions.https.HttpsError("not-found", "Document not found");
+      throw new HttpsError("not-found", "Document not found");
     }
     const d = snap.data();
     if (d.qbDocId) {
@@ -603,7 +679,7 @@ async function beginQbDocumentPush(docRef) {
     if (lockAt && typeof lockAt.toMillis === "function") {
       const ageMs = Date.now() - lockAt.toMillis();
       if (ageMs >= 0 && ageMs < QB_PUSH_LOCK_TTL_MS) {
-        throw new functions.https.HttpsError(
+        throw new HttpsError(
           "resource-exhausted",
           "QuickBooks push already in progress for this document. Wait a minute and try again."
         );
@@ -642,7 +718,7 @@ function _httpsErrStatus(code) {
 async function runPushInvoiceToQBCore(projectId, docId, sendEmail) {
   const docRef = db.collection("boards").doc(projectId).collection("invoices").doc(docId);
   const snap = await docRef.get();
-  if (!snap.exists) throw new functions.https.HttpsError("not-found", "Invoice not found");
+  if (!snap.exists) throw new HttpsError("not-found", "Invoice not found");
   const invoice = snap.data();
 
   if (invoice.qbDocId) {
@@ -661,12 +737,12 @@ async function runPushInvoiceToQBCore(projectId, docId, sendEmail) {
   const displayNameCandidates = qbCustomerDisplayNameCandidates(proj, invoice, projectId);
 
   if (!displayNameCandidates.length) {
-    throw new functions.https.HttpsError("failed-precondition",
+    throw new HttpsError("failed-precondition",
       "Set the project name and/or client name on the project (or qbCustomerId under Integrations) before pushing to QuickBooks.");
   }
 
   if (!invoice.items || invoice.items.length === 0) {
-    throw new functions.https.HttpsError("failed-precondition",
+    throw new HttpsError("failed-precondition",
       "Invoice has no line items. Add items before pushing to QB.");
   }
 
@@ -893,7 +969,7 @@ async function resolveQbCustomerIdForPush(accessToken, realmId, displayNameCandi
   }
 
   if (!candidates.length) {
-    throw new functions.https.HttpsError(
+    throw new HttpsError(
       "invalid-argument",
       "No project or client names available to match a QuickBooks customer."
     );
@@ -915,7 +991,7 @@ async function resolveQbCustomerIdForPush(accessToken, realmId, displayNameCandi
     }
   }
 
-  throw new functions.https.HttpsError(
+  throw new HttpsError(
     "failed-precondition",
     "QuickBooks: no customer is linked to this project. Creating new QuickBooks customers from Studio is disabled. " +
       "Set qbCustomerId on the project (Integrations), or use a QuickBooks customer DisplayName that matches the " +
@@ -932,7 +1008,7 @@ async function resolveQbCustomerIdForPush(accessToken, realmId, displayNameCandi
 async function resolveQbVendorIdForPush(accessToken, realmId, vendorName) {
   const vn = (vendorName || "").trim();
   if (!vn) {
-    throw new functions.https.HttpsError("invalid-argument", "Vendor name is required");
+    throw new HttpsError("invalid-argument", "Vendor name is required");
   }
 
   let vendorDocRef = null;
@@ -964,7 +1040,7 @@ async function resolveQbVendorIdForPush(accessToken, realmId, vendorName) {
     return id;
   }
 
-  throw new functions.https.HttpsError(
+  throw new HttpsError(
     "failed-precondition",
     "QuickBooks: no vendor is linked for \"" + vn + "\". Creating new QuickBooks vendors from Studio is disabled. " +
       "In Studio → Vendors → Edit this vendor (name must match the PO vendor field exactly) and set QuickBooks vendor Id, " +
@@ -973,14 +1049,12 @@ async function resolveQbVendorIdForPush(accessToken, realmId, vendorName) {
 }
 
 // ─── PUSH INVOICE → QB (callable: requires CCH Firebase sign-in on allow-list) ──
-exports.pushInvoiceToQB = qbRuntime.https.onCall(
-  { invoker: "public" },
-  async (request) => {
+exports.pushInvoiceToQB = onCall(QB_CALLABLE, async (request) => {
   assertQbPushAllowed(request);
 
   const { projectId, docId, sendEmail } = request.data || {};
   if (!projectId || !docId) {
-    throw new functions.https.HttpsError("invalid-argument", "projectId and docId required");
+    throw new HttpsError("invalid-argument", "projectId and docId required");
   }
 
   return runPushInvoiceToQBCore(projectId, docId, sendEmail !== false);
@@ -1052,14 +1126,14 @@ async function fetchQBInvoiceForStudio(accessToken, realmId, existing) {
     );
     const qbInv = invResp && invResp.Invoice;
     if (!qbInv) {
-      throw new functions.https.HttpsError("internal", "QuickBooks returned no invoice for id " + numeric);
+      throw new HttpsError("internal", "QuickBooks returned no invoice for id " + numeric);
     }
     return { qbInv, canonicalQbId: String(qbInv.Id || numeric) };
   }
 
   const candidates = _studioInvoiceDocNumberCandidates(existing);
   if (!candidates.length) {
-    throw new functions.https.HttpsError(
+    throw new HttpsError(
       "failed-precondition",
       "No way to find this invoice in QuickBooks: add the numeric Id (open the invoice in QB → copy Id from the URL), or ensure Studio invoice # matches QB DocNumber, then retry."
     );
@@ -1077,14 +1151,14 @@ async function fetchQBInvoiceForStudio(accessToken, realmId, existing) {
       return { qbInv, canonicalQbId: String(qbInv.Id) };
     }
     if (list.length > 1) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "failed-precondition",
         "Multiple QuickBooks invoices match DocNumber '" + docNum + "'. In QB, remove duplicates or set qbDocId to the numeric Id of the correct invoice."
       );
     }
   }
 
-  throw new functions.https.HttpsError(
+  throw new HttpsError(
     "not-found",
     "No QuickBooks invoice found for DocNumber tries: " + candidates.slice(0, 6).join(", ")
   );
@@ -1168,17 +1242,15 @@ function buildFirestorePatchFromQBInvoice(existing, qbInv) {
 }
 
 /** Pull one invoice from QuickBooks by qbDocId and update paid status / balance fields in Firestore. */
-exports.syncInvoiceBalanceFromQB = qbRuntime.https.onCall(
-  { invoker: "public" },
-  async (request) => {
+exports.syncInvoiceBalanceFromQB = onCall(QB_CALLABLE, async (request) => {
     assertQbPushAllowed(request);
     const { projectId, invoiceId } = request.data || {};
     if (!projectId || !invoiceId) {
-      throw new functions.https.HttpsError("invalid-argument", "projectId and invoiceId required");
+      throw new HttpsError("invalid-argument", "projectId and invoiceId required");
     }
     const docRef = db.collection("boards").doc(projectId).collection("invoices").doc(invoiceId);
     const snap = await docRef.get();
-    if (!snap.exists) throw new functions.https.HttpsError("not-found", "Invoice not found");
+    if (!snap.exists) throw new HttpsError("not-found", "Invoice not found");
     const existing = snap.data();
     const { accessToken, realmId } = await getQBAccessToken();
     const { qbInv, canonicalQbId } = await fetchQBInvoiceForStudio(accessToken, realmId, existing);
@@ -1203,9 +1275,7 @@ exports.syncInvoiceBalanceFromQB = qbRuntime.https.onCall(
  * Scan all boards' invoice subcollections and refresh paid status from QuickBooks (GET per row).
  * Run from Studio when payments were recorded in QB but webhook did not update Firestore.
  */
-exports.batchSyncInvoiceBalancesFromQB = functions
-  .runWith({ timeoutSeconds: 300, memory: "512MB", secrets: QB_SECRET_NAMES })
-  .https.onCall({ invoker: "public" }, async (request) => {
+exports.batchSyncInvoiceBalancesFromQB = onCall(QB_BATCH_CALLABLE, async (request) => {
     assertQbPushAllowed(request);
     const rawMax = request.data && request.data.maxInvoices;
     const maxInvoices = Math.min(Math.max(parseInt(String(rawMax != null ? rawMax : 200), 10) || 200, 1), 500);
@@ -1260,7 +1330,7 @@ exports.batchSyncInvoiceBalancesFromQB = functions
  *
  * QuickBooks OAuth still uses admin/qb refresh token (fully automatic; no Intuit login per request).
  */
-exports.pushInvoiceToQBAutomated = qbRuntime.https.onRequest(async (req, res) => {
+exports.pushInvoiceToQBAutomated = onRequest(QB_HTTP, async (req, res) => {
   res.set("Access-Control-Allow-Origin", "*");
   res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -1292,7 +1362,7 @@ exports.pushInvoiceToQBAutomated = qbRuntime.https.onRequest(async (req, res) =>
     const out = await runPushInvoiceToQBCore(projectId, docId, body.sendEmail !== false);
     return res.json(out);
   } catch (e) {
-    if (e instanceof functions.https.HttpsError) {
+    if (e instanceof HttpsError) {
       return res.status(_httpsErrStatus(e.code)).json({ error: e.message, code: e.code });
     }
     console.error("[pushInvoiceToQBAutomated]", e);
@@ -1308,7 +1378,7 @@ exports.pushInvoiceToQBAutomated = qbRuntime.https.onRequest(async (req, res) =>
 exports.processInvoiceQBPushPending = onDocumentWritten(
   {
     document: "boards/{projectId}/invoices/{invoiceId}",
-    region: "us-central1",
+    region: REGION,
     secrets: QB_SECRET_NAMES
   },
   async (event) => {
@@ -1330,7 +1400,7 @@ exports.processInvoiceQBPushPending = onDocumentWritten(
       await runPushInvoiceToQBCore(projectId, invoiceId, sendEmail);
     } catch (e) {
       const msg =
-        e instanceof functions.https.HttpsError
+        e instanceof HttpsError
           ? e.message
           : (e && e.message) || String(e);
       console.error("[processInvoiceQBPushPending]", projectId, invoiceId, msg);
@@ -1342,19 +1412,16 @@ exports.processInvoiceQBPushPending = onDocumentWritten(
         })
         .catch(() => {});
     }
-  }
-);
+  });
 
 // ─── PUSH PO → QB (as Purchase Order) ───────────────────────────
-exports.pushPOToQB = qbRuntime.https.onCall(
-  { invoker: "public" },
-  async (request) => {
+exports.pushPOToQB = onCall(QB_CALLABLE, async (request) => {
   assertQbPushAllowed(request);
 
   const { projectId, docId } = request.data || {};
   const docRef = db.collection("boards").doc(projectId).collection("purchaseOrders").doc(docId);
   const snap = await docRef.get();
-  if (!snap.exists) throw new functions.https.HttpsError("not-found", "PO not found");
+  if (!snap.exists) throw new HttpsError("not-found", "PO not found");
   const po = snap.data();
 
   if (po.qbDocId) {
@@ -1364,13 +1431,13 @@ exports.pushPOToQB = qbRuntime.https.onCall(
   // Validation: require vendor
   const vendorName = po.vendor || po.vendorName || "";
   if (!vendorName) {
-    throw new functions.https.HttpsError("failed-precondition",
+    throw new HttpsError("failed-precondition",
       "Vendor name is required. Set the vendor on this PO before pushing to QB.");
   }
 
   // Validation: require at least one line item
   if (!po.items || po.items.length === 0) {
-    throw new functions.https.HttpsError("failed-precondition",
+    throw new HttpsError("failed-precondition",
       "PO has no line items. Add items before pushing to QB.");
   }
 
@@ -1467,14 +1534,12 @@ exports.pushPOToQB = qbRuntime.https.onCall(
 );
 
 // ─── DELETE FROM QB (when deleted in Studio) ─────────────────────
-exports.deleteFromQB = qbRuntime.https.onCall(
-  { invoker: "public" },
-  async (request) => {
+exports.deleteFromQB = onCall(QB_CALLABLE, async (request) => {
   assertQbAdmin(request);
 
   const { qbDocId, docType } = request.data || {}; // docType: "invoice" or "purchaseorder"
   if (!qbDocId || !docType) {
-    throw new functions.https.HttpsError("invalid-argument", "qbDocId and docType required");
+    throw new HttpsError("invalid-argument", "qbDocId and docType required");
   }
 
   const { accessToken, realmId } = await getQBAccessToken();
@@ -1486,7 +1551,7 @@ exports.deleteFromQB = qbRuntime.https.onCall(
   const entity = fetched[entityType];
 
   if (!entity) {
-    throw new functions.https.HttpsError("not-found", "QB document not found: " + qbDocId);
+    throw new HttpsError("not-found", "QB document not found: " + qbDocId);
   }
 
   // QB delete = POST with Id + SyncToken + operation=delete
@@ -1500,9 +1565,7 @@ exports.deleteFromQB = qbRuntime.https.onCall(
 );
 
 // ─── SETUP STUDIO ACCOUNTS IN QB ─────────────────────────────────
-exports.qbSetupAccounts = qbRuntime.https.onCall(
-  { invoker: "public" },
-  async (request) => {
+exports.qbSetupAccounts = onCall(QB_CALLABLE, async (request) => {
   assertQbAdmin(request);
 
   const { accessToken, realmId } = await getQBAccessToken();
@@ -1550,73 +1613,474 @@ exports.qbSetupAccounts = qbRuntime.https.onCall(
   }
 );
 
-// ─── QB WEBHOOK (receives payment notifications) ─────────────────
-exports.qbWebhook = qbRuntime.https.onRequest(async (req, res) => {
-  if (req.method !== "POST") { res.status(200).send("OK"); return; }
+// ─── QB WEBHOOK (payments → Studio invoices/POs, activity feed, Teams) ──
+const STUDIO_APP_URL = "https://cch-platform.web.app";
+
+function projectIdFromBoardSubdocRef(docRef) {
+  const parts = String(docRef.path || "").split("/");
+  return parts[0] === "boards" && parts.length >= 2 ? parts[1] : "";
+}
+
+function studioDocRefTotal(existing) {
+  return parseFloat(existing.total || existing.amount || 0) || 0;
+}
+
+async function loadTeamsIntegrations() {
+  try {
+    const snap = await db.collection("settings").doc("integrations").get();
+    return snap.exists ? snap.data() || {} : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function getTeamsWebhookForType(integrations, type) {
+  const ch = integrations || {};
+  if ((type === "payment" || type === "qb_sync") && ch.teamsPaymentsWebhook) {
+    return String(ch.teamsPaymentsWebhook).trim();
+  }
+  if (
+    (type === "invoice" || type === "proposal" || type === "po" || type === "payment") &&
+    ch.teamsFinancialsWebhook
+  ) {
+    return String(ch.teamsFinancialsWebhook).trim();
+  }
+  return String(ch.teamsWebhookUrl || "").trim();
+}
+
+async function postTeamsAdaptiveCard(webhookUrl, title, body, linkUrl) {
+  if (!webhookUrl) return;
+  const card = {
+    type: "message",
+    attachments: [{
+      contentType: "application/vnd.microsoft.card.adaptive",
+      contentUrl: null,
+      content: {
+        $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
+        type: "AdaptiveCard",
+        version: "1.4",
+        body: [
+          { type: "TextBlock", text: title, weight: "Bolder", size: "Medium", wrap: true },
+          { type: "TextBlock", text: body, wrap: true, spacing: "Small" },
+          {
+            type: "TextBlock",
+            text: new Date().toLocaleString("en-US", {
+              month: "short",
+              day: "numeric",
+              hour: "numeric",
+              minute: "2-digit"
+            }),
+            size: "Small",
+            isSubtle: true,
+            spacing: "Small"
+          }
+        ],
+        actions: linkUrl
+          ? [{ type: "Action.OpenUrl", title: "View in CCH Studio", url: linkUrl }]
+          : []
+      }
+    }]
+  };
+  const resp = await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(card)
+  });
+  if (!resp.ok) {
+    console.warn("[qbWebhook] Teams HTTP", resp.status);
+  }
+}
+
+async function recordQbPaymentStudioSideEffects(opts) {
+  const { projectId, collection, docId, docLabel, amount, newStatus, qbPaymentId, paymentStatus } = opts;
+  if (!projectId || !collection || !docId) return;
+
+  const ts = new Date().toISOString();
+  const wasPaid =
+    newStatus === "Paid" || String(paymentStatus || "").toLowerCase() === "paid";
+  let projectName = projectId;
+  try {
+    const bSnap = await db.collection("boards").doc(projectId).get();
+    if (bSnap.exists) projectName = bSnap.data().name || projectId;
+  } catch (e) { /* ignore */ }
+
+  const activityEntry = {
+    action: wasPaid ? "paid" : "payment_recorded",
+    details:
+      (wasPaid ? "Paid via QuickBooks: " : "Payment from QuickBooks: ") +
+      docLabel +
+      (amount > 0 ? " · $" + amount.toFixed(2) : ""),
+    userName: "QuickBooks",
+    userEmail: "qb-webhook@cchdesign.com",
+    timestamp: ts
+  };
+
+  await db
+    .collection("boards")
+    .doc(projectId)
+    .collection(collection)
+    .doc(docId)
+    .update({
+      activityLog: admin.firestore.FieldValue.arrayUnion(activityEntry),
+      lastQbWebhookAt: admin.firestore.FieldValue.serverTimestamp()
+    })
+    .catch((e) => console.warn("[qbWebhook] doc activityLog", e.message));
+
+  const typeLabel = collection === "purchaseOrders" ? "PO" : "Invoice";
+  const desc =
+    typeLabel +
+    " " +
+    docLabel +
+    (wasPaid ? " marked Paid in QuickBooks" : " — payment recorded in QuickBooks") +
+    (amount > 0 ? " · $" + amount.toFixed(2) : "") +
+    " — " +
+    projectName;
+
+  await db
+    .collection("activity")
+    .add({
+      type: collection === "purchaseOrders" ? "po" : "invoice",
+      action: wasPaid ? "paid" : "payment_recorded",
+      description: desc,
+      projectId,
+      projectName,
+      user: "qb-webhook",
+      timestamp: ts,
+      createdAt: ts,
+      meta: { docId, collection, qbPaymentId: qbPaymentId || "", source: "qb-webhook" }
+    })
+    .catch((e) => console.warn("[qbWebhook] activity collection", e.message));
+
+  const integrations = await loadTeamsIntegrations();
+  const webhookUrl = getTeamsWebhookForType(integrations, "payment");
+  const link = STUDIO_APP_URL + "/#/project/" + encodeURIComponent(projectId);
+  await postTeamsAdaptiveCard(
+    webhookUrl,
+    wasPaid ? "💳 Paid in QuickBooks" : "💳 QuickBooks payment",
+    desc,
+    link
+  ).catch((e) => console.warn("[qbWebhook] Teams", e.message));
+}
+
+async function findStudioInvoiceByQbTxnId(qbInvoiceTxnId) {
+  const id = String(qbInvoiceTxnId || "").trim();
+  if (!id) return null;
+  const q = await db.collectionGroup("invoices").where("qbDocId", "==", id).limit(1).get();
+  return q.empty ? null : q.docs[0];
+}
+
+async function findStudioPoByQbTxnId(qbPoTxnId) {
+  const id = String(qbPoTxnId || "").trim();
+  if (!id) return null;
+  const q = await db.collectionGroup("purchaseOrders").where("qbDocId", "==", id).limit(1).get();
+  return q.empty ? null : q.docs[0];
+}
+
+async function refreshInvoiceBalanceFromQb(invDocRef, accessToken, realmId) {
+  try {
+    const snap = await invDocRef.get();
+    if (!snap.exists) return null;
+    const existing = snap.data();
+    const { qbInv } = await fetchQBInvoiceForStudio(accessToken, realmId, existing);
+    const balancePatch = buildFirestorePatchFromQBInvoice(existing, qbInv);
+    if (Object.keys(balancePatch).length) {
+      await invDocRef.update(balancePatch);
+    }
+    return balancePatch.status || existing.status;
+  } catch (e) {
+    console.warn("[qbWebhook] balance refresh", invDocRef.id, e.message);
+    const snap = await invDocRef.get().catch(() => null);
+    return snap && snap.exists ? snap.data().status : null;
+  }
+}
+
+async function processQbCustomerPaymentEntity(entity, accessToken, realmId) {
+  const payment = await qbApiCall("GET", "payment/" + entity.id, accessToken, realmId);
+  const paymentData = payment.Payment;
+  if (!paymentData) return;
+
+  const lineList = paymentData.Line || [];
+  for (const line of lineList) {
+    if (!line.LinkedTxn || !line.LinkedTxn.length) continue;
+    const invLinks = line.LinkedTxn.filter((t) => t.TxnType === "Invoice");
+    if (!invLinks.length) continue;
+
+    const lineAmtRaw = parseFloat(line.Amount);
+    const lineAmt = Number.isFinite(lineAmtRaw) && lineAmtRaw > 0
+      ? lineAmtRaw
+      : lineList.length === 1
+        ? parseFloat(paymentData.TotalAmt) || 0
+        : 0;
+    const perInvoice =
+      invLinks.length === 1
+        ? lineAmt
+        : lineAmt / invLinks.length;
+
+    for (const txn of invLinks) {
+      const invDoc = await findStudioInvoiceByQbTxnId(txn.TxnId);
+      if (!invDoc) {
+        console.warn("[qbWebhook] No Studio invoice for QB Invoice Id", txn.TxnId);
+        continue;
+      }
+
+      const existing = invDoc.data();
+      const payments = Array.isArray(existing.payments) ? existing.payments.slice() : [];
+      const lineFingerprint =
+        String(entity.id) +
+        "|" +
+        String(txn.TxnId) +
+        "|" +
+        String(Math.round(perInvoice * 100) / 100);
+      if (payments.some((p) => String(p.qbPaymentLineKey || "") === lineFingerprint)) {
+        continue;
+      }
+      if (
+        payments.some(
+          (p) =>
+            String(p.qbPaymentId) === String(entity.id) &&
+            String(p.qbInvoiceTxnId || "") === String(txn.TxnId)
+        )
+      ) {
+        continue;
+      }
+
+      payments.push({
+        amount: perInvoice,
+        date: paymentData.TxnDate,
+        method: paymentData.PaymentMethodRef
+          ? paymentData.PaymentMethodRef.name
+          : "QB Payment",
+        note: "Auto-synced from QuickBooks",
+        qbPaymentId: entity.id,
+        qbInvoiceTxnId: String(txn.TxnId),
+        qbPaymentLineKey: lineFingerprint
+      });
+
+      const totalPaid = payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+      const total = studioDocRefTotal(existing);
+      const newStatus = total > 0.01 && totalPaid >= total - 0.02 ? "Paid" : "Partially Paid";
+      const qbStatus = newStatus === "Paid" ? "paid" : "partial";
+      const patch = {
+        payments,
+        status: newStatus,
+        qbStatus,
+        paidAmount: newStatus === "Paid" && total > 0.01 ? total : totalPaid,
+        paymentCount: payments.length,
+        qbPaymentConfirmation:
+          "QB payment " +
+          String(entity.id) +
+          " · $" +
+          (perInvoice || 0).toFixed(2) +
+          " on " +
+          (paymentData.TxnDate || "")
+      };
+      if (newStatus === "Paid" && !existing.datePaid) {
+        patch.datePaid =
+          (paymentData.TxnDate && String(paymentData.TxnDate).slice(0, 10)) ||
+          new Date().toISOString().slice(0, 10);
+      }
+
+      await invDoc.ref.update(patch);
+      const finalStatus = await refreshInvoiceBalanceFromQb(invDoc.ref, accessToken, realmId);
+
+      const projectId = projectIdFromBoardSubdocRef(invDoc.ref);
+      const docLabel =
+        existing.invoiceNum || existing.number || existing.displayNumber || invDoc.id;
+      await recordQbPaymentStudioSideEffects({
+        projectId,
+        collection: "invoices",
+        docId: invDoc.id,
+        docLabel: String(docLabel),
+        amount: perInvoice,
+        newStatus: finalStatus || newStatus,
+        qbPaymentId: entity.id
+      });
+    }
+  }
+}
+
+async function processQbBillPaymentEntity(entity, accessToken, realmId) {
+  const bpResp = await qbApiCall("GET", "billpayment/" + entity.id, accessToken, realmId);
+  const bp = bpResp.BillPayment;
+  if (!bp) return;
+
+  const seenPo = new Set();
+  for (const line of bp.Line || []) {
+    const lineAmt = parseFloat(line.Amount) || parseFloat(bp.TotalAmt) || 0;
+    for (const txn of line.LinkedTxn || []) {
+      if (txn.TxnType !== "Bill") continue;
+
+      let bill;
+      try {
+        const billResp = await qbApiCall("GET", "bill/" + txn.TxnId, accessToken, realmId);
+        bill = billResp.Bill;
+      } catch (e) {
+        console.warn("[qbWebhook] Bill fetch", txn.TxnId, e.message);
+        continue;
+      }
+      if (!bill) continue;
+
+      const poLinks = (bill.LinkedTxn || []).filter((t) => t.TxnType === "PurchaseOrder");
+      for (const poTxn of poLinks) {
+        const poQbId = String(poTxn.TxnId);
+        if (seenPo.has(poQbId)) continue;
+        seenPo.add(poQbId);
+
+        const poDoc = await findStudioPoByQbTxnId(poQbId);
+        if (!poDoc) {
+          console.warn("[qbWebhook] No Studio PO for QB PO Id", poQbId);
+          continue;
+        }
+
+        const existing = poDoc.data();
+        const payments = Array.isArray(existing.payments) ? existing.payments.slice() : [];
+        const fingerprint =
+          "bp|" + String(entity.id) + "|" + poQbId + "|" + String(Math.round(lineAmt * 100) / 100);
+        if (payments.some((p) => String(p.qbPaymentLineKey || "") === fingerprint)) {
+          continue;
+        }
+
+        payments.push({
+          amount: lineAmt,
+          date: bp.TxnDate,
+          method: "QuickBooks",
+          note: "Vendor payment (BillPayment) from QuickBooks",
+          qbPaymentId: entity.id,
+          qbBillId: String(txn.TxnId),
+          qbPaymentLineKey: fingerprint
+        });
+
+        const totalPaid = payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+        const total = studioDocRefTotal(existing);
+        const fullyPaid = total > 0.01 && totalPaid >= total - 0.02;
+        const patch = {
+          payments,
+          paidAmount: fullyPaid && total > 0.01 ? total : totalPaid,
+          paymentCount: payments.length,
+          paymentStatus: fullyPaid ? "paid" : "partial",
+          qbPaymentConfirmation:
+            "QB BillPayment " + String(entity.id) + " · $" + lineAmt.toFixed(2)
+        };
+        if (fullyPaid) {
+          patch.status = "Paid";
+          patch.qbStatus = "paid";
+        } else if (totalPaid > 0.02) {
+          patch.qbStatus = "partial";
+        }
+
+        await poDoc.ref.update(patch);
+
+        const projectId = projectIdFromBoardSubdocRef(poDoc.ref);
+        const docLabel = existing.number || existing.num || existing.poNum || poDoc.id;
+        await recordQbPaymentStudioSideEffects({
+          projectId,
+          collection: "purchaseOrders",
+          docId: poDoc.id,
+          docLabel: String(docLabel),
+          amount: lineAmt,
+          newStatus: fullyPaid ? "Paid" : "Partially Paid",
+          paymentStatus: patch.paymentStatus,
+          qbPaymentId: entity.id
+        });
+      }
+    }
+  }
+}
+
+async function processQbPurchaseOrderClosed(entity, accessToken, realmId) {
+  const poResp = await qbApiCall("GET", "purchaseorder/" + entity.id, accessToken, realmId);
+  const qpo = poResp.PurchaseOrder;
+  if (!qpo) return;
+
+  const closed =
+    qpo.POStatus === "Closed" ||
+    qpo.POStatus === "Received" ||
+    parseFloat(qpo.Balance || qpo.TotalAmt) <= 0.02;
+  if (!closed) return;
+
+  const poDoc = await findStudioPoByQbTxnId(String(qpo.Id));
+  if (!poDoc) return;
+
+  const existing = poDoc.data();
+  const total = studioDocRefTotal(existing) || parseFloat(qpo.TotalAmt) || 0;
+  const patch = {
+    status: "Paid",
+    qbStatus: "paid",
+    paymentStatus: "paid",
+    paidAmount: total > 0.01 ? total : parseFloat(existing.paidAmount) || 0,
+    qbPaymentConfirmation: "QB PO " + String(qpo.POStatus || "closed") + " in QuickBooks"
+  };
+  if (!existing.datePaid && qpo.TxnDate) {
+    patch.datePaid = String(qpo.TxnDate).slice(0, 10);
+  }
+
+  await poDoc.ref.update(patch);
+
+  const projectId = projectIdFromBoardSubdocRef(poDoc.ref);
+  const docLabel = existing.number || existing.num || existing.poNum || poDoc.id;
+  await recordQbPaymentStudioSideEffects({
+    projectId,
+    collection: "purchaseOrders",
+    docId: poDoc.id,
+    docLabel: String(docLabel),
+    amount: patch.paidAmount,
+    newStatus: "Paid",
+    paymentStatus: "paid",
+    qbPaymentId: "po-" + String(entity.id)
+  });
+}
+
+exports.qbWebhook = onRequest(QB_HTTP, async (req, res) => {
+  // Intuit webhook URL verification (challenge echo)
+  const challenge = req.query && (req.query.challenge || req.query.verifier);
+  if (challenge) {
+    res.status(200).send(String(challenge));
+    return;
+  }
+
+  if (req.method === "GET") {
+    res.status(200).send("OK");
+    return;
+  }
+
+  if (req.method !== "POST") {
+    res.status(200).send("OK");
+    return;
+  }
 
   const body = req.body;
-  if (!body.eventNotifications) { res.status(200).send("OK"); return; }
+  if (!body || !body.eventNotifications) {
+    res.status(200).send("OK");
+    return;
+  }
 
-  const { accessToken, realmId } = await getQBAccessToken();
+  let accessToken;
+  let realmId;
+  try {
+    const tok = await getQBAccessToken();
+    accessToken = tok.accessToken;
+    realmId = tok.realmId;
+  } catch (e) {
+    console.error("[qbWebhook] QB auth failed:", e);
+    res.status(200).send("OK");
+    return;
+  }
 
   for (const notification of body.eventNotifications) {
     for (const entity of (notification.dataChangeEvent || {}).entities || []) {
-      if (entity.name === "Payment" && entity.operation === "Create") {
-        try {
-          const payment = await qbApiCall("GET", "payment/" + entity.id, accessToken, realmId);
-          const paymentData = payment.Payment;
+      const op = entity.operation;
+      const isCreateOrUpdate = op === "Create" || op === "Update";
 
-          for (const line of (paymentData.Line || [])) {
-            if (!line.LinkedTxn || !line.LinkedTxn.length) continue;
-            const invLinks = line.LinkedTxn.filter((t) => t.TxnType === "Invoice");
-            if (!invLinks.length) continue;
-            // Each payment line applies `line.Amount` to linked invoice(s); do not use payment TotalAmt per invoice.
-            const lineAmt = parseFloat(line.Amount);
-            const perInvoice = invLinks.length === 1
-              ? (Number.isFinite(lineAmt) ? lineAmt : parseFloat(paymentData.TotalAmt) || 0)
-              : (Number.isFinite(lineAmt) ? lineAmt : 0) / invLinks.length;
-
-            for (const txn of invLinks) {
-              const invoiceQuery = await db.collectionGroup("invoices")
-                .where("qbDocId", "==", String(txn.TxnId)).limit(1).get();
-
-              if (!invoiceQuery.empty) {
-                const invDoc = invoiceQuery.docs[0];
-                const existing = invDoc.data();
-                const payments = existing.payments || [];
-                const dup = payments.some((p) =>
-                  String(p.qbPaymentId) === String(entity.id) && String(p.qbInvoiceTxnId || "") === String(txn.TxnId)
-                );
-                if (dup) continue;
-
-                payments.push({
-                  amount: perInvoice,
-                  date: paymentData.TxnDate,
-                  method: paymentData.PaymentMethodRef ? paymentData.PaymentMethodRef.name : "QB Payment",
-                  note: "Auto-synced from QuickBooks",
-                  qbPaymentId: entity.id,
-                  qbInvoiceTxnId: String(txn.TxnId)
-                });
-
-                const totalPaid = payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
-                const total = parseFloat(existing.total) || 0;
-                const newStatus = totalPaid >= total ? "Paid" : "Partially Paid";
-                const qbStatus = totalPaid >= total ? "paid" : "partial";
-                const patch = { payments, status: newStatus, qbStatus };
-                if (newStatus === "Paid" && total > 0) {
-                  patch.paidAmount = total;
-                  if (!existing.datePaid) patch.datePaid = paymentData.TxnDate || new Date().toISOString().slice(0, 10);
-                } else if (newStatus === "Partially Paid") {
-                  patch.paidAmount = totalPaid;
-                }
-
-                await invDoc.ref.update(patch);
-              }
-            }
-          }
-        } catch (e) {
-          console.error("Webhook payment processing error:", e);
+      try {
+        if (entity.name === "Payment" && isCreateOrUpdate) {
+          await processQbCustomerPaymentEntity(entity, accessToken, realmId);
+        } else if (entity.name === "BillPayment" && isCreateOrUpdate) {
+          await processQbBillPaymentEntity(entity, accessToken, realmId);
+        } else if (entity.name === "PurchaseOrder" && isCreateOrUpdate) {
+          await processQbPurchaseOrderClosed(entity, accessToken, realmId);
         }
+      } catch (e) {
+        console.error("[qbWebhook]", entity.name, entity.id, op, e);
       }
     }
   }
@@ -1629,7 +2093,7 @@ exports.qbWebhook = qbRuntime.https.onRequest(async (req, res) => {
 // ══════════════════════════════════════════════════════════
 
 // Callable via button in platform or scheduled
-exports.rebuildSearchIndex = functions.https.onRequest(async (req, res) => {
+exports.rebuildSearchIndex = onRequest(HTTP_STUDIO, async (req, res) => {
   res.set("Access-Control-Allow-Origin", "https://cch-platform.web.app");
   res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.set("Access-Control-Allow-Headers", "Content-Type");
@@ -1800,7 +2264,7 @@ exports.rebuildSearchIndex = functions.https.onRequest(async (req, res) => {
 });
 
 // Financial summary — one doc with all KPIs
-exports.rebuildFinancialSummary = functions.https.onRequest(async (req, res) => {
+exports.rebuildFinancialSummary = onRequest(HTTP_STUDIO, async (req, res) => {
   res.set("Access-Control-Allow-Origin", "https://cch-platform.web.app");
   res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.set("Access-Control-Allow-Headers", "Content-Type");

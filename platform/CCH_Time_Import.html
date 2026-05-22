@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <title>CCH Studio — Houzz Time Entry Import</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:'DM Sans',Arial,sans-serif; background:#0D0D0D; color:#E0E0E0; padding:24px; }
@@ -60,7 +60,7 @@
 <div class="card" id="step-auth">
   <h2><span class="step-num active" id="sn1">1</span> Authenticate</h2>
   <p style="color:#888;font-size:13px;margin-bottom:12px;">Sign in with your CCH Studio email and password.</p>
-  <input type="text" id="email" placeholder="Email" value="cynthiacbh@gmail.com">
+  <input type="text" id="email" placeholder="Email (same account as the target environment)">
   <input type="password" id="password" placeholder="Password (your CCH Studio password)">
   <button onclick="doLogin()">Sign In</button>
   <p id="auth-status" style="margin-top:8px;font-size:13px;"></p>
@@ -122,14 +122,41 @@
 
 <script>
 // ============================================
-// Firebase Init
+// Firebase Init — match index.html: hostname decides project (staging vs prod).
+// Open this page from staging hosting (URL contains "staging") to write to cch-studio-staging.
 // ============================================
-const firebaseConfig = {
+const CCH_ENV = (function() {
+  var h = location.hostname || '';
+  if (h.indexOf('staging') >= 0 || h === 'localhost' || h === '127.0.0.1') return 'staging';
+  return 'production';
+})();
+
+const firebaseConfig = CCH_ENV === 'staging' ? {
+  apiKey: "AIzaSyBIwwo7uRij6Q0FZg-qmIS1LC8t2AjXrYo",
+  authDomain: "cch-studio-staging.firebaseapp.com",
+  projectId: "cch-studio-staging",
+  storageBucket: "cch-studio-staging.firebasestorage.app",
+  messagingSenderId: "210388013080",
+  appId: "1:210388013080:web:fcd520b30c0d50b149736d"
+} : {
   apiKey: "AIzaSyAd24U5ArVGrA24IxNcYD2NYiTVycyF4og",
   authDomain: "cch-design-boards.firebaseapp.com",
   projectId: "cch-design-boards",
-  storageBucket: "cch-design-boards.appspot.com"
+  storageBucket: "cch-design-boards.firebasestorage.app",
+  messagingSenderId: "210388013080",
+  appId: "1:210388013080:web:fcd520b30c0d50b149736d"
 };
+
+(function showEnvBanner() {
+  var el = document.getElementById('env-banner');
+  if (!el) return;
+  if (CCH_ENV === 'staging') {
+    el.innerHTML = '<span style="color:#FFB74D;">⚠ Target: <strong>STAGING</strong> — Firestore project <code>cch-studio-staging</code> (safe for test imports).</span>';
+  } else {
+    el.innerHTML = '<span style="color:#E57373;">Target: <strong>PRODUCTION</strong> — Firestore project <code>cch-design-boards</code>. Only import here if you intend to affect live data.</span>';
+  }
+})();
+
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
@@ -162,7 +189,7 @@ async function doLogin() {
     await loadProjectMap();
   } catch(e) {
     if (e.code === 'auth/invalid-login-credentials' || e.code === 'auth/wrong-password') {
-      status.innerHTML = '<span style="color:#FF4444;">Wrong password. Use the same password you log into cch-platform.web.app with.</span>';
+      status.innerHTML = '<span style="color:#FF4444;">Wrong password. Use the password for this environment' + (CCH_ENV === 'staging' ? ' (staging app / cch-studio-staging).' : ' (cch-platform.web.app).') + '</span>';
     } else if (e.code === 'auth/user-not-found') {
       status.innerHTML = '<span style="color:#FF4444;">No account found for that email. Try your other CCH email.</span>';
     } else if (e.code === 'auth/too-many-requests') {

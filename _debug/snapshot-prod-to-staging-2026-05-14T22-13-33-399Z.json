@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-05-14T22:13:33.399Z",
+  "apply": false,
+  "includeSystem": false,
+  "maxDepth": 10,
+  "collectionFilter": null,
+  "stats": {
+    "collectionsScanned": 362,
+    "docsRead": 61180,
+    "docsWritten": 61180,
+    "docsSkipped": 1,
+    "errors": 0
+  },
+  "errorsSample": []
+}

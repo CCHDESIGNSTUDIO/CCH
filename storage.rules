@@ -20,7 +20,10 @@ service firebase.storage {
     function allowedImageWrite() {
       return signedIn()
         && request.resource.size < 10 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+        && (
+          request.resource.contentType.matches('image/.*')
+          || request.resource.contentType == 'application/octet-stream'
+        );
     }
     /** boards/ path: images plus PDF/HTML shared to client portal (legacy uploads used boards/.../clientDocuments/). */
     function allowedBoardsMediaWrite() {
@@ -39,6 +42,27 @@ service firebase.storage {
       allow read: if true;
       allow create, update: if allowedProjectWrite();
       // Deletes must not require image/* (metadata on delete can fail strict checks; library cleanup needs this).
+      allow delete: if signedIn();
+    }
+
+    /** Legacy line-item path (older builds used docs/{projectId}/...). */
+    match /docs/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if allowedImageWrite();
+      allow delete: if signedIn();
+    }
+
+    /** Legacy proposal line uploads (uploadProposalImage). */
+    match /proposals/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if allowedImageWrite();
+      allow delete: if signedIn();
+    }
+
+    /** Document attachments on proposals, invoices, POs (addDocEditAttachment, addProposalAttachment) */
+    match /attachments/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if allowedProjectWrite();
       allow delete: if signedIn();
     }
 

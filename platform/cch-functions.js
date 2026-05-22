@@ -243,13 +243,103 @@ async function printProposal(projectId, proposalId) {
   setTimeout(function(){ win.print(); }, 600);
 }
 
+async function cchCollectLinkedProjectDocs(projectId, docType, docId, docData) {
+  var col = docType === 'proposal' ? 'proposals' : docType === 'invoice' ? 'invoices' : 'purchaseOrders';
+  if (!docData) {
+    try {
+      var snap = await db.collection('boards').doc(projectId).collection(col).doc(docId).get();
+      docData = snap.exists ? Object.assign({ id: snap.id }, snap.data()) : { id: docId };
+    } catch (e) { docData = { id: docId }; }
+  }
+  var out = [];
+  var seen = {};
+  function push(type, id, data) {
+    if (!id || (type === docType && id === docId)) return;
+    var key = type + '|' + id;
+    if (seen[key]) return;
+    seen[key] = true;
+    data = data || {};
+    var label = type === 'proposal'
+      ? ('P: ' + (data.proposalNum || data.number || data.name || 'Proposal'))
+      : type === 'invoice'
+        ? ('I: ' + (data.invoiceNum || data.number || 'Invoice'))
+        : ('PO: ' + (data.number || data.num || 'PO'));
+    out.push({ id: id, type: type, label: label, status: data.status || 'Draft' });
+  }
+  function sid(v) { return String(v || '').trim(); }
+
+  var propId = sid(docData.linkedProposalId || docData.fromProposal || docData.proposalId || docData.proposalDocId);
+  var invId = sid(docData.linkedInvoiceId || docData.invoiceId || docData.invoiceDocId);
+  if (docType === 'proposal') propId = docId;
+  if (docType === 'invoice') invId = docId;
+
+  var proposals = [], invoices = [], pos = [];
+  try {
+    var rs = await Promise.all([
+      db.collection('boards').doc(projectId).collection('proposals').get().catch(function() { return { docs: [] }; }),
+      db.collection('boards').doc(projectId).collection('invoices').get().catch(function() { return { docs: [] }; }),
+      db.collection('boards').doc(projectId).collection('purchaseOrders').get().catch(function() { return { docs: [] }; })
+    ]);
+    rs[0].docs.forEach(function(d) { proposals.push({ id: d.id, data: d.data() || {} }); });
+    rs[1].docs.forEach(function(d) { invoices.push({ id: d.id, data: d.data() || {} }); });
+    rs[2].docs.forEach(function(d) { pos.push({ id: d.id, data: d.data() || {} }); });
+  } catch (e2) { return out; }
+
+  if (docType !== 'proposal' && propId) {
+    var pr = proposals.find(function(p) { return p.id === propId; });
+    if (pr) push('proposal', pr.id, pr.data);
+  }
+  if (docType === 'proposal' && !invId) {
+    invoices.forEach(function(iv) {
+      var d = iv.data;
+      if (sid(d.linkedProposalId) === docId || sid(d.fromProposal) === docId) invId = iv.id;
+    });
+  }
+  if (docType !== 'invoice' && invId) {
+    var ivm = invoices.find(function(iv) { return iv.id === invId; });
+    if (ivm) push('invoice', ivm.id, ivm.data);
+  }
+  if (docType === 'invoice' && !propId) {
+    invoices.forEach(function(iv) {
+      if (iv.id !== docId) return;
+      var d = iv.data;
+      propId = sid(d.linkedProposalId || d.fromProposal);
+    });
+    if (propId) {
+      var pr2 = proposals.find(function(p) { return p.id === propId; });
+      if (pr2) push('proposal', pr2.id, pr2.data);
+    }
+  }
+
+  var anchorPr = docType === 'proposal' ? docId : propId;
+  var anchorInv = docType === 'invoice' ? docId : invId;
+
+  pos.forEach(function(row) {
+    var po = row.data;
+    var poPr = sid(po.linkedProposalId || po.proposalId || po.proposalDocId || po.fromProposal);
+    var poInv = sid(po.linkedInvoiceId || po.invoiceId || po.invoiceDocId);
+    if (docType === 'po') {
+      if (row.id === docId) return;
+      if (anchorPr && poPr === anchorPr) push('po', row.id, po);
+      else if (anchorInv && poInv === anchorInv) push('po', row.id, po);
+      return;
+    }
+    if (anchorPr && poPr === anchorPr) push('po', row.id, po);
+    if (anchorInv && poInv === anchorInv) push('po', row.id, po);
+    if (docType === 'proposal' && sid(docData.linkedPOId) === row.id) push('po', row.id, po);
+    if (docType === 'invoice' && sid(docData.linkedPOId) === row.id) push('po', row.id, po);
+  });
+
+  return out;
+}
+
 async function showConnectedDocs(projectId, docType, docId, docNumber, anchorEl) {
   var existing = document.getElementById('connectedDocsDropdown');
   if (existing) { existing.remove(); if (existing.dataset.for === docId) return; }
   var dropdown = document.createElement('div');
   dropdown.id = 'connectedDocsDropdown';
   dropdown.dataset.for = docId;
-  dropdown.style.cssText = 'position:fixed;background:white;border:1px solid var(--gray-200);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:9999;min-width:220px;padding:8px 0;';
+  dropdown.style.cssText = 'position:fixed;background:white;border:1px solid var(--gray-200);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:9999;min-width:240px;max-height:320px;overflow-y:auto;padding:8px 0;';
   dropdown.innerHTML = '<div style="padding:6px 14px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--gray-400);">Connected Docs</div><div id="connDocsInner"><div style="padding:6px 14px;font-size:12px;color:var(--gray-400);">Loading...</div></div>';
   document.body.appendChild(dropdown);
   var rect = anchorEl.getBoundingClientRect();
@@ -261,22 +351,18 @@ async function showConnectedDocs(projectId, docType, docId, docNumber, anchorEl)
     });
   }, 50);
   try {
-    var results = await Promise.all([
-      db.collection('boards').doc(projectId).collection('proposals').get().catch(function(){ return {docs:[]}; }),
-      db.collection('boards').doc(projectId).collection('invoices').get().catch(function(){ return {docs:[]}; }),
-      db.collection('boards').doc(projectId).collection('purchaseOrders').get().catch(function(){ return {docs:[]}; })
-    ]);
-    var allDocs = [];
-    results[0].docs.forEach(function(d) { if (d.id !== docId || docType !== 'proposal') allDocs.push({ id:d.id, type:'proposal', label:'P: '+(d.data().name||d.data().number||'Proposal'), status:d.data().status||'Draft' }); });
-    results[1].docs.forEach(function(d) { if (d.id !== docId || docType !== 'invoice') allDocs.push({ id:d.id, type:'invoice', label:'I: '+(d.data().number||'Invoice'), status:d.data().status||'Draft' }); });
-    results[2].docs.forEach(function(d) { if (d.id !== docId || docType !== 'po') allDocs.push({ id:d.id, type:'po', label:'PO: '+(d.data().number||'PO'), status:d.data().status||'Draft' }); });
-    var sc = {'Draft':'var(--gray-400)','Sent':'var(--gold)','Approved':'var(--green)','Paid':'var(--green)','Ordered':'#0097A7','Received':'var(--green)','Overdue':'var(--red)'};
+    var docData = (window._docEdit && window._docEdit.docId === docId && window._docEdit.docData) ? window._docEdit.docData : null;
+    var linkedDocs = await cchCollectLinkedProjectDocs(projectId, docType, docId, docData);
+    var sc = {'Draft':'var(--gray-400)','Sent':'var(--gold)','Published':'var(--green)','Approved':'var(--green)','Paid':'var(--green)','Partially Paid':'var(--gold)','Invoiced':'var(--teal)','Ordered':'#0097A7','Received':'var(--green)','Overdue':'var(--red)','Unsent':'var(--gray-400)'};
     var inner = document.getElementById('connDocsInner');
     if (!inner) return;
-    if (allDocs.length === 0) { inner.innerHTML = '<div style="padding:6px 14px;font-size:12px;color:var(--gray-400);">No other docs</div>'; return; }
-    inner.innerHTML = allDocs.map(function(d) {
-      return '<div onclick="closeDropdownAndNavigate(\'' + projectId + '\',\'' + d.type + '\',\'' + d.id + '\')" style="padding:6px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:13px;" onmouseover="this.style.background=\'var(--gray-50)\'" onmouseout="this.style.background=\'\'">' +
-        esc(d.label) + '<span style="font-size:10px;padding:2px 6px;border-radius:8px;background:var(--gray-100);color:' + (sc[d.status]||'var(--gray-400)') + ';font-weight:600;">' + esc(d.status) + '</span></div>';
+    if (linkedDocs.length === 0) {
+      inner.innerHTML = '<div style="padding:6px 14px;font-size:12px;color:var(--gray-400);line-height:1.45;">No linked documents yet.<br><span style="font-size:11px;">Use <strong>Link Documents</strong> on the project list.</span></div>';
+      return;
+    }
+    inner.innerHTML = linkedDocs.map(function(d) {
+      return '<div onclick="closeDropdownAndNavigate(\'' + projectId + '\',\'' + d.type + '\',\'' + d.id + '\')" style="padding:6px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;" onmouseover="this.style.background=\'var(--gray-50)\'" onmouseout="this.style.background=\'\'">' +
+        esc(d.label) + '<span style="font-size:10px;padding:2px 6px;border-radius:8px;background:var(--gray-100);color:' + (sc[d.status]||'var(--gray-400)') + ';font-weight:600;flex-shrink:0;">' + esc(d.status) + '</span></div>';
     }).join('');
   } catch(e) {
     var inner2 = document.getElementById('connDocsInner');
@@ -286,8 +372,8 @@ async function showConnectedDocs(projectId, docType, docId, docNumber, anchorEl)
 
 function closeDropdownAndNavigate(projectId, type, id) {
   var d = document.getElementById('connectedDocsDropdown'); if (d) d.remove();
-  var tabMap = { proposal:'proposals', invoice:'invoices', po:'pos' };
-  navigate('#/project/' + projectId + '/' + (tabMap[type]||'proposals'));
+  var routeType = type === 'po' ? 'po' : type === 'invoice' ? 'invoice' : 'proposal';
+  navigate('#/project/' + projectId + '/' + routeType + '/' + id);
 }
 
 async function renderClients() {

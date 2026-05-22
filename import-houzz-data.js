@@ -3,6 +3,13 @@
  * CCH Studio — Houzz Data Import
  * Merges: Houzz transaction XLS + scraped image map → Firestore
  *
+ * Export shapes (Houzz has changed over time — both exist in the wild):
+ *   - Legacy: "All Transactions" .xlsx — includes Transaction Type; filter PO rows by type Purchase Order.
+ *   - New Houzz: "Outgoing Transactions" / PO-oriented reports — often no Transaction Type; PO- rows with
+ *     Project Name, Total, Balance, Paid payments (text), Shipping. Same paid math as houzzMoneyCell + balance.
+ *   Project labels and PO # strings may not match Studio character-for-character; the web app merge adds
+ *   extra project + PO key variants (see index.html chParseHouzzTxnPurchaseOrderRows / houzzPoMergeLookupKeys).
+ *
  * Targets:
  *   1. boards/{projectId}/clips — room board items with images
  *   2. boards/{projectId}/invoices — invoice docs with line items
@@ -116,15 +123,19 @@ function houzzMoneyCell(v) {
 
 /**
  * Paid amount for a PO row from the All Transactions / Outgoing report.
- * Prefer explicit Payments column; else derive from Balance vs order total (amount + shipping).
+ * When Balance ~0, paid = line Total + Shipping (Paid payments text may omit freight).
+ * Otherwise: first $ in Payments / Paid payments (capped at order total), or total − balance.
  */
 function houzzPoPaidAmountFromTxn(po) {
   const total = (parseFloat(po.amount) || 0) + (parseFloat(po.shipping) || 0);
+  const bal = houzzMoneyCell(po.balance);
+  if (!Number.isNaN(bal) && total > 0 && bal <= 0.02) {
+    return Math.round(total * 100) / 100;
+  }
   const paidFromCell = houzzMoneyCell(po.payments);
   if (!Number.isNaN(paidFromCell) && paidFromCell > 0) {
     return total > 0 ? Math.min(total, paidFromCell) : paidFromCell;
   }
-  const bal = parseFloat(po.balance);
   if (!Number.isNaN(bal) && total > 0) {
     const fromBal = total - bal;
     if (fromBal >= 0 && fromBal <= total + 0.01) return Math.round(fromBal * 100) / 100;
