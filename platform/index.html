@@ -4802,9 +4802,8 @@
           if (type === 'invoices') {
             var ta = typeof invoiceListRowTotal === 'function' ? invoiceListRowTotal(a) : invoiceComputedGrandTotal(a);
             var tb = typeof invoiceListRowTotal === 'function' ? invoiceListRowTotal(b) : invoiceComputedGrandTotal(b);
-            var sta = String(a.status || '').toLowerCase(), stb = String(b.status || '').toLowerCase();
-            var ab = (sta === 'paid' || sta === 'void') ? 0 : (ta - (a.payments || []).reduce(function(s, p) { return s + (parseFloat(p.amount) || 0); }, 0));
-            var bb = (stb === 'paid' || stb === 'void') ? 0 : (tb - (b.payments || []).reduce(function(s, p) { return s + (parseFloat(p.amount) || 0); }, 0));
+            var ab = typeof invoiceListRowBalance === 'function' ? invoiceListRowBalance(a) : 0;
+            var bb = typeof invoiceListRowBalance === 'function' ? invoiceListRowBalance(b) : 0;
             return d * (ab - bb);
           }
           var tta = parseFloat(a.total) || 0, ttb = parseFloat(b.total) || 0;
@@ -13766,9 +13765,9 @@
       const totalPOCost = pPOs.reduce((s,p) => s + (parseFloat(p.total)||0), 0);
       let totalPaid = 0;
       pInvoicesForFinancials.forEach(inv => {
-        var invPaid = (inv.payments || []).reduce((s,p) => s + (parseFloat(p.amount)||0), 0);
-        var invGrand = invoiceComputedGrandTotal(inv) || (parseFloat(inv.total) || 0);
-        totalPaid += invPaid || (inv.status === 'Paid' ? invGrand : 0);
+        totalPaid += typeof invoiceListRowCollected === 'function'
+          ? invoiceListRowCollected(inv)
+          : (inv.payments || []).reduce((s,p) => s + (parseFloat(p.amount)||0), 0);
       });
       const balance = totalInvoiced - totalPaid;
       // Design fees from logged time
@@ -19579,6 +19578,28 @@ async function renderBoardsTab(T, proj) {
       return stored;
     }
 
+    function invoiceListRowPayments(inv) {
+      return _num2((inv.payments || []).reduce(function(s, p) { return s + (parseFloat(p.amount) || 0); }, 0));
+    }
+
+    /** Balance = line-based total minus payment rows (never hidden because status says Paid). */
+    function invoiceListRowBalance(inv) {
+      if (!inv) return 0;
+      if (String(inv.status || '').toLowerCase() === 'void') return 0;
+      return _num2(Math.max(0, invoiceListRowTotal(inv) - invoiceListRowPayments(inv)));
+    }
+
+    /** Collected for summary cards: Paid invoices count as fully paid even if payment lines are partial. */
+    function invoiceListRowCollected(inv) {
+      if (!inv) return 0;
+      var st = String(inv.status || '').toLowerCase();
+      if (st === 'void') return 0;
+      var it = invoiceListRowTotal(inv);
+      var tp = invoiceListRowPayments(inv);
+      if (st === 'paid') return _num2(Math.max(tp, it));
+      return tp;
+    }
+
     /** True for junk #s like "%20-" or "-" (not the same as a blank not-yet-assigned number). */
     function invoiceNumberIsPlaceholderGarbage(inv) {
       var raw = String(inv.invoiceNum != null ? inv.invoiceNum : (inv.number != null ? inv.number : '')).trim();
@@ -19719,10 +19740,8 @@ async function renderBoardsTab(T, proj) {
       const totalInv = invoices.reduce((s,i) => s + invoiceListRowTotal(i), 0);
       let totalPdFromInvoices = 0;
       invoices.forEach(inv => {
-        const pm = (inv.payments || []).reduce((s,p) => s + (parseFloat(p.amount)||0), 0);
-        totalPdFromInvoices += pm || (inv.status === 'Paid' ? invoiceListRowTotal(inv) : 0);
+        totalPdFromInvoices += invoiceListRowCollected(inv);
       });
-      // Use invoice payment lines only here so Total Paid / Outstanding match the table (avoid compact max() inflating totals).
       const totalPd = totalPdFromInvoices;
       const totalBal = totalInv - totalPd;
       const _canPushQB = userCanPushToQB();
@@ -19775,9 +19794,9 @@ async function renderBoardsTab(T, proj) {
                   const invTag = (typeof documentTagDisplayText === 'function' ? documentTagDisplayText(inv) : (typeof proposalDocumentTagText === 'function' ? proposalDocumentTagText(inv) : (String(inv.shortDescription||'').trim()))) || '';
                   const invNameLine = String(inv.name || inv.title || '').trim();
                   const invShowNameUnderNum = invNameLine && invNameLine !== String(invTag || '').trim();
-                  const tp = (inv.payments || []).reduce((s,p) => s + (parseFloat(p.amount)||0), 0);
+                  const tp = invoiceListRowPayments(inv);
                   const it = invoiceListRowTotal(inv);
-                  const bal = (inv.status === 'Paid' || inv.status === 'Void') ? 0 : it - tp;
+                  const bal = invoiceListRowBalance(inv);
                   const lp = inv._linkedPrs || [];
                   const lo = inv._linkedPos || [];
                   return '<tr style="cursor:pointer;" onclick="navigate(\'#/project/' + proj.id + '/invoice/' + inv.id + '\')">' +
@@ -31548,38 +31567,91 @@ async function renderBoardsTab(T, proj) {
 
       let docData = null, items = [];
 
-      // Try loading from invoices collection first
+      // Direct load by Firestore doc id (URL segment)
       try {
         const doc = await db.collection('boards').doc(projectId).collection('invoices').doc(invoiceId).get();
         if (doc.exists) { docData = { id: doc.id, ...doc.data() }; items = docData.items || []; }
       } catch(e) {}
 
+      // Empty uppercase shell (items:[] but total set) — prefer sibling/query doc with lines
+      if (docData) {
+        var _shellTotal = parseFloat(docData.total || docData.amount || 0) || 0;
+        var _shellLooksDup = /^IN-\d/i.test(String(invoiceId)) && String(invoiceId) === String(invoiceId).toUpperCase();
+        if (items.length === 0 && (_shellTotal > 0.01 || _shellLooksDup)) {
+          console.warn('[renderInvoiceDetail] empty shell', invoiceId, '— resolving canonical invoice doc');
+          var _candMap = {};
+          _candMap[docData.id] = docData;
+          var _lowerId = String(invoiceId).toLowerCase();
+          if (_lowerId !== invoiceId) {
+            try {
+              var _lowerSnap = await db.collection('boards').doc(projectId).collection('invoices').doc(_lowerId).get();
+              if (_lowerSnap.exists) _candMap[_lowerSnap.id] = { id: _lowerSnap.id, ..._lowerSnap.data() };
+            } catch (_eLow) {}
+          }
+          var _lookupNums = [];
+          var _invNumRaw = String(docData.invoiceNum || docData.number || invoiceId || '').trim();
+          if (_invNumRaw) _lookupNums.push(_invNumRaw);
+          if (/^INV/i.test(_invNumRaw)) _lookupNums.push(_invNumRaw.replace(/^INV/i, 'IN'));
+          if (/^IN-/i.test(_invNumRaw) && !/^INV/i.test(_invNumRaw)) _lookupNums.push(_invNumRaw.replace(/^IN-/, 'INV-'));
+          for (var _lni = 0; _lni < _lookupNums.length; _lni++) {
+            var _qNum = _lookupNums[_lni];
+            if (!_qNum) continue;
+            try {
+              var _qsNum = await db.collection('boards').doc(projectId).collection('invoices')
+                .where('invoiceNum', '==', _qNum).limit(6).get();
+              _qsNum.forEach(function(d) { _candMap[d.id] = { id: d.id, ...d.data() }; });
+              var _qsNum2 = await db.collection('boards').doc(projectId).collection('invoices')
+                .where('number', '==', _qNum).limit(6).get();
+              _qsNum2.forEach(function(d) { _candMap[d.id] = { id: d.id, ...d.data() }; });
+            } catch (_eQ) {}
+          }
+          var _candList = Object.keys(_candMap).map(function(k) { return _candMap[k]; });
+          if (_candList.length) {
+            var _bestInv = _candList.reduce(_pickBestInvoiceDoc);
+            var _bestLines = (_bestInv.items && _bestInv.items.length) || 0;
+            if (_bestInv && _bestLines > items.length) {
+              docData = _bestInv;
+              items = _bestInv.items || [];
+              invoiceId = _bestInv.id;
+              var _wantShellHash = '#/project/' + projectId + '/invoice/' + _bestInv.id;
+              if (String(window.location.hash || '').replace(/^#\/?/, '') !== _wantShellHash.replace(/^#\/?/, '')) {
+                window.location.hash = _wantShellHash;
+                return;
+              }
+            }
+          }
+        }
+      }
+
       // Human # in URL (e.g. /invoice/INV-6024) — resolve to real Firestore doc id
       if (!docData && projectId && invoiceId && /^(in|inv)([-–\s]|\s*)\d{2,}/i.test(String(invoiceId))) {
         try {
           const col = db.collection('boards').doc(projectId).collection('invoices');
-          let qs = await col.where('invoiceNum', '==', invoiceId).limit(3).get();
-          if (qs.empty) qs = await col.where('number', '==', invoiceId).limit(3).get();
+          let qs = await col.where('invoiceNum', '==', invoiceId).limit(6).get();
+          if (qs.empty) qs = await col.where('number', '==', invoiceId).limit(6).get();
           if (qs.empty && /^INV/i.test(String(invoiceId))) {
             var alt0 = String(invoiceId).replace(/^INV/i, 'IN');
-            qs = await col.where('invoiceNum', '==', alt0).limit(3).get();
-            if (qs.empty) qs = await col.where('number', '==', alt0).limit(3).get();
+            qs = await col.where('invoiceNum', '==', alt0).limit(6).get();
+            if (qs.empty) qs = await col.where('number', '==', alt0).limit(6).get();
           }
           if (qs.empty && /^IN-/i.test(String(invoiceId)) && !/^INV/i.test(String(invoiceId))) {
             var alt1 = String(invoiceId).replace(/^IN-/, 'INV-');
-            qs = await col.where('invoiceNum', '==', alt1).limit(3).get();
-            if (qs.empty) qs = await col.where('number', '==', alt1).limit(3).get();
+            qs = await col.where('invoiceNum', '==', alt1).limit(6).get();
+            if (qs.empty) qs = await col.where('number', '==', alt1).limit(6).get();
           }
           if (!qs.empty) {
-            const rid = qs.docs[0].id;
-            if (rid !== invoiceId) {
+            var _humCands = qs.docs.map(function(d) { return { id: d.id, ...d.data() }; });
+            var _bestHum = _humCands.reduce(_pickBestInvoiceDoc);
+            const rid = _bestHum.id;
+            if (rid !== invoiceId || !docData) {
               invoiceId = rid;
-              const doc2 = await col.doc(rid).get();
-              if (doc2.exists) { docData = { id: doc2.id, ...doc2.data() }; items = docData.items || []; }
+              docData = _bestHum;
+              items = docData.items || [];
               try {
                 var wantH = '#/project/' + projectId + '/invoice/' + rid;
                 if (String(window.location.hash || '').replace(/^#\/?/, '') !== wantH.replace(/^#\/?/, '')) {
                   window.location.hash = wantH;
+                  return;
                 }
               } catch (_h) {}
             }
@@ -44839,6 +44911,53 @@ async function renderBoardsTab(T, proj) {
      * Read-only: compare invoice-line rollup vs payment_compact (incl. RR- retainers) for one board.
      * Console: dryRunProjectPaymentRollup('7225-bugletrail')
      */
+    /**
+     * Console: find why Invoices tab Outstanding ≠ sum of visible Balance column.
+     * await auditProjectInvoiceOutstanding('cloud-huntington-beach')
+     */
+    window.auditProjectInvoiceOutstanding = async function(projectId) {
+      if (!projectId || typeof db === 'undefined') { console.warn('[audit] need projectId'); return; }
+      var invoices = [];
+      try {
+        var snap = await db.collection('boards').doc(projectId).collection('invoices').get();
+        snap.forEach(function(d) { invoices.push(Object.assign({ id: d.id }, d.data() || {})); });
+      } catch (e) { console.error(e); return; }
+      var totalInv = 0, totalCol = 0, rows = [];
+      invoices.forEach(function(inv) {
+        var it = invoiceListRowTotal(inv);
+        var tp = invoiceListRowPayments(inv);
+        var bal = invoiceListRowBalance(inv);
+        var col = invoiceListRowCollected(inv);
+        totalInv += it;
+        totalCol += col;
+        if (bal > 0.02 || (String(inv.status || '').toLowerCase() === 'paid' && tp + 0.02 < it)) {
+          rows.push({
+            num: inv.invoiceNum || inv.number || inv.id,
+            status: inv.status,
+            total: it,
+            payments: tp,
+            balance: bal,
+            collectedInSummary: col,
+            gap: _num2(it - tp)
+          });
+        }
+      });
+      totalInv = _num2(totalInv);
+      totalCol = _num2(totalCol);
+      console.group('[auditProjectInvoiceOutstanding] ' + projectId + ' — ' + invoices.length + ' invoice(s)');
+      console.log('Total invoiced (line-based):', totalInv);
+      console.log('Total collected (summary formula):', totalCol);
+      console.log('Outstanding (header):', _num2(totalInv - totalCol));
+      if (rows.length) {
+        console.table(rows);
+        console.log('These rows drive outstanding — scroll to high Balance or fix payment lines / status.');
+      } else {
+        console.log('No per-invoice balance gaps; header should show $0 outstanding after refresh.');
+      }
+      console.groupEnd();
+      return { totalInv: totalInv, totalCol: totalCol, outstanding: _num2(totalInv - totalCol), gaps: rows };
+    };
+
     window.dryRunProjectPaymentRollup = async function(projectId) {
       try {
         var snap = await db.collection('boards').doc(projectId).get();
@@ -45206,6 +45325,16 @@ async function renderBoardsTab(T, proj) {
       }
       // normalizeInvoiceNumberRaw already strips " - Sent" etc.; keep any extra paid-only cleanup here.
       return s || String(raw).trim();
+    }
+
+    /** Prefer invoice doc with more line items; tie-break with list-tab dedupe scorer. */
+    function _pickBestInvoiceDoc(a, b) {
+      if (!a) return b;
+      if (!b) return a;
+      var la = (a.items && a.items.length) || 0;
+      var lb = (b.items && b.items.length) || 0;
+      if (la !== lb) return la > lb ? a : b;
+      return _pickBetterInvoiceDuplicate(a, b);
     }
 
     function _pickBetterInvoiceDuplicate(a, b) {
@@ -50724,17 +50853,13 @@ async function renderBoardsTab(T, proj) {
           return t > 0.02;
         });
         periodFiltered.forEach(function(inv) {
-          var totalPmts = (inv.payments || []).reduce(function(s, p) { return s + (parseFloat(p.amount) || 0); }, 0);
-          inv._totalPaid = totalPmts;
-          var rowTot = typeof invoiceListRowTotal === 'function' ? invoiceListRowTotal(inv) : (parseFloat(inv.total) || 0);
-          inv._rowTotal = rowTot;
-          inv._balance = (String(inv.status || '').toLowerCase() === 'paid' || String(inv.status || '').toLowerCase() === 'void') ? 0 : (rowTot - totalPmts);
+          inv._totalPaid = invoiceListRowPayments(inv);
+          inv._rowTotal = invoiceListRowTotal(inv);
+          inv._balance = invoiceListRowBalance(inv);
         });
         const filtered = applySortFilter(periodFiltered, 'invoices');
-        const totalBilled = _num2(filtered.reduce(function(s, i) { return s + (typeof invoiceListRowTotal === 'function' ? invoiceListRowTotal(i) : (parseFloat(i.total) || 0)); }, 0));
-        const totalCollected = _num2(filtered.reduce(function(s, i) {
-          return s + (i._totalPaid || (i.status === 'Paid' ? (typeof invoiceListRowTotal === 'function' ? invoiceListRowTotal(i) : (parseFloat(i.total) || 0)) : 0));
-        }, 0));
+        const totalBilled = _num2(filtered.reduce(function(s, i) { return s + invoiceListRowTotal(i); }, 0));
+        const totalCollected = _num2(filtered.reduce(function(s, i) { return s + invoiceListRowCollected(i); }, 0));
         const totalOutstanding = _num2(totalBilled - totalCollected);
         const overdue = filtered.filter(i=>i.status==='Overdue').length;
         const thStyle = 'text-align:left;padding:12px 14px;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--gray-400);font-weight:600;white-space:nowrap;';
@@ -50788,9 +50913,9 @@ async function renderBoardsTab(T, proj) {
               </thead>
               <tbody>
                 ${filtered.slice((invoicesPage-1)*PAGE_SIZE, invoicesPage*PAGE_SIZE).map(inv => {
-                  const rowT = typeof invoiceListRowTotal === 'function' ? invoiceListRowTotal(inv) : (parseFloat(inv.total) || 0);
-                  const bal = inv._balance != null ? inv._balance : (inv.status === 'Paid' ? 0 : rowT);
-                  const paidShown = rowT - bal;
+                  const rowT = invoiceListRowTotal(inv);
+                  const bal = inv._balance != null ? inv._balance : invoiceListRowBalance(inv);
+                  const paidShown = invoiceListRowCollected(inv);
                   const numDisp = typeof invoiceDisplayNumber === 'function' ? invoiceDisplayNumber(inv) : (inv.invoiceNum || inv.number || inv.id.substring(0, 8));
                   return `
                   <tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;${inv.status==='Overdue'?'background:#fff8f8;':''}" onclick="navigate('#/project/${inv.projectId}/invoice/${inv.id}')">
@@ -51101,8 +51226,25 @@ async function renderBoardsTab(T, proj) {
     async function markInvoicePaid(projectId, docId) {
       // Get invoice details for notification
       var invDoc = null;
-      try { var d = await db.collection('boards').doc(projectId).collection('invoices').doc(docId).get(); if (d.exists) invDoc = d.data(); } catch(e) {}
-      await db.collection('boards').doc(projectId).collection('invoices').doc(docId).update({ status: 'Paid', paidAt: new Date().toISOString() });
+      try { var d = await db.collection('boards').doc(projectId).collection('invoices').doc(docId).get(); if (d.exists) invDoc = Object.assign({ id: docId }, d.data()); } catch(e) {}
+      var patch = { status: 'Paid', paidAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      if (invDoc) {
+        var it = invoiceListRowTotal(invDoc);
+        var pm = invoiceListRowPayments(invDoc);
+        if (it > pm + 0.01) {
+          var payments = (invDoc.payments || []).slice();
+          payments.push({
+            amount: _num2(it - pm),
+            date: new Date().toISOString().slice(0, 10),
+            method: 'Marked paid',
+            note: 'Recorded when status set to Paid'
+          });
+          patch.payments = payments;
+          patch.paidAmount = it;
+          patch.paymentCount = payments.length;
+        }
+      }
+      await db.collection('boards').doc(projectId).collection('invoices').doc(docId).update(patch);
       logDocActivity(projectId, 'invoices', docId, 'paid', 'Marked as paid');
       // Post to Teams → payment channel
       var invNum = invDoc ? (invDoc.invoiceNum || invDoc.number || docId.substring(0,8)) : docId.substring(0,8);
