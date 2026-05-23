@@ -1,0 +1,94 @@
+{
+  "timestamp": "2026-05-22T23:08:32.893Z",
+  "apply": true,
+  "boardId": "cloud-rolling-hills",
+  "invoiceMatch": "",
+  "copyStorage": true,
+  "stats": {
+    "subcollections": [
+      {
+        "subName": "clips",
+        "total": 362,
+        "written": 362,
+        "skipped": 0
+      },
+      {
+        "subName": "designBoards",
+        "total": 1,
+        "written": 1,
+        "skipped": 0
+      },
+      {
+        "subName": "files",
+        "total": 1,
+        "written": 1,
+        "skipped": 0
+      },
+      {
+        "subName": "heroImages",
+        "total": 1,
+        "written": 1,
+        "skipped": 0
+      },
+      {
+        "subName": "ideabooks",
+        "total": 34,
+        "written": 34,
+        "skipped": 0
+      },
+      {
+        "subName": "invoices",
+        "total": 39,
+        "written": 39,
+        "skipped": 0
+      },
+      {
+        "subName": "messages",
+        "total": 3,
+        "written": 3,
+        "skipped": 0
+      },
+      {
+        "subName": "proposals",
+        "total": 7,
+        "written": 7,
+        "skipped": 0
+      },
+      {
+        "subName": "purchaseOrders",
+        "total": 6,
+        "written": 6,
+        "skipped": 0
+      },
+      {
+        "subName": "roomMeta",
+        "total": 18,
+        "written": 18,
+        "skipped": 0
+      },
+      {
+        "subName": "tasks",
+        "total": 18,
+        "written": 18,
+        "skipped": 0
+      },
+      {
+        "subName": "workOrders",
+        "total": 1,
+        "written": 1,
+        "skipped": 0
+      }
+    ],
+    "docsRead": 491,
+    "docsWouldWrite": 492,
+    "docsWritten": 492,
+    "docsSkippedInvoiceFilter": 0,
+    "firebaseUrlsFound": 361,
+    "storagePathsUnique": 361,
+    "storageCopied": 361,
+    "storageSkippedExists": 0,
+    "storageErrors": 0,
+    "urlRewrites": 860
+  },
+  "storageErrors": []
+}

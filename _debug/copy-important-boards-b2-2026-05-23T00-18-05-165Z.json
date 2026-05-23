@@ -1,0 +1,28 @@
+{
+  "timestamp": "2026-05-23T00:18:05.165Z",
+  "apply": true,
+  "batchNum": 2,
+  "batchSize": 5,
+  "boards": [
+    "7225-bugletrail",
+    "shimano-maverick-cir",
+    "shimano-westridge-lane",
+    "holtz-hill",
+    "katke-graceland-dr"
+  ],
+  "copyStorage": true,
+  "globalStats": {
+    "boardsPlanned": 5,
+    "boardsCopied": 5,
+    "boardsMissingOnProd": 0,
+    "docsRead": 4369,
+    "docsWritten": 4374,
+    "docsWouldWrite": 4374,
+    "firebaseUrlsFound": 242,
+    "storageCopied": 242,
+    "storageSkippedExists": 0,
+    "storageErrors": 0,
+    "urlRewrites": 349
+  },
+  "storageErrors": []
+}

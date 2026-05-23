@@ -1,0 +1,28 @@
+{
+  "timestamp": "2026-05-22T23:56:56.485Z",
+  "apply": false,
+  "batchNum": 1,
+  "batchSize": 5,
+  "boards": [
+    "cloud-susan",
+    "cloud-parker",
+    "cloud-rolling-hills",
+    "cloud-huntington-beach",
+    "cloud-mustang"
+  ],
+  "copyStorage": false,
+  "globalStats": {
+    "boardsPlanned": 5,
+    "boardsCopied": 0,
+    "boardsMissingOnProd": 0,
+    "docsRead": 0,
+    "docsWritten": 0,
+    "docsWouldWrite": 0,
+    "firebaseUrlsFound": 0,
+    "storageCopied": 0,
+    "storageSkippedExists": 0,
+    "storageErrors": 0,
+    "urlRewrites": 0
+  },
+  "storageErrors": []
+}

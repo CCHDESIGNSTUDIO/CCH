@@ -2296,14 +2296,21 @@
         if (type === 'invoice' && isSvcRow) {
           imgTag = '<div style="width:64px;height:64px;background:transparent;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--gray-300);border:1px dashed var(--gray-200);">—</div>';
         } else {
-          var _thumbUrl = (typeof window.getInvoiceLineDisplayImageUrl === 'function'
-            ? window.getInvoiceLineDisplayImageUrl(item)
-            : (typeof window.getProposalLineHeroImageUrl === 'function' ? window.getProposalLineHeroImageUrl(item) : ''))
-            || item.imageUrl || '';
-          if (_thumbUrl) {
-            imgTag = '<img src="' + _escImgSrcAttr(_thumbUrl) + '" style="width:64px;height:64px;object-fit:cover;border-radius:4px;" onerror="this.style.display=\'none\'" referrerpolicy="no-referrer">';
+          var _lineIdxImg = (type === 'invoice') ? cchDocItemLineIndex(items, item) : -1;
+          if (type === 'invoice' && typeof window.cchBuildInvoiceLineImgHtml === 'function') {
+            imgTag = window.cchBuildInvoiceLineImgHtml(item, _lineIdxImg);
           } else {
-            imgTag = '<div style="width:64px;height:64px;background:var(--gray-50);display:flex;align-items:center;justify-content:center;font-size:24px;border-radius:4px;">📦</div>';
+            var _thumbUrl = (typeof window.getBestImageUrl === 'function'
+              ? window.getBestImageUrl(item, _lineIdxImg)
+              : (typeof window.getInvoiceLineDisplayImageUrl === 'function'
+                ? window.getInvoiceLineDisplayImageUrl(item, _lineIdxImg)
+                : (typeof window.getProposalLineHeroImageUrl === 'function' ? window.getProposalLineHeroImageUrl(item) : '')))
+              || item.imageUrl || '';
+            if (_thumbUrl) {
+              imgTag = '<img src="' + _escImgSrcAttr(_thumbUrl) + '" style="width:64px;height:64px;object-fit:cover;border-radius:4px;background:var(--gray-50);" referrerpolicy="no-referrer" onerror="typeof cchImgTryFallbacks===\'function\'&&cchImgTryFallbacks(this)">';
+            } else {
+              imgTag = '<div style="width:64px;height:64px;background:var(--gray-50);display:flex;align-items:center;justify-content:center;font-size:24px;border-radius:4px;border:1px solid var(--gray-100);">📦</div>';
+            }
           }
         }
         var lineTag = (typeof window.cchLineTagText === 'function') ? window.cchLineTagText(item) : '';
@@ -3007,7 +3014,12 @@
       var imgTag = '';
       if (_showPremiumImgCol && !isSvc) {
         var imgSrc = '';
-        if (it.imageUrl) imgSrc = String(it.imageUrl).trim();
+        if (type === 'invoice' && typeof window.getBestImageUrl === 'function') {
+          imgSrc = String(window.getBestImageUrl(it) || '').trim();
+        } else if (type === 'invoice' && typeof window.getInvoiceLineDisplayImageUrl === 'function') {
+          imgSrc = String(window.getInvoiceLineDisplayImageUrl(it) || '').trim();
+        }
+        if (!imgSrc && it.imageUrl) imgSrc = String(it.imageUrl).trim();
         if (!imgSrc && typeof _firstCoercedGalleryUrl === 'function') {
           imgSrc = String(_firstCoercedGalleryUrl(it) || '').trim();
         }
@@ -3017,7 +3029,7 @@
           else if (g0 && (g0.imageUrl || g0.url)) imgSrc = String(g0.imageUrl || g0.url || '').trim();
         }
         if (imgSrc) {
-          imgTag = '<img src="' + _escImgSrcAttr(imgSrc) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">';
+          imgTag = '<img src="' + _escImgSrcAttr(imgSrc) + '" referrerpolicy="no-referrer" onerror="typeof cchImgTryFallbacks===\'function\'&&cchImgTryFallbacks(this)">';
         }
       }
       var imgBlock = '';

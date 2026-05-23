@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-05-23T00:18:24.238Z",
+  "apply": true,
+  "scrubVendors": false,
+  "stats": {
+    "clients": 0,
+    "boards": 8,
+    "vendors": 0,
+    "skipped": 0,
+    "errors": 0
+  },
+  "errorsSample": []
+}

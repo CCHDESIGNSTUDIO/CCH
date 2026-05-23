@@ -7437,6 +7437,9 @@
         var byTitle = new Map();
         function nk(v) { return String(v || '').toLowerCase().trim().replace(/\s+/g, ' '); }
         function scoreClip(c) {
+          if (typeof _cchBestImageUrlFromClipOrObj === 'function') {
+            return cchInvoiceImageUrlScore(_cchBestImageUrlFromClipOrObj(c || {}));
+          }
           var p = cchProposalLineImagesFromSource(c || {});
           return (p.images && p.images.length) ? p.images.length : (p.imageUrl ? 1 : 0);
         }
@@ -7468,12 +7471,18 @@
           if (!clip) clip = byTitle.get(nk(o.title)) || null;
           if (!clip) return o;
 
-          var pack = cchProposalLineImagesFromSource(clip);
-          if (!pack.imageUrl && (!pack.images || !pack.images.length)) return o;
+          var nextHero = typeof _cchBestImageUrlFromClipOrObj === 'function'
+            ? _cchBestImageUrlFromClipOrObj(clip)
+            : String((cchProposalLineImagesFromSource(clip).imageUrl) || '').trim();
+          if (!nextHero) return o;
+          if (typeof cchInvoiceImageUrlIsUnreliable === 'function' && cchInvoiceImageUrlIsUnreliable(nextHero)) {
+            var cur0 = String(o.imageUrl || '').trim();
+            if (cur0 && !cchInvoiceImageUrlIsUnreliable(cur0)) return o;
+          }
 
+          var pack = cchProposalLineImagesFromSource(clip);
           var current = cchProposalLineImagesFromSource(o);
           var curHero = String(current.imageUrl || '').trim();
-          var nextHero = String(pack.imageUrl || '').trim();
           var curList = (current.images || []).join('||');
           var nextList = (pack.images || []).join('||');
           if (curHero === nextHero && curList === nextList) return o;
@@ -8707,6 +8716,8 @@
       if (url == null || url === '') return '';
       url = String(url).trim();
       if (!url) return '';
+      // Firestore imports sometimes store query strings with HTML entities (&amp;) — breaks signed S3/Ivy URLs.
+      url = url.replace(/&amp;/gi, '&').replace(/&#38;/gi, '&').replace(/&#x26;/gi, '&');
       try {
         if (url.indexOf('%') >= 0 && /%22|%27|%5C|%3[Aa]%2[Ff]/i.test(url)) {
           var dec = decodeURIComponent(url.replace(/\+/g, ' '));
@@ -9047,11 +9058,370 @@
       return _resolveImgSrc(String(item.imageUrl || item.image || '').trim());
     }
 
+    /** Ivy/Houzz signed URLs often 404; prefer Firebase / library / clip fallbacks. */
+    function cchInvoiceImageUrlIsUnreliable(u) {
+      u = String(u == null ? '' : u).trim();
+      if (!u) return true;
+      if (/&amp;|&#38;/i.test(u)) return true;
+      if (/ivy-uploads\.|houzz|img\.houzz|houzzcdn/i.test(u)) return true;
+      if (typeof cchBoardImageIsWeak === 'function' && cchBoardImageIsWeak(u)) return true;
+      if (/^https?:\/\//i.test(u) || /^data:image/i.test(u)) {
+        if (/firebasestorage\.googleapis|\.firebasestorage\.app|storage\.googleapis\.com/i.test(u)) return false;
+        if (typeof cchProductBoardImageIsLikelyValid === 'function' && cchProductBoardImageIsLikelyValid(u)) return false;
+        if (/ivy-uploads|houzz/i.test(u)) return true;
+        return false;
+      }
+      return true;
+    }
+    function cchInvoiceImageUrlScore(u) {
+      u = _resolveImgSrc(String(u || '').trim());
+      if (!u) return -1;
+      if (/^data:image/i.test(u)) return 95;
+      if (/firebasestorage\.googleapis|\.firebasestorage\.app|storage\.googleapis\.com/i.test(u)) return 100;
+      if (cchInvoiceImageUrlIsUnreliable(u)) return 5;
+      if (typeof cchBoardImageIsPreferred === 'function' && cchBoardImageIsPreferred(u)) return 70;
+      return 40;
+    }
+    function _cchNormInvoiceLineKey(s) {
+      return String(s || '').toLowerCase().trim().replace(/\s+/g, ' ');
+    }
+    function _cchClipTitleMatchesInvoiceLine(clipTitle, itemTitle, itemDesc) {
+      var ct = _cchNormInvoiceLineKey(clipTitle);
+      var it = _cchNormInvoiceLineKey(itemTitle);
+      var id0 = String(itemDesc || '').split('\n')[0];
+      var id = _cchNormInvoiceLineKey(id0);
+      if (!ct) return false;
+      if (it && ct === it) return true;
+      if (it && it.length >= 4 && (ct.indexOf(it) >= 0 || it.indexOf(ct) >= 0)) return true;
+      if (id && id.length >= 6 && (ct === id || ct.indexOf(id) >= 0 || id.indexOf(ct) >= 0)) return true;
+      return false;
+    }
+    function _cchBestImageUrlFromClipOrObj(obj) {
+      if (!obj) return '';
+      var best = '';
+      var bestScore = -1;
+      function consider(u) {
+        u = _resolveImgSrc(String(u || '').trim());
+        if (!u) return;
+        var sc = cchInvoiceImageUrlScore(u);
+        if (sc > bestScore) { bestScore = sc; best = u; }
+      }
+      try {
+        if (typeof cchPickPreferredProductImageUrl === 'function') consider(cchPickPreferredProductImageUrl(obj));
+      } catch (_e0) {}
+      try {
+        var pack = cchProposalLineImagesFromSource(obj);
+        if (pack && pack.images) {
+          for (var i = 0; i < pack.images.length; i++) consider(pack.images[i]);
+        }
+        consider(pack && pack.imageUrl);
+      } catch (_e1) {}
+      consider(obj.imageUrl);
+      consider(obj.image);
+      consider(obj.thumbnail);
+      return best;
+    }
+    function _cchPickClipForInvoiceLine(item, clips) {
+      if (!clips || !clips.length || !item) return null;
+      var wantVendor = _cchNormInvoiceLineKey(item.vendor || '');
+      var itemTitle = item.title || '';
+      var itemDesc = item.description || '';
+      var itemCost = parseFloat(item.cost) || 0;
+      var cand = clips.filter(function(c) {
+        return _cchClipTitleMatchesInvoiceLine(c.title || c.name || '', itemTitle, itemDesc);
+      });
+      if (!cand.length) return null;
+      var vPref = cand.filter(function(c) {
+        var cv = _cchNormInvoiceLineKey(c.vendor || '');
+        return wantVendor && cv && cv === wantVendor;
+      });
+      var pool = vPref.length ? vPref : cand;
+      var best = pool[0];
+      var bestRank = -Infinity;
+      pool.forEach(function(c) {
+        var uc = parseMoney(c.cost);
+        if (!uc && c.totalCost && c.qty) uc = parseMoney(c.totalCost) / (parseFloat(c.qty) || 1);
+        uc = parseFloat(uc) || 0;
+        var costD = itemCost > 0 && uc > 0 ? Math.abs(uc - itemCost) : 0;
+        var imgSc = cchInvoiceImageUrlScore(_cchBestImageUrlFromClipOrObj(c));
+        var rank = imgSc * 1000 - costD;
+        if (rank > bestRank) { bestRank = rank; best = c; }
+      });
+      return best;
+    }
+    function _findLibraryProductForInvoiceLine(item) {
+      item = item || {};
+      var lid = String(item.libraryProductId || item.linkedLibraryProductId || '').trim();
+      if (lid && typeof libraryProducts !== 'undefined' && libraryProducts && libraryProducts.length) {
+        var byId = libraryProducts.find(function(x) { return String(x.id) === lid; });
+        if (byId) return byId;
+      }
+      var tLow = _cchNormInvoiceLineKey(item.title || '');
+      var vLow = _cchNormInvoiceLineKey(item.vendor || '');
+      if (!tLow || tLow.length < 2 || !libraryProducts || !libraryProducts.length) return null;
+      var loose = null;
+      for (var i = 0; i < libraryProducts.length; i++) {
+        var p = libraryProducts[i];
+        var pt = _cchNormInvoiceLineKey(p.title || p.name || '');
+        var pv = _cchNormInvoiceLineKey(p.vendor || '');
+        if (pt !== tLow) continue;
+        if (vLow && pv && pv === vLow) return p;
+        if (!loose) loose = p;
+      }
+      return loose;
+    }
+    function _collectInvoiceLineImageUrls(item, lineIdx) {
+      item = item || {};
+      var seen = {};
+      var scored = [];
+      function addRaw(u) {
+        u = _resolveImgSrc(String(u || '').trim());
+        if (!u) return;
+        var k = u.toLowerCase();
+        if (seen[k]) return;
+        seen[k] = true;
+        scored.push({ url: u, score: cchInvoiceImageUrlScore(u) });
+      }
+      function addFromObj(obj) {
+        if (!obj) return;
+        try {
+          if (typeof cchPickPreferredProductImageUrl === 'function') addRaw(cchPickPreferredProductImageUrl(obj));
+        } catch (_eA) {}
+        try {
+          var pack = cchProposalLineImagesFromSource(obj);
+          if (pack && pack.images) {
+            for (var gi = 0; gi < pack.images.length; gi++) addRaw(pack.images[gi]);
+          }
+          addRaw(pack && pack.imageUrl);
+        } catch (_eB) {}
+        addRaw(obj.imageUrlOverride);
+        addRaw(obj.imageUrl);
+        addRaw(obj.image);
+        addRaw(obj.thumbnail);
+        addRaw(obj.img);
+      }
+      var lib = _findLibraryProductForInvoiceLine(item);
+      if (lib) addFromObj(lib);
+      var ctx = window._cchInvoiceImageCtx;
+      var clip = null;
+      if (ctx && ctx.clipForItem) {
+        if (typeof lineIdx === 'number' && lineIdx >= 0 && ctx.clipForItem['i:' + lineIdx]) clip = ctx.clipForItem['i:' + lineIdx];
+        if (!clip) {
+          var lk = _cchNormInvoiceLineKey(item.title || '') + '|' + _cchNormInvoiceLineKey(item.vendor || '');
+          if (ctx.clipForItem[lk]) clip = ctx.clipForItem[lk];
+        }
+      }
+      if (clip) {
+        try {
+          var cn = _normalizeClipImagesForTear(clip);
+          if (cn && cn.list) {
+            for (var ci = 0; ci < cn.list.length; ci++) addRaw(cn.list[ci]);
+          }
+        } catch (_eC) {}
+        addFromObj(clip);
+      }
+      try {
+        var n = _normalizeProposalItemImages(item);
+        if (n && n.list && n.list.length) {
+          for (var hi = 0; hi < n.list.length; hi++) addRaw(n.list[hi]);
+        }
+      } catch (_eD) {}
+      addFromObj(item);
+      scored.sort(function(a, b) { return b.score - a.score; });
+      var urls = scored.map(function(x) { return x.url; });
+      var good = urls.filter(function(u) { return !cchInvoiceImageUrlIsUnreliable(u); });
+      if (good.length) return good.concat(urls.filter(function(u) { return good.indexOf(u) < 0; }));
+      return urls;
+    }
+    /**
+     * Robust image URL for invoice/proposal lines (and similar rows).
+     * Firebase first; Houzz/Ivy/filename-only → Product Library + Room Board clip; else resolved line URL or ''.
+     */
+    function getBestImageUrl(item, lineIdx) {
+      item = item || {};
+      var url = _resolveImgSrc(String(item.imageUrl || item.image || item.thumbnail || '').trim());
+
+      if (url && /firebasestorage\.googleapis|\.firebasestorage\.app|storage\.googleapis\.com/i.test(url)) return url;
+      if (url && /^data:image/i.test(url)) return url;
+
+      var needsFallback = !url || cchInvoiceImageUrlIsUnreliable(url);
+      if (needsFallback && (item.title || item.vendor || item.libraryProductId || item.linkedLibraryProductId)) {
+        var lib = _findLibraryProductForInvoiceLine(item);
+        if (lib) {
+          var libUrl = _cchBestImageUrlFromClipOrObj(lib);
+          if (libUrl && !cchInvoiceImageUrlIsUnreliable(libUrl)) return libUrl;
+        }
+        var clip = null;
+        var ctx = window._cchInvoiceImageCtx;
+        if (ctx && ctx.clipForItem) {
+          if (typeof lineIdx === 'number' && lineIdx >= 0 && ctx.clipForItem['i:' + lineIdx]) {
+            clip = ctx.clipForItem['i:' + lineIdx];
+          }
+          if (!clip) {
+            var lk = _cchNormInvoiceLineKey(item.title || '') + '|' + _cchNormInvoiceLineKey(item.vendor || '');
+            clip = ctx.clipForItem[lk] || null;
+          }
+        }
+        if (!clip && ctx && ctx.allClips && ctx.allClips.length) {
+          clip = _cchPickClipForInvoiceLine(item, ctx.allClips);
+        }
+        if (clip) {
+          var clipUrl = _cchBestImageUrlFromClipOrObj(clip);
+          if (clipUrl && !cchInvoiceImageUrlIsUnreliable(clipUrl)) return clipUrl;
+        }
+        var urls = _collectInvoiceLineImageUrls(item, lineIdx);
+        var reliable = urls.filter(function(u) { return !cchInvoiceImageUrlIsUnreliable(u); });
+        if (reliable.length) return reliable[0];
+        if (urls.length) return urls[0];
+        return '';
+      }
+      return url;
+    }
+    window.getBestImageUrl = getBestImageUrl;
+
+    function getInvoiceLineDisplayImageCandidates(item, lineIdx) {
+      var primary = getBestImageUrl(item, lineIdx);
+      var fallbacks = _collectInvoiceLineImageUrls(item, lineIdx).filter(function(u) {
+        return u && u !== primary;
+      });
+      return { primary: primary || '', fallbacks: fallbacks };
+    }
+    window.getInvoiceLineDisplayImageCandidates = getInvoiceLineDisplayImageCandidates;
+
     /** Invoice line rows + PDF use cover (hero); proposals table uses list thumbnail. */
-    function getInvoiceLineDisplayImageUrl(item) {
-      return getProposalLineHeroImageUrl(item);
+    function getInvoiceLineDisplayImageUrl(item, lineIdx) {
+      return getBestImageUrl(item, lineIdx);
     }
     window.getInvoiceLineDisplayImageUrl = getInvoiceLineDisplayImageUrl;
+
+    function cchImgTryFallbacks(img) {
+      if (!img) return;
+      var list = [];
+      try { list = JSON.parse(img.getAttribute('data-fallbacks') || '[]'); } catch (_eFb) {}
+      var idx = parseInt(img.getAttribute('data-fb-i') || '0', 10);
+      while (idx < list.length) {
+        var next = _resolveImgSrc(String(list[idx++] || '').trim());
+        img.setAttribute('data-fb-i', String(idx));
+        if (next && img.src !== next) {
+          img.onerror = function() { cchImgTryFallbacks(img); };
+          img.src = next;
+          return;
+        }
+      }
+      img.onerror = null;
+      img.outerHTML = '<div style="width:64px;height:64px;background:var(--gray-50);display:flex;align-items:center;justify-content:center;font-size:24px;border-radius:4px;border:1px solid var(--gray-100);">📦</div>';
+    }
+    window.cchImgTryFallbacks = cchImgTryFallbacks;
+
+    function cchBuildInvoiceLineImgHtml(item, lineIdx) {
+      var pack = getInvoiceLineDisplayImageCandidates(item, lineIdx);
+      var primary = pack.primary || '';
+      var fbs = (pack.fallbacks || []).filter(function(u) { return u && u !== primary; });
+      var ph = '<div style="width:64px;height:64px;background:var(--gray-50);display:flex;align-items:center;justify-content:center;font-size:24px;border-radius:4px;border:1px solid var(--gray-100);">📦</div>';
+      if (!primary && !fbs.length) return ph;
+      if (!primary && fbs.length) { primary = fbs.shift(); }
+      var fbAttr = fbs.length ? (' data-fallbacks="' + escAttr(JSON.stringify(fbs)) + '" data-fb-i="0"') : '';
+      return '<img src="' + _escImgSrcAttr(primary) + '"' + fbAttr +
+        ' style="width:64px;height:64px;object-fit:cover;border-radius:4px;background:var(--gray-50);border:1px solid var(--gray-100);" referrerpolicy="no-referrer"' +
+        ' onerror="typeof cchImgTryFallbacks===\'function\'&&cchImgTryFallbacks(this)">';
+    }
+    window.cchBuildInvoiceLineImgHtml = cchBuildInvoiceLineImgHtml;
+
+    async function ensureLibraryCacheForInvoiceImageFallback(items) {
+      if (!items || !items.length) return;
+      var needs = false;
+      for (var i = 0; i < items.length; i++) {
+        var it = items[i];
+        if (!it || (it.expenseType === 'service' || it.itemType === 'service')) continue;
+        if (!it.imageUrl || cchInvoiceImageUrlIsUnreliable(it.imageUrl)) { needs = true; break; }
+      }
+      if (!needs) return;
+      var have = {};
+      if (typeof libraryProducts !== 'undefined' && libraryProducts) {
+        libraryProducts.forEach(function(p) { if (p && p.id) have[p.id] = true; });
+      }
+      try {
+        var snaps = await Promise.all([
+          db.collection('products').limit(1000).get(),
+          db.collection('productLibrary').limit(1000).get()
+        ]);
+        snaps.forEach(function(snap) {
+          snap.forEach(function(d) {
+            if (have[d.id]) return;
+            libraryProducts.push(Object.assign({ id: d.id }, d.data() || {}));
+            have[d.id] = true;
+          });
+        });
+      } catch (e) {
+        console.warn('ensureLibraryCacheForInvoiceImageFallback', e);
+      }
+    }
+    window.ensureLibraryCacheForInvoiceImageFallback = ensureLibraryCacheForInvoiceImageFallback;
+
+    async function buildInvoiceLineImageFallbackContext(projectId, docData, items) {
+      window._cchInvoiceImageCtx = { projectId: projectId, clipForItem: {} };
+      if (!items || !items.length) return;
+      var invNum = (docData && (docData.invoiceNum || docData.number)) || '';
+      var invKey = invNum && typeof normalizeInvoiceNumberKey === 'function'
+        ? normalizeInvoiceNumberKey(String(invNum)) : '';
+      try {
+        var clipSnap = await db.collection('boards').doc(projectId).collection('clips').get();
+        var allClips = [];
+        var invoiceClips = [];
+        clipSnap.forEach(function(d) {
+          var c = Object.assign({ _clipId: d.id }, d.data() || {});
+          allClips.push(c);
+          var tag = String(c.invoiceNum || c.houzzInvoice || '').trim();
+          if (invKey && tag && normalizeInvoiceNumberKey(tag) === invKey) invoiceClips.push(c);
+        });
+        window._cchInvoiceImageCtx.allClips = allClips;
+        for (var li = 0; li < items.length; li++) {
+          var clip = _cchPickClipForInvoiceLine(items[li], allClips);
+          if (!clip) continue;
+          window._cchInvoiceImageCtx.clipForItem['i:' + li] = clip;
+          var lk = _cchNormInvoiceLineKey(items[li].title || '') + '|' + _cchNormInvoiceLineKey(items[li].vendor || '');
+          window._cchInvoiceImageCtx.clipForItem[lk] = clip;
+        }
+      } catch (e) {
+        console.warn('[buildInvoiceLineImageFallbackContext]', e);
+      }
+    }
+    window.buildInvoiceLineImageFallbackContext = buildInvoiceLineImageFallbackContext;
+    window._cchBestImageUrlFromClipOrObj = _cchBestImageUrlFromClipOrObj;
+
+    async function applyInvoiceLineImagesFromMatchedClips(projectId, invoiceId, items) {
+      var ctx = window._cchInvoiceImageCtx;
+      if (!ctx || !ctx.clipForItem || !items || !items.length) return false;
+      var changed = false;
+      for (var li = 0; li < items.length; li++) {
+        var it = items[li];
+        var clip = ctx.clipForItem['i:' + li];
+        if (!clip) continue;
+        var best = _cchBestImageUrlFromClipOrObj(clip);
+        if (!best) continue;
+        var cur = String(it.imageUrl || '').trim();
+        var bestReliable = !cchInvoiceImageUrlIsUnreliable(best);
+        var curReliable = cur && !cchInvoiceImageUrlIsUnreliable(cur);
+        if (cur === best) continue;
+        if (bestReliable && !curReliable) {
+          it.imageUrl = best;
+          changed = true;
+        } else if (!cur && best) {
+          it.imageUrl = best;
+          changed = true;
+        }
+      }
+      if (changed) {
+        try {
+          await db.collection('boards').doc(projectId).collection('invoices').doc(invoiceId).update({ items: items });
+        } catch (e) {
+          console.warn('[applyInvoiceLineImagesFromMatchedClips]', e);
+          changed = false;
+        }
+      }
+      return changed;
+    }
+    window.applyInvoiceLineImagesFromMatchedClips = applyInvoiceLineImagesFromMatchedClips;
 
     function _normalizeClipImagesForTear(c) {
       c = c || {};
@@ -26907,7 +27277,9 @@ async function renderBoardsTab(T, proj) {
             ? (Math.round(rateInv * qty * 100) / 100 + shipping)
             : ((cost === 0 && sellAmt > 0) ? sellAmt + shipping : (cost * qty * (1 + markupPct / 100)) + shipping));
         const markupDollar = isPO ? 0 : (cost * qty * (markupPct / 100));
-        const imgSrc = (isInvoice && typeof getInvoiceLineDisplayImageUrl === 'function')
+        const imgSrc = (isInvoice && typeof getBestImageUrl === 'function')
+          ? (getBestImageUrl(item) || item.imageUrl || '')
+          : (isInvoice && typeof getInvoiceLineDisplayImageUrl === 'function')
           ? (getInvoiceLineDisplayImageUrl(item) || item.imageUrl || '')
           : ((typeof getProposalLineListThumbnailUrl === 'function' ? getProposalLineListThumbnailUrl(item) : '') || item.imageUrl || '');
         const isServiceLine = item.expenseType === 'service' || item.itemType === 'service' || item._isService === true;
@@ -31573,12 +31945,18 @@ async function renderBoardsTab(T, proj) {
         if (doc.exists) { docData = { id: doc.id, ...doc.data() }; items = docData.items || []; }
       } catch(e) {}
 
-      // Empty uppercase shell (items:[] but total set) — prefer sibling/query doc with lines
+      // Empty / thin duplicate invoice docs — prefer sibling with more line items (IN-* vs in-*, IN-12902 vs IN-12902 - Paid)
       if (docData) {
         var _shellTotal = parseFloat(docData.total || docData.amount || 0) || 0;
         var _shellLooksDup = /^IN-\d/i.test(String(invoiceId)) && String(invoiceId) === String(invoiceId).toUpperCase();
-        if (items.length === 0 && (_shellTotal > 0.01 || _shellLooksDup)) {
-          console.warn('[renderInvoiceDetail] empty shell', invoiceId, '— resolving canonical invoice doc');
+        var _shellInvKey = (typeof normalizeInvoiceNumberKey === 'function')
+          ? normalizeInvoiceNumberKey(String(docData.invoiceNum || docData.number || invoiceId || ''))
+          : '';
+        var _shellEmpty = items.length === 0 && (_shellTotal > 0.01 || _shellLooksDup);
+        var _shellThinDup = _shellInvKey && items.length > 0 && items.length < 8 && _shellTotal > 50;
+        if (_shellEmpty || _shellThinDup) {
+          console.warn('[renderInvoiceDetail] resolving duplicate invoice', invoiceId,
+            '(items:' + items.length + ', total:' + _shellTotal + ')');
           var _candMap = {};
           _candMap[docData.id] = docData;
           var _lowerId = String(invoiceId).toLowerCase();
@@ -31598,12 +31976,28 @@ async function renderBoardsTab(T, proj) {
             if (!_qNum) continue;
             try {
               var _qsNum = await db.collection('boards').doc(projectId).collection('invoices')
-                .where('invoiceNum', '==', _qNum).limit(6).get();
+                .where('invoiceNum', '==', _qNum).limit(8).get();
               _qsNum.forEach(function(d) { _candMap[d.id] = { id: d.id, ...d.data() }; });
               var _qsNum2 = await db.collection('boards').doc(projectId).collection('invoices')
-                .where('number', '==', _qNum).limit(6).get();
+                .where('number', '==', _qNum).limit(8).get();
               _qsNum2.forEach(function(d) { _candMap[d.id] = { id: d.id, ...d.data() }; });
             } catch (_eQ) {}
+          }
+          // Full-board scan by normalized invoice # (e.g. IN-12902 vs IN-12902 - Partially Paid)
+          if (_shellInvKey && Object.keys(_candMap).length < 3 && typeof normalizeInvoiceNumberKey === 'function') {
+            try {
+              var _fullInvSnap = await db.collection('boards').doc(projectId).collection('invoices').get();
+              _fullInvSnap.forEach(function(d) {
+                var dd = d.data() || {};
+                var k1 = normalizeInvoiceNumberKey(String(dd.invoiceNum || ''));
+                var k2 = normalizeInvoiceNumberKey(String(dd.number || ''));
+                if (k1 === _shellInvKey || k2 === _shellInvKey) {
+                  _candMap[d.id] = { id: d.id, ...dd };
+                }
+              });
+            } catch (_eFullScan) {
+              console.warn('[renderInvoiceDetail] normalized invoice scan', _eFullScan);
+            }
           }
           var _candList = Object.keys(_candMap).map(function(k) { return _candMap[k]; });
           if (_candList.length) {
@@ -31613,6 +32007,7 @@ async function renderBoardsTab(T, proj) {
               docData = _bestInv;
               items = _bestInv.items || [];
               invoiceId = _bestInv.id;
+              console.log('[renderInvoiceDetail] switched to', _bestInv.id, 'with', _bestLines, 'items');
               var _wantShellHash = '#/project/' + projectId + '/invoice/' + _bestInv.id;
               if (String(window.location.hash || '').replace(/^#\/?/, '') !== _wantShellHash.replace(/^#\/?/, '')) {
                 window.location.hash = _wantShellHash;
@@ -31720,7 +32115,11 @@ async function renderBoardsTab(T, proj) {
       if (docData && items.length > 0) {
         const zeroCostCount = items.filter(i => !parseFloat(i.cost) || parseFloat(i.cost) === 0).length;
         const noImageCount = items.filter(i => !i.imageUrl).length;
-        if (zeroCostCount >= items.length * 0.3 || noImageCount >= items.length * 0.3) {
+        const brokenImgCount = items.filter(function(i) {
+          var u = String(i.imageUrl || '');
+          return !u || /&amp;/i.test(u) || /&#38;/i.test(u) || /ivy-uploads/i.test(u);
+        }).length;
+        if (zeroCostCount >= items.length * 0.3 || noImageCount >= items.length * 0.3 || brokenImgCount >= items.length * 0.3) {
           try {
             const invNum = docData.invoiceNum || docData.number || '';
             const invKey = invNum ? normalizeInvoiceNumberKey(String(invNum)) : '';
@@ -31781,10 +32180,14 @@ async function renderBoardsTab(T, proj) {
               const vItem = _normLineKey(item.vendor || '');
               const vClip = _normLineKey(clip.vendor || '');
               const vendorOk = !vItem || !vClip || vItem === vClip;
-              // Sync image
-              if (!item.imageUrl && (clip.imageUrl || clip.image || clip.thumbnail)) {
-                if (vendorOk) {
-                  item.imageUrl = clip.imageUrl || clip.image || clip.thumbnail;
+              // Sync image — fill missing or replace HTML-entity / broken remote URLs from matched clip
+              var clipImg = _resolveImgSrc(String(clip.imageUrl || clip.image || clip.thumbnail || '').trim());
+              var lineImg = String(item.imageUrl || '');
+              var lineImgBroken = !lineImg || /&amp;/i.test(lineImg) || /&#38;/i.test(lineImg) ||
+                (!/firebasestorage/i.test(lineImg) && /ivy-uploads/i.test(lineImg));
+              if (clipImg && vendorOk && (lineImgBroken || (!item.imageUrl && clipImg))) {
+                if (!lineImg || lineImgBroken || (clipImg.indexOf('firebasestorage') >= 0 && lineImg.indexOf('firebasestorage') < 0)) {
+                  item.imageUrl = clipImg;
                   needsUpdate = true;
                 }
               }
@@ -31855,7 +32258,34 @@ async function renderBoardsTab(T, proj) {
         }
       }
 
+      // Normalize stored image URLs for display + persist entity fixes (e.g. &amp; → & on Ivy links)
+      var _imgUrlPersist = false;
+      items.forEach(function(it) {
+        if (!it.imageUrl) return;
+        var fixed = _resolveImgSrc(String(it.imageUrl).trim());
+        if (fixed && fixed !== it.imageUrl) {
+          it.imageUrl = fixed;
+          _imgUrlPersist = true;
+        }
+      });
+      if (_imgUrlPersist) {
+        try {
+          await db.collection('boards').doc(projectId).collection('invoices').doc(invoiceId).update({ items: items });
+          docData.items = items;
+        } catch (_eImgNorm) { console.warn('[renderInvoiceDetail] imageUrl normalize persist', _eImgNorm); }
+      }
+
       await ensureLibraryProductsForLineItems(items);
+      if (typeof ensureLibraryCacheForInvoiceImageFallback === 'function') {
+        await ensureLibraryCacheForInvoiceImageFallback(items);
+      }
+      if (typeof buildInvoiceLineImageFallbackContext === 'function') {
+        await buildInvoiceLineImageFallbackContext(projectId, docData, items);
+      }
+      if (typeof applyInvoiceLineImagesFromMatchedClips === 'function') {
+        var _appliedClipImgs = await applyInvoiceLineImagesFromMatchedClips(projectId, invoiceId, items);
+        if (_appliedClipImgs) docData.items = items;
+      }
 
       // Show view mode first, edit on button click
       if (window._forceEditMode) {

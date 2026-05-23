@@ -1,0 +1,174 @@
+{
+  "dryRun": false,
+  "boards": [
+    "cloud-rolling-hills"
+  ],
+  "stats": {
+    "docsScanned": 414,
+    "ivyUrlsFound": 212,
+    "alreadyFirebase": 0,
+    "fixedWould": 204,
+    "fixedApplied": 204,
+    "noMatch": 4,
+    "noStorage": 4,
+    "docsUpdated": 197,
+    "viaClipCanonical": 7,
+    "viaHouzzId": 197,
+    "viaFilename": 0,
+    "imagesArraysCollapsed": 0,
+    "bySource": {
+      "boards/cloud-rolling-hills/clips": 201,
+      "boards/cloud-rolling-hills/invoices": 9,
+      "boards/cloud-rolling-hills/proposals": 2
+    },
+    "byBoard": {
+      "cloud-rolling-hills": 211
+    },
+    "samples": {
+      "fixed": [
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "via": "houzz-products/55273152",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/260123574/3g",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "via": "houzz-products/54556397",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/258420940/Bu",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "via": "houzz-products/54550144",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/258421051/30",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "via": "houzz-products/52997126",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/258420614/m4",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "via": "houzz-products/54703434",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/258420652/mw",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "via": "houzz-products/54545859",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/258421101/Sc",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "via": "houzz-products/54549683",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/258420798/0n",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "via": "houzz-products/53037447",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/244083731/ww",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "via": "houzz-products/33490758",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/258420902/vk",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "via": "houzz-products/53041980",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/258420588/mk",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "via": "houzz-products/53368714",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/246633757/xr",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "via": "houzz-products/54853427",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/258041269/z1",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "via": "houzz-products/54575801",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/258420355/ow",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "via": "houzz-products/53389033",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/246771094/5j",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "via": "houzz-products/54703059",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/258420898/is",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        }
+      ],
+      "noMatch": [
+        {
+          "path": "imageUrl",
+          "ivy": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/258420853/Screenshot_2"
+        },
+        {
+          "path": "imageUrl",
+          "ivy": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/257101731/zsl67_4728_A"
+        },
+        {
+          "path": "imageUrl",
+          "ivy": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/258556935/Belevedere_s"
+        },
+        {
+          "path": "imageUrl",
+          "ivy": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/262813664/Freight.jpg?"
+        },
+        {
+          "path": "imageUrl",
+          "ivy": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/262813648/fwvxm_sf_lic"
+        },
+        {
+          "path": "items[7].imageUrl",
+          "title": "Freight",
+          "ivy": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/262813664/Freight.jpg?"
+        },
+        {
+          "path": "items[0].imageUrl",
+          "title": "Soapstone Slab",
+          "ivy": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/258556935/Belevedere_s"
+        },
+        {
+          "path": "items[62].imageUrl",
+          "title": "HUDSON VALLEY LIGHTINGPlandome",
+          "ivy": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/257101731/zsl67_4728_A"
+        }
+      ]
+    }
+  }
+}
