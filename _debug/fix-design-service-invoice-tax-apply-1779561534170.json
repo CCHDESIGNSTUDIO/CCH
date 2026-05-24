@@ -1,0 +1,65 @@
+{
+  "boards": [
+    "cloud-rolling-hills"
+  ],
+  "updated": 7,
+  "log": [
+    {
+      "boardId": "cloud-rolling-hills",
+      "invoiceId": "17zvCe3CeU7fZIkkseGW",
+      "number": "IN-12902",
+      "oldTotal": 15835.187009999998,
+      "newTotal": 15433.35,
+      "delta": -401.84
+    },
+    {
+      "boardId": "cloud-rolling-hills",
+      "invoiceId": "IN-12976",
+      "number": "IN-12976",
+      "oldTotal": 0,
+      "newTotal": 2570,
+      "delta": 2570
+    },
+    {
+      "boardId": "cloud-rolling-hills",
+      "invoiceId": "IN-12977",
+      "number": "IN-12977",
+      "oldTotal": 0,
+      "newTotal": 6310,
+      "delta": 6310
+    },
+    {
+      "boardId": "cloud-rolling-hills",
+      "invoiceId": "IN-12978",
+      "number": "IN-12978",
+      "oldTotal": 0,
+      "newTotal": 2988.75,
+      "delta": 2988.75
+    },
+    {
+      "boardId": "cloud-rolling-hills",
+      "invoiceId": "TztTb3puQToRQouIWJlC",
+      "number": "INV-6030",
+      "oldTotal": 4717.5,
+      "newTotal": 4717.5,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-rolling-hills",
+      "invoiceId": "in-12929",
+      "number": "IN-12929",
+      "oldTotal": 6725,
+      "newTotal": 6725,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-rolling-hills",
+      "invoiceId": "in-12948",
+      "number": "IN-12948",
+      "oldTotal": 3722.5,
+      "newTotal": 3722.5,
+      "delta": 0
+    }
+  ],
+  "rules": "cch-invoice-tax-rules.js"
+}

@@ -1,0 +1,97 @@
+{
+  "patch": {
+    "items": [
+      {
+        "title": "Lakeview Signature",
+        "description": "16\"  Electric - Sides of house &  pool house",
+        "vendor": "Flambeaux",
+        "category": "Exterior",
+        "room": "",
+        "qty": 12,
+        "cost": 1010,
+        "markupPct": 0,
+        "shipping": 0,
+        "amount": 12120,
+        "taxable": true,
+        "imageUrl": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebasestorage.app/o/houzz-products%2F53036494%2F1.png?alt=media&token=fe2ac435-b386-4df5-998e-d997637f2942",
+        "images": [
+          "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebasestorage.app/o/houzz-products%2F53036494%2F1.png?alt=media&token=fe2ac435-b386-4df5-998e-d997637f2942"
+        ],
+        "houzzId": "53036494",
+        "lineNotes": "",
+        "_in12946TotalsFixedAt": "2026-05-23T17:50:40.180Z"
+      },
+      {
+        "title": "Lakeview Signature",
+        "description": "23\" Electric - Patio & Master bedroom / Side of Large garage\nManual Control\nD. Oxidation \nFlushmount with Copper Rear channel",
+        "vendor": "Flambeaux",
+        "category": "Exterior",
+        "room": "",
+        "qty": 7,
+        "cost": 1205,
+        "markupPct": 0,
+        "shipping": 0,
+        "amount": 8435,
+        "taxable": true,
+        "imageUrl": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebasestorage.app/o/houzz-products%2F53036494%2F1.png?alt=media&token=fe2ac435-b386-4df5-998e-d997637f2942",
+        "images": [
+          "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebasestorage.app/o/houzz-products%2F53036494%2F1.png?alt=media&token=fe2ac435-b386-4df5-998e-d997637f2942"
+        ],
+        "houzzId": "53036494",
+        "lineNotes": "",
+        "_in12946TotalsFixedAt": "2026-05-23T17:50:40.180Z"
+      },
+      {
+        "title": "Lakeview Signature",
+        "description": "23\" Gas   GARAGE & SIDE SCONCES @ ENTRY\nD.  Oxidation \nElectronic Igniter",
+        "vendor": "Flambeaux",
+        "category": "Exterior",
+        "room": "",
+        "qty": 8,
+        "cost": 1685,
+        "markupPct": 0,
+        "shipping": 0,
+        "amount": 13480,
+        "taxable": true,
+        "imageUrl": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebasestorage.app/o/houzz-products%2F53036494%2F1.png?alt=media&token=fe2ac435-b386-4df5-998e-d997637f2942",
+        "images": [
+          "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebasestorage.app/o/houzz-products%2F53036494%2F1.png?alt=media&token=fe2ac435-b386-4df5-998e-d997637f2942"
+        ],
+        "houzzId": "53036494",
+        "lineNotes": "",
+        "_in12946TotalsFixedAt": "2026-05-23T17:50:40.180Z"
+      },
+      {
+        "title": "Lakeview Signature",
+        "description": "27\" Gas - ENTRY \r\nElectronic Igniter \r\nDark Oxidation - Oil Rubbed Bronze (Very Close to Black) \r\nFlush Mount (With Copper Rear Channel)  USD\r\n\r\nCurrent Estimated Lead Time: 10-12 weeks",
+        "vendor": "Flambeaux",
+        "category": "Exterior",
+        "room": "",
+        "qty": 2,
+        "cost": 1985,
+        "markupPct": 0,
+        "shipping": 1500,
+        "amount": 3970,
+        "taxable": true,
+        "imageUrl": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebasestorage.app/o/houzz-products%2F53036494%2F1.png?alt=media&token=fe2ac435-b386-4df5-998e-d997637f2942",
+        "images": [
+          "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebasestorage.app/o/houzz-products%2F53036494%2F1.png?alt=media&token=fe2ac435-b386-4df5-998e-d997637f2942"
+        ],
+        "houzzId": "53036494",
+        "lineNotes": "",
+        "_in12946TotalsFixedAt": "2026-05-23T17:50:40.180Z"
+      }
+    ],
+    "total": 43115.48,
+    "paidAmount": 43115.48,
+    "invoiceBalance": 0,
+    "subtotal": 38005,
+    "shipping": 0,
+    "taxRate": 9.5,
+    "updatedAt": "2026-05-23T17:50:40.180Z",
+    "lastEditedAt": "2026-05-23T17:50:40.180Z",
+    "lastEditedBy": "fix-in12946-totals.js",
+    "_in12946TotalsFixedAt": "2026-05-23T17:50:40.180Z"
+  },
+  "computed": 43115.48
+}

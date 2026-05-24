@@ -1,0 +1,365 @@
+{
+  "dryRun": false,
+  "boards": [
+    "cloud-rolling-hills"
+  ],
+  "stats": {
+    "docsScanned": 414,
+    "docsUpdated": 50,
+    "itemsChecked": 725,
+    "itemsFixed": 109,
+    "alreadyOk": 487,
+    "noLibraryMatch": 129,
+    "libraryNoFirebase": 0,
+    "matchVia": {
+      "loose-title-vendor": 102,
+      "libraryProductId": 2,
+      "exact-title": 1,
+      "houzzId": 4
+    },
+    "byBoard": {
+      "cloud-rolling-hills": 109
+    },
+    "bySource": {
+      "boards/cloud-rolling-hills/clips": 42,
+      "boards/cloud-rolling-hills/invoices": 38,
+      "boards/cloud-rolling-hills/proposals": 29
+    },
+    "samples": {
+      "fixed": [
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "BOMBER GOOSENECK LIGHT",
+          "vendor": "Barn Electric",
+          "via": "loose-title-vendor → productLibrary/B67ldpbLZW8th7wya18k",
+          "old": "https://cdn.barnlight.com/images/thumbnails/475/475/detailed/48/b",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Maverick 52\" Ceiling Fan",
+          "vendor": "Visual Comfort",
+          "via": "loose-title-vendor → productLibrary/LCmDNGhkRiMNO0dY4AqK",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Bryant Large Tail Sconce",
+          "vendor": "Visual Comfort",
+          "via": "loose-title-vendor → productLibrary/46g2rH1ShvUMsKCXwou4",
+          "old": "https://images.visualcomfort.com/is/image/visualcomfortco/TOB2024",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Cone wall sconce",
+          "vendor": "Elu",
+          "via": "loose-title-vendor → productLibrary/0NeBtZfV95xK9tGqR0h0",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Drum buoy black with Chain 14\"",
+          "vendor": "Elu",
+          "via": "loose-title-vendor → productLibrary/232hKrPBHGfEzq9xyJWp",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "HUDSON VALLEY LIGHTINGPlandome",
+          "vendor": "Hudson Valley Lighting",
+          "via": "loose-title-vendor → productLibrary/JU9QjRN8uEgXhX9kXq3r",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Tailor Leather Dome Pendant",
+          "vendor": "Elu",
+          "via": "loose-title-vendor → productLibrary/PRpL1oYY4fvOSecb9QZ9",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "BOMBER GOOSENECK LIGHT",
+          "vendor": "Barn Electric",
+          "via": "loose-title-vendor → productLibrary/B67ldpbLZW8th7wya18k",
+          "old": "https://cdn.barnlight.com/images/thumbnails/475/475/detailed/48/b",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Hand-Blown Milk Glass Chandeliers",
+          "vendor": "Early Electrics",
+          "via": "loose-title-vendor → productLibrary/G1ReoduhAn7paKE3gDWH",
+          "old": "(empty)",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Tailor Leather Flush",
+          "vendor": "Elu",
+          "via": "loose-title-vendor → productLibrary/7fI1bHAydA2s16iA90Xy",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Anna Semi-Flush Mount",
+          "vendor": "Arteriors",
+          "via": "loose-title-vendor → products/93WNGh4hetTjLelYY9Xy",
+          "old": "(empty)",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Leather brass mini pendant shade",
+          "vendor": "Elu",
+          "via": "loose-title-vendor → productLibrary/JDleN3XryMSe4jJe0UP7",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "New Town Sconce | by Hubbardton Forge | 204260",
+          "vendor": "Hubbardton Forge",
+          "via": "loose-title-vendor → productLibrary/DCaHER9PyghbfjXGgCPY",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Saddle Cascade Two Tier Chandelier",
+          "vendor": "Elu",
+          "via": "libraryProductId → productLibrary/GFBglFUtkNNm8hVGYc3c",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Vale Sconce - Med.",
+          "vendor": "Elu",
+          "via": "loose-title-vendor → products/fCuSFel8iaMy8a7LO1dZ",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Vale Sconce - Single",
+          "vendor": "Elu",
+          "via": "loose-title-vendor → products/fCuSFel8iaMy8a7LO1dZ",
+          "old": "(empty)",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Vale - Metal and leather glass wall sconce",
+          "vendor": "no vendor",
+          "via": "loose-title-vendor → productLibrary/D6YXqyHGftHIUq4VIi56",
+          "old": "(empty)",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Selecta Long Sconce",
+          "vendor": "Signature Collection",
+          "via": "exact-title → productLibrary/3tVDLf4ZREF7SzCq2N3k",
+          "old": "https://images.visualcomfort.com/is/image/visualcomfortco/TOB2062",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "A customizable swing-arm sconce featuring our Grain Drum 14\"",
+          "vendor": "",
+          "via": "loose-title-vendor → productLibrary/IWtznE5DmOOgOFFNZzaN",
+          "old": "(empty)",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Railroad Platform Lamp",
+          "vendor": "Early Electrics",
+          "via": "loose-title-vendor → productLibrary/Mm896OBnlYNthVBAXald",
+          "old": "(empty)",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Deep Tented Milk Glass Pendent With Ornate Crown",
+          "vendor": "Early Electrics",
+          "via": "loose-title-vendor → productLibrary/9kbz7u5lKYk4pVVkzlRH",
+          "old": "(empty)",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Vale Lantern - Large Sconce",
+          "vendor": "Elu",
+          "via": "loose-title-vendor → productLibrary/8VrshiB0O2mnn5SqGNwm",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Saddle Pull Sconce",
+          "vendor": "Elu",
+          "via": "loose-title-vendor → products/HhpXa9znsyuIlTQ9z8l1",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Custom built to order.. This oak farm table is seen here in 132\" x",
+          "vendor": "1st Dibs",
+          "via": "loose-title-vendor → productLibrary/22ksCA4ssqUDv1xMylS6",
+          "old": "(empty)",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Double sconce, Bronze finish",
+          "vendor": "",
+          "via": "loose-title-vendor → productLibrary/2SemQMhMLIYWANOF7kNd",
+          "old": "(empty)",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        }
+      ],
+      "noMatch": [
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Aaron Wall Sconce",
+          "vendor": "Arteriors",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Prismatic Dish Sconce",
+          "vendor": "1st Dibs",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Saddle Ring Shade",
+          "vendor": "Elu",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Modern Farmhouse 54\" Single Wide Sink Vanity",
+          "vendor": "potterybarn",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Brantley Lantern",
+          "vendor": "Visual Comfort",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Simple Swing Arm Sconce",
+          "vendor": "Hubbardton Forge",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Vale Sq. Lantern",
+          "vendor": "Elu",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Malik Large Sconce",
+          "vendor": "Signature Collection",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Tailor Linen Strap",
+          "vendor": "Elu",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Soapstone Slab",
+          "vendor": "M.Teixeira",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "1908 Welsbach Gas Lamp",
+          "vendor": "Early Electrics",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Elsa Farm Table in White Oak, Built to Order by Petersen",
+          "vendor": "",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Freight",
+          "vendor": "Soapstone Sinks",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Black 52\" Maverick II Ceiling Fan",
+          "vendor": "Circa Lighting",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Material samples/Flooring/Tile",
+          "vendor": "",
+          "reason": "no-library-match"
+        }
+      ]
+    }
+  }
+}

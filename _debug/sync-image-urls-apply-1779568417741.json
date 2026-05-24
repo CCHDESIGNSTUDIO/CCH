@@ -1,0 +1,369 @@
+{
+  "dryRun": false,
+  "boards": [
+    "shimano-maverick-cir",
+    "holtz-hill"
+  ],
+  "stats": {
+    "docsScanned": 1279,
+    "docsUpdated": 356,
+    "itemsChecked": 2156,
+    "itemsFixed": 421,
+    "alreadyOk": 0,
+    "noLibraryMatch": 1735,
+    "libraryNoFirebase": 0,
+    "matchVia": {
+      "loose-title-vendor": 126,
+      "exact-title-vendor": 275,
+      "exact-title": 20
+    },
+    "byBoard": {
+      "shimano-maverick-cir": 384,
+      "holtz-hill": 37
+    },
+    "bySource": {
+      "boards/shimano-maverick-cir/clips": 328,
+      "boards/shimano-maverick-cir/invoices": 52,
+      "boards/shimano-maverick-cir/purchaseOrders": 4,
+      "boards/holtz-hill/clips": 15,
+      "boards/holtz-hill/invoices": 7,
+      "boards/holtz-hill/proposals": 15
+    },
+    "samples": {
+      "fixed": [
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "8 INCH COLLIERS PULL",
+          "vendor": "Restoration Hardware",
+          "via": "loose-title-vendor → products/1ig06xUzJrFCgyAhPWWn",
+          "old": "ymvkd_prod11060015_E69483665_F_RHR_cl401013.jpeg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "Dominica Large Rectangle Sconce",
+          "vendor": "Visual Comfort",
+          "via": "exact-title-vendor → products/6pTJu8V9TJ4TzwQvxIhk",
+          "old": "8tbij_arn2923galb_9.png",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "LAMBETH SMOOTH TOWEL RING",
+          "vendor": "Restoration Hardware",
+          "via": "exact-title-vendor → products/lambeth_smooth_towel_ring__restoration_hardware",
+          "old": "l776o_prod18940570_E213199626_TQ.jpeg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "Paloma Chandelier",
+          "vendor": "Arhaus",
+          "via": "exact-title-vendor → products/3AJtKSG1kh7LGntNjkeD",
+          "old": "zyp75_66594H622_E220901.jpeg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "LE MYTHE",
+          "vendor": "Arte",
+          "via": "exact-title-vendor → products/2vzhKNC0PfMoYLPeQgTu",
+          "old": "s39il_arte_fpg_12006_YOHMFe_full_pattern.jpeg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "Andros-Batik-Purple-om Tinted-Linen",
+          "vendor": "",
+          "via": "exact-title-vendor → products/CXDwIoJ5goF1zhLLl5WT",
+          "old": "4j6tq_medium.jpeg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "CHAMPEAUX PIVOTING FLUSHMOUNT",
+          "vendor": "Restoration Hardware",
+          "via": "exact-title-vendor → productLibrary/xwaeKbUzjpuygEq3xVOi",
+          "old": "cmbhb_prod21280365_E815513169_F_RHR.jpeg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "Indramayu-Reverse-Bali-Blu-on-White",
+          "vendor": "",
+          "via": "exact-title-vendor → products/l9CYwCKRoiB82SiUX1da",
+          "old": "qkfzq_medium.jpeg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "METAL FLOATING MIRROR",
+          "vendor": "Restoration Hardware",
+          "via": "exact-title-vendor → productLibrary/nfFN5Hcbht9CaBDZbriz",
+          "old": "xu643_prod28720125_E22819900496_F_RHR.jpeg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "Hanging Rectangle Mirror",
+          "vendor": "Regina Andrews",
+          "via": "exact-title-vendor → productLibrary/4yln87qhxKPkk1KUKHQo",
+          "old": "yezue_21_1046_Steel_1.jpeg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "Additional Rods- Cuff Mini Pendant",
+          "vendor": "Hubbardton Forge",
+          "via": "exact-title-vendor → products/TCYrinYOWglXT1ufkHmy",
+          "old": "cuff_mini.jpeg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "1 Inch LAMBETH KNURLED KNOB",
+          "vendor": "Restoration Hardware",
+          "via": "exact-title-vendor → products/1nls5UXaW6Al6HPtbYT7",
+          "old": "c7xz9_prod11060050_E49487132_F_RHR_cl401013.jpeg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "Sei Sheet Set - King",
+          "vendor": "Matteo Home",
+          "via": "exact-title-vendor → productLibrary/EI0ydH2EL5l4DZXUEJhl",
+          "old": "matteo-sheet-sets-04.jpg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "Riley Toilet Paper Holder",
+          "vendor": "Rejuvination",
+          "via": "loose-title-vendor → productLibrary/iNDbdJXumakI5RGJyYkG",
+          "old": "kjnkd_img120o.jpeg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "ROCK EDGE CHANDELIER",
+          "vendor": "John Pomp",
+          "via": "exact-title-vendor → products/BRTzd6zU6Wkl7NBfFMVJ",
+          "old": "kwu8k_31_JohnPomp_034.jpeg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "8 INCH URBAN PULL",
+          "vendor": "Ashley Norton",
+          "via": "loose-title-vendor → productLibrary/04F71DdAOFTowPSJayAu",
+          "old": "v97o4_MT0337_152_GSN.jpeg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "Lugano Carmel",
+          "vendor": "Coraggio",
+          "via": "loose-title-vendor → productLibrary/7kocdU8VLhcRpxDNdoEE",
+          "old": "kfev4_C98063.jpeg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "CLIVE COUNTER STOOL",
+          "vendor": "Industry West",
+          "via": "exact-title-vendor → products/IiivZAqKON2Qh8H3sVCQ",
+          "old": "ft7rq_20180813_iw_clive_h65_brsfrm_lbl_031_copy_2.jpeg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "Melbourne Bedside Chest",
+          "vendor": "Somerset Bay",
+          "via": "exact-title-vendor → productLibrary/nZ92GH2u9vKBKFkCa1aO",
+          "old": "nt9kn_SB232.jpeg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "Lulu-Stripe-Blue-on-White",
+          "vendor": "Quadrille",
+          "via": "exact-title-vendor → products/YRqi1R2rbZYINm4vOuna",
+          "old": "7sy2r_medium.jpeg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "Salong-Batik-Multi-Turquoise-New-Navy",
+          "vendor": "Quadrille",
+          "via": "exact-title-vendor → products/BrgwmyyKIpexOQa4UTI6",
+          "old": "37fm5_medium.jpeg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "LAMBETH KNURLED HOOK",
+          "vendor": "Restoration Hardware",
+          "via": "exact-title-vendor → productLibrary/COzlpyYbg8n0yQP0BcTL",
+          "old": "xhcug_prod10810135_E89432813_TQ_cl401013.jpeg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "Steele Swivel Bar Stool",
+          "vendor": "Antigua de Mexico",
+          "via": "exact-title-vendor → productLibrary/u8IhHTscaeePuDfVeJyf",
+          "old": "steele.jpg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "EVERLY OVERSIZED CHANDELIER",
+          "vendor": "Palecek",
+          "via": "exact-title-vendor → products/F8sYJwgqTPCs0ZIi8fu6",
+          "old": "z5648_2283_79a.jpeg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "Kediri-Batik-Purple-Lavender-Lilac",
+          "vendor": "Quadrille",
+          "via": "exact-title-vendor → products/XEWElB0zKfykARj70GnF",
+          "old": "6aisz_medium.jpeg",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        }
+      ],
+      "noMatch": [
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "CCH  Client Project Services  VH",
+          "vendor": "",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "T&E VH",
+          "vendor": "",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "Window Treatments",
+          "vendor": "Bartolo Window Treatment Designs",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "CCH  Client Project Services  VH",
+          "vendor": "",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "Lavali Emb - Coral/Sky",
+          "vendor": "KRAVET",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "Bartolo Hardware (copy)",
+          "vendor": "Bartolo Window Treatment Designs",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "Window Treatments",
+          "vendor": "Bartolo Window Treatment Designs",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "CCH Design Blended Services",
+          "vendor": "",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "CCH Admin",
+          "vendor": "",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "CCH Project Team Meetings",
+          "vendor": "",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "tar",
+          "vendor": "",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "CCH Design Concepts & Mood Boards",
+          "vendor": "",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "CCH Admin",
+          "vendor": "",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "RABANE",
+          "vendor": "Arte",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "shimano-maverick-cir",
+          "source": "boards/shimano-maverick-cir/clips",
+          "title": "CCH Project Team Meetings - VH",
+          "vendor": "",
+          "reason": "no-library-match"
+        }
+      ]
+    }
+  }
+}

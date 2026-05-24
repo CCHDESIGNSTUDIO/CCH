@@ -36,12 +36,22 @@
     'by room', 'by category', 'all rooms',
     'labor', 'labour', 'expense', 'expenses', 'services', 'service',
     'cch design service', 'cch design services', 'cch project management',
-    'custom labor', 'design services', 'blended design services', 'consultation',
-    'installation charges', 'freight', 'postage & printing', 'transaction fees',
-    'time billing', 'hourly', 'retainer', 'design fee', 'design fees',
+    'custom labor', 'design services', 'design service', 'blended design services', 'consultation',
+    'designer fee', 'designer fees', 'design fee', 'design fees', 'blended design fees',
+    'installation charges', 'installation', 'install', 'freight', 'freight charges', 'freight charge',
+    'postage & printing', 'transaction fees', 'pass-through', 'pass through',
+    'time billing', 'time track', 'time tracking', 'hourly', 'retainer',
     'cch admin', 'shipping', 'handling', 'sales tax', 'discount', 'other expense',
-    'professional services', 'project management', 'design fee - rates are already set in smart time'
+    'professional services', 'project management', 'design fee - rates are already set in smart time',
+    'uncategorized', 'etails', 'details', 'etail', 'retail', 'fee', 'fees', 'taxes'
   ]);
+
+  /** Billing / service labels — never show in Product Library or Selections category pickers. */
+  global.cchIsNonProductFfeCategory = function (label) {
+    var s = String(label || '').trim();
+    if (!s) return true;
+    return NOT_FFE_CATEGORY_LABEL.has(s.toLowerCase());
+  };
 
   /**
    * Master order first; then board-only custom categories (sorted).

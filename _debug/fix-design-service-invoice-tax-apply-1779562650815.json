@@ -1,0 +1,6747 @@
+{
+  "boards": [
+    "1489-cantera",
+    "31-whitesail",
+    "500-via-heirba",
+    "7225-bugletrail",
+    "860-woodland",
+    "974-debra-dr",
+    "_lib_designer",
+    "airosa-santa-barbara",
+    "aitken-130-cobblestone",
+    "aitken-aitken-cohn",
+    "anaheim-ducks-honda-center",
+    "ann-scarborough-sb",
+    "ashleigh-aitken",
+    "avalos-red-rock",
+    "beck-castle-rock-cir",
+    "borgatello-via-lara",
+    "bourdilion-goldenrod",
+    "bradbury-blue-bird",
+    "bradbury-high",
+    "bradbury-high-drive",
+    "brine-930-lilac",
+    "cameron-avenida-evita",
+    "cannon-perdido",
+    "cbh",
+    "cch",
+    "christal-cresta",
+    "cloud-huntington-beach",
+    "cloud-mustang",
+    "cloud-parker",
+    "cloud-rolling-hills",
+    "cloud-susan",
+    "cohen-culver",
+    "comrie-pelican-point",
+    "daniel",
+    "davis-carreterra-dr",
+    "day-2590-monaco-drive",
+    "derk-bixby-hills",
+    "derk-giralda-walk",
+    "dewell-sb",
+    "eikanas",
+    "elu-ranch",
+    "escalette-newport-ca",
+    "finkel-santa-barbara",
+    "galliardt-larkstone",
+    "gehret",
+    "gordon-anaheim-ca",
+    "graves-ocean-blvd",
+    "greene-de-anza",
+    "greene-hixson",
+    "haghighi-triumphal-way",
+    "harris-port-abbey",
+    "harrison",
+    "heiser-colgate-circle",
+    "helix",
+    "herbert-roxbury-road",
+    "hollister-ranch",
+    "holtz-hill",
+    "inspiration",
+    "jade-fernleaf-ave",
+    "james-david-custom-homes",
+    "johnny",
+    "justin-sierra-sienna",
+    "katke-graceland-dr",
+    "katke-nashville",
+    "katke-puerto-vallarta",
+    "kipp-lassetter-paradise-valley",
+    "kipp-lassetter-park-city",
+    "kron-alexandria-va",
+    "kruse-lido",
+    "lack-santa-barbara",
+    "land-glenwood",
+    "lassetter-scottsdale",
+    "lepak-rock-creek-ridge",
+    "linleigh-richker",
+    "lori-payne",
+    "manno-imperatrice",
+    "meats-on-ocean",
+    "mills",
+    "moelke-cypress-st",
+    "moneim-puro-way",
+    "morning-wood-dr",
+    "mumford-sharp-rd",
+    "narva-guest-house",
+    "nieves-3920-laguna-blanca-drive-sb",
+    "nikki-bentley",
+    "park-city",
+    "parsons-fairway",
+    "perkowshi-5-shoreline",
+    "polito-bvr",
+    "pulsifer-olympia",
+    "rayment-sleepy-hollow",
+    "renee-meadowbrook-drive",
+    "rodin-whidbey-dr",
+    "rosenthal-335-myrtle-st",
+    "sakioka-mountain-view",
+    "santoro",
+    "sargent-santa-monica",
+    "scarborough-139-claremont-long-beach",
+    "schneider-east-coast-hwy",
+    "schneider-michael",
+    "schwartz-via-ventana",
+    "shauna-cernovich",
+    "shimano-maverick-cir",
+    "shimano-westridge-lane",
+    "silverman-la-esperanza",
+    "skeen-greenleaf-way",
+    "smith-remodel",
+    "speciale",
+    "stapf",
+    "tate-calle-de-las-focas",
+    "test-import",
+    "valentine",
+    "velasco-2151-faust-ave",
+    "via-abrigada",
+    "villanueva",
+    "von-hummel",
+    "werline-shingletown",
+    "west-avalon",
+    "wiesinger",
+    "williams-santa-clarita",
+    "wolff",
+    "yoshi-378-loma-terrace",
+    "z-kelly-clark-magdalena-dr"
+  ],
+  "updated": 827,
+  "log": [
+    {
+      "boardId": "1489-cantera",
+      "invoiceId": "in-11587",
+      "number": "IN-11587",
+      "oldTotal": 843.75,
+      "newTotal": 843.75,
+      "delta": 0
+    },
+    {
+      "boardId": "1489-cantera",
+      "invoiceId": "in-11588",
+      "number": "IN-11588",
+      "oldTotal": 2475,
+      "newTotal": 2475,
+      "delta": 0
+    },
+    {
+      "boardId": "1489-cantera",
+      "invoiceId": "in-12267",
+      "number": "IN-12267",
+      "oldTotal": 1867.7,
+      "newTotal": 1867.7,
+      "delta": 0
+    },
+    {
+      "boardId": "7225-bugletrail",
+      "invoiceId": "IN-10076",
+      "number": "IN-10076",
+      "oldTotal": 78842.02,
+      "newTotal": 76961.22,
+      "delta": -1880.8
+    },
+    {
+      "boardId": "7225-bugletrail",
+      "invoiceId": "IN-10087",
+      "number": "IN-10087",
+      "oldTotal": 4160,
+      "newTotal": 4160,
+      "delta": 0
+    },
+    {
+      "boardId": "7225-bugletrail",
+      "invoiceId": "IN-10094",
+      "number": "IN-10094",
+      "oldTotal": 4412,
+      "newTotal": 4412,
+      "delta": 0
+    },
+    {
+      "boardId": "7225-bugletrail",
+      "invoiceId": "IN-10105",
+      "number": "IN-10105",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "7225-bugletrail",
+      "invoiceId": "IN-10107",
+      "number": "IN-10107",
+      "oldTotal": 349.49,
+      "newTotal": 349.49,
+      "delta": 0
+    },
+    {
+      "boardId": "7225-bugletrail",
+      "invoiceId": "IN-10115",
+      "number": "IN-10115",
+      "oldTotal": 3289.1300000000006,
+      "newTotal": 3177.13,
+      "delta": -112
+    },
+    {
+      "boardId": "7225-bugletrail",
+      "invoiceId": "IN-10128",
+      "number": "IN-10128",
+      "oldTotal": 7494.42,
+      "newTotal": 7075.51,
+      "delta": -418.91
+    },
+    {
+      "boardId": "7225-bugletrail",
+      "invoiceId": "IN-10129",
+      "number": "IN-10129",
+      "oldTotal": 1505.48,
+      "newTotal": 1505.48,
+      "delta": 0
+    },
+    {
+      "boardId": "7225-bugletrail",
+      "invoiceId": "IN-10131",
+      "number": "IN-10131",
+      "oldTotal": 4876.25,
+      "newTotal": 4876.25,
+      "delta": 0
+    },
+    {
+      "boardId": "7225-bugletrail",
+      "invoiceId": "IN-10132",
+      "number": "IN-10132",
+      "oldTotal": 416.21,
+      "newTotal": 315.11,
+      "delta": -101.1
+    },
+    {
+      "boardId": "7225-bugletrail",
+      "invoiceId": "IN-10143",
+      "number": "IN-10143",
+      "oldTotal": 2720.63,
+      "newTotal": 2720.89,
+      "delta": 0.26
+    },
+    {
+      "boardId": "7225-bugletrail",
+      "invoiceId": "IN-10163",
+      "number": "IN-10163",
+      "oldTotal": 4620.6,
+      "newTotal": 4620.6,
+      "delta": 0
+    },
+    {
+      "boardId": "7225-bugletrail",
+      "invoiceId": "IN-10165",
+      "number": "IN-10165",
+      "oldTotal": 1838.7,
+      "newTotal": 1838.7,
+      "delta": 0
+    },
+    {
+      "boardId": "7225-bugletrail",
+      "invoiceId": "ULGDbBp3Xq8rflVzqL7e",
+      "number": "INV-6028",
+      "oldTotal": 2316.2500000000005,
+      "newTotal": 2286.25,
+      "delta": -30
+    },
+    {
+      "boardId": "860-woodland",
+      "invoiceId": "in-11943",
+      "number": "IN-11943",
+      "oldTotal": 12113.75,
+      "newTotal": 12113.75,
+      "delta": 0
+    },
+    {
+      "boardId": "airosa-santa-barbara",
+      "invoiceId": "IN-10031",
+      "number": "IN-10031",
+      "oldTotal": 9920,
+      "newTotal": 9975,
+      "delta": 55
+    },
+    {
+      "boardId": "airosa-santa-barbara",
+      "invoiceId": "IN-10032",
+      "number": "IN-10032",
+      "oldTotal": 2555,
+      "newTotal": 2555,
+      "delta": 0
+    },
+    {
+      "boardId": "aitken-130-cobblestone",
+      "invoiceId": "in-10326",
+      "number": "IN-10326",
+      "oldTotal": 2738.75,
+      "newTotal": 2738.75,
+      "delta": 0
+    },
+    {
+      "boardId": "aitken-130-cobblestone",
+      "invoiceId": "in-12770",
+      "number": "IN-12770",
+      "oldTotal": 7557.5,
+      "newTotal": 7557.5,
+      "delta": 0
+    },
+    {
+      "boardId": "aitken-130-cobblestone",
+      "invoiceId": "in-12827",
+      "number": "IN-12827",
+      "oldTotal": 1068.75,
+      "newTotal": 1068.75,
+      "delta": 0
+    },
+    {
+      "boardId": "aitken-aitken-cohn",
+      "invoiceId": "in-10433",
+      "number": "IN-10433",
+      "oldTotal": 5310,
+      "newTotal": 5310,
+      "delta": 0
+    },
+    {
+      "boardId": "aitken-aitken-cohn",
+      "invoiceId": "in-10911",
+      "number": "IN-10911",
+      "oldTotal": 4365.78,
+      "newTotal": 4365.78,
+      "delta": 0
+    },
+    {
+      "boardId": "aitken-aitken-cohn",
+      "invoiceId": "in-11071",
+      "number": "IN-11071",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "aitken-aitken-cohn",
+      "invoiceId": "in-11304",
+      "number": "IN-11304",
+      "oldTotal": 1993.87,
+      "newTotal": 1993.87,
+      "delta": 0
+    },
+    {
+      "boardId": "aitken-aitken-cohn",
+      "invoiceId": "in-11309",
+      "number": "IN-11309",
+      "oldTotal": 5777.5,
+      "newTotal": 5777.5,
+      "delta": 0
+    },
+    {
+      "boardId": "ann-scarborough-sb",
+      "invoiceId": "in-12417",
+      "number": "IN-12417",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "ashleigh-aitken",
+      "invoiceId": "in-11409",
+      "number": "IN-11409",
+      "oldTotal": 831.25,
+      "newTotal": 831.25,
+      "delta": 0
+    },
+    {
+      "boardId": "beck-castle-rock-cir",
+      "invoiceId": "in-11095",
+      "number": "IN-11095",
+      "oldTotal": 437.5,
+      "newTotal": 437.5,
+      "delta": 0
+    },
+    {
+      "boardId": "beck-castle-rock-cir",
+      "invoiceId": "in-11096",
+      "number": "IN-11096",
+      "oldTotal": 782.5,
+      "newTotal": 782.5,
+      "delta": 0
+    },
+    {
+      "boardId": "beck-castle-rock-cir",
+      "invoiceId": "in-11483",
+      "number": "IN-11483",
+      "oldTotal": 760,
+      "newTotal": 760,
+      "delta": 0
+    },
+    {
+      "boardId": "beck-castle-rock-cir",
+      "invoiceId": "in-11484",
+      "number": "IN-11484",
+      "oldTotal": 250,
+      "newTotal": 250,
+      "delta": 0
+    },
+    {
+      "boardId": "beck-castle-rock-cir",
+      "invoiceId": "in-11752",
+      "number": "IN-11752",
+      "oldTotal": 1195,
+      "newTotal": 1195,
+      "delta": 0
+    },
+    {
+      "boardId": "beck-castle-rock-cir",
+      "invoiceId": "in-11806",
+      "number": "IN-11806",
+      "oldTotal": 892.5,
+      "newTotal": 892.5,
+      "delta": 0
+    },
+    {
+      "boardId": "beck-castle-rock-cir",
+      "invoiceId": "in-11859",
+      "number": "IN-11859",
+      "oldTotal": 1093.75,
+      "newTotal": 1093.75,
+      "delta": 0
+    },
+    {
+      "boardId": "bourdilion-goldenrod",
+      "invoiceId": "in-10437",
+      "number": "IN-10437",
+      "oldTotal": 521.25,
+      "newTotal": 521.25,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-blue-bird",
+      "invoiceId": "in-10003",
+      "number": "IN-10003",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-blue-bird",
+      "invoiceId": "in-10102",
+      "number": "IN-10102",
+      "oldTotal": 1912.5,
+      "newTotal": 1912.5,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-blue-bird",
+      "invoiceId": "in-10110",
+      "number": "IN-10110",
+      "oldTotal": 887.5,
+      "newTotal": 887.5,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-blue-bird",
+      "invoiceId": "in-10114",
+      "number": "IN-10114",
+      "oldTotal": 1706.25,
+      "newTotal": 1706.25,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-blue-bird",
+      "invoiceId": "in-10155",
+      "number": "IN-10155",
+      "oldTotal": 1995,
+      "newTotal": 1995,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-blue-bird",
+      "invoiceId": "in-10258",
+      "number": "IN-10258",
+      "oldTotal": 1611.25,
+      "newTotal": 1611.25,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-blue-bird",
+      "invoiceId": "in-10259",
+      "number": "IN-10259",
+      "oldTotal": 1478.75,
+      "newTotal": 1478.75,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-blue-bird",
+      "invoiceId": "in-10260",
+      "number": "IN-10260",
+      "oldTotal": 1987.5,
+      "newTotal": 1987.5,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-blue-bird",
+      "invoiceId": "in-10317",
+      "number": "IN-10317",
+      "oldTotal": 1846.25,
+      "newTotal": 1846.25,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-blue-bird",
+      "invoiceId": "in-10318",
+      "number": "IN-10318",
+      "oldTotal": 5097.5,
+      "newTotal": 5097.5,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-blue-bird",
+      "invoiceId": "in-10336",
+      "number": "IN-10336",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-blue-bird",
+      "invoiceId": "in-103960",
+      "number": "IN-103960",
+      "oldTotal": 1197.5,
+      "newTotal": 1197.5,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-blue-bird",
+      "invoiceId": "in-10556",
+      "number": "IN-10556",
+      "oldTotal": 297.5,
+      "newTotal": 297.5,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-high-drive",
+      "invoiceId": "in-11153",
+      "number": "IN-11153",
+      "oldTotal": 631.25,
+      "newTotal": 631.25,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-high-drive",
+      "invoiceId": "in-12130",
+      "number": "IN-12130",
+      "oldTotal": 3135,
+      "newTotal": 3135,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-high-drive",
+      "invoiceId": "in-12176",
+      "number": "IN-12176",
+      "oldTotal": 1852.5,
+      "newTotal": 1852.5,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-high-drive",
+      "invoiceId": "in-12307",
+      "number": "IN-12307",
+      "oldTotal": 123.75,
+      "newTotal": 123.75,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-high-drive",
+      "invoiceId": "in-12308",
+      "number": "IN-12308",
+      "oldTotal": 437.5,
+      "newTotal": 437.5,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-high-drive",
+      "invoiceId": "in-12309",
+      "number": "IN-12309",
+      "oldTotal": 357.5,
+      "newTotal": 357.5,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-high-drive",
+      "invoiceId": "in-12310",
+      "number": "IN-12310",
+      "oldTotal": 376.25,
+      "newTotal": 376.25,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-high-drive",
+      "invoiceId": "in-12325",
+      "number": "IN-12325",
+      "oldTotal": 226.25,
+      "newTotal": 226.25,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-high-drive",
+      "invoiceId": "in-12354",
+      "number": "IN-12354",
+      "oldTotal": 68.75,
+      "newTotal": 68.75,
+      "delta": 0
+    },
+    {
+      "boardId": "bradbury-high-drive",
+      "invoiceId": "in-12432",
+      "number": "IN-12432",
+      "oldTotal": 440.28,
+      "newTotal": 440.28,
+      "delta": 0
+    },
+    {
+      "boardId": "brine-930-lilac",
+      "invoiceId": "in-11694",
+      "number": "IN-11694",
+      "oldTotal": 7348.75,
+      "newTotal": 7348.75,
+      "delta": 0
+    },
+    {
+      "boardId": "cameron-avenida-evita",
+      "invoiceId": "in-11609",
+      "number": "IN-11609",
+      "oldTotal": 1220,
+      "newTotal": 1220,
+      "delta": 0
+    },
+    {
+      "boardId": "cameron-avenida-evita",
+      "invoiceId": "in-11640",
+      "number": "IN-11640",
+      "oldTotal": 2898.75,
+      "newTotal": 2898.75,
+      "delta": 0
+    },
+    {
+      "boardId": "cameron-avenida-evita",
+      "invoiceId": "in-11669",
+      "number": "IN-11669",
+      "oldTotal": 1778.93,
+      "newTotal": 1778.93,
+      "delta": 0
+    },
+    {
+      "boardId": "cameron-avenida-evita",
+      "invoiceId": "in-11692",
+      "number": "IN-11692",
+      "oldTotal": 2700,
+      "newTotal": 2700,
+      "delta": 0
+    },
+    {
+      "boardId": "cameron-avenida-evita",
+      "invoiceId": "in-11735",
+      "number": "IN-11735",
+      "oldTotal": 2457.5,
+      "newTotal": 2457.5,
+      "delta": 0
+    },
+    {
+      "boardId": "cameron-avenida-evita",
+      "invoiceId": "in-11749",
+      "number": "IN-11749",
+      "oldTotal": 420,
+      "newTotal": 420,
+      "delta": 0
+    },
+    {
+      "boardId": "cameron-avenida-evita",
+      "invoiceId": "in-11750",
+      "number": "IN-11750",
+      "oldTotal": 878.75,
+      "newTotal": 878.75,
+      "delta": 0
+    },
+    {
+      "boardId": "cannon-perdido",
+      "invoiceId": "in-11310",
+      "number": "IN-11310",
+      "oldTotal": 4936.25,
+      "newTotal": 4936.25,
+      "delta": 0
+    },
+    {
+      "boardId": "cannon-perdido",
+      "invoiceId": "in-11337",
+      "number": "IN-11337",
+      "oldTotal": 2421.25,
+      "newTotal": 2421.25,
+      "delta": 0
+    },
+    {
+      "boardId": "cannon-perdido",
+      "invoiceId": "in-11388",
+      "number": "IN-11388",
+      "oldTotal": 1683.75,
+      "newTotal": 1683.75,
+      "delta": 0
+    },
+    {
+      "boardId": "cannon-perdido",
+      "invoiceId": "in-11427",
+      "number": "IN-11427",
+      "oldTotal": 1132.5,
+      "newTotal": 1132.5,
+      "delta": 0
+    },
+    {
+      "boardId": "cch",
+      "invoiceId": "in-11717",
+      "number": "IN-11717",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "christal-cresta",
+      "invoiceId": "in-11777",
+      "number": "IN-11777",
+      "oldTotal": 2500,
+      "newTotal": 2500,
+      "delta": 0
+    },
+    {
+      "boardId": "christal-cresta",
+      "invoiceId": "in-12026",
+      "number": "IN-12026",
+      "oldTotal": 2911.25,
+      "newTotal": 2911.25,
+      "delta": 0
+    },
+    {
+      "boardId": "christal-cresta",
+      "invoiceId": "in-12027",
+      "number": "IN-12027",
+      "oldTotal": 5948.75,
+      "newTotal": 5948.75,
+      "delta": 0
+    },
+    {
+      "boardId": "christal-cresta",
+      "invoiceId": "in-12028",
+      "number": "IN-12028",
+      "oldTotal": 2782.25,
+      "newTotal": 2782.25,
+      "delta": 0
+    },
+    {
+      "boardId": "christal-cresta",
+      "invoiceId": "in-12029",
+      "number": "IN-12029",
+      "oldTotal": 4818.75,
+      "newTotal": 4818.75,
+      "delta": 0
+    },
+    {
+      "boardId": "christal-cresta",
+      "invoiceId": "in-12030",
+      "number": "IN-12030",
+      "oldTotal": 3566.25,
+      "newTotal": 3566.25,
+      "delta": 0
+    },
+    {
+      "boardId": "christal-cresta",
+      "invoiceId": "in-12031",
+      "number": "IN-12031",
+      "oldTotal": 5627.5,
+      "newTotal": 7127.5,
+      "delta": 1500
+    },
+    {
+      "boardId": "christal-cresta",
+      "invoiceId": "in-12032",
+      "number": "IN-12032",
+      "oldTotal": 2173.75,
+      "newTotal": 2173.75,
+      "delta": 0
+    },
+    {
+      "boardId": "christal-cresta",
+      "invoiceId": "in-12136",
+      "number": "IN-12136",
+      "oldTotal": 741.25,
+      "newTotal": 741.25,
+      "delta": 0
+    },
+    {
+      "boardId": "christal-cresta",
+      "invoiceId": "in-12192",
+      "number": "IN-12192",
+      "oldTotal": 1.46,
+      "newTotal": 1.46,
+      "delta": 0
+    },
+    {
+      "boardId": "christal-cresta",
+      "invoiceId": "in-12367",
+      "number": "IN-12367",
+      "oldTotal": 708.75,
+      "newTotal": 708.75,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-huntington-beach",
+      "invoiceId": "in-12006",
+      "number": "IN-12006",
+      "oldTotal": 4934.28,
+      "newTotal": 4936.56,
+      "delta": 2.28
+    },
+    {
+      "boardId": "cloud-huntington-beach",
+      "invoiceId": "in-12053",
+      "number": "IN-12053",
+      "oldTotal": 3075,
+      "newTotal": 3075,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-huntington-beach",
+      "invoiceId": "in-12122",
+      "number": "IN-12122",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-huntington-beach",
+      "invoiceId": "in-12133",
+      "number": "IN-12133",
+      "oldTotal": 733.75,
+      "newTotal": 733.75,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-huntington-beach",
+      "invoiceId": "in-12253",
+      "number": "IN-12253",
+      "oldTotal": 0,
+      "newTotal": 45,
+      "delta": 45
+    },
+    {
+      "boardId": "cloud-huntington-beach",
+      "invoiceId": "in-12437",
+      "number": "IN-12437",
+      "oldTotal": 608.75,
+      "newTotal": 608.75,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-11003",
+      "number": "IN-11003",
+      "oldTotal": 788.75,
+      "newTotal": 788.75,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-11100",
+      "number": "IN-11100",
+      "oldTotal": 1292.5,
+      "newTotal": 1292.5,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-11140",
+      "number": "IN-11140",
+      "oldTotal": 232.25,
+      "newTotal": 232.25,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-11193",
+      "number": "IN-11193",
+      "oldTotal": 196.56,
+      "newTotal": 196.56,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-11241",
+      "number": "IN-11241",
+      "oldTotal": 274.75,
+      "newTotal": 274.75,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-11257",
+      "number": "IN-11257",
+      "oldTotal": 1425,
+      "newTotal": 1425,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-11283",
+      "number": "IN-11283",
+      "oldTotal": 1186.25,
+      "newTotal": 1186.25,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-11599",
+      "number": "IN-11599",
+      "oldTotal": 1558.75,
+      "newTotal": 1558.75,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-11712",
+      "number": "IN-11712",
+      "oldTotal": 4143.75,
+      "newTotal": 4143.75,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-11918",
+      "number": "IN-11918",
+      "oldTotal": 2312.6,
+      "newTotal": 2312.6,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-119400",
+      "number": "IN-119400",
+      "oldTotal": 1642.5,
+      "newTotal": 1642.5,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-12093",
+      "number": "IN-12093",
+      "oldTotal": 1310.44,
+      "newTotal": 1310.44,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-12132",
+      "number": "IN-12132",
+      "oldTotal": 532.5,
+      "newTotal": 532.5,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-12177",
+      "number": "IN-12177",
+      "oldTotal": 0,
+      "newTotal": 255,
+      "delta": 255
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-12179",
+      "number": "IN-12179",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-12180",
+      "number": "IN-12180",
+      "oldTotal": 3303.75,
+      "newTotal": 3303.75,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-12181",
+      "number": "IN-12181",
+      "oldTotal": 830,
+      "newTotal": 830,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-12274",
+      "number": "IN-12274",
+      "oldTotal": 3413.75,
+      "newTotal": 3413.75,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-12438",
+      "number": "IN-12438",
+      "oldTotal": 1411.35,
+      "newTotal": 1411.35,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-12854",
+      "number": "IN-12854",
+      "oldTotal": 4471.29,
+      "newTotal": 4307.09,
+      "delta": -164.2
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-12943",
+      "number": "IN-12943",
+      "oldTotal": 2111.25,
+      "newTotal": 2111.25,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-12944",
+      "number": "IN-12944",
+      "oldTotal": 450,
+      "newTotal": 450,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-mustang",
+      "invoiceId": "in-12945",
+      "number": "IN-12945",
+      "oldTotal": 822.5,
+      "newTotal": 822.5,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-11949",
+      "number": "IN-11949",
+      "oldTotal": 12200,
+      "newTotal": 12200,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12055",
+      "number": "IN-12055",
+      "oldTotal": 8723.75,
+      "newTotal": 8723.75,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12056",
+      "number": "IN-12056",
+      "oldTotal": 6287.5,
+      "newTotal": 6287.5,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12202",
+      "number": "IN-12202",
+      "oldTotal": 1343.75,
+      "newTotal": 1343.75,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12272",
+      "number": "IN-12272",
+      "oldTotal": 1847.5,
+      "newTotal": 1847.5,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12391",
+      "number": "IN-12391",
+      "oldTotal": 5368.75,
+      "newTotal": 5368.75,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12466",
+      "number": "IN-12466",
+      "oldTotal": 16750,
+      "newTotal": 16750,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12570",
+      "number": "IN-12570",
+      "oldTotal": 5000,
+      "newTotal": 5000,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12571",
+      "number": "IN-12571",
+      "oldTotal": 5297.45,
+      "newTotal": 5297.45,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12572",
+      "number": "IN-12572",
+      "oldTotal": 6796.25,
+      "newTotal": 6796.25,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12573",
+      "number": "IN-12573",
+      "oldTotal": 5637.5,
+      "newTotal": 5637.5,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12623",
+      "number": "IN-12623",
+      "oldTotal": 2597.5,
+      "newTotal": 2597.5,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12643",
+      "number": "IN-12643",
+      "oldTotal": 3080,
+      "newTotal": 3080,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12644",
+      "number": "IN-12644",
+      "oldTotal": 911.25,
+      "newTotal": 911.25,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12645",
+      "number": "IN-12645",
+      "oldTotal": 3655,
+      "newTotal": 3655,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12659",
+      "number": "IN-12659",
+      "oldTotal": 4297.5,
+      "newTotal": 4297.5,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12741",
+      "number": "IN-12741",
+      "oldTotal": 6262.5,
+      "newTotal": 6262.5,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12767",
+      "number": "IN-12767",
+      "oldTotal": 5995,
+      "newTotal": 5995,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12768",
+      "number": "IN-12768",
+      "oldTotal": 5940,
+      "newTotal": 5940,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12769",
+      "number": "IN-12769",
+      "oldTotal": 4241.25,
+      "newTotal": 4241.25,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12782",
+      "number": "IN-12782",
+      "oldTotal": 6494,
+      "newTotal": 6494,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12783",
+      "number": "IN-12783",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12790",
+      "number": "IN-12790",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12802",
+      "number": "IN-12802",
+      "oldTotal": 4790,
+      "newTotal": 4790,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12803",
+      "number": "IN-12803",
+      "oldTotal": 4702.5,
+      "newTotal": 4702.5,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12810",
+      "number": "IN-12810",
+      "oldTotal": 25169.51,
+      "newTotal": 20104.01,
+      "delta": -5065.5
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12811",
+      "number": "IN-12811",
+      "oldTotal": 36915,
+      "newTotal": 29732,
+      "delta": -7183
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12819",
+      "number": "IN-12819",
+      "oldTotal": 4436.25,
+      "newTotal": 4436.25,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12826",
+      "number": "IN-12826",
+      "oldTotal": 2523.75,
+      "newTotal": 2523.75,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12836",
+      "number": "IN-12836",
+      "oldTotal": 2901.25,
+      "newTotal": 2901.25,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12842",
+      "number": "IN-12842",
+      "oldTotal": 742.5,
+      "newTotal": 742.5,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12853",
+      "number": "IN-12853",
+      "oldTotal": 2927.76,
+      "newTotal": 3228.9,
+      "delta": 301.14
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12857",
+      "number": "IN-12857",
+      "oldTotal": 3500,
+      "newTotal": 7000,
+      "delta": 3500
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12862",
+      "number": "IN-12862",
+      "oldTotal": 5278.75,
+      "newTotal": 5278.75,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12880",
+      "number": "IN-12880",
+      "oldTotal": 2403.75,
+      "newTotal": 2403.75,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12888",
+      "number": "IN-12888",
+      "oldTotal": 1200,
+      "newTotal": 1200,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12891",
+      "number": "IN-12891",
+      "oldTotal": 969.37,
+      "newTotal": 1309.74,
+      "delta": 340.37
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12912",
+      "number": "IN-12912",
+      "oldTotal": 768.75,
+      "newTotal": 768.75,
+      "delta": 0
+    },
+    {
+      "boardId": "cloud-parker",
+      "invoiceId": "in-12933",
+      "number": "IN-12933",
+      "oldTotal": 1613.75,
+      "newTotal": 1613.75,
+      "delta": 0
+    },
+    {
+      "boardId": "cohen-culver",
+      "invoiceId": "in-11219",
+      "number": "IN-11219",
+      "oldTotal": 1508.75,
+      "newTotal": 1508.75,
+      "delta": 0
+    },
+    {
+      "boardId": "cohen-culver",
+      "invoiceId": "in-11220",
+      "number": "IN-11220",
+      "oldTotal": 368.75,
+      "newTotal": 368.75,
+      "delta": 0
+    },
+    {
+      "boardId": "comrie-pelican-point",
+      "invoiceId": "in-11272",
+      "number": "IN-11272",
+      "oldTotal": 1500,
+      "newTotal": 1500,
+      "delta": 0
+    },
+    {
+      "boardId": "daniel",
+      "invoiceId": "in-11956",
+      "number": "IN-11956",
+      "oldTotal": 3625,
+      "newTotal": 3625,
+      "delta": 0
+    },
+    {
+      "boardId": "daniel",
+      "invoiceId": "in-11960",
+      "number": "IN-11960",
+      "oldTotal": 3300,
+      "newTotal": 3300,
+      "delta": 0
+    },
+    {
+      "boardId": "davis-carreterra-dr",
+      "invoiceId": "IN-10062",
+      "number": "IN-10062",
+      "oldTotal": 867.5,
+      "newTotal": 867.5,
+      "delta": 0
+    },
+    {
+      "boardId": "davis-carreterra-dr",
+      "invoiceId": "IN-10066",
+      "number": "IN-10066",
+      "oldTotal": 1931.25,
+      "newTotal": 1931.25,
+      "delta": 0
+    },
+    {
+      "boardId": "davis-carreterra-dr",
+      "invoiceId": "IN-10070",
+      "number": "IN-10070",
+      "oldTotal": 868.75,
+      "newTotal": 868.75,
+      "delta": 0
+    },
+    {
+      "boardId": "davis-carreterra-dr",
+      "invoiceId": "IN-10083",
+      "number": "IN-10083",
+      "oldTotal": 898.75,
+      "newTotal": 898.75,
+      "delta": 0
+    },
+    {
+      "boardId": "davis-carreterra-dr",
+      "invoiceId": "IN-10085",
+      "number": "IN-10085",
+      "oldTotal": 1175,
+      "newTotal": 1175,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-10016",
+      "number": "IN-10016",
+      "oldTotal": 1362.5,
+      "newTotal": 1362.5,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-10044",
+      "number": "IN-10044",
+      "oldTotal": 518.75,
+      "newTotal": 518.75,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-10125",
+      "number": "IN-10125",
+      "oldTotal": 297.5,
+      "newTotal": 297.5,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-10173",
+      "number": "IN-10173",
+      "oldTotal": 688.75,
+      "newTotal": 688.75,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-10817",
+      "number": "IN-10817",
+      "oldTotal": 1649.05,
+      "newTotal": 1649.05,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-10843",
+      "number": "IN-10843",
+      "oldTotal": 365,
+      "newTotal": 365,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-10881",
+      "number": "IN-10881",
+      "oldTotal": 219.6,
+      "newTotal": 219.6,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-10906",
+      "number": "IN-10906",
+      "oldTotal": 125.1,
+      "newTotal": 125.1,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-10982",
+      "number": "IN-10982",
+      "oldTotal": 1063.75,
+      "newTotal": 1063.75,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-11018",
+      "number": "IN-11018",
+      "oldTotal": 260,
+      "newTotal": 260,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-11090",
+      "number": "IN-11090",
+      "oldTotal": 262.5,
+      "newTotal": 262.5,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-11091",
+      "number": "IN-11091",
+      "oldTotal": 75,
+      "newTotal": 75,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-11162",
+      "number": "IN-11162",
+      "oldTotal": 112.5,
+      "newTotal": 112.5,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-11924",
+      "number": "IN-11924",
+      "oldTotal": 1143.75,
+      "newTotal": 1143.75,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-12018",
+      "number": "IN-12018",
+      "oldTotal": 173.75,
+      "newTotal": 173.75,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-12019",
+      "number": "IN-12019",
+      "oldTotal": 171.25,
+      "newTotal": 171.25,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-12063",
+      "number": "IN-12063",
+      "oldTotal": 906.5,
+      "newTotal": 906.5,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-12095",
+      "number": "IN-12095",
+      "oldTotal": 989.4,
+      "newTotal": 989.4,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-12143",
+      "number": "IN-12143",
+      "oldTotal": 188.75,
+      "newTotal": 188.75,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-12162",
+      "number": "IN-12162",
+      "oldTotal": 122.5,
+      "newTotal": 122.5,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-12209",
+      "number": "IN-12209",
+      "oldTotal": 163.75,
+      "newTotal": 163.75,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-12402",
+      "number": "IN-12402",
+      "oldTotal": 130,
+      "newTotal": 130,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-12461",
+      "number": "IN-12461",
+      "oldTotal": 259.34,
+      "newTotal": 290.72,
+      "delta": 31.38
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-12682",
+      "number": "IN-12682",
+      "oldTotal": 727.5,
+      "newTotal": 727.5,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-12716",
+      "number": "IN-12716",
+      "oldTotal": 550,
+      "newTotal": 550,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-12882",
+      "number": "IN-12882",
+      "oldTotal": 660,
+      "newTotal": 660,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-12889",
+      "number": "IN-12889",
+      "oldTotal": 3328.92,
+      "newTotal": 3328.92,
+      "delta": 0
+    },
+    {
+      "boardId": "day-2590-monaco-drive",
+      "invoiceId": "in-12911",
+      "number": "IN-12911",
+      "oldTotal": 1631.25,
+      "newTotal": 1631.25,
+      "delta": 0
+    },
+    {
+      "boardId": "derk-bixby-hills",
+      "invoiceId": "in-11285",
+      "number": "IN-11285",
+      "oldTotal": 2878.75,
+      "newTotal": 2878.75,
+      "delta": 0
+    },
+    {
+      "boardId": "derk-bixby-hills",
+      "invoiceId": "in-11341",
+      "number": "IN-11341",
+      "oldTotal": 1438.75,
+      "newTotal": 1438.75,
+      "delta": 0
+    },
+    {
+      "boardId": "derk-bixby-hills",
+      "invoiceId": "in-11359",
+      "number": "IN-11359",
+      "oldTotal": 1875,
+      "newTotal": 1875,
+      "delta": 0
+    },
+    {
+      "boardId": "derk-giralda-walk",
+      "invoiceId": "in-11509",
+      "number": "IN-11509",
+      "oldTotal": 1347.5,
+      "newTotal": 1347.5,
+      "delta": 0
+    },
+    {
+      "boardId": "derk-giralda-walk",
+      "invoiceId": "in-11511",
+      "number": "IN-11511",
+      "oldTotal": 1593.75,
+      "newTotal": 1593.75,
+      "delta": 0
+    },
+    {
+      "boardId": "derk-giralda-walk",
+      "invoiceId": "in-11530",
+      "number": "IN-11530",
+      "oldTotal": 2526.25,
+      "newTotal": 2526.25,
+      "delta": 0
+    },
+    {
+      "boardId": "derk-giralda-walk",
+      "invoiceId": "in-11597",
+      "number": "IN-11597",
+      "oldTotal": 1510,
+      "newTotal": 1510,
+      "delta": 0
+    },
+    {
+      "boardId": "derk-giralda-walk",
+      "invoiceId": "in-11616",
+      "number": "IN-11616",
+      "oldTotal": 2686.75,
+      "newTotal": 2686.75,
+      "delta": 0
+    },
+    {
+      "boardId": "derk-giralda-walk",
+      "invoiceId": "in-11628",
+      "number": "IN-11628",
+      "oldTotal": 23.97,
+      "newTotal": 23.97,
+      "delta": 0
+    },
+    {
+      "boardId": "derk-giralda-walk",
+      "invoiceId": "in-11653",
+      "number": "IN-11653",
+      "oldTotal": 2300,
+      "newTotal": 2300,
+      "delta": 0
+    },
+    {
+      "boardId": "derk-giralda-walk",
+      "invoiceId": "in-11792",
+      "number": "IN-11792",
+      "oldTotal": 382.5,
+      "newTotal": 382.5,
+      "delta": 0
+    },
+    {
+      "boardId": "derk-giralda-walk",
+      "invoiceId": "in-11803",
+      "number": "IN-11803",
+      "oldTotal": 1002.5,
+      "newTotal": 1002.5,
+      "delta": 0
+    },
+    {
+      "boardId": "derk-giralda-walk",
+      "invoiceId": "in-11860",
+      "number": "IN-11860",
+      "oldTotal": 4252,
+      "newTotal": 4252,
+      "delta": 0
+    },
+    {
+      "boardId": "derk-giralda-walk",
+      "invoiceId": "in-11875",
+      "number": "IN-11875",
+      "oldTotal": 2913.38,
+      "newTotal": 2913.38,
+      "delta": 0
+    },
+    {
+      "boardId": "derk-giralda-walk",
+      "invoiceId": "in-11930",
+      "number": "IN-11930",
+      "oldTotal": 1746.25,
+      "newTotal": 1746.25,
+      "delta": 0
+    },
+    {
+      "boardId": "eikanas",
+      "invoiceId": "IN-10123",
+      "number": "IN-10123",
+      "oldTotal": 1801.25,
+      "newTotal": 1801.25,
+      "delta": 0
+    },
+    {
+      "boardId": "finkel-santa-barbara",
+      "invoiceId": "in-10773",
+      "number": "IN-10773",
+      "oldTotal": 865,
+      "newTotal": 865,
+      "delta": 0
+    },
+    {
+      "boardId": "galliardt-larkstone",
+      "invoiceId": "in-11515",
+      "number": "IN-11515",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "galliardt-larkstone",
+      "invoiceId": "in-11522",
+      "number": "IN-11522",
+      "oldTotal": 1672.5,
+      "newTotal": 1672.5,
+      "delta": 0
+    },
+    {
+      "boardId": "galliardt-larkstone",
+      "invoiceId": "in-11554",
+      "number": "IN-11554",
+      "oldTotal": 1165,
+      "newTotal": 1165,
+      "delta": 0
+    },
+    {
+      "boardId": "galliardt-larkstone",
+      "invoiceId": "in-11578",
+      "number": "IN-11578",
+      "oldTotal": 850.28,
+      "newTotal": 850.28,
+      "delta": 0
+    },
+    {
+      "boardId": "galliardt-larkstone",
+      "invoiceId": "in-11607",
+      "number": "IN-11607",
+      "oldTotal": 863.68,
+      "newTotal": 863.68,
+      "delta": 0
+    },
+    {
+      "boardId": "galliardt-larkstone",
+      "invoiceId": "in-11636",
+      "number": "IN-11636",
+      "oldTotal": 831.25,
+      "newTotal": 831.25,
+      "delta": 0
+    },
+    {
+      "boardId": "galliardt-larkstone",
+      "invoiceId": "in-11664",
+      "number": "IN-11664",
+      "oldTotal": 585,
+      "newTotal": 585,
+      "delta": 0
+    },
+    {
+      "boardId": "galliardt-larkstone",
+      "invoiceId": "in-11684",
+      "number": "IN-11684",
+      "oldTotal": 643.75,
+      "newTotal": 643.75,
+      "delta": 0
+    },
+    {
+      "boardId": "galliardt-larkstone",
+      "invoiceId": "in-11742",
+      "number": "IN-11742",
+      "oldTotal": 236.35,
+      "newTotal": 236.35,
+      "delta": 0
+    },
+    {
+      "boardId": "galliardt-larkstone",
+      "invoiceId": "in-11743",
+      "number": "IN-11743",
+      "oldTotal": 257.5,
+      "newTotal": 257.5,
+      "delta": 0
+    },
+    {
+      "boardId": "gehret",
+      "invoiceId": "in-12131",
+      "number": "IN-12131",
+      "oldTotal": 552.5,
+      "newTotal": 552.5,
+      "delta": 0
+    },
+    {
+      "boardId": "gehret",
+      "invoiceId": "in-12164",
+      "number": "IN-12164",
+      "oldTotal": 1297.5,
+      "newTotal": 1382.5,
+      "delta": 85
+    },
+    {
+      "boardId": "gehret",
+      "invoiceId": "in-12169",
+      "number": "IN-12169",
+      "oldTotal": 498.75,
+      "newTotal": 498.75,
+      "delta": 0
+    },
+    {
+      "boardId": "gehret",
+      "invoiceId": "in-12304",
+      "number": "IN-12304",
+      "oldTotal": 125,
+      "newTotal": 125,
+      "delta": 0
+    },
+    {
+      "boardId": "gehret",
+      "invoiceId": "in-12305",
+      "number": "IN-12305",
+      "oldTotal": 401.25,
+      "newTotal": 401.25,
+      "delta": 0
+    },
+    {
+      "boardId": "gordon-anaheim-ca",
+      "invoiceId": "in-10549",
+      "number": "IN-10549",
+      "oldTotal": 1000,
+      "newTotal": 1000,
+      "delta": 0
+    },
+    {
+      "boardId": "graves-ocean-blvd",
+      "invoiceId": "in-10638",
+      "number": "IN-10638",
+      "oldTotal": 2737.5,
+      "newTotal": 2737.5,
+      "delta": 0
+    },
+    {
+      "boardId": "graves-ocean-blvd",
+      "invoiceId": "in-10665",
+      "number": "IN-10665",
+      "oldTotal": 4728.75,
+      "newTotal": 4728.75,
+      "delta": 0
+    },
+    {
+      "boardId": "graves-ocean-blvd",
+      "invoiceId": "in-10679",
+      "number": "IN-10679",
+      "oldTotal": 906.25,
+      "newTotal": 906.25,
+      "delta": 0
+    },
+    {
+      "boardId": "graves-ocean-blvd",
+      "invoiceId": "in-10713",
+      "number": "IN-10713",
+      "oldTotal": 1490,
+      "newTotal": 1490,
+      "delta": 0
+    },
+    {
+      "boardId": "graves-ocean-blvd",
+      "invoiceId": "in-10766",
+      "number": "IN-10766",
+      "oldTotal": 937.5,
+      "newTotal": 937.5,
+      "delta": 0
+    },
+    {
+      "boardId": "graves-ocean-blvd",
+      "invoiceId": "in-10801",
+      "number": "IN-10801",
+      "oldTotal": 2432.5,
+      "newTotal": 2432.5,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-11979",
+      "number": "IN-11979",
+      "oldTotal": 1225,
+      "newTotal": 1225,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-11980",
+      "number": "IN-11980",
+      "oldTotal": 2359.88,
+      "newTotal": 2359.88,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12023",
+      "number": "IN-12023",
+      "oldTotal": 1643.75,
+      "newTotal": 1643.75,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12047",
+      "number": "IN-12047",
+      "oldTotal": 3587.25,
+      "newTotal": 3587.25,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12076",
+      "number": "IN-12076",
+      "oldTotal": 2062.88,
+      "newTotal": 2062.88,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12114",
+      "number": "IN-12114",
+      "oldTotal": 1386.25,
+      "newTotal": 1386.25,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12160",
+      "number": "IN-12160",
+      "oldTotal": 1640,
+      "newTotal": 1640,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12172",
+      "number": "IN-12172",
+      "oldTotal": 2122.5,
+      "newTotal": 2122.5,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12240",
+      "number": "IN-12240",
+      "oldTotal": 1750,
+      "newTotal": 1750,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12278",
+      "number": "IN-12278",
+      "oldTotal": 1532.5,
+      "newTotal": 1532.5,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12301",
+      "number": "IN-12301",
+      "oldTotal": 601.25,
+      "newTotal": 601.25,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12369",
+      "number": "IN-12369",
+      "oldTotal": 1521.25,
+      "newTotal": 1521.25,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12378",
+      "number": "IN-12378",
+      "oldTotal": 550,
+      "newTotal": 550,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12385",
+      "number": "IN-12385",
+      "oldTotal": 2370,
+      "newTotal": 2370,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12399",
+      "number": "IN-12399",
+      "oldTotal": 3973.75,
+      "newTotal": 3973.75,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12421",
+      "number": "IN-12421",
+      "oldTotal": 3248.75,
+      "newTotal": 3248.75,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12429",
+      "number": "IN-12429",
+      "oldTotal": 1720,
+      "newTotal": 1720,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12448",
+      "number": "IN-12448",
+      "oldTotal": 713.75,
+      "newTotal": 713.75,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12460",
+      "number": "IN-12460",
+      "oldTotal": 2870,
+      "newTotal": 2870,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12474",
+      "number": "IN-12474",
+      "oldTotal": 763.75,
+      "newTotal": 763.75,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12493",
+      "number": "IN-12493",
+      "oldTotal": 1435,
+      "newTotal": 1435,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12557",
+      "number": "IN-12557",
+      "oldTotal": 647.5,
+      "newTotal": 647.5,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12609",
+      "number": "IN-12609",
+      "oldTotal": 1677.5,
+      "newTotal": 1677.5,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12624",
+      "number": "IN-12624",
+      "oldTotal": 945,
+      "newTotal": 945,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12641",
+      "number": "IN-12641",
+      "oldTotal": 262.5,
+      "newTotal": 262.5,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12681",
+      "number": "IN-12681",
+      "oldTotal": 810,
+      "newTotal": 810,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12714",
+      "number": "IN-12714",
+      "oldTotal": 1850,
+      "newTotal": 1850,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12735",
+      "number": "IN-12735",
+      "oldTotal": 1617.5,
+      "newTotal": 1617.5,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12762",
+      "number": "IN-12762",
+      "oldTotal": 1500,
+      "newTotal": 1500,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-de-anza",
+      "invoiceId": "in-12784",
+      "number": "IN-12784",
+      "oldTotal": 240,
+      "newTotal": 240,
+      "delta": 0
+    },
+    {
+      "boardId": "greene-hixson",
+      "invoiceId": "IN-10164",
+      "number": "IN-10164",
+      "oldTotal": 2808.75,
+      "newTotal": 2808.75,
+      "delta": 0
+    },
+    {
+      "boardId": "haghighi-triumphal-way",
+      "invoiceId": "in-10873",
+      "number": "IN-10873",
+      "oldTotal": 1623.75,
+      "newTotal": 1623.75,
+      "delta": 0
+    },
+    {
+      "boardId": "harris-port-abbey",
+      "invoiceId": "in-10842",
+      "number": "IN-10842",
+      "oldTotal": 1449.56,
+      "newTotal": 1449.56,
+      "delta": 0
+    },
+    {
+      "boardId": "harrison",
+      "invoiceId": "in-11755",
+      "number": "IN-11755",
+      "oldTotal": 1953.75,
+      "newTotal": 1953.75,
+      "delta": 0
+    },
+    {
+      "boardId": "harrison",
+      "invoiceId": "in-11784",
+      "number": "IN-11784",
+      "oldTotal": 262.5,
+      "newTotal": 262.5,
+      "delta": 0
+    },
+    {
+      "boardId": "harrison",
+      "invoiceId": "in-11785",
+      "number": "IN-11785",
+      "oldTotal": 481.25,
+      "newTotal": 481.25,
+      "delta": 0
+    },
+    {
+      "boardId": "harrison",
+      "invoiceId": "in-12335",
+      "number": "IN-12335",
+      "oldTotal": 561.25,
+      "newTotal": 561.25,
+      "delta": 0
+    },
+    {
+      "boardId": "harrison",
+      "invoiceId": "in-12336",
+      "number": "IN-12336",
+      "oldTotal": 1323.75,
+      "newTotal": 1323.75,
+      "delta": 0
+    },
+    {
+      "boardId": "harrison",
+      "invoiceId": "in-12383",
+      "number": "IN-12383",
+      "oldTotal": 1845,
+      "newTotal": 1845,
+      "delta": 0
+    },
+    {
+      "boardId": "harrison",
+      "invoiceId": "in-12400",
+      "number": "IN-12400",
+      "oldTotal": 993.75,
+      "newTotal": 993.75,
+      "delta": 0
+    },
+    {
+      "boardId": "harrison",
+      "invoiceId": "in-12410",
+      "number": "IN-12410",
+      "oldTotal": 1141.89,
+      "newTotal": 1171.28,
+      "delta": 29.39
+    },
+    {
+      "boardId": "helix",
+      "invoiceId": "in-11555",
+      "number": "IN-11555",
+      "oldTotal": 2500,
+      "newTotal": 2500,
+      "delta": 0
+    },
+    {
+      "boardId": "helix",
+      "invoiceId": "in-11563",
+      "number": "IN-11563",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "herbert-roxbury-road",
+      "invoiceId": "in-11368",
+      "number": "IN-11368",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "herbert-roxbury-road",
+      "invoiceId": "in-12715",
+      "number": "IN-12715",
+      "oldTotal": 1686.75,
+      "newTotal": 1686.75,
+      "delta": 0
+    },
+    {
+      "boardId": "hollister-ranch",
+      "invoiceId": "in-10637",
+      "number": "IN-10637",
+      "oldTotal": 1325,
+      "newTotal": 1325,
+      "delta": 0
+    },
+    {
+      "boardId": "hollister-ranch",
+      "invoiceId": "in-10677",
+      "number": "IN-10677",
+      "oldTotal": 3686.25,
+      "newTotal": 3686.25,
+      "delta": 0
+    },
+    {
+      "boardId": "hollister-ranch",
+      "invoiceId": "in-10678",
+      "number": "IN-10678",
+      "oldTotal": 1193.75,
+      "newTotal": 1193.75,
+      "delta": 0
+    },
+    {
+      "boardId": "hollister-ranch",
+      "invoiceId": "in-10741",
+      "number": "IN-10741",
+      "oldTotal": 2793.75,
+      "newTotal": 2793.75,
+      "delta": 0
+    },
+    {
+      "boardId": "hollister-ranch",
+      "invoiceId": "in-10772",
+      "number": "IN-10772",
+      "oldTotal": 2000,
+      "newTotal": 2000,
+      "delta": 0
+    },
+    {
+      "boardId": "hollister-ranch",
+      "invoiceId": "in-10814",
+      "number": "IN-10814",
+      "oldTotal": 2275,
+      "newTotal": 2275,
+      "delta": 0
+    },
+    {
+      "boardId": "hollister-ranch",
+      "invoiceId": "in-10854",
+      "number": "IN-10854",
+      "oldTotal": 1000,
+      "newTotal": 1000,
+      "delta": 0
+    },
+    {
+      "boardId": "hollister-ranch",
+      "invoiceId": "in-10874",
+      "number": "IN-10874",
+      "oldTotal": 1350,
+      "newTotal": 1350,
+      "delta": 0
+    },
+    {
+      "boardId": "hollister-ranch",
+      "invoiceId": "in-10923",
+      "number": "IN-10923",
+      "oldTotal": 1856.25,
+      "newTotal": 1856.25,
+      "delta": 0
+    },
+    {
+      "boardId": "hollister-ranch",
+      "invoiceId": "in-10945",
+      "number": "IN-10945",
+      "oldTotal": 2818.75,
+      "newTotal": 2818.75,
+      "delta": 0
+    },
+    {
+      "boardId": "hollister-ranch",
+      "invoiceId": "in-10973",
+      "number": "IN-10973",
+      "oldTotal": 1933.75,
+      "newTotal": 1933.75,
+      "delta": 0
+    },
+    {
+      "boardId": "hollister-ranch",
+      "invoiceId": "in-11006",
+      "number": "IN-11006",
+      "oldTotal": 713.75,
+      "newTotal": 713.75,
+      "delta": 0
+    },
+    {
+      "boardId": "hollister-ranch",
+      "invoiceId": "in-11055",
+      "number": "IN-11055",
+      "oldTotal": 1956.25,
+      "newTotal": 1956.25,
+      "delta": 0
+    },
+    {
+      "boardId": "hollister-ranch",
+      "invoiceId": "in-11099",
+      "number": "IN-11099",
+      "oldTotal": 693.75,
+      "newTotal": 693.75,
+      "delta": 0
+    },
+    {
+      "boardId": "hollister-ranch",
+      "invoiceId": "in-11152",
+      "number": "IN-11152",
+      "oldTotal": 470,
+      "newTotal": 470,
+      "delta": 0
+    },
+    {
+      "boardId": "hollister-ranch",
+      "invoiceId": "in-11186",
+      "number": "IN-11186",
+      "oldTotal": 2956.25,
+      "newTotal": 2956.25,
+      "delta": 0
+    },
+    {
+      "boardId": "hollister-ranch",
+      "invoiceId": "in-11201",
+      "number": "IN-11201",
+      "oldTotal": 3437.36,
+      "newTotal": 3437.36,
+      "delta": 0
+    },
+    {
+      "boardId": "hollister-ranch",
+      "invoiceId": "in-11238",
+      "number": "IN-11238",
+      "oldTotal": 2955,
+      "newTotal": 2955,
+      "delta": 0
+    },
+    {
+      "boardId": "hollister-ranch",
+      "invoiceId": "in-11260",
+      "number": "IN-11260",
+      "oldTotal": 2650,
+      "newTotal": 2650,
+      "delta": 0
+    },
+    {
+      "boardId": "hollister-ranch",
+      "invoiceId": "in-11338",
+      "number": "IN-11338",
+      "oldTotal": 1485,
+      "newTotal": 1485,
+      "delta": 0
+    },
+    {
+      "boardId": "hollister-ranch",
+      "invoiceId": "in-11389",
+      "number": "IN-11389",
+      "oldTotal": 393.75,
+      "newTotal": 393.75,
+      "delta": 0
+    },
+    {
+      "boardId": "holtz-hill",
+      "invoiceId": "3ClUKe4jgpasB8EPjlUY",
+      "number": "INV-6020",
+      "oldTotal": 31587.7235,
+      "newTotal": 29112.65,
+      "delta": -2475.07
+    },
+    {
+      "boardId": "holtz-hill",
+      "invoiceId": "IN-24-10057",
+      "number": "IN-24-10057",
+      "oldTotal": 3672.5,
+      "newTotal": 3672.5,
+      "delta": 0
+    },
+    {
+      "boardId": "holtz-hill",
+      "invoiceId": "IN-24-10060",
+      "number": "IN-24-10060",
+      "oldTotal": 2500,
+      "newTotal": 2500,
+      "delta": 0
+    },
+    {
+      "boardId": "holtz-hill",
+      "invoiceId": "IN-24-10061",
+      "number": "IN-24-10061",
+      "oldTotal": 4710,
+      "newTotal": 4710,
+      "delta": 0
+    },
+    {
+      "boardId": "holtz-hill",
+      "invoiceId": "IN-24-10067",
+      "number": "IN-24-10067",
+      "oldTotal": 2135,
+      "newTotal": 2135,
+      "delta": 0
+    },
+    {
+      "boardId": "holtz-hill",
+      "invoiceId": "IN-24-10073",
+      "number": "IN-24-10073",
+      "oldTotal": 911.25,
+      "newTotal": 911.25,
+      "delta": 0
+    },
+    {
+      "boardId": "holtz-hill",
+      "invoiceId": "IN-24-10077",
+      "number": "IN-24-10077",
+      "oldTotal": 2662.5,
+      "newTotal": 2662.5,
+      "delta": 0
+    },
+    {
+      "boardId": "holtz-hill",
+      "invoiceId": "IN-24-10079",
+      "number": "IN-24-10079",
+      "oldTotal": 5418.75,
+      "newTotal": 5418.75,
+      "delta": 0
+    },
+    {
+      "boardId": "holtz-hill",
+      "invoiceId": "IN-24-10092",
+      "number": "IN-24-10092",
+      "oldTotal": 4827.5,
+      "newTotal": 4827.5,
+      "delta": 0
+    },
+    {
+      "boardId": "holtz-hill",
+      "invoiceId": "IN-24-10097",
+      "number": "IN-24-10097",
+      "oldTotal": 2460,
+      "newTotal": 2460,
+      "delta": 0
+    },
+    {
+      "boardId": "holtz-hill",
+      "invoiceId": "IN-24-10118",
+      "number": "IN-24-10118",
+      "oldTotal": 3245,
+      "newTotal": 3245,
+      "delta": 0
+    },
+    {
+      "boardId": "holtz-hill",
+      "invoiceId": "IN-24-10119",
+      "number": "IN-24-10119",
+      "oldTotal": 3507.5,
+      "newTotal": 3507.5,
+      "delta": 0
+    },
+    {
+      "boardId": "holtz-hill",
+      "invoiceId": "IN-24-10120",
+      "number": "IN-24-10120",
+      "oldTotal": 4861.25,
+      "newTotal": 5056.25,
+      "delta": 195
+    },
+    {
+      "boardId": "holtz-hill",
+      "invoiceId": "IN-24-10121",
+      "number": "IN-24-10121",
+      "oldTotal": 1778.75,
+      "newTotal": 1778.75,
+      "delta": 0
+    },
+    {
+      "boardId": "holtz-hill",
+      "invoiceId": "IN-24-10124",
+      "number": "IN-24-10124",
+      "oldTotal": 1258.75,
+      "newTotal": 1258.75,
+      "delta": 0
+    },
+    {
+      "boardId": "holtz-hill",
+      "invoiceId": "IN-24-10138",
+      "number": "IN-24-10138",
+      "oldTotal": 6168.75,
+      "newTotal": 6168.75,
+      "delta": 0
+    },
+    {
+      "boardId": "holtz-hill",
+      "invoiceId": "IN-24-10139",
+      "number": "IN-24-10139",
+      "oldTotal": 1995,
+      "newTotal": 1995,
+      "delta": 0
+    },
+    {
+      "boardId": "holtz-hill",
+      "invoiceId": "IN-24-10140",
+      "number": "IN-24-10140",
+      "oldTotal": 2991.25,
+      "newTotal": 2991.25,
+      "delta": 0
+    },
+    {
+      "boardId": "holtz-hill",
+      "invoiceId": "IN-24-10141",
+      "number": "IN-24-10141",
+      "oldTotal": 966,
+      "newTotal": 966,
+      "delta": 0
+    },
+    {
+      "boardId": "holtz-hill",
+      "invoiceId": "IN-24-10158",
+      "number": "IN-24-10158",
+      "oldTotal": 587.5,
+      "newTotal": 587.5,
+      "delta": 0
+    },
+    {
+      "boardId": "jade-fernleaf-ave",
+      "invoiceId": "in-11206",
+      "number": "IN-11206",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "james-david-custom-homes",
+      "invoiceId": "in-11057",
+      "number": "IN-11057",
+      "oldTotal": 1350,
+      "newTotal": 1350,
+      "delta": 0
+    },
+    {
+      "boardId": "james-david-custom-homes",
+      "invoiceId": "in-11150",
+      "number": "IN-11150",
+      "oldTotal": 1570.11,
+      "newTotal": 1570.11,
+      "delta": 0
+    },
+    {
+      "boardId": "james-david-custom-homes",
+      "invoiceId": "in-11194",
+      "number": "IN-11194",
+      "oldTotal": 462.5,
+      "newTotal": 462.5,
+      "delta": 0
+    },
+    {
+      "boardId": "james-david-custom-homes",
+      "invoiceId": "in-11200",
+      "number": "IN-11200",
+      "oldTotal": 951.25,
+      "newTotal": 951.25,
+      "delta": 0
+    },
+    {
+      "boardId": "johnny",
+      "invoiceId": "in-12127",
+      "number": "IN-12127",
+      "oldTotal": 2720,
+      "newTotal": 2720,
+      "delta": 0
+    },
+    {
+      "boardId": "johnny",
+      "invoiceId": "in-12243",
+      "number": "IN-12243",
+      "oldTotal": 987.5,
+      "newTotal": 987.5,
+      "delta": 0
+    },
+    {
+      "boardId": "johnny",
+      "invoiceId": "in-12244",
+      "number": "IN-12244",
+      "oldTotal": 1213.75,
+      "newTotal": 1213.75,
+      "delta": 0
+    },
+    {
+      "boardId": "johnny",
+      "invoiceId": "in-12245",
+      "number": "IN-12245",
+      "oldTotal": 1080,
+      "newTotal": 1080,
+      "delta": 0
+    },
+    {
+      "boardId": "johnny",
+      "invoiceId": "in-12277",
+      "number": "IN-12277",
+      "oldTotal": 1096.25,
+      "newTotal": 1096.25,
+      "delta": 0
+    },
+    {
+      "boardId": "johnny",
+      "invoiceId": "in-12303",
+      "number": "IN-12303",
+      "oldTotal": 882.5,
+      "newTotal": 882.5,
+      "delta": 0
+    },
+    {
+      "boardId": "johnny",
+      "invoiceId": "in-12330",
+      "number": "IN-12330",
+      "oldTotal": 247.5,
+      "newTotal": 247.5,
+      "delta": 0
+    },
+    {
+      "boardId": "johnny",
+      "invoiceId": "in-12381",
+      "number": "IN-12381",
+      "oldTotal": 610,
+      "newTotal": 610,
+      "delta": 0
+    },
+    {
+      "boardId": "johnny",
+      "invoiceId": "in-12413",
+      "number": "IN-12413",
+      "oldTotal": 111.25,
+      "newTotal": 111.25,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "32yHinTFV2Wh5oosGDTL",
+      "number": "INV-6007",
+      "oldTotal": 1098.75,
+      "newTotal": 1098.75,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-10018",
+      "number": "IN-10018",
+      "oldTotal": 406.25,
+      "newTotal": 406.25,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-10045",
+      "number": "IN-10045",
+      "oldTotal": 125,
+      "newTotal": 125,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-10090",
+      "number": "IN-10090",
+      "oldTotal": 1431.25,
+      "newTotal": 1431.25,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-10123",
+      "number": "IN-10123",
+      "oldTotal": 1675,
+      "newTotal": 1675,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-10172",
+      "number": "IN-10172",
+      "oldTotal": 1268.75,
+      "newTotal": 1268.75,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-10288",
+      "number": "IN-10288",
+      "oldTotal": 1635,
+      "newTotal": 1635,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-10334",
+      "number": "IN-10334",
+      "oldTotal": 120,
+      "newTotal": 120,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-10446",
+      "number": "IN-10446",
+      "oldTotal": 172.5,
+      "newTotal": 172.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-10820",
+      "number": "IN-10820",
+      "oldTotal": 272.5,
+      "newTotal": 272.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-10984",
+      "number": "IN-10984",
+      "oldTotal": 512.5,
+      "newTotal": 512.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-11017",
+      "number": "IN-11017",
+      "oldTotal": 345,
+      "newTotal": 345,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-11056",
+      "number": "IN-11056",
+      "oldTotal": 876.76,
+      "newTotal": 866.42,
+      "delta": -10.34
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-11093",
+      "number": "IN-11093",
+      "oldTotal": 2266.25,
+      "newTotal": 2266.25,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-11163",
+      "number": "IN-11163",
+      "oldTotal": 763.75,
+      "newTotal": 763.75,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-11184",
+      "number": "IN-11184",
+      "oldTotal": 475,
+      "newTotal": 475,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-11612",
+      "number": "IN-11612",
+      "oldTotal": 811.63,
+      "newTotal": 811.63,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-11672",
+      "number": "IN-11672",
+      "oldTotal": 1512.5,
+      "newTotal": 1512.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-11685",
+      "number": "IN-11685",
+      "oldTotal": 200,
+      "newTotal": 200,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-11753",
+      "number": "IN-11753",
+      "oldTotal": 1212.5,
+      "newTotal": 1212.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-11787",
+      "number": "IN-11787",
+      "oldTotal": 907.75,
+      "newTotal": 907.75,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-11855",
+      "number": "IN-11855",
+      "oldTotal": 550,
+      "newTotal": 550,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-11856",
+      "number": "IN-11856",
+      "oldTotal": 772.5,
+      "newTotal": 772.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-11873",
+      "number": "IN-11873",
+      "oldTotal": 437.5,
+      "newTotal": 437.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-11927",
+      "number": "IN-11927",
+      "oldTotal": 604.75,
+      "newTotal": 604.75,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-11978",
+      "number": "IN-11978",
+      "oldTotal": 400,
+      "newTotal": 400,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-12078",
+      "number": "IN-12078",
+      "oldTotal": 329.35,
+      "newTotal": 329.35,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-12147",
+      "number": "IN-12147",
+      "oldTotal": 282.5,
+      "newTotal": 282.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-12159",
+      "number": "IN-12159",
+      "oldTotal": 176.25,
+      "newTotal": 176.25,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-12210",
+      "number": "IN-12210",
+      "oldTotal": 311.25,
+      "newTotal": 311.25,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-12237",
+      "number": "IN-12237",
+      "oldTotal": 1051.25,
+      "newTotal": 1051.25,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-12332",
+      "number": "IN-12332",
+      "oldTotal": 515,
+      "newTotal": 515,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-12333",
+      "number": "IN-12333",
+      "oldTotal": 512.5,
+      "newTotal": 512.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-12683",
+      "number": "IN-12683",
+      "oldTotal": 211.25,
+      "newTotal": 211.25,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-12684",
+      "number": "IN-12684",
+      "oldTotal": 487.5,
+      "newTotal": 487.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-12717",
+      "number": "IN-12717",
+      "oldTotal": 695,
+      "newTotal": 695,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-12738",
+      "number": "IN-12738",
+      "oldTotal": 583.75,
+      "newTotal": 583.75,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-12785",
+      "number": "IN-12785",
+      "oldTotal": 550,
+      "newTotal": 550,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-12883",
+      "number": "IN-12883",
+      "oldTotal": 602.5,
+      "newTotal": 602.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-12897",
+      "number": "IN-12897",
+      "oldTotal": 868.75,
+      "newTotal": 868.75,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-12908",
+      "number": "IN-12908",
+      "oldTotal": 922.5,
+      "newTotal": 922.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-12909",
+      "number": "IN-12909",
+      "oldTotal": 2970,
+      "newTotal": 2970,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-12925",
+      "number": "IN-12925",
+      "oldTotal": 787.5,
+      "newTotal": 787.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-129320",
+      "number": "IN-129320",
+      "oldTotal": 652.5,
+      "newTotal": 652.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-12936",
+      "number": "IN-12936",
+      "oldTotal": 848.31,
+      "newTotal": 1213.31,
+      "delta": 365
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-12942",
+      "number": "IN-12942",
+      "oldTotal": 656.25,
+      "newTotal": 656.25,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-12961",
+      "number": "IN-12961",
+      "oldTotal": 668.75,
+      "newTotal": 668.75,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-12969",
+      "number": "IN-12969",
+      "oldTotal": 4537.5,
+      "newTotal": 4537.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-graceland-dr",
+      "invoiceId": "in-12970",
+      "number": "IN-12970",
+      "oldTotal": 1395,
+      "newTotal": 1395,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-nashville",
+      "invoiceId": "IN-10006",
+      "number": "IN-10006",
+      "oldTotal": 461.25,
+      "newTotal": 461.25,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-nashville",
+      "invoiceId": "IN-10007",
+      "number": "IN-10007",
+      "oldTotal": 2221.25,
+      "newTotal": 2221.25,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-nashville",
+      "invoiceId": "IN-10008",
+      "number": "IN-10008",
+      "oldTotal": 5047.5,
+      "newTotal": 5047.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-nashville",
+      "invoiceId": "IN-10018",
+      "number": "IN-10018",
+      "oldTotal": 913.75,
+      "newTotal": 913.75,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-nashville",
+      "invoiceId": "IN-10019",
+      "number": "IN-10019",
+      "oldTotal": 3080,
+      "newTotal": 3080,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-nashville",
+      "invoiceId": "IN-10020",
+      "number": "IN-10020",
+      "oldTotal": 3765,
+      "newTotal": 3765,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10328",
+      "number": "IN-10328",
+      "oldTotal": 12442.5,
+      "newTotal": 12442.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10330",
+      "number": "IN-10330",
+      "oldTotal": 2500,
+      "newTotal": 2500,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10332",
+      "number": "IN-10332",
+      "oldTotal": 7781.25,
+      "newTotal": 7781.25,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10335",
+      "number": "IN-10335",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10398",
+      "number": "IN-10398",
+      "oldTotal": 1045.72,
+      "newTotal": 1045.72,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10406",
+      "number": "IN-10406",
+      "oldTotal": 387.5,
+      "newTotal": 387.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10442",
+      "number": "IN-10442",
+      "oldTotal": 4800,
+      "newTotal": 4800,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10443",
+      "number": "IN-10443",
+      "oldTotal": 1369.33,
+      "newTotal": 1369.33,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10455",
+      "number": "IN-10455",
+      "oldTotal": 1175,
+      "newTotal": 1175,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10458",
+      "number": "IN-10458",
+      "oldTotal": 1625,
+      "newTotal": 1625,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10466",
+      "number": "IN-10466",
+      "oldTotal": 2062.5,
+      "newTotal": 2062.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10480",
+      "number": "IN-10480",
+      "oldTotal": 7691.57,
+      "newTotal": 7691.57,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10505",
+      "number": "IN-10505",
+      "oldTotal": 5672.5,
+      "newTotal": 5672.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10525",
+      "number": "IN-10525",
+      "oldTotal": 1340.96,
+      "newTotal": 1340.96,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10534",
+      "number": "IN-10534",
+      "oldTotal": 841.39,
+      "newTotal": 841.39,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10558",
+      "number": "IN-10558",
+      "oldTotal": 4125,
+      "newTotal": 4125,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10563",
+      "number": "IN-10563",
+      "oldTotal": 2400,
+      "newTotal": 2400,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10586",
+      "number": "IN-10586",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10612",
+      "number": "IN-10612",
+      "oldTotal": 2218.75,
+      "newTotal": 2218.75,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10620",
+      "number": "IN-10620",
+      "oldTotal": 861.57,
+      "newTotal": 1028.91,
+      "delta": 167.34
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10640",
+      "number": "IN-10640",
+      "oldTotal": 3668.75,
+      "newTotal": 3668.75,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10656",
+      "number": "IN-10656",
+      "oldTotal": 4841.6,
+      "newTotal": 4841.6,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10671",
+      "number": "IN-10671",
+      "oldTotal": 801.15,
+      "newTotal": 801.15,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10681",
+      "number": "IN-10681",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10682",
+      "number": "IN-10682",
+      "oldTotal": 2543.75,
+      "newTotal": 2543.75,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10821",
+      "number": "IN-10821",
+      "oldTotal": 956.25,
+      "newTotal": 956.25,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10845",
+      "number": "IN-10845",
+      "oldTotal": 237.5,
+      "newTotal": 237.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10879",
+      "number": "IN-10879",
+      "oldTotal": 1937.5,
+      "newTotal": 1937.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10986",
+      "number": "IN-10986",
+      "oldTotal": 1237.5,
+      "newTotal": 1237.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-10987",
+      "number": "IN-10987",
+      "oldTotal": 593.75,
+      "newTotal": 593.75,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-11021",
+      "number": "IN-11021",
+      "oldTotal": 412.5,
+      "newTotal": 412.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-11092",
+      "number": "IN-11092",
+      "oldTotal": 400,
+      "newTotal": 400,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-11164",
+      "number": "IN-11164",
+      "oldTotal": 845.98,
+      "newTotal": 845.98,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-11185",
+      "number": "IN-11185",
+      "oldTotal": 312.5,
+      "newTotal": 312.5,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-11221",
+      "number": "IN-11221",
+      "oldTotal": 243.75,
+      "newTotal": 243.75,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-12737",
+      "number": "IN-12737",
+      "oldTotal": 928.75,
+      "newTotal": 928.75,
+      "delta": 0
+    },
+    {
+      "boardId": "katke-puerto-vallarta",
+      "invoiceId": "in-12808",
+      "number": "IN-12808",
+      "oldTotal": 281.25,
+      "newTotal": 281.25,
+      "delta": 0
+    },
+    {
+      "boardId": "kron-alexandria-va",
+      "invoiceId": "in-10017",
+      "number": "IN-10017",
+      "oldTotal": 484.37,
+      "newTotal": 484.37,
+      "delta": 0
+    },
+    {
+      "boardId": "kruse-lido",
+      "invoiceId": "in-11314",
+      "number": "IN-11314",
+      "oldTotal": 1062.5,
+      "newTotal": 1062.5,
+      "delta": 0
+    },
+    {
+      "boardId": "kruse-lido",
+      "invoiceId": "in-11315",
+      "number": "IN-11315",
+      "oldTotal": 3881.25,
+      "newTotal": 3881.25,
+      "delta": 0
+    },
+    {
+      "boardId": "kruse-lido",
+      "invoiceId": "in-11356",
+      "number": "IN-11356",
+      "oldTotal": 3556.25,
+      "newTotal": 3556.25,
+      "delta": 0
+    },
+    {
+      "boardId": "kruse-lido",
+      "invoiceId": "in-11410",
+      "number": "IN-11410",
+      "oldTotal": 3606.25,
+      "newTotal": 3606.25,
+      "delta": 0
+    },
+    {
+      "boardId": "kruse-lido",
+      "invoiceId": "in-11411",
+      "number": "IN-11411",
+      "oldTotal": 2781.25,
+      "newTotal": 2781.25,
+      "delta": 0
+    },
+    {
+      "boardId": "kruse-lido",
+      "invoiceId": "in-11412",
+      "number": "IN-11412",
+      "oldTotal": 4227.5,
+      "newTotal": 4227.5,
+      "delta": 0
+    },
+    {
+      "boardId": "kruse-lido",
+      "invoiceId": "in-11454",
+      "number": "IN-11454",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "kruse-lido",
+      "invoiceId": "in-11455",
+      "number": "IN-11455",
+      "oldTotal": 1381.25,
+      "newTotal": 1381.25,
+      "delta": 0
+    },
+    {
+      "boardId": "kruse-lido",
+      "invoiceId": "in-11461",
+      "number": "IN-11461",
+      "oldTotal": 4100,
+      "newTotal": 4100,
+      "delta": 0
+    },
+    {
+      "boardId": "kruse-lido",
+      "invoiceId": "in-11492",
+      "number": "IN-11492",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "kruse-lido",
+      "invoiceId": "in-11495",
+      "number": "IN-11495",
+      "oldTotal": 2100,
+      "newTotal": 2100,
+      "delta": 0
+    },
+    {
+      "boardId": "kruse-lido",
+      "invoiceId": "in-11508",
+      "number": "IN-11508",
+      "oldTotal": 1318.75,
+      "newTotal": 1318.75,
+      "delta": 0
+    },
+    {
+      "boardId": "kruse-lido",
+      "invoiceId": "in-11519",
+      "number": "IN-11519",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "kruse-lido",
+      "invoiceId": "in-11548",
+      "number": "IN-11548",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "kruse-lido",
+      "invoiceId": "in-11592",
+      "number": "IN-11592",
+      "oldTotal": 1443.75,
+      "newTotal": 1443.75,
+      "delta": 0
+    },
+    {
+      "boardId": "kruse-lido",
+      "invoiceId": "in-11594",
+      "number": "IN-11594",
+      "oldTotal": 1450,
+      "newTotal": 1450,
+      "delta": 0
+    },
+    {
+      "boardId": "kruse-lido",
+      "invoiceId": "in-11614",
+      "number": "IN-11614",
+      "oldTotal": 1300,
+      "newTotal": 1300,
+      "delta": 0
+    },
+    {
+      "boardId": "lack-santa-barbara",
+      "invoiceId": "in-11620",
+      "number": "IN-11620",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "lack-santa-barbara",
+      "invoiceId": "in-11699",
+      "number": "IN-11699",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "land-glenwood",
+      "invoiceId": "in-11339",
+      "number": "IN-11339",
+      "oldTotal": 3561.25,
+      "newTotal": 3561.25,
+      "delta": 0
+    },
+    {
+      "boardId": "land-glenwood",
+      "invoiceId": "in-11496",
+      "number": "IN-11496",
+      "oldTotal": 1341.25,
+      "newTotal": 1341.25,
+      "delta": 0
+    },
+    {
+      "boardId": "land-glenwood",
+      "invoiceId": "in-11526",
+      "number": "IN-11526",
+      "oldTotal": 1308.75,
+      "newTotal": 1308.75,
+      "delta": 0
+    },
+    {
+      "boardId": "land-glenwood",
+      "invoiceId": "in-11528",
+      "number": "IN-11528",
+      "oldTotal": 1480,
+      "newTotal": 1480,
+      "delta": 0
+    },
+    {
+      "boardId": "land-glenwood",
+      "invoiceId": "in-11559",
+      "number": "IN-11559",
+      "oldTotal": 268.75,
+      "newTotal": 268.75,
+      "delta": 0
+    },
+    {
+      "boardId": "land-glenwood",
+      "invoiceId": "in-11702",
+      "number": "IN-11702",
+      "oldTotal": 393.31,
+      "newTotal": 393.31,
+      "delta": 0
+    },
+    {
+      "boardId": "lassetter-scottsdale",
+      "invoiceId": "in-11698",
+      "number": "IN-11698",
+      "oldTotal": 2625,
+      "newTotal": 2625,
+      "delta": 0
+    },
+    {
+      "boardId": "lepak-rock-creek-ridge",
+      "invoiceId": "in-10686",
+      "number": "IN-10686",
+      "oldTotal": 2696.25,
+      "newTotal": 2696.25,
+      "delta": 0
+    },
+    {
+      "boardId": "lepak-rock-creek-ridge",
+      "invoiceId": "in-10687",
+      "number": "IN-10687",
+      "oldTotal": 2197.5,
+      "newTotal": 2197.5,
+      "delta": 0
+    },
+    {
+      "boardId": "lepak-rock-creek-ridge",
+      "invoiceId": "in-10757",
+      "number": "IN-10757",
+      "oldTotal": 1150,
+      "newTotal": 1150,
+      "delta": 0
+    },
+    {
+      "boardId": "lepak-rock-creek-ridge",
+      "invoiceId": "in-10758",
+      "number": "IN-10758",
+      "oldTotal": 345,
+      "newTotal": 345,
+      "delta": 0
+    },
+    {
+      "boardId": "lepak-rock-creek-ridge",
+      "invoiceId": "in-10840",
+      "number": "IN-10840",
+      "oldTotal": 2106.25,
+      "newTotal": 2106.25,
+      "delta": 0
+    },
+    {
+      "boardId": "meats-on-ocean",
+      "invoiceId": "in-10411",
+      "number": "IN-10411",
+      "oldTotal": 1794.68,
+      "newTotal": 1794.68,
+      "delta": 0
+    },
+    {
+      "boardId": "meats-on-ocean",
+      "invoiceId": "in-10412",
+      "number": "IN-10412",
+      "oldTotal": 2057.5,
+      "newTotal": 2057.5,
+      "delta": 0
+    },
+    {
+      "boardId": "moneim-puro-way",
+      "invoiceId": "in-11925",
+      "number": "IN-11925",
+      "oldTotal": 910.25,
+      "newTotal": 910.25,
+      "delta": 0
+    },
+    {
+      "boardId": "moneim-puro-way",
+      "invoiceId": "in-11926",
+      "number": "IN-11926",
+      "oldTotal": 470,
+      "newTotal": 470,
+      "delta": 0
+    },
+    {
+      "boardId": "moneim-puro-way",
+      "invoiceId": "in-11963",
+      "number": "IN-11963",
+      "oldTotal": 277.4,
+      "newTotal": 277.4,
+      "delta": 0
+    },
+    {
+      "boardId": "moneim-puro-way",
+      "invoiceId": "in-11977",
+      "number": "IN-11977",
+      "oldTotal": 97.5,
+      "newTotal": 97.5,
+      "delta": 0
+    },
+    {
+      "boardId": "moneim-puro-way",
+      "invoiceId": "in-12033",
+      "number": "IN-12033",
+      "oldTotal": 136.25,
+      "newTotal": 136.25,
+      "delta": 0
+    },
+    {
+      "boardId": "moneim-puro-way",
+      "invoiceId": "in-12034",
+      "number": "IN-12034",
+      "oldTotal": 207.5,
+      "newTotal": 207.5,
+      "delta": 0
+    },
+    {
+      "boardId": "moneim-puro-way",
+      "invoiceId": "in-12065",
+      "number": "IN-12065",
+      "oldTotal": 493.75,
+      "newTotal": 493.75,
+      "delta": 0
+    },
+    {
+      "boardId": "moneim-puro-way",
+      "invoiceId": "in-12241",
+      "number": "IN-12241",
+      "oldTotal": 138.75,
+      "newTotal": 138.75,
+      "delta": 0
+    },
+    {
+      "boardId": "moneim-puro-way",
+      "invoiceId": "in-12242",
+      "number": "IN-12242",
+      "oldTotal": 335,
+      "newTotal": 335,
+      "delta": 0
+    },
+    {
+      "boardId": "moneim-puro-way",
+      "invoiceId": "in-12352",
+      "number": "IN-12352",
+      "oldTotal": 1575,
+      "newTotal": 1575,
+      "delta": 0
+    },
+    {
+      "boardId": "moneim-puro-way",
+      "invoiceId": "in-12384",
+      "number": "IN-12384",
+      "oldTotal": 600,
+      "newTotal": 600,
+      "delta": 0
+    },
+    {
+      "boardId": "moneim-puro-way",
+      "invoiceId": "in-12401",
+      "number": "IN-12401",
+      "oldTotal": 956.25,
+      "newTotal": 956.25,
+      "delta": 0
+    },
+    {
+      "boardId": "moneim-puro-way",
+      "invoiceId": "in-12418",
+      "number": "IN-12418",
+      "oldTotal": 701.99,
+      "newTotal": 701.99,
+      "delta": 0
+    },
+    {
+      "boardId": "moneim-puro-way",
+      "invoiceId": "in-12431",
+      "number": "IN-12431",
+      "oldTotal": 63.55,
+      "newTotal": 63.55,
+      "delta": 0
+    },
+    {
+      "boardId": "moneim-puro-way",
+      "invoiceId": "in-12473",
+      "number": "IN-12473",
+      "oldTotal": 1683.75,
+      "newTotal": 1683.75,
+      "delta": 0
+    },
+    {
+      "boardId": "moneim-puro-way",
+      "invoiceId": "in-12492",
+      "number": "IN-12492",
+      "oldTotal": 1001.25,
+      "newTotal": 1001.25,
+      "delta": 0
+    },
+    {
+      "boardId": "moneim-puro-way",
+      "invoiceId": "in-12558",
+      "number": "IN-12558",
+      "oldTotal": 1337.5,
+      "newTotal": 1337.5,
+      "delta": 0
+    },
+    {
+      "boardId": "moneim-puro-way",
+      "invoiceId": "in-12638",
+      "number": "IN-12638",
+      "oldTotal": 143.75,
+      "newTotal": 143.75,
+      "delta": 0
+    },
+    {
+      "boardId": "moneim-puro-way",
+      "invoiceId": "in-12639",
+      "number": "IN-12639",
+      "oldTotal": 467.5,
+      "newTotal": 467.5,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "GuNVdTSlDjoZjOkuD7UN",
+      "number": "INV-6027",
+      "oldTotal": 234.35999999999999,
+      "newTotal": 167.4,
+      "delta": -66.96
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10002",
+      "number": "IN-24-10002",
+      "oldTotal": 1502.5,
+      "newTotal": 1502.5,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10003",
+      "number": "IN-24-10003",
+      "oldTotal": 1500,
+      "newTotal": 1500,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10004",
+      "number": "IN-24-10004",
+      "oldTotal": 1510,
+      "newTotal": 1510,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10005",
+      "number": "IN-24-10005",
+      "oldTotal": 1811.25,
+      "newTotal": 1811.25,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10009",
+      "number": "IN-24-10009",
+      "oldTotal": 4867.5,
+      "newTotal": 4867.5,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10010",
+      "number": "IN-24-10010",
+      "oldTotal": 1736.25,
+      "newTotal": 1736.25,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10011",
+      "number": "IN-24-10011",
+      "oldTotal": 657.5,
+      "newTotal": 657.5,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10012",
+      "number": "IN-24-10012",
+      "oldTotal": 993.75,
+      "newTotal": 993.75,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10013",
+      "number": "IN-24-10013",
+      "oldTotal": 950,
+      "newTotal": 950,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10014",
+      "number": "IN-24-10014",
+      "oldTotal": 2446.25,
+      "newTotal": 2446.25,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10021",
+      "number": "IN-24-10021",
+      "oldTotal": 30,
+      "newTotal": 30,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10024",
+      "number": "IN-24-10024",
+      "oldTotal": 2400.75,
+      "newTotal": 2400.75,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10028",
+      "number": "IN-24-10028",
+      "oldTotal": 2397.5,
+      "newTotal": 2397.5,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10033",
+      "number": "IN-24-10033",
+      "oldTotal": 1495,
+      "newTotal": 1495,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10034",
+      "number": "IN-24-10034",
+      "oldTotal": 1642.62,
+      "newTotal": 1642.62,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10035",
+      "number": "IN-24-10035",
+      "oldTotal": 1049.4,
+      "newTotal": 1049.4,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10036",
+      "number": "IN-24-10036",
+      "oldTotal": 2216.25,
+      "newTotal": 2216.25,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10037",
+      "number": "IN-24-10037",
+      "oldTotal": 2002.5,
+      "newTotal": 2002.5,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10038",
+      "number": "IN-24-10038",
+      "oldTotal": 2717.8,
+      "newTotal": 2717.8,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10039",
+      "number": "IN-24-10039",
+      "oldTotal": 2596.25,
+      "newTotal": 2596.25,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10041",
+      "number": "IN-24-10041",
+      "oldTotal": 2733.75,
+      "newTotal": 2733.75,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10046",
+      "number": "IN-24-10046",
+      "oldTotal": 818.75,
+      "newTotal": 818.75,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10047",
+      "number": "IN-24-10047",
+      "oldTotal": 575,
+      "newTotal": 575,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10050",
+      "number": "IN-24-10050",
+      "oldTotal": 1267.5,
+      "newTotal": 1267.5,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10053",
+      "number": "IN-24-10053",
+      "oldTotal": 189.54,
+      "newTotal": 140.4,
+      "delta": -49.14
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10055",
+      "number": "IN-24-10055",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "morning-wood-dr",
+      "invoiceId": "IN-24-10056",
+      "number": "IN-24-10056",
+      "oldTotal": 2018.75,
+      "newTotal": 2018.75,
+      "delta": 0
+    },
+    {
+      "boardId": "mumford-sharp-rd",
+      "invoiceId": "in-10551",
+      "number": "IN-10551",
+      "oldTotal": 3906.25,
+      "newTotal": 3906.25,
+      "delta": 0
+    },
+    {
+      "boardId": "mumford-sharp-rd",
+      "invoiceId": "in-10668",
+      "number": "IN-10668",
+      "oldTotal": 2325,
+      "newTotal": 2325,
+      "delta": 0
+    },
+    {
+      "boardId": "mumford-sharp-rd",
+      "invoiceId": "in-10669",
+      "number": "IN-10669",
+      "oldTotal": 375,
+      "newTotal": 375,
+      "delta": 0
+    },
+    {
+      "boardId": "mumford-sharp-rd",
+      "invoiceId": "in-10726",
+      "number": "IN-10726",
+      "oldTotal": 1226.25,
+      "newTotal": 1226.25,
+      "delta": 0
+    },
+    {
+      "boardId": "mumford-sharp-rd",
+      "invoiceId": "in-10727",
+      "number": "IN-10727",
+      "oldTotal": 991.9,
+      "newTotal": 991.9,
+      "delta": 0
+    },
+    {
+      "boardId": "narva-guest-house",
+      "invoiceId": "in-11281",
+      "number": "IN-11281",
+      "oldTotal": 822.5,
+      "newTotal": 822.5,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-10156",
+      "number": "IN-10156",
+      "oldTotal": 2250,
+      "newTotal": 2250,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-10157",
+      "number": "IN-10157",
+      "oldTotal": 1902.5,
+      "newTotal": 1902.5,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-10481",
+      "number": "IN-10481",
+      "oldTotal": 4137.5,
+      "newTotal": 4137.5,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-10483",
+      "number": "IN-10483",
+      "oldTotal": 2968.75,
+      "newTotal": 2968.75,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-10484",
+      "number": "IN-10484",
+      "oldTotal": 902.5,
+      "newTotal": 902.5,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-10564",
+      "number": "IN-10564",
+      "oldTotal": 2475,
+      "newTotal": 2475,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-10565",
+      "number": "IN-10565",
+      "oldTotal": 2968.75,
+      "newTotal": 2968.75,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-10609",
+      "number": "IN-10609",
+      "oldTotal": 1712.5,
+      "newTotal": 1712.5,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-10684",
+      "number": "IN-10684",
+      "oldTotal": 2148.75,
+      "newTotal": 2148.75,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-10685",
+      "number": "IN-10685",
+      "oldTotal": 1862.5,
+      "newTotal": 1862.5,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-10722",
+      "number": "IN-10722",
+      "oldTotal": 1818.75,
+      "newTotal": 1818.75,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-10778",
+      "number": "IN-10778",
+      "oldTotal": 1281.25,
+      "newTotal": 1281.25,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-10824",
+      "number": "IN-10824",
+      "oldTotal": 900,
+      "newTotal": 900,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-10841",
+      "number": "IN-10841",
+      "oldTotal": 2395,
+      "newTotal": 2395,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-10884",
+      "number": "IN-10884",
+      "oldTotal": 5005,
+      "newTotal": 5005,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-10890",
+      "number": "IN-10890",
+      "oldTotal": 1775,
+      "newTotal": 1775,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-10925",
+      "number": "IN-10925",
+      "oldTotal": 4068.75,
+      "newTotal": 4068.75,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-10948",
+      "number": "IN-10948",
+      "oldTotal": 4981.25,
+      "newTotal": 4981.25,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-10974",
+      "number": "IN-10974",
+      "oldTotal": 4156.25,
+      "newTotal": 4156.25,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-11007",
+      "number": "IN-11007",
+      "oldTotal": 2376.81,
+      "newTotal": 2376.81,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-11058",
+      "number": "IN-11058",
+      "oldTotal": 1342.68,
+      "newTotal": 1342.68,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-11060",
+      "number": "IN-11060",
+      "oldTotal": 520.65,
+      "newTotal": 520.65,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-11103",
+      "number": "IN-11103",
+      "oldTotal": 1535.33,
+      "newTotal": 1535.33,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-11138",
+      "number": "IN-11138",
+      "oldTotal": 438,
+      "newTotal": 438,
+      "delta": 0
+    },
+    {
+      "boardId": "nieves-3920-laguna-blanca-drive-sb",
+      "invoiceId": "in-11203",
+      "number": "IN-11203",
+      "oldTotal": 1418.75,
+      "newTotal": 1418.75,
+      "delta": 0
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12268",
+      "number": "IN-12268",
+      "oldTotal": 13747.5,
+      "newTotal": 13747.5,
+      "delta": 0
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12269",
+      "number": "IN-12269",
+      "oldTotal": 14348.75,
+      "newTotal": 14348.75,
+      "delta": 0
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12270",
+      "number": "IN-12270",
+      "oldTotal": 7685,
+      "newTotal": 7685,
+      "delta": 0
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12373",
+      "number": "IN-12373",
+      "oldTotal": 14801.25,
+      "newTotal": 14801.25,
+      "delta": 0
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12510",
+      "number": "IN-12510",
+      "oldTotal": 2953.75,
+      "newTotal": 2953.75,
+      "delta": 0
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12511",
+      "number": "IN-12511",
+      "oldTotal": 1811.25,
+      "newTotal": 1811.25,
+      "delta": 0
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12625",
+      "number": "IN-12625",
+      "oldTotal": 1796.25,
+      "newTotal": 1796.25,
+      "delta": 0
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12635",
+      "number": "IN-12635",
+      "oldTotal": 3180,
+      "newTotal": 3180,
+      "delta": 0
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12636",
+      "number": "IN-12636",
+      "oldTotal": 9568.75,
+      "newTotal": 9568.75,
+      "delta": 0
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12637",
+      "number": "IN-12637",
+      "oldTotal": 7956.25,
+      "newTotal": 7956.25,
+      "delta": 0
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12649",
+      "number": "IN-12649",
+      "oldTotal": 4745,
+      "newTotal": 4745,
+      "delta": 0
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12676",
+      "number": "IN-12676",
+      "oldTotal": 1895,
+      "newTotal": 1895,
+      "delta": 0
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12687",
+      "number": "IN-12687",
+      "oldTotal": 1690,
+      "newTotal": 1690,
+      "delta": 0
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12732",
+      "number": "IN-12732",
+      "oldTotal": 1882.5,
+      "newTotal": 1882.5,
+      "delta": 0
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12733",
+      "number": "IN-12733",
+      "oldTotal": 2302.5,
+      "newTotal": 2302.5,
+      "delta": 0
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12743",
+      "number": "IN-12743",
+      "oldTotal": 3180,
+      "newTotal": 3180,
+      "delta": 0
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12758",
+      "number": "IN-12758",
+      "oldTotal": 2467.5,
+      "newTotal": 2467.5,
+      "delta": 0
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12761",
+      "number": "IN-12761",
+      "oldTotal": 3093.75,
+      "newTotal": 3093.75,
+      "delta": 0
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12765",
+      "number": "IN-12765",
+      "oldTotal": 2976.25,
+      "newTotal": 2976.25,
+      "delta": 0
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12766",
+      "number": "IN-12766",
+      "oldTotal": 1462.5,
+      "newTotal": 1462.5,
+      "delta": 0
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12778",
+      "number": "IN-12778",
+      "oldTotal": 832.78,
+      "newTotal": 1192.96,
+      "delta": 360.18
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12786",
+      "number": "IN-12786",
+      "oldTotal": 3822.5,
+      "newTotal": 3822.5,
+      "delta": 0
+    },
+    {
+      "boardId": "park-city",
+      "invoiceId": "in-12813",
+      "number": "IN-12813",
+      "oldTotal": 993.75,
+      "newTotal": 993.75,
+      "delta": 0
+    },
+    {
+      "boardId": "parsons-fairway",
+      "invoiceId": "in-10063",
+      "number": "IN-10063",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "perkowshi-5-shoreline",
+      "invoiceId": "in-10568",
+      "number": "IN-10568",
+      "oldTotal": 818.75,
+      "newTotal": 818.75,
+      "delta": 0
+    },
+    {
+      "boardId": "perkowshi-5-shoreline",
+      "invoiceId": "in-10607",
+      "number": "IN-10607",
+      "oldTotal": 2643.75,
+      "newTotal": 2643.75,
+      "delta": 0
+    },
+    {
+      "boardId": "perkowshi-5-shoreline",
+      "invoiceId": "in-10632",
+      "number": "IN-10632",
+      "oldTotal": 2680,
+      "newTotal": 2680,
+      "delta": 0
+    },
+    {
+      "boardId": "polito-bvr",
+      "invoiceId": "in-12839",
+      "number": "IN-12839",
+      "oldTotal": 10052.5,
+      "newTotal": 10052.5,
+      "delta": 0
+    },
+    {
+      "boardId": "polito-bvr",
+      "invoiceId": "in-12938",
+      "number": "IN-12938",
+      "oldTotal": 6172.5,
+      "newTotal": 6172.5,
+      "delta": 0
+    },
+    {
+      "boardId": "pulsifer-olympia",
+      "invoiceId": "in-10846",
+      "number": "IN-10846",
+      "oldTotal": 1850,
+      "newTotal": 1850,
+      "delta": 0
+    },
+    {
+      "boardId": "rayment-sleepy-hollow",
+      "invoiceId": "in-10321",
+      "number": "IN-10321",
+      "oldTotal": 690,
+      "newTotal": 690,
+      "delta": 0
+    },
+    {
+      "boardId": "rayment-sleepy-hollow",
+      "invoiceId": "in-10390",
+      "number": "IN-10390",
+      "oldTotal": 555,
+      "newTotal": 555,
+      "delta": 0
+    },
+    {
+      "boardId": "rayment-sleepy-hollow",
+      "invoiceId": "in-10429",
+      "number": "IN-10429",
+      "oldTotal": 572.5,
+      "newTotal": 572.5,
+      "delta": 0
+    },
+    {
+      "boardId": "rayment-sleepy-hollow",
+      "invoiceId": "in-10504",
+      "number": "IN-10504",
+      "oldTotal": 1268.75,
+      "newTotal": 1268.75,
+      "delta": 0
+    },
+    {
+      "boardId": "rayment-sleepy-hollow",
+      "invoiceId": "in-10548",
+      "number": "IN-10548",
+      "oldTotal": 935,
+      "newTotal": 935,
+      "delta": 0
+    },
+    {
+      "boardId": "rayment-sleepy-hollow",
+      "invoiceId": "in-10633",
+      "number": "IN-10633",
+      "oldTotal": 1393.75,
+      "newTotal": 1393.75,
+      "delta": 0
+    },
+    {
+      "boardId": "rayment-sleepy-hollow",
+      "invoiceId": "in-10634",
+      "number": "IN-10634",
+      "oldTotal": 990,
+      "newTotal": 990,
+      "delta": 0
+    },
+    {
+      "boardId": "rayment-sleepy-hollow",
+      "invoiceId": "in-10673",
+      "number": "IN-10673",
+      "oldTotal": 1747.5,
+      "newTotal": 1747.5,
+      "delta": 0
+    },
+    {
+      "boardId": "rayment-sleepy-hollow",
+      "invoiceId": "in-10737",
+      "number": "IN-10737",
+      "oldTotal": 927.5,
+      "newTotal": 927.5,
+      "delta": 0
+    },
+    {
+      "boardId": "rayment-sleepy-hollow",
+      "invoiceId": "in-10872",
+      "number": "IN-10872",
+      "oldTotal": 415,
+      "newTotal": 415,
+      "delta": 0
+    },
+    {
+      "boardId": "rayment-sleepy-hollow",
+      "invoiceId": "in-10983",
+      "number": "IN-10983",
+      "oldTotal": 475,
+      "newTotal": 475,
+      "delta": 0
+    },
+    {
+      "boardId": "rayment-sleepy-hollow",
+      "invoiceId": "in-11020",
+      "number": "IN-11020",
+      "oldTotal": 166.25,
+      "newTotal": 166.25,
+      "delta": 0
+    },
+    {
+      "boardId": "renee-meadowbrook-drive",
+      "invoiceId": "in-10224",
+      "number": "IN-10224",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "renee-meadowbrook-drive",
+      "invoiceId": "in-10255",
+      "number": "IN-10255",
+      "oldTotal": 487.5,
+      "newTotal": 487.5,
+      "delta": 0
+    },
+    {
+      "boardId": "renee-meadowbrook-drive",
+      "invoiceId": "in-10256",
+      "number": "IN-10256",
+      "oldTotal": 2790,
+      "newTotal": 2790,
+      "delta": 0
+    },
+    {
+      "boardId": "renee-meadowbrook-drive",
+      "invoiceId": "in-10257",
+      "number": "IN-10257",
+      "oldTotal": 906.25,
+      "newTotal": 906.25,
+      "delta": 0
+    },
+    {
+      "boardId": "renee-meadowbrook-drive",
+      "invoiceId": "in-10282",
+      "number": "IN-10282",
+      "oldTotal": 782.5,
+      "newTotal": 782.5,
+      "delta": 0
+    },
+    {
+      "boardId": "renee-meadowbrook-drive",
+      "invoiceId": "in-10388",
+      "number": "IN-10388",
+      "oldTotal": 500,
+      "newTotal": 500,
+      "delta": 0
+    },
+    {
+      "boardId": "renee-meadowbrook-drive",
+      "invoiceId": "in-11658",
+      "number": "IN-11658",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "rodin-whidbey-dr",
+      "invoiceId": "in-11019",
+      "number": "IN-11019",
+      "oldTotal": 450,
+      "newTotal": 450,
+      "delta": 0
+    },
+    {
+      "boardId": "rodin-whidbey-dr",
+      "invoiceId": "in-11105",
+      "number": "IN-11105",
+      "oldTotal": 703.75,
+      "newTotal": 703.75,
+      "delta": 0
+    },
+    {
+      "boardId": "rodin-whidbey-dr",
+      "invoiceId": "in-11160",
+      "number": "IN-11160",
+      "oldTotal": 160,
+      "newTotal": 160,
+      "delta": 0
+    },
+    {
+      "boardId": "rodin-whidbey-dr",
+      "invoiceId": "in-11183",
+      "number": "IN-11183",
+      "oldTotal": 25,
+      "newTotal": 25,
+      "delta": 0
+    },
+    {
+      "boardId": "rodin-whidbey-dr",
+      "invoiceId": "in-12064",
+      "number": "IN-12064",
+      "oldTotal": 1246.25,
+      "newTotal": 1246.25,
+      "delta": 0
+    },
+    {
+      "boardId": "rodin-whidbey-dr",
+      "invoiceId": "in-12097",
+      "number": "IN-12097",
+      "oldTotal": 3041.25,
+      "newTotal": 3041.25,
+      "delta": 0
+    },
+    {
+      "boardId": "rodin-whidbey-dr",
+      "invoiceId": "in-12144",
+      "number": "IN-12144",
+      "oldTotal": 323.75,
+      "newTotal": 323.75,
+      "delta": 0
+    },
+    {
+      "boardId": "rodin-whidbey-dr",
+      "invoiceId": "in-12158",
+      "number": "IN-12158",
+      "oldTotal": 1120,
+      "newTotal": 1120,
+      "delta": 0
+    },
+    {
+      "boardId": "rosenthal-335-myrtle-st",
+      "invoiceId": "in-10047",
+      "number": "IN-10047",
+      "oldTotal": 3725,
+      "newTotal": 3725,
+      "delta": 0
+    },
+    {
+      "boardId": "rosenthal-335-myrtle-st",
+      "invoiceId": "in-10091",
+      "number": "IN-10091",
+      "oldTotal": 2836.25,
+      "newTotal": 2836.25,
+      "delta": 0
+    },
+    {
+      "boardId": "rosenthal-335-myrtle-st",
+      "invoiceId": "in-10124",
+      "number": "IN-10124",
+      "oldTotal": 1612.5,
+      "newTotal": 1612.5,
+      "delta": 0
+    },
+    {
+      "boardId": "rosenthal-335-myrtle-st",
+      "invoiceId": "in-10175",
+      "number": "IN-10175",
+      "oldTotal": 3930,
+      "newTotal": 3930,
+      "delta": 0
+    },
+    {
+      "boardId": "rosenthal-335-myrtle-st",
+      "invoiceId": "in-10211",
+      "number": "IN-10211",
+      "oldTotal": 342.5,
+      "newTotal": 342.5,
+      "delta": 0
+    },
+    {
+      "boardId": "rosenthal-335-myrtle-st",
+      "invoiceId": "in-10284",
+      "number": "IN-10284",
+      "oldTotal": 1080,
+      "newTotal": 1080,
+      "delta": 0
+    },
+    {
+      "boardId": "rosenthal-335-myrtle-st",
+      "invoiceId": "in-10391",
+      "number": "IN-10391",
+      "oldTotal": 1839.17,
+      "newTotal": 1839.17,
+      "delta": 0
+    },
+    {
+      "boardId": "rosenthal-335-myrtle-st",
+      "invoiceId": "in-10739",
+      "number": "IN-10739",
+      "oldTotal": 2000,
+      "newTotal": 2000,
+      "delta": 0
+    },
+    {
+      "boardId": "rosenthal-335-myrtle-st",
+      "invoiceId": "in-10745",
+      "number": "IN-10745",
+      "oldTotal": 2568.75,
+      "newTotal": 2568.75,
+      "delta": 0
+    },
+    {
+      "boardId": "rosenthal-335-myrtle-st",
+      "invoiceId": "in-10822",
+      "number": "IN-10822",
+      "oldTotal": 2278.75,
+      "newTotal": 2278.75,
+      "delta": 0
+    },
+    {
+      "boardId": "rosenthal-335-myrtle-st",
+      "invoiceId": "in-10823",
+      "number": "IN-10823",
+      "oldTotal": 905,
+      "newTotal": 905,
+      "delta": 0
+    },
+    {
+      "boardId": "rosenthal-335-myrtle-st",
+      "invoiceId": "in-10844",
+      "number": "IN-10844",
+      "oldTotal": 1162.5,
+      "newTotal": 1162.5,
+      "delta": 0
+    },
+    {
+      "boardId": "rosenthal-335-myrtle-st",
+      "invoiceId": "in-10878",
+      "number": "IN-10878",
+      "oldTotal": 2593.75,
+      "newTotal": 2593.75,
+      "delta": 0
+    },
+    {
+      "boardId": "rosenthal-335-myrtle-st",
+      "invoiceId": "in-10909",
+      "number": "IN-10909",
+      "oldTotal": 1908.75,
+      "newTotal": 1908.75,
+      "delta": 0
+    },
+    {
+      "boardId": "rosenthal-335-myrtle-st",
+      "invoiceId": "in-10910",
+      "number": "IN-10910",
+      "oldTotal": 28.28,
+      "newTotal": 28.28,
+      "delta": 0
+    },
+    {
+      "boardId": "rosenthal-335-myrtle-st",
+      "invoiceId": "in-10988",
+      "number": "IN-10988",
+      "oldTotal": 1926.25,
+      "newTotal": 1926.25,
+      "delta": 0
+    },
+    {
+      "boardId": "rosenthal-335-myrtle-st",
+      "invoiceId": "in-10989",
+      "number": "IN-10989",
+      "oldTotal": 1430,
+      "newTotal": 1430,
+      "delta": 0
+    },
+    {
+      "boardId": "rosenthal-335-myrtle-st",
+      "invoiceId": "in-11161",
+      "number": "IN-11161",
+      "oldTotal": 811.25,
+      "newTotal": 811.25,
+      "delta": 0
+    },
+    {
+      "boardId": "rosenthal-335-myrtle-st",
+      "invoiceId": "in-11182",
+      "number": "IN-11182",
+      "oldTotal": 712.5,
+      "newTotal": 712.5,
+      "delta": 0
+    },
+    {
+      "boardId": "rosenthal-335-myrtle-st",
+      "invoiceId": "in-11211",
+      "number": "IN-11211",
+      "oldTotal": 2232.5,
+      "newTotal": 2232.5,
+      "delta": 0
+    },
+    {
+      "boardId": "rosenthal-335-myrtle-st",
+      "invoiceId": "in-11243",
+      "number": "IN-11243",
+      "oldTotal": 1112.5,
+      "newTotal": 1112.5,
+      "delta": 0
+    },
+    {
+      "boardId": "rosenthal-335-myrtle-st",
+      "invoiceId": "in-11340",
+      "number": "IN-11340",
+      "oldTotal": 350,
+      "newTotal": 350,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11052",
+      "number": "IN-11052",
+      "oldTotal": 3281.25,
+      "newTotal": 3281.25,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11101",
+      "number": "IN-11101",
+      "oldTotal": 1712.5,
+      "newTotal": 1712.5,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11143",
+      "number": "IN-11143",
+      "oldTotal": 2200.03,
+      "newTotal": 2200.03,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11189",
+      "number": "IN-11189",
+      "oldTotal": 2046.25,
+      "newTotal": 2046.25,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11216",
+      "number": "IN-11216",
+      "oldTotal": 712.5,
+      "newTotal": 712.5,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11240",
+      "number": "IN-11240",
+      "oldTotal": 2954.15,
+      "newTotal": 2954.15,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11267",
+      "number": "IN-11267",
+      "oldTotal": 4559.75,
+      "newTotal": 4559.75,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11275",
+      "number": "IN-11275",
+      "oldTotal": 137.21,
+      "newTotal": 137.21,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11286",
+      "number": "IN-11286",
+      "oldTotal": 3641,
+      "newTotal": 3641,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11312",
+      "number": "IN-11312",
+      "oldTotal": 1036.25,
+      "newTotal": 1036.25,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11321",
+      "number": "IN-11321",
+      "oldTotal": 1042.5,
+      "newTotal": 1042.5,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11335",
+      "number": "IN-11335",
+      "oldTotal": 1981.25,
+      "newTotal": 1981.25,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11405",
+      "number": "IN-11405",
+      "oldTotal": 1625,
+      "newTotal": 1625,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11448",
+      "number": "IN-11448",
+      "oldTotal": 593.75,
+      "newTotal": 593.75,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11480",
+      "number": "IN-11480",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11481",
+      "number": "IN-11481",
+      "oldTotal": 1520,
+      "newTotal": 1520,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11503",
+      "number": "IN-11503",
+      "oldTotal": 475,
+      "newTotal": 475,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11556",
+      "number": "IN-11556",
+      "oldTotal": 1951.25,
+      "newTotal": 1951.25,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11589",
+      "number": "IN-11589",
+      "oldTotal": 863.24,
+      "newTotal": 863.24,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11654",
+      "number": "IN-11654",
+      "oldTotal": 1884.26,
+      "newTotal": 1884.26,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11667",
+      "number": "IN-11667",
+      "oldTotal": 550,
+      "newTotal": 550,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11689",
+      "number": "IN-11689",
+      "oldTotal": 762.5,
+      "newTotal": 762.5,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11744",
+      "number": "IN-11744",
+      "oldTotal": 1003.75,
+      "newTotal": 1003.75,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11751",
+      "number": "IN-11751",
+      "oldTotal": 1094,
+      "newTotal": 1094,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11791",
+      "number": "IN-11791",
+      "oldTotal": 2230,
+      "newTotal": 2230,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11796",
+      "number": "IN-11796",
+      "oldTotal": 2815.75,
+      "newTotal": 2815.75,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11857",
+      "number": "IN-11857",
+      "oldTotal": 1741.25,
+      "newTotal": 1741.25,
+      "delta": 0
+    },
+    {
+      "boardId": "sakioka-mountain-view",
+      "invoiceId": "in-11874",
+      "number": "IN-11874",
+      "oldTotal": 406.59,
+      "newTotal": 406.59,
+      "delta": 0
+    },
+    {
+      "boardId": "scarborough-139-claremont-long-beach",
+      "invoiceId": "in-10101",
+      "number": "IN-10101",
+      "oldTotal": 1403.75,
+      "newTotal": 1403.75,
+      "delta": 0
+    },
+    {
+      "boardId": "scarborough-139-claremont-long-beach",
+      "invoiceId": "in-10261",
+      "number": "IN-10261",
+      "oldTotal": 485,
+      "newTotal": 485,
+      "delta": 0
+    },
+    {
+      "boardId": "scarborough-139-claremont-long-beach",
+      "invoiceId": "in-10262",
+      "number": "IN-10262",
+      "oldTotal": 338.75,
+      "newTotal": 338.75,
+      "delta": 0
+    },
+    {
+      "boardId": "scarborough-139-claremont-long-beach",
+      "invoiceId": "in-10445",
+      "number": "IN-10445",
+      "oldTotal": 1348.75,
+      "newTotal": 1348.75,
+      "delta": 0
+    },
+    {
+      "boardId": "schneider-east-coast-hwy",
+      "invoiceId": "in-10900",
+      "number": "IN-10900",
+      "oldTotal": 968.06,
+      "newTotal": 968.06,
+      "delta": 0
+    },
+    {
+      "boardId": "schneider-east-coast-hwy",
+      "invoiceId": "in-11804",
+      "number": "IN-11804",
+      "oldTotal": 712.5,
+      "newTotal": 712.5,
+      "delta": 0
+    },
+    {
+      "boardId": "schneider-east-coast-hwy",
+      "invoiceId": "in-11805",
+      "number": "IN-11805",
+      "oldTotal": 387.5,
+      "newTotal": 387.5,
+      "delta": 0
+    },
+    {
+      "boardId": "schneider-east-coast-hwy",
+      "invoiceId": "in-12348",
+      "number": "IN-12348",
+      "oldTotal": 6148.78,
+      "newTotal": 4829.08,
+      "delta": -1319.7
+    },
+    {
+      "boardId": "schneider-east-coast-hwy",
+      "invoiceId": "in-12470",
+      "number": "IN-12470",
+      "oldTotal": 637.5,
+      "newTotal": 637.5,
+      "delta": 0
+    },
+    {
+      "boardId": "schneider-east-coast-hwy",
+      "invoiceId": "in-12471",
+      "number": "IN-12471",
+      "oldTotal": 2175,
+      "newTotal": 2175,
+      "delta": 0
+    },
+    {
+      "boardId": "schneider-east-coast-hwy",
+      "invoiceId": "in-12494",
+      "number": "IN-12494",
+      "oldTotal": 3067.5,
+      "newTotal": 3067.5,
+      "delta": 0
+    },
+    {
+      "boardId": "schneider-east-coast-hwy",
+      "invoiceId": "in-12579",
+      "number": "IN-12579",
+      "oldTotal": 798.75,
+      "newTotal": 798.75,
+      "delta": 0
+    },
+    {
+      "boardId": "schneider-east-coast-hwy",
+      "invoiceId": "in-12963",
+      "number": "IN-12963",
+      "oldTotal": 448.75,
+      "newTotal": 448.75,
+      "delta": 0
+    },
+    {
+      "boardId": "schneider-east-coast-hwy",
+      "invoiceId": "in-12964",
+      "number": "IN-12964",
+      "oldTotal": 796.25,
+      "newTotal": 796.25,
+      "delta": 0
+    },
+    {
+      "boardId": "schneider-east-coast-hwy",
+      "invoiceId": "in-12966",
+      "number": "IN-12966",
+      "oldTotal": 2033.75,
+      "newTotal": 2033.75,
+      "delta": 0
+    },
+    {
+      "boardId": "schneider-east-coast-hwy",
+      "invoiceId": "in-12972",
+      "number": "IN-12972",
+      "oldTotal": 1461.25,
+      "newTotal": 1461.25,
+      "delta": 0
+    },
+    {
+      "boardId": "schneider-michael",
+      "invoiceId": "IN-10082",
+      "number": "IN-10082",
+      "oldTotal": 1926.2,
+      "newTotal": 1926.2,
+      "delta": 0
+    },
+    {
+      "boardId": "schneider-michael",
+      "invoiceId": "IN-10084",
+      "number": "IN-10084",
+      "oldTotal": 527.5,
+      "newTotal": 527.5,
+      "delta": 0
+    },
+    {
+      "boardId": "schneider-michael",
+      "invoiceId": "IN-10100",
+      "number": "IN-10100",
+      "oldTotal": 348.75,
+      "newTotal": 348.75,
+      "delta": 0
+    },
+    {
+      "boardId": "shauna-cernovich",
+      "invoiceId": "IN-10069",
+      "number": "IN-10069",
+      "oldTotal": 2956.25,
+      "newTotal": 2956.25,
+      "delta": 0
+    },
+    {
+      "boardId": "shauna-cernovich",
+      "invoiceId": "IN-10134",
+      "number": "IN-10134",
+      "oldTotal": 1000,
+      "newTotal": 1000,
+      "delta": 0
+    },
+    {
+      "boardId": "shauna-cernovich",
+      "invoiceId": "IN-10146",
+      "number": "IN-10146",
+      "oldTotal": 6460,
+      "newTotal": 6460,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10074",
+      "number": "IN-10074",
+      "oldTotal": 3978.75,
+      "newTotal": 3978.75,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10080",
+      "number": "IN-10080",
+      "oldTotal": 2996.25,
+      "newTotal": 2996.25,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10088",
+      "number": "IN-10088",
+      "oldTotal": 4772.5,
+      "newTotal": 4772.5,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10089",
+      "number": "IN-10089",
+      "oldTotal": 19848.719999999998,
+      "newTotal": 19848.72,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10090",
+      "number": "IN-10090",
+      "oldTotal": 3400,
+      "newTotal": 3400,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10093",
+      "number": "IN-10093",
+      "oldTotal": 413.76,
+      "newTotal": 404.8,
+      "delta": -8.96
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10101",
+      "number": "IN-10101",
+      "oldTotal": 6172.8,
+      "newTotal": 6172.8,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10103",
+      "number": "IN-10103",
+      "oldTotal": 4056.25,
+      "newTotal": 4056.25,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10104",
+      "number": "IN-10104",
+      "oldTotal": 3837.5,
+      "newTotal": 3837.5,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10106",
+      "number": "IN-10106",
+      "oldTotal": 38631.55,
+      "newTotal": 38631.55,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10109",
+      "number": "IN-10109",
+      "oldTotal": 1827.46,
+      "newTotal": 1827.46,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10110",
+      "number": "IN-10110",
+      "oldTotal": 3062.5,
+      "newTotal": 3062.5,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10117",
+      "number": "IN-10117",
+      "oldTotal": 3813.75,
+      "newTotal": 3813.75,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10125",
+      "number": "IN-10125",
+      "oldTotal": 4052.5,
+      "newTotal": 4052.5,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10126",
+      "number": "IN-10126",
+      "oldTotal": 2042.5,
+      "newTotal": 2042.5,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10127",
+      "number": "IN-10127",
+      "oldTotal": 3407.5,
+      "newTotal": 3407.5,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10133",
+      "number": "IN-10133",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10137",
+      "number": "IN-10137",
+      "oldTotal": 3425,
+      "newTotal": 3425,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10145",
+      "number": "IN-10145",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10148",
+      "number": "IN-10148",
+      "oldTotal": 1850,
+      "newTotal": 1850,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10151",
+      "number": "IN-10151",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10159",
+      "number": "IN-10159",
+      "oldTotal": 900,
+      "newTotal": 900,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10168",
+      "number": "IN-10168",
+      "oldTotal": 3125,
+      "newTotal": 3125,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-maverick-cir",
+      "invoiceId": "IN-10169",
+      "number": "IN-10169",
+      "oldTotal": 2553.75,
+      "newTotal": 2553.75,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11053",
+      "number": "IN-11053",
+      "oldTotal": 1635,
+      "newTotal": 1635,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11102",
+      "number": "IN-11102",
+      "oldTotal": 2300.13,
+      "newTotal": 2300.13,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11151",
+      "number": "IN-11151",
+      "oldTotal": 381.25,
+      "newTotal": 381.25,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11192",
+      "number": "IN-11192",
+      "oldTotal": 231.25,
+      "newTotal": 231.25,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11215",
+      "number": "IN-11215",
+      "oldTotal": 4373.75,
+      "newTotal": 4373.75,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11239",
+      "number": "IN-11239",
+      "oldTotal": 2136.25,
+      "newTotal": 2136.25,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11258",
+      "number": "IN-11258",
+      "oldTotal": 2992.5,
+      "newTotal": 2992.5,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11287",
+      "number": "IN-11287",
+      "oldTotal": 3402.25,
+      "newTotal": 3402.25,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11313",
+      "number": "IN-11313",
+      "oldTotal": 997.5,
+      "newTotal": 997.5,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11344",
+      "number": "IN-11344",
+      "oldTotal": 4687.5,
+      "newTotal": 4687.5,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11408",
+      "number": "IN-11408",
+      "oldTotal": 2980,
+      "newTotal": 2980,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11452",
+      "number": "IN-11452",
+      "oldTotal": 1558.75,
+      "newTotal": 1558.75,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11482",
+      "number": "IN-11482",
+      "oldTotal": 2413.75,
+      "newTotal": 2413.75,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11504",
+      "number": "IN-11504",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11532",
+      "number": "IN-11532",
+      "oldTotal": 3926.87,
+      "newTotal": 3926.87,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11533",
+      "number": "IN-11533",
+      "oldTotal": 4892.5,
+      "newTotal": 4892.5,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11557",
+      "number": "IN-11557",
+      "oldTotal": 2885.07,
+      "newTotal": 2885.07,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11590",
+      "number": "IN-11590",
+      "oldTotal": 2857.5,
+      "newTotal": 2857.5,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11696",
+      "number": "IN-11696",
+      "oldTotal": 4279.3,
+      "newTotal": 4279.3,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11697",
+      "number": "IN-11697",
+      "oldTotal": 1037.5,
+      "newTotal": 1037.5,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11776",
+      "number": "IN-11776",
+      "oldTotal": 1975,
+      "newTotal": 1975,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11779",
+      "number": "IN-11779",
+      "oldTotal": 1425,
+      "newTotal": 1425,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11815",
+      "number": "IN-11815",
+      "oldTotal": 1414.22,
+      "newTotal": 1414.22,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11911",
+      "number": "IN-11911",
+      "oldTotal": 1956.25,
+      "newTotal": 1956.25,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11912",
+      "number": "IN-11912",
+      "oldTotal": 2725,
+      "newTotal": 2725,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11933",
+      "number": "IN-11933",
+      "oldTotal": 3671,
+      "newTotal": 3671,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11935",
+      "number": "IN-11935",
+      "oldTotal": 5181.5,
+      "newTotal": 5181.5,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11936",
+      "number": "IN-11936",
+      "oldTotal": 2884,
+      "newTotal": 2884,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11937",
+      "number": "IN-11937",
+      "oldTotal": 2130.15,
+      "newTotal": 2130.15,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11997",
+      "number": "IN-11997",
+      "oldTotal": 5652.5,
+      "newTotal": 5652.5,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-11998",
+      "number": "IN-11998",
+      "oldTotal": 1733.75,
+      "newTotal": 1733.75,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-12037",
+      "number": "IN-12037",
+      "oldTotal": 3125,
+      "newTotal": 3125,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-12039",
+      "number": "IN-12039",
+      "oldTotal": 1900,
+      "newTotal": 1900,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-12091",
+      "number": "IN-12091",
+      "oldTotal": 6201,
+      "newTotal": 6201,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-12137",
+      "number": "IN-12137",
+      "oldTotal": 3455,
+      "newTotal": 3455,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-12263",
+      "number": "IN-12263",
+      "oldTotal": 4383.75,
+      "newTotal": 4383.75,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-12264",
+      "number": "IN-12264",
+      "oldTotal": 6748.75,
+      "newTotal": 6748.75,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-12276",
+      "number": "IN-12276",
+      "oldTotal": 2142.5,
+      "newTotal": 2142.5,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-12288",
+      "number": "IN-12288",
+      "oldTotal": 4508.5,
+      "newTotal": 4508.5,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-12297",
+      "number": "IN-12297",
+      "oldTotal": 3653.6,
+      "newTotal": 3653.6,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-12342",
+      "number": "IN-12342",
+      "oldTotal": 4193.75,
+      "newTotal": 4193.75,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-12377",
+      "number": "IN-12377",
+      "oldTotal": 4230,
+      "newTotal": 4230,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-12419",
+      "number": "IN-12419",
+      "oldTotal": 2258.75,
+      "newTotal": 2258.75,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-12420",
+      "number": "IN-12420",
+      "oldTotal": 1976.25,
+      "newTotal": 1976.25,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-12430",
+      "number": "IN-12430",
+      "oldTotal": 3322.5,
+      "newTotal": 3322.5,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-12442",
+      "number": "IN-12442",
+      "oldTotal": 2283.75,
+      "newTotal": 2283.75,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-12447",
+      "number": "IN-12447",
+      "oldTotal": 1173.75,
+      "newTotal": 1173.75,
+      "delta": 0
+    },
+    {
+      "boardId": "shimano-westridge-lane",
+      "invoiceId": "in-12475",
+      "number": "IN-12475",
+      "oldTotal": 540,
+      "newTotal": 540,
+      "delta": 0
+    },
+    {
+      "boardId": "silverman-la-esperanza",
+      "invoiceId": "IN-24-10051",
+      "number": "IN-24-10051",
+      "oldTotal": 796.25,
+      "newTotal": 796.25,
+      "delta": 0
+    },
+    {
+      "boardId": "silverman-la-esperanza",
+      "invoiceId": "IN-24-10054",
+      "number": "IN-24-10054",
+      "oldTotal": 950,
+      "newTotal": 950,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-10838",
+      "number": "IN-10838",
+      "oldTotal": 1993.75,
+      "newTotal": 1993.75,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-10942",
+      "number": "IN-10942",
+      "oldTotal": 643.58,
+      "newTotal": 643.58,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-10950",
+      "number": "IN-10950",
+      "oldTotal": 1812.5,
+      "newTotal": 1812.5,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-10952",
+      "number": "IN-10952",
+      "oldTotal": 1362.5,
+      "newTotal": 1362.5,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-10975",
+      "number": "IN-10975",
+      "oldTotal": 1037.5,
+      "newTotal": 1037.5,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-11011",
+      "number": "IN-11011",
+      "oldTotal": 2912.5,
+      "newTotal": 2912.5,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-11054",
+      "number": "IN-11054",
+      "oldTotal": 1650,
+      "newTotal": 1650,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-11109",
+      "number": "IN-11109",
+      "oldTotal": 3922.5,
+      "newTotal": 3922.5,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-11123",
+      "number": "IN-11123",
+      "oldTotal": 1292,
+      "newTotal": 1292,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-11145",
+      "number": "IN-11145",
+      "oldTotal": 3836.25,
+      "newTotal": 3836.25,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-11191",
+      "number": "IN-11191",
+      "oldTotal": 1093.75,
+      "newTotal": 1093.75,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-11202",
+      "number": "IN-11202",
+      "oldTotal": 1566.25,
+      "newTotal": 1566.25,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-11236",
+      "number": "IN-11236",
+      "oldTotal": 1525,
+      "newTotal": 1525,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-11263",
+      "number": "IN-11263",
+      "oldTotal": 2650,
+      "newTotal": 2650,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-11288",
+      "number": "IN-11288",
+      "oldTotal": 2225,
+      "newTotal": 2225,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-11332",
+      "number": "IN-11332",
+      "oldTotal": 1593.75,
+      "newTotal": 1593.75,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-11407",
+      "number": "IN-11407",
+      "oldTotal": 1365,
+      "newTotal": 1365,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-11451",
+      "number": "IN-11451",
+      "oldTotal": 1220,
+      "newTotal": 1220,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-11489",
+      "number": "IN-11489",
+      "oldTotal": 1030,
+      "newTotal": 1030,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-11525",
+      "number": "IN-11525",
+      "oldTotal": 1360,
+      "newTotal": 1360,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-11560",
+      "number": "IN-11560",
+      "oldTotal": 1556.25,
+      "newTotal": 1556.25,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-11596",
+      "number": "IN-11596",
+      "oldTotal": 1421.25,
+      "newTotal": 1421.25,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-11651",
+      "number": "IN-11651",
+      "oldTotal": 2171.25,
+      "newTotal": 2171.25,
+      "delta": 0
+    },
+    {
+      "boardId": "skeen-greenleaf-way",
+      "invoiceId": "in-11695",
+      "number": "IN-11695",
+      "oldTotal": 1052.5,
+      "newTotal": 1052.5,
+      "delta": 0
+    },
+    {
+      "boardId": "smith-remodel",
+      "invoiceId": "in-10136",
+      "number": "IN-10136",
+      "oldTotal": 2706.25,
+      "newTotal": 2706.25,
+      "delta": 0
+    },
+    {
+      "boardId": "smith-remodel",
+      "invoiceId": "in-10137",
+      "number": "IN-10137",
+      "oldTotal": 1311.25,
+      "newTotal": 1311.25,
+      "delta": 0
+    },
+    {
+      "boardId": "smith-remodel",
+      "invoiceId": "in-10138",
+      "number": "IN-10138",
+      "oldTotal": 1406.25,
+      "newTotal": 1406.25,
+      "delta": 0
+    },
+    {
+      "boardId": "smith-remodel",
+      "invoiceId": "in-10759",
+      "number": "IN-10759",
+      "oldTotal": 2647.5,
+      "newTotal": 2647.5,
+      "delta": 0
+    },
+    {
+      "boardId": "smith-remodel",
+      "invoiceId": "in-10760",
+      "number": "IN-10760",
+      "oldTotal": 1621.25,
+      "newTotal": 1621.25,
+      "delta": 0
+    },
+    {
+      "boardId": "smith-remodel",
+      "invoiceId": "in-10813",
+      "number": "IN-10813",
+      "oldTotal": 3060,
+      "newTotal": 3060,
+      "delta": 0
+    },
+    {
+      "boardId": "smith-remodel",
+      "invoiceId": "in-10837",
+      "number": "IN-10837",
+      "oldTotal": 2273.67,
+      "newTotal": 2273.67,
+      "delta": 0
+    },
+    {
+      "boardId": "smith-remodel",
+      "invoiceId": "in-10875",
+      "number": "IN-10875",
+      "oldTotal": 2133.75,
+      "newTotal": 2133.75,
+      "delta": 0
+    },
+    {
+      "boardId": "smith-remodel",
+      "invoiceId": "in-10924",
+      "number": "IN-10924",
+      "oldTotal": 1952.5,
+      "newTotal": 1952.5,
+      "delta": 0
+    },
+    {
+      "boardId": "smith-remodel",
+      "invoiceId": "in-10949",
+      "number": "IN-10949",
+      "oldTotal": 2500,
+      "newTotal": 2500,
+      "delta": 0
+    },
+    {
+      "boardId": "smith-remodel",
+      "invoiceId": "in-10970",
+      "number": "IN-10970",
+      "oldTotal": 1688.75,
+      "newTotal": 1688.75,
+      "delta": 0
+    },
+    {
+      "boardId": "stapf",
+      "invoiceId": "IN-10043",
+      "number": "IN-10043",
+      "oldTotal": 6756.25,
+      "newTotal": 6756.25,
+      "delta": 0
+    },
+    {
+      "boardId": "tate-calle-de-las-focas",
+      "invoiceId": "in-12035",
+      "number": "IN-12035",
+      "oldTotal": 337.5,
+      "newTotal": 337.5,
+      "delta": 0
+    },
+    {
+      "boardId": "tate-calle-de-las-focas",
+      "invoiceId": "in-12098",
+      "number": "IN-12098",
+      "oldTotal": 1961.25,
+      "newTotal": 1961.25,
+      "delta": 0
+    },
+    {
+      "boardId": "tate-calle-de-las-focas",
+      "invoiceId": "in-12141",
+      "number": "IN-12141",
+      "oldTotal": 777.5,
+      "newTotal": 777.5,
+      "delta": 0
+    },
+    {
+      "boardId": "tate-calle-de-las-focas",
+      "invoiceId": "in-12161",
+      "number": "IN-12161",
+      "oldTotal": 327.5,
+      "newTotal": 327.5,
+      "delta": 0
+    },
+    {
+      "boardId": "valentine",
+      "invoiceId": "IN-10058",
+      "number": "IN-10058",
+      "oldTotal": 1938.75,
+      "newTotal": 1938.75,
+      "delta": 0
+    },
+    {
+      "boardId": "valentine",
+      "invoiceId": "IN-10059",
+      "number": "IN-10059",
+      "oldTotal": 3933.75,
+      "newTotal": 4433.75,
+      "delta": 500
+    },
+    {
+      "boardId": "valentine",
+      "invoiceId": "IN-10068",
+      "number": "IN-10068",
+      "oldTotal": 876.25,
+      "newTotal": 876.25,
+      "delta": 0
+    },
+    {
+      "boardId": "valentine",
+      "invoiceId": "IN-10071",
+      "number": "IN-10071",
+      "oldTotal": 825,
+      "newTotal": 825,
+      "delta": 0
+    },
+    {
+      "boardId": "valentine",
+      "invoiceId": "IN-10096",
+      "number": "IN-10096",
+      "oldTotal": 3286.25,
+      "newTotal": 3286.25,
+      "delta": 0
+    },
+    {
+      "boardId": "valentine",
+      "invoiceId": "IN-10136",
+      "number": "IN-10136",
+      "oldTotal": 2491.25,
+      "newTotal": 2491.25,
+      "delta": 0
+    },
+    {
+      "boardId": "valentine",
+      "invoiceId": "IN-10142",
+      "number": "IN-10142",
+      "oldTotal": 1147.5,
+      "newTotal": 1147.5,
+      "delta": 0
+    },
+    {
+      "boardId": "valentine",
+      "invoiceId": "IN-10147",
+      "number": "IN-10147",
+      "oldTotal": 7157.5,
+      "newTotal": 7563.85,
+      "delta": 406.35
+    },
+    {
+      "boardId": "valentine",
+      "invoiceId": "IN-10149",
+      "number": "IN-10149",
+      "oldTotal": 975,
+      "newTotal": 975,
+      "delta": 0
+    },
+    {
+      "boardId": "valentine",
+      "invoiceId": "IN-10150",
+      "number": "IN-10150",
+      "oldTotal": 5907.639999999999,
+      "newTotal": 5907.64,
+      "delta": 0
+    },
+    {
+      "boardId": "valentine",
+      "invoiceId": "IN-10152",
+      "number": "IN-10152",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "valentine",
+      "invoiceId": "IN-10154",
+      "number": "IN-10154",
+      "oldTotal": 768.75,
+      "newTotal": 768.75,
+      "delta": 0
+    },
+    {
+      "boardId": "valentine",
+      "invoiceId": "IN-10157",
+      "number": "IN-10157",
+      "oldTotal": 788.25,
+      "newTotal": 788.25,
+      "delta": 0
+    },
+    {
+      "boardId": "velasco-2151-faust-ave",
+      "invoiceId": "in-10202",
+      "number": "IN-10202",
+      "oldTotal": 2500,
+      "newTotal": 2500,
+      "delta": 0
+    },
+    {
+      "boardId": "via-abrigada",
+      "invoiceId": "in-11786",
+      "number": "IN-11786",
+      "oldTotal": 3101.25,
+      "newTotal": 3101.25,
+      "delta": 0
+    },
+    {
+      "boardId": "villanueva",
+      "invoiceId": "in-12020",
+      "number": "IN-12020",
+      "oldTotal": 13026.25,
+      "newTotal": 13026.25,
+      "delta": 0
+    },
+    {
+      "boardId": "villanueva",
+      "invoiceId": "in-12021",
+      "number": "IN-12021",
+      "oldTotal": 2983.75,
+      "newTotal": 2983.75,
+      "delta": 0
+    },
+    {
+      "boardId": "villanueva",
+      "invoiceId": "in-12022",
+      "number": "IN-12022",
+      "oldTotal": 4483.75,
+      "newTotal": 4483.75,
+      "delta": 0
+    },
+    {
+      "boardId": "villanueva",
+      "invoiceId": "in-12094",
+      "number": "IN-12094",
+      "oldTotal": 5761.25,
+      "newTotal": 5761.25,
+      "delta": 0
+    },
+    {
+      "boardId": "villanueva",
+      "invoiceId": "in-12135",
+      "number": "IN-12135",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    },
+    {
+      "boardId": "villanueva",
+      "invoiceId": "in-12265",
+      "number": "IN-12265",
+      "oldTotal": 4423.75,
+      "newTotal": 4423.75,
+      "delta": 0
+    },
+    {
+      "boardId": "villanueva",
+      "invoiceId": "in-12266",
+      "number": "IN-12266",
+      "oldTotal": 5888.75,
+      "newTotal": 5888.75,
+      "delta": 0
+    },
+    {
+      "boardId": "villanueva",
+      "invoiceId": "in-12389",
+      "number": "IN-12389",
+      "oldTotal": 7853.75,
+      "newTotal": 7853.75,
+      "delta": 0
+    },
+    {
+      "boardId": "villanueva",
+      "invoiceId": "in-12633",
+      "number": "IN-12633",
+      "oldTotal": 403.35,
+      "newTotal": 403.35,
+      "delta": 0
+    },
+    {
+      "boardId": "villanueva",
+      "invoiceId": "in-12829",
+      "number": "IN-12829",
+      "oldTotal": 9473.75,
+      "newTotal": 9473.75,
+      "delta": 0
+    },
+    {
+      "boardId": "von-hummel",
+      "invoiceId": "in-11975",
+      "number": "IN-11975",
+      "oldTotal": 11077.5,
+      "newTotal": 11077.5,
+      "delta": 0
+    },
+    {
+      "boardId": "von-hummel",
+      "invoiceId": "in-12013",
+      "number": "IN-12013",
+      "oldTotal": 6591.25,
+      "newTotal": 6591.25,
+      "delta": 0
+    },
+    {
+      "boardId": "west-avalon",
+      "invoiceId": "vEsvMohWndbv6HqXMd8a",
+      "number": "IN-10161",
+      "oldTotal": 22595,
+      "newTotal": 22610.7,
+      "delta": 15.7
+    },
+    {
+      "boardId": "williams-santa-clarita",
+      "invoiceId": "in-10115",
+      "number": "IN-10115",
+      "oldTotal": 3930,
+      "newTotal": 3930,
+      "delta": 0
+    },
+    {
+      "boardId": "williams-santa-clarita",
+      "invoiceId": "in-10134",
+      "number": "IN-10134",
+      "oldTotal": 3353.75,
+      "newTotal": 3353.75,
+      "delta": 0
+    },
+    {
+      "boardId": "williams-santa-clarita",
+      "invoiceId": "in-10159",
+      "number": "IN-10159",
+      "oldTotal": 3122.5,
+      "newTotal": 3122.5,
+      "delta": 0
+    },
+    {
+      "boardId": "williams-santa-clarita",
+      "invoiceId": "in-10167",
+      "number": "IN-10167",
+      "oldTotal": 4500,
+      "newTotal": 4500,
+      "delta": 0
+    },
+    {
+      "boardId": "williams-santa-clarita",
+      "invoiceId": "in-10207",
+      "number": "IN-10207",
+      "oldTotal": 3921.25,
+      "newTotal": 3921.25,
+      "delta": 0
+    },
+    {
+      "boardId": "williams-santa-clarita",
+      "invoiceId": "in-10253",
+      "number": "IN-10253",
+      "oldTotal": 1327.5,
+      "newTotal": 1327.5,
+      "delta": 0
+    },
+    {
+      "boardId": "williams-santa-clarita",
+      "invoiceId": "in-10254",
+      "number": "IN-10254",
+      "oldTotal": 1327.5,
+      "newTotal": 1327.5,
+      "delta": 0
+    },
+    {
+      "boardId": "williams-santa-clarita",
+      "invoiceId": "in-10347",
+      "number": "IN-10347",
+      "oldTotal": 617.5,
+      "newTotal": 617.5,
+      "delta": 0
+    },
+    {
+      "boardId": "williams-santa-clarita",
+      "invoiceId": "in-10348",
+      "number": "IN-10348",
+      "oldTotal": 591.25,
+      "newTotal": 591.25,
+      "delta": 0
+    },
+    {
+      "boardId": "wolff",
+      "invoiceId": "in-11608",
+      "number": "IN-11608",
+      "oldTotal": 598.75,
+      "newTotal": 598.75,
+      "delta": 0
+    },
+    {
+      "boardId": "wolff",
+      "invoiceId": "in-11666",
+      "number": "IN-11666",
+      "oldTotal": 511.25,
+      "newTotal": 511.25,
+      "delta": 0
+    },
+    {
+      "boardId": "wolff",
+      "invoiceId": "in-11686",
+      "number": "IN-11686",
+      "oldTotal": 590.3,
+      "newTotal": 590.3,
+      "delta": 0
+    },
+    {
+      "boardId": "yoshi-378-loma-terrace",
+      "invoiceId": "in-10286",
+      "number": "IN-10286",
+      "oldTotal": 3418.75,
+      "newTotal": 3418.75,
+      "delta": 0
+    },
+    {
+      "boardId": "yoshi-378-loma-terrace",
+      "invoiceId": "in-10320",
+      "number": "IN-10320",
+      "oldTotal": 1206.25,
+      "newTotal": 1206.25,
+      "delta": 0
+    },
+    {
+      "boardId": "yoshi-378-loma-terrace",
+      "invoiceId": "in-10389",
+      "number": "IN-10389",
+      "oldTotal": 640,
+      "newTotal": 640,
+      "delta": 0
+    },
+    {
+      "boardId": "yoshi-378-loma-terrace",
+      "invoiceId": "in-10428",
+      "number": "IN-10428",
+      "oldTotal": 230,
+      "newTotal": 230,
+      "delta": 0
+    },
+    {
+      "boardId": "yoshi-378-loma-terrace",
+      "invoiceId": "in-10476",
+      "number": "IN-10476",
+      "oldTotal": 927.5,
+      "newTotal": 927.5,
+      "delta": 0
+    },
+    {
+      "boardId": "yoshi-378-loma-terrace",
+      "invoiceId": "in-10503",
+      "number": "IN-10503",
+      "oldTotal": 1413.75,
+      "newTotal": 1413.75,
+      "delta": 0
+    },
+    {
+      "boardId": "yoshi-378-loma-terrace",
+      "invoiceId": "in-10553",
+      "number": "IN-10553",
+      "oldTotal": 323.75,
+      "newTotal": 323.75,
+      "delta": 0
+    },
+    {
+      "boardId": "yoshi-378-loma-terrace",
+      "invoiceId": "in-10674",
+      "number": "IN-10674",
+      "oldTotal": 395,
+      "newTotal": 395,
+      "delta": 0
+    },
+    {
+      "boardId": "yoshi-378-loma-terrace",
+      "invoiceId": "in-10738",
+      "number": "IN-10738",
+      "oldTotal": 315,
+      "newTotal": 315,
+      "delta": 0
+    },
+    {
+      "boardId": "z-kelly-clark-magdalena-dr",
+      "invoiceId": "in-10430",
+      "number": "IN-10430",
+      "oldTotal": 0,
+      "newTotal": 0,
+      "delta": 0
+    }
+  ],
+  "rules": "cch-invoice-tax-rules.js"
+}

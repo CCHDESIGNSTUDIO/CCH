@@ -1,0 +1,63 @@
+{
+  "docId": "in-12958",
+  "patch": {
+    "items": [
+      {
+        "title": "Soapstone slabs & backsplash",
+        "description": "Belvedere 2 1/2 slabs. Mudroom Countertop and backsplash. Laundry - countertops. Butler Pantry - Fabrication & Installation not included. Forklift required for delivery - delivery to fabricator.",
+        "qty": 150,
+        "rate": 71.5,
+        "unitPrice": 71.5,
+        "cost": 71.5,
+        "amount": 10725,
+        "markupPct": 0,
+        "shipping": 1900,
+        "taxable": true,
+        "expenseType": "product",
+        "itemType": "product",
+        "vendor": "Ron & Tracey Cloud",
+        "category": "Stone",
+        "room": "",
+        "imageUrl": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/258556935/Belevedere_soapstone.jpg?X-Amz-Expires=99398&X-Amz-Date=20260224T000000Z&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIARBESUJ5WRYNZ4NM3/20260224/us-west-2/s3/aws4_request&X-Amz-SignedHeaders=host&X-Amz-Signature=ca8cc8172db8d10a61a909d6a2a7a12fb5f77e784b9783872b1867ffd2a883c6",
+        "images": [],
+        "houzzId": "",
+        "sku": "",
+        "lineNotes": "",
+        "_in12958TotalsFixedAt": "2026-05-23T18:38:51.300Z"
+      }
+    ],
+    "total": 13643.88,
+    "paidAmount": 13643.88,
+    "invoiceBalance": 0,
+    "subtotal": 10725,
+    "shipping": 0,
+    "taxRate": 9.5,
+    "status": "Paid",
+    "updatedAt": "2026-05-23T18:38:51.300Z",
+    "lastEditedAt": "2026-05-23T18:38:51.300Z",
+    "lastEditedBy": "fix-in12958-totals.js",
+    "_in12958TotalsFixedAt": "2026-05-23T18:38:51.300Z"
+  },
+  "computed": 13643.88,
+  "before": {
+    "total": 13643.88,
+    "items": [
+      {
+        "room": "",
+        "category": "",
+        "qty": 1,
+        "title": "Soapstone slabs & backsplash",
+        "shipTo": "",
+        "shipping": 1900,
+        "_isService": true,
+        "description": "Soapstone slabs & backsplash",
+        "amount": 13643.88,
+        "imageUrl": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/258556935/Belevedere_soapstone.jpg?X-Amz-Expires=99398&X-Amz-Date=20260224T000000Z&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIARBESUJ5WRYNZ4NM3/20260224/us-west-2/s3/aws4_request&X-Amz-SignedHeaders=host&X-Amz-Signature=ca8cc8172db8d10a61a909d6a2a7a12fb5f77e784b9783872b1867ffd2a883c6",
+        "vendor": "Ron & Tracey Cloud",
+        "markupPct": 8,
+        "_phase11ProcessedAt": "2026-05-04T20:10:57.680Z",
+        "cost": 12668.88
+      }
+    ]
+  }
+}

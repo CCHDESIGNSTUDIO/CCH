@@ -274,7 +274,14 @@ async function cchCollectLinkedProjectDocs(projectId, docType, docId, docData) {
   if (docType === 'invoice') invId = docId;
 
   var proposals = [], invoices = [], pos = [];
-  try {
+  var _ldTtl = (window.CCH_DOC_SESSION_CACHE_MS || 300000);
+  window._cchLinkedDocsProjectLists = window._cchLinkedDocsProjectLists || {};
+  var _ldHit = window._cchLinkedDocsProjectLists[projectId];
+  if (_ldHit && (Date.now() - _ldHit.at) < _ldTtl) {
+    proposals = _ldHit.proposals.slice();
+    invoices = _ldHit.invoices.slice();
+    pos = _ldHit.pos.slice();
+  } else try {
     var rs = await Promise.all([
       db.collection('boards').doc(projectId).collection('proposals').get().catch(function() { return { docs: [] }; }),
       db.collection('boards').doc(projectId).collection('invoices').get().catch(function() { return { docs: [] }; }),
@@ -283,6 +290,12 @@ async function cchCollectLinkedProjectDocs(projectId, docType, docId, docData) {
     rs[0].docs.forEach(function(d) { proposals.push({ id: d.id, data: d.data() || {} }); });
     rs[1].docs.forEach(function(d) { invoices.push({ id: d.id, data: d.data() || {} }); });
     rs[2].docs.forEach(function(d) { pos.push({ id: d.id, data: d.data() || {} }); });
+    window._cchLinkedDocsProjectLists[projectId] = {
+      at: Date.now(),
+      proposals: proposals.slice(),
+      invoices: invoices.slice(),
+      pos: pos.slice()
+    };
   } catch (e2) { return out; }
 
   if (docType !== 'proposal' && propId) {
@@ -352,7 +365,16 @@ async function showConnectedDocs(projectId, docType, docId, docNumber, anchorEl)
   }, 50);
   try {
     var docData = (window._docEdit && window._docEdit.docId === docId && window._docEdit.docData) ? window._docEdit.docData : null;
-    var linkedDocs = await cchCollectLinkedProjectDocs(projectId, docType, docId, docData);
+    var _connCacheKey = projectId + '|' + docType + '|' + docId;
+    window._cchLinkedDocsResultCache = window._cchLinkedDocsResultCache || {};
+    var _connHit = window._cchLinkedDocsResultCache[_connCacheKey];
+    var linkedDocs;
+    if (_connHit && (Date.now() - _connHit.at) < (window.CCH_DOC_SESSION_CACHE_MS || 300000)) {
+      linkedDocs = _connHit.docs;
+    } else {
+      linkedDocs = await cchCollectLinkedProjectDocs(projectId, docType, docId, docData);
+      window._cchLinkedDocsResultCache[_connCacheKey] = { at: Date.now(), docs: linkedDocs };
+    }
     var sc = {'Draft':'var(--gray-400)','Sent':'var(--gold)','Published':'var(--green)','Approved':'var(--green)','Paid':'var(--green)','Partially Paid':'var(--gold)','Invoiced':'var(--teal)','Ordered':'#0097A7','Received':'var(--green)','Overdue':'var(--red)','Unsent':'var(--gray-400)'};
     var inner = document.getElementById('connDocsInner');
     if (!inner) return;

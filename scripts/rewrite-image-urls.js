@@ -20,6 +20,8 @@
  *   node scripts/rewrite-image-urls.js --all-boards
  *   node scripts/rewrite-image-urls.js --include-products
  *     (also rewrite products + productLibrary — large; use after board test)
+ *   node scripts/rewrite-image-urls.js --include-unmatched
+ *     (extra pass: manifest localFile tokens, fuzzy title, ivy URL on clips)
  *
  * Default: dry-run, boards cloud-rolling-hills + cloud-susan, board subcollections only.
  */
@@ -45,6 +47,7 @@ const DRY_RUN = !argv.includes('--apply');
 const SKIP_CONFIRM = argv.includes('--yes');
 const ALL_BOARDS = argv.includes('--all-boards');
 const INCLUDE_PRODUCTS = argv.includes('--include-products');
+const INCLUDE_UNMATCHED = argv.includes('--include-unmatched');
 const BOARDS = (() => {
   const a = argv.find((x) => x.startsWith('--boards='));
   if (a) return a.split('=')[1].split(',').map((s) => s.trim()).filter(Boolean);
@@ -77,6 +80,7 @@ const stats = {
   viaClipCanonical: 0,
   viaHouzzId: 0,
   viaFilename: 0,
+  viaUnmatched: 0,
   imagesArraysCollapsed: 0,
   bySource: {},
   byBoard: {},
@@ -88,6 +92,8 @@ const houzzIdStorageChecked = new Map();
 const titleVendorToHouzzId = new Map();
 const boardClipFirebaseByTitle = new Map();
 const basenameToStorageUrl = new Map();
+const manifestLocalFileRows = [];
+const boardClipByIvyUrl = new Map();
 
 const IMAGE_KEYS = new Set([
   'imageUrl', 'image', 'thumbnail', 'img', 'heroImageUrl', 'clientPortalHeroUrl',
@@ -164,11 +170,51 @@ function loadManifestFiles() {
           basenameToStorageUrl.set(base, url);
         }
       }
+      const lf = String(r.localFile || '').trim();
+      if (lf && hid) {
+        manifestLocalFileRows.push({
+          localLower: lf.toLowerCase(),
+          houzzId: hid,
+          url,
+        });
+      }
     }
     loaded += rows.length;
   }
   console.log('Manifest index:', houzzIdToUrl.size, 'houzzIds from', loaded, 'manifest rows');
   console.log('Filename index (manifest basenames):', basenameToStorageUrl.size);
+  if (INCLUDE_UNMATCHED) {
+    console.log('Unmatched helpers: manifest localFile rows:', manifestLocalFileRows.length);
+  }
+}
+
+function lookupManifestByIvyFilePart(filePart) {
+  const fp = String(filePart || '').toLowerCase().replace(/\.[a-z0-9]+$/i, '');
+  if (!fp || fp.length < 6) return null;
+  let best = null;
+  let bestLen = 0;
+  for (const row of manifestLocalFileRows) {
+    const lf = row.localLower;
+    if (lf.includes(fp) || fp.includes(path.basename(lf).replace(/\.[a-z0-9]+$/i, ''))) {
+      const score = Math.min(fp.length, 40);
+      if (score > bestLen) {
+        bestLen = score;
+        best = row;
+      }
+    }
+    const base = path.basename(lf);
+    const tokenM = base.match(/^\d+__(.+)\.[a-z0-9]+$/i);
+    const token = tokenM ? tokenM[1].toLowerCase() : base.toLowerCase();
+    const stem = fp.length >= 8 ? fp.slice(0, 8) : fp;
+    if (token.includes(stem) || (stem.length >= 8 && fp.length >= 8 && token.slice(0, 8) === stem.slice(0, 8))) {
+      const score = stem.length + 10;
+      if (score > bestLen) {
+        bestLen = score;
+        best = row;
+      }
+    }
+  }
+  return best;
 }
 
 function pickBestClipEntry(bm, title, vendor) {
@@ -294,9 +340,69 @@ async function resolveFirebaseUrl(ivyUrl, ctx) {
   return null;
 }
 
+async function resolveUnmatchedExtras(ivyUrl, ctx) {
+  const ivy = parseIvyUrl(ivyUrl);
+  if (ivy && ivy.filePart) {
+    const row = lookupManifestByIvyFilePart(ivy.filePart);
+    if (row && row.url) {
+      return { url: row.url, via: 'manifest-ivy-file/' + row.houzzId, houzzId: row.houzzId };
+    }
+  }
+
+  const ivyNorm = decodeUrl(ivyUrl).split('?')[0].toLowerCase();
+  if (ctx.boardId && boardClipByIvyUrl.has(ctx.boardId)) {
+    const hit = boardClipByIvyUrl.get(ctx.boardId).get(ivyNorm);
+    if (hit && hit.firebaseUrl) {
+      return { url: hit.firebaseUrl, via: 'board-clip-same-ivy-url', houzzId: hit.houzzId };
+    }
+  }
+
+  if (ctx.boardId && ctx.title) {
+    const bm = boardClipFirebaseByTitle.get(ctx.boardId);
+    if (bm) {
+      const wantT = normKey(ctx.title);
+      const words = wantT.split(' ').filter((w) => w.length >= 4);
+      let best = null;
+      let bestScore = 0;
+      bm.forEach((entry, key) => {
+        const ct = key.endsWith('|') ? key.slice(0, -1) : key.split('|')[0];
+        if (!ct) return;
+        let score = 0;
+        if (ct === wantT) score = 90;
+        else if (words.some((w) => ct.includes(w) || wantT.includes(ct))) score = 50;
+        else return;
+        if (entry.firebaseUrl) score += 40;
+        if (score > bestScore) { bestScore = score; best = entry; }
+      });
+      if (best && best.firebaseUrl && bestScore >= 70) {
+        return { url: best.firebaseUrl, via: 'fuzzy-title-clip', houzzId: best.houzzId };
+      }
+      if (best && best.houzzId && bestScore >= 70) {
+        const url = await pickStorageUrlForHouzzId(best.houzzId);
+        if (url) return { url, via: 'fuzzy-title-houzzId/' + best.houzzId, houzzId: best.houzzId };
+      }
+    }
+  }
+
+  if (ctx.title) {
+    const wantT = normKey(ctx.title);
+    for (const col of ROOT_COLLECTIONS) {
+      const hid = titleVendorToHouzzId.get(tvKey(ctx.title, ctx.vendor || ''))
+        || titleVendorToHouzzId.get(wantT + '|');
+      if (hid) {
+        const url = await pickStorageUrlForHouzzId(hid);
+        if (url) return { url, via: 'catalog-title/' + hid, houzzId: hid };
+      }
+    }
+  }
+
+  return null;
+}
+
 async function indexBoardClips(boardId) {
   const snap = await db.collection('boards').doc(boardId).collection('clips').get();
   const m = new Map();
+  const ivyMap = new Map();
   snap.forEach((d) => {
     const c = d.data() || {};
     const title = c.title || c.name || '';
@@ -307,6 +413,8 @@ async function indexBoardClips(boardId) {
       clipId: d.id,
       houzzId: hid,
       firebaseUrl: isFirebaseUrl(img) ? img : '',
+      title,
+      vendor,
     };
     if (hid) registerTitleLookup(title, vendor, hid);
     const k = tvKey(title, vendor);
@@ -314,8 +422,25 @@ async function indexBoardClips(boardId) {
     if (!existing || (entry.firebaseUrl && !existing.firebaseUrl)) m.set(k, entry);
     const kt = normKey(title) + '|';
     if (!m.has(kt) || (entry.firebaseUrl && !m.get(kt).firebaseUrl)) m.set(kt, entry);
+
+    if (isIvyUrl(img)) {
+      const ivyNorm = img.split('?')[0].toLowerCase();
+      if (!ivyMap.has(ivyNorm)) ivyMap.set(ivyNorm, entry);
+      if (INCLUDE_UNMATCHED) {
+        const parsed = parseIvyUrl(img);
+        if (parsed && parsed.filePart) {
+          const row = lookupManifestByIvyFilePart(parsed.filePart);
+          if (row && row.url) {
+            entry.firebaseUrl = row.url;
+            entry.houzzId = entry.houzzId || row.houzzId;
+            registerTitleLookup(title, vendor, row.houzzId);
+          }
+        }
+      }
+    }
   });
   boardClipFirebaseByTitle.set(boardId, m);
+  boardClipByIvyUrl.set(boardId, ivyMap);
   const fb = [...m.values()].filter((e) => e.firebaseUrl).length;
   console.log('  Indexed clips:', snap.size, '| with firebase image:', fb);
 }
@@ -432,7 +557,10 @@ async function applyChanges(changes) {
       stats.alreadyFirebase++;
       continue;
     }
-    const resolved = await resolveFirebaseUrl(ch.oldUrl, ch.ctx);
+    let resolved = await resolveFirebaseUrl(ch.oldUrl, ch.ctx);
+    if ((!resolved || !resolved.url) && INCLUDE_UNMATCHED) {
+      resolved = await resolveUnmatchedExtras(ch.oldUrl, ch.ctx);
+    }
     if (!resolved || !resolved.url) {
       if (extractHouzzId(ch.ctx.obj || {}) || ch.ctx.title) stats.noStorage++;
       else stats.noMatch++;
@@ -450,7 +578,13 @@ async function applyChanges(changes) {
     ch.houzzIdResolved = resolved.houzzId || '';
     stats.fixedWould++;
     if (resolved.via && resolved.via.indexOf('board-clip') === 0) stats.viaClipCanonical++;
-    else if (resolved.via && resolved.via.indexOf('filename') >= 0) stats.viaFilename++;
+    else if (resolved.via && (resolved.via.indexOf('filename') >= 0)) stats.viaFilename++;
+    else if (resolved.via && (
+      resolved.via.indexOf('manifest-ivy') === 0
+      || resolved.via.indexOf('fuzzy') === 0
+      || resolved.via.indexOf('catalog-title') === 0
+      || resolved.via.indexOf('same-ivy') === 0
+    )) stats.viaUnmatched++;
     else stats.viaHouzzId++;
     if (stats.samples.fixed.length < 15) {
       stats.samples.fixed.push({
@@ -574,6 +708,7 @@ async function confirmApply() {
   console.log('Mode:   ', DRY_RUN ? 'DRY-RUN' : 'APPLY');
   console.log('Boards: ', BOARDS ? BOARDS.join(', ') : 'ALL production boards');
   console.log('Bucket: ', BUCKET);
+  if (INCLUDE_UNMATCHED) console.log('Extra:   --include-unmatched (manifest tokens + fuzzy title)');
   console.log('===============================================================\n');
 
   loadManifestFiles();
@@ -605,6 +740,7 @@ async function confirmApply() {
   console.log('  via board clip (legacy reconnect):', stats.viaClipCanonical);
   console.log('  via houzzId / storage:          ', stats.viaHouzzId);
   console.log('  via filename index:             ', stats.viaFilename);
+  console.log('  via unmatched helpers:          ', stats.viaUnmatched);
   console.log('  images[] collapsed to one URL:  ', stats.imagesArraysCollapsed);
   console.log('no houzz/storage:  ', stats.noMatch + stats.noStorage);
   if (!DRY_RUN) console.log('docs updated:      ', stats.docsUpdated);

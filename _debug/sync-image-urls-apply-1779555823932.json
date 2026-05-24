@@ -1,0 +1,353 @@
+{
+  "dryRun": false,
+  "boards": [
+    "cloud-rolling-hills"
+  ],
+  "stats": {
+    "docsScanned": 414,
+    "docsUpdated": 25,
+    "itemsChecked": 725,
+    "itemsFixed": 57,
+    "alreadyOk": 415,
+    "noLibraryMatch": 253,
+    "libraryNoFirebase": 0,
+    "byBoard": {
+      "cloud-rolling-hills": 57
+    },
+    "bySource": {
+      "boards/cloud-rolling-hills/clips": 19,
+      "boards/cloud-rolling-hills/invoices": 22,
+      "boards/cloud-rolling-hills/proposals": 16
+    },
+    "samples": {
+      "fixed": [
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Lakeview Signature",
+          "vendor": "Flambeaux",
+          "via": "productLibrary/sFUUDqmcVQEfqJfNVeCP",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Fisher Sconce Single",
+          "vendor": "Regina Andrews",
+          "via": "productLibrary/welLFzE0soVltaVu2Gag",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "New Town Sconce",
+          "vendor": "Hubbardton Forge",
+          "via": "productLibrary/fxPNNe7WHN5xGHFUZCP8",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Black Buoy Pendant",
+          "vendor": "Elu",
+          "via": "productLibrary/vSiIvmgRZuKw6WuU225a",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Milk Glass Bath Sconce",
+          "vendor": "Elu",
+          "via": "productLibrary/fqt9n1xetMsGnV4n6y2a",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Drum Pendant",
+          "vendor": "Elu",
+          "via": "productLibrary/gWyDbPSoTq68jPp5Avdm",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Carson Sconce, 12\" Width",
+          "vendor": "Rejuvination",
+          "via": "productLibrary/LFXNVK8ylO9vmuf7Z3OR",
+          "old": "https://assets.rjimgs.com/rjimgs/ab/images/dp/wcm/202609/0007/img",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Hex Lantern",
+          "vendor": "Elu",
+          "via": "productLibrary/xRkEXap3LZKZb9ScUZne",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Large Rec Glass Lantern sconce",
+          "vendor": "Elu",
+          "via": "productLibrary/gWPgnpfAdJXlcjVlwRUq",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Linear Iron and Brass Chandelier",
+          "vendor": "Elu",
+          "via": "productLibrary/7GdmFwzgpFfr4TmWQb2K",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Peek Can",
+          "vendor": "Ravenhill Studio",
+          "via": "productLibrary/veGfrInbexIIn7tMdymJ",
+          "old": "https://ravenhillstudio.com/cdn/shop/files/Peek_Can_BB_Dressed_2_",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "3 Shade Semi Flush",
+          "vendor": "Elu",
+          "via": "productLibrary/aEwwEadOuomc3szPmDx4",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "New Town Large Sconce",
+          "vendor": "",
+          "via": "productLibrary/RasxZ795GAWzHVH5SFsw",
+          "old": "(empty)",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "French street light",
+          "vendor": "Early Electrics",
+          "via": "productLibrary/wgFnU1gbETbVX8Fnsm27",
+          "old": "(empty)",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "DOUBLEBROOK PLAID Midnight RALPH LAUREN",
+          "vendor": "Designers Guild (USA) Inc.",
+          "via": "productLibrary/vLA6keFOESwmjUm1xyKl",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Metro",
+          "vendor": "urbanelectric",
+          "via": "productLibrary/vNO0C9r449Qbo3Gm4iMQ",
+          "old": "https://res.cloudinary.com/daciacad7/image/upload/Website%20BUILD",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Leather strapped Single sconce",
+          "vendor": "",
+          "via": "products/wcxjoflPmfOLxDyEI1bd",
+          "old": "(empty)",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Bryant Sconce",
+          "vendor": "Visual Comfort",
+          "via": "productLibrary/yvupjbkHnb7uc6FPHzAM",
+          "old": "https://images.visualcomfort.com/is/image/visualcomfortco/TOB2002",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "PN Glass dome pendant",
+          "vendor": "Elu",
+          "via": "productLibrary/eRK03J5GqNeBc4oRuREZ",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/invoices",
+          "title": "items[30]",
+          "via": "productLibrary/fxPNNe7WHN5xGHFUZCP8",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/invoices",
+          "title": "items[32]",
+          "via": "productLibrary/veGfrInbexIIn7tMdymJ",
+          "old": "https://ravenhillstudio.com/cdn/shop/files/Peek_Can_BB_Dressed_2_",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/invoices",
+          "title": "items[33]",
+          "via": "productLibrary/LFXNVK8ylO9vmuf7Z3OR",
+          "old": "https://assets.rjimgs.com/rjimgs/ab/images/dp/wcm/202609/0007/img",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/invoices",
+          "title": "items[40]",
+          "via": "productLibrary/vSiIvmgRZuKw6WuU225a",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/invoices",
+          "title": "items[44]",
+          "via": "productLibrary/welLFzE0soVltaVu2Gag",
+          "old": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/invoices",
+          "title": "items[54]",
+          "via": "productLibrary/axJ0AvfHBB7eZmRYQEnC",
+          "old": "https://images.visualcomfort.com/is/image/visualcomfortco/TOB2062",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.fir"
+        }
+      ],
+      "noMatch": [
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "BOMBER GOOSENECK LIGHT",
+          "vendor": "Barn Electric",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Maverick 52\" Ceiling Fan",
+          "vendor": "Visual Comfort",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Bryant Large Tail Sconce",
+          "vendor": "Visual Comfort",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Aaron Wall Sconce",
+          "vendor": "Arteriors",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Prismatic Dish Sconce",
+          "vendor": "1st Dibs",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Cone wall sconce",
+          "vendor": "Elu",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Drum buoy black with Chain 14\"",
+          "vendor": "Elu",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Saddle Ring Shade",
+          "vendor": "Elu",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Modern Farmhouse 54\" Single Wide Sink Vanity",
+          "vendor": "potterybarn",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Brantley Lantern",
+          "vendor": "Visual Comfort",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Simple Swing Arm Sconce",
+          "vendor": "Hubbardton Forge",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "HUDSON VALLEY LIGHTINGPlandome",
+          "vendor": "Hudson Valley Lighting",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Vale Sq. Lantern",
+          "vendor": "Elu",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Tailor Leather Dome Pendant",
+          "vendor": "Elu",
+          "reason": "no-library-match"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "title": "Malik Large Sconce",
+          "vendor": "Signature Collection",
+          "reason": "no-library-match"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,431 @@
+{
+  "qbPath": "C:\\Users\\cindy\\Documents\\CCH Design Inc._Invoice List by Date.xlsx",
+  "minYear": 2020,
+  "studioInvoices": 2583,
+  "qbInvoices": 1224,
+  "stats": {
+    "matched": 1058,
+    "amountOk": 736,
+    "amountMismatch": 322,
+    "balanceMismatch": 327,
+    "studioOnly": 885,
+    "qbOnly": 142,
+    "studioDuplicate": 640,
+    "qbDuplicate": 0,
+    "fuzzyMatch": 0,
+    "noQbMatch": 885
+  },
+  "mismatchCount": 1443,
+  "topAmountMismatches": [
+    {
+      "number": "RR-12174",
+      "board": "Bradbury - High Drive",
+      "studio": 25000,
+      "qb": 0,
+      "delta": 25000,
+      "qbNum": "RR-12174"
+    },
+    {
+      "number": "IN-11790",
+      "board": "Shimano - Westridge Lane",
+      "studio": 170691.36,
+      "qb": 158289,
+      "delta": 12402.36,
+      "qbNum": "IN-11790"
+    },
+    {
+      "number": "IN-11955",
+      "board": "Cloud - Huntington Beach",
+      "studio": 88696.51,
+      "qb": 80406.15,
+      "delta": 8290.36,
+      "qbNum": "IN-11955"
+    },
+    {
+      "number": "IN-11970",
+      "board": "Shimano - Westridge Lane",
+      "studio": 17403.7,
+      "qb": 9264.26,
+      "delta": 8139.44,
+      "qbNum": "IN-11970"
+    },
+    {
+      "number": "IN-11567",
+      "board": "Skeen - Greenleaf Way",
+      "studio": 122699.19,
+      "qb": 116867.1,
+      "delta": 5832.09,
+      "qbNum": "IN-11567"
+    },
+    {
+      "number": "IN-10007",
+      "board": "Day - 2590 Monaco Drive",
+      "studio": 7688.39,
+      "qb": 2221.25,
+      "delta": 5467.14,
+      "qbNum": "IN-24-10007"
+    },
+    {
+      "number": "IN-11799",
+      "board": "Shimano - Westridge Lane",
+      "studio": 71963.67,
+      "qb": 66956.45,
+      "delta": 5007.22,
+      "qbNum": "IN-11799"
+    },
+    {
+      "number": "IN-11561",
+      "board": "Shimano - Westridge Lane",
+      "studio": 66724.56,
+      "qb": 62045.91,
+      "delta": 4678.65,
+      "qbNum": "IN-11561"
+    },
+    {
+      "number": "IN-11774",
+      "board": "Christal Cresta",
+      "studio": 35799.6,
+      "qb": 31277.78,
+      "delta": 4521.82,
+      "qbNum": "IN-11774"
+    },
+    {
+      "number": "IN-11872",
+      "board": "Shimano - Westridge Lane",
+      "studio": 58254.31,
+      "qb": 53765.44,
+      "delta": 4488.87,
+      "qbNum": "IN-11872"
+    },
+    {
+      "number": "IN-11661",
+      "board": "Cloud - Mustang",
+      "studio": 27226.95,
+      "qb": 22995.72,
+      "delta": 4231.23,
+      "qbNum": "IN-11661"
+    },
+    {
+      "number": "IN-12621",
+      "board": "Cloud - Mustang",
+      "studio": 898.75,
+      "qb": 4881.25,
+      "delta": -3982.5,
+      "qbNum": "IN-12621"
+    },
+    {
+      "number": "IN-11613",
+      "board": "Shimano - Westridge Lane",
+      "studio": 49579.34,
+      "qb": 45850.18,
+      "delta": 3729.16,
+      "qbNum": "IN-11613"
+    },
+    {
+      "number": "IN-11678",
+      "board": "Cameron- Avenida Evita",
+      "studio": 53520.01,
+      "qb": 49806.48,
+      "delta": 3713.53,
+      "qbNum": "IN-11678"
+    },
+    {
+      "number": "IN-11823",
+      "board": "Shimano - Westridge Lane",
+      "studio": 7335,
+      "qb": 3704.74,
+      "delta": 3630.26,
+      "qbNum": "IN-11823"
+    },
+    {
+      "number": "IN-11419",
+      "board": "Kruse - Lido",
+      "studio": 55735.43,
+      "qb": 52350.06,
+      "delta": 3385.37,
+      "qbNum": "IN-11419"
+    },
+    {
+      "number": "IN-11850",
+      "board": "Christal Cresta",
+      "studio": 22806.8,
+      "qb": 19489.47,
+      "delta": 3317.33,
+      "qbNum": "IN-11850"
+    },
+    {
+      "number": "IN-10020",
+      "board": "Katke - Nashville",
+      "studio": 3765,
+      "qb": 913.75,
+      "delta": 2851.25,
+      "qbNum": "IN-24-10020"
+    },
+    {
+      "number": "INV-6020",
+      "board": "Holtz Hill",
+      "studio": 29112.65,
+      "qb": 31587.73,
+      "delta": -2475.08,
+      "qbNum": "INV-6020"
+    },
+    {
+      "number": "IN-11706",
+      "board": "Shimano - Westridge Lane",
+      "studio": 29808.8,
+      "qb": 27609.57,
+      "delta": 2199.23,
+      "qbNum": "IN-11706"
+    },
+    {
+      "number": "IN-11818",
+      "board": "Shimano - Westridge Lane",
+      "studio": 20688.17,
+      "qb": 18670.24,
+      "delta": 2017.93,
+      "qbNum": "IN-11818"
+    },
+    {
+      "number": "IN-12955",
+      "board": "Katke - Graceland Dr.",
+      "studio": 3016.64,
+      "qb": 1005.61,
+      "delta": 2011.03,
+      "qbNum": "IN-12955"
+    },
+    {
+      "number": "IN-11809",
+      "board": "Shimano - Westridge Lane",
+      "studio": 26214.08,
+      "qb": 24258.87,
+      "delta": 1955.21,
+      "qbNum": "IN-11809"
+    },
+    {
+      "number": "IN-11748",
+      "board": "Cloud - Mustang",
+      "studio": 3652.4,
+      "qb": 1743.39,
+      "delta": 1909.01,
+      "qbNum": "IN-11748"
+    },
+    {
+      "number": "IN-11871",
+      "board": "Christal Cresta",
+      "studio": 20537.66,
+      "qb": 18716.76,
+      "delta": 1820.9,
+      "qbNum": "IN-11871"
+    },
+    {
+      "number": "IN-11905",
+      "board": "Cloud - Huntington Beach",
+      "studio": 23521.06,
+      "qb": 21716.18,
+      "delta": 1804.88,
+      "qbNum": "IN-11905"
+    },
+    {
+      "number": "IN-11569",
+      "board": "Skeen - Greenleaf Way",
+      "studio": 68084.85,
+      "qb": 66410.03,
+      "delta": 1674.82,
+      "qbNum": "IN-11569"
+    },
+    {
+      "number": "IN-11355",
+      "board": "Kruse - Lido",
+      "studio": 23498.54,
+      "qb": 21846.17,
+      "delta": 1652.37,
+      "qbNum": "IN-11355"
+    },
+    {
+      "number": "IN-11881",
+      "board": "Cloud - Huntington Beach",
+      "studio": 21789.24,
+      "qb": 20223.95,
+      "delta": 1565.29,
+      "qbNum": "IN-11881"
+    },
+    {
+      "number": "IN-11959",
+      "board": "Shimano - Westridge Lane",
+      "studio": 18970.86,
+      "qb": 17625.37,
+      "delta": 1345.49,
+      "qbNum": "IN-11959"
+    },
+    {
+      "number": "IN-11837",
+      "board": "Renee - Meadowbrook Drive",
+      "studio": 9339.9,
+      "qb": 8028.65,
+      "delta": 1311.25,
+      "qbNum": "IN-11837"
+    },
+    {
+      "number": "IN-11910",
+      "board": "Shimano - Westridge Lane",
+      "studio": 17655.78,
+      "qb": 16377.79,
+      "delta": 1277.99,
+      "qbNum": "IN-11910"
+    },
+    {
+      "number": "IN-11906",
+      "board": "Cloud - Huntington Beach",
+      "studio": 14974.42,
+      "qb": 13771,
+      "delta": 1203.42,
+      "qbNum": "IN-11906"
+    },
+    {
+      "number": "IN-11877",
+      "board": "Christal Cresta",
+      "studio": 29235.29,
+      "qb": 28045.46,
+      "delta": 1189.83,
+      "qbNum": "IN-11877"
+    },
+    {
+      "number": "IN-11969",
+      "board": "Cloud - Huntington Beach",
+      "studio": 6585.26,
+      "qb": 5426.12,
+      "delta": 1159.14,
+      "qbNum": "IN-11969"
+    },
+    {
+      "number": "IN-11812",
+      "board": "Shimano - Westridge Lane",
+      "studio": 15509.99,
+      "qb": 14444.52,
+      "delta": 1065.47,
+      "qbNum": "IN-11812"
+    },
+    {
+      "number": "IN-11487",
+      "board": "Land; Glenwood",
+      "studio": 15254.53,
+      "qb": 14216.85,
+      "delta": 1037.68,
+      "qbNum": "IN-11487"
+    },
+    {
+      "number": "IN-11624",
+      "board": "Skeen - Greenleaf Way",
+      "studio": 7473.48,
+      "qb": 6463.53,
+      "delta": 1009.95,
+      "qbNum": "IN-11624"
+    },
+    {
+      "number": "IN-11830",
+      "board": "Christal Cresta",
+      "studio": 12102.89,
+      "qb": 11109.74,
+      "delta": 993.15,
+      "qbNum": "IN-11830"
+    },
+    {
+      "number": "IN-11442",
+      "board": "Ashleigh Aitken",
+      "studio": 12248.27,
+      "qb": 11340.24,
+      "delta": 908.03,
+      "qbNum": "IN-11442"
+    }
+  ],
+  "rollingHillsSpot": [
+    {
+      "result": "AMOUNT_AND_BALANCE_MISMATCH",
+      "matchMethod": "exact",
+      "number": "IN-12958",
+      "boardId": "cloud-rolling-hills",
+      "boardName": "Cloud - Rolling Hills",
+      "studioStored": 13643.88,
+      "studioComputed": 13643.88,
+      "studioPaid": 13643.88,
+      "studioBalance": 0,
+      "studioStatus": "Paid",
+      "studioQbId": "73861",
+      "qbNum": "IN-12958",
+      "qbAmount": 13670.69,
+      "qbOpen": 26.81,
+      "qbPaid": 13643.88,
+      "amountDelta": -26.81,
+      "balanceDelta": -26.81,
+      "qbName": "Tracey Cloud",
+      "qbDate": "12/05/2025",
+      "note": ""
+    },
+    {
+      "result": "MATCH",
+      "matchMethod": "exact",
+      "number": "IN-12946",
+      "boardId": "cloud-rolling-hills",
+      "boardName": "Cloud - Rolling Hills",
+      "studioStored": 43115.48,
+      "studioComputed": 43115.48,
+      "studioPaid": 43115.48,
+      "studioBalance": 0,
+      "studioStatus": "Paid",
+      "studioQbId": "73562",
+      "qbNum": "IN-12946",
+      "qbAmount": 43115.48,
+      "qbOpen": 0,
+      "qbPaid": 43115.48,
+      "amountDelta": 0,
+      "balanceDelta": 0,
+      "qbName": "Tracey Cloud",
+      "qbDate": "10/20/2025",
+      "note": ""
+    },
+    {
+      "result": "AMOUNT_AND_BALANCE_MISMATCH",
+      "matchMethod": "exact",
+      "number": "IN-12902",
+      "boardId": "cloud-rolling-hills",
+      "boardName": "Cloud - Rolling Hills",
+      "studioStored": 15433.35,
+      "studioComputed": 15433.35,
+      "studioPaid": 15645.43,
+      "studioBalance": 1.96,
+      "studioStatus": "Paid",
+      "studioQbId": "71973",
+      "qbNum": "IN-12902",
+      "qbAmount": 15679.67,
+      "qbOpen": 34.24,
+      "qbPaid": 15645.43,
+      "amountDelta": -246.32,
+      "balanceDelta": -32.28,
+      "qbName": "Tracey Cloud",
+      "qbDate": "04/28/2025",
+      "note": ""
+    },
+    {
+      "result": "MATCH",
+      "matchMethod": "exact",
+      "number": "IN-12930",
+      "boardId": "cloud-rolling-hills",
+      "boardName": "Cloud - Rolling Hills",
+      "studioStored": 5211.25,
+      "studioComputed": 5211.25,
+      "studioPaid": 5211.25,
+      "studioBalance": 0,
+      "studioStatus": "Paid",
+      "studioQbId": "73098",
+      "qbNum": "IN-12930",
+      "qbAmount": 5211.25,
+      "qbOpen": 0,
+      "qbPaid": 5211.25,
+      "amountDelta": 0,
+      "balanceDelta": 0,
+      "qbName": "Tracey Cloud",
+      "qbDate": "08/18/2025",
+      "note": ""
+    }
+  ]
+}

@@ -1,0 +1,431 @@
+{
+  "qbPath": "C:\\Users\\cindy\\Documents\\CCH Design Inc._Invoice List by Date.xlsx",
+  "minYear": 2020,
+  "studioInvoices": 2583,
+  "qbInvoices": 1224,
+  "stats": {
+    "matched": 1939,
+    "amountOk": 803,
+    "amountMismatch": 1136,
+    "balanceMismatch": 736,
+    "studioOnly": 4,
+    "qbOnly": 36,
+    "studioDuplicate": 640,
+    "qbDuplicate": 149,
+    "fuzzyMatch": 881,
+    "noQbMatch": 4
+  },
+  "mismatchCount": 1226,
+  "topAmountMismatches": [
+    {
+      "number": "RR-12207",
+      "board": "Shimano - Westridge Lane",
+      "studio": 200000,
+      "qb": 287.98,
+      "delta": 199712.02,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "RR-12390",
+      "board": "Shimano - Westridge Lane",
+      "studio": 125000,
+      "qb": 287.98,
+      "delta": 124712.02,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "RR-12294",
+      "board": "Shimano - Westridge Lane",
+      "studio": 100000,
+      "qb": 287.98,
+      "delta": 99712.02,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "INV-6018",
+      "board": "Cloud - Rolling Hills",
+      "studio": 89378,
+      "qb": 287.98,
+      "delta": 89090.02,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "IN-10314",
+      "board": "Katke - Puerto Vallarta",
+      "studio": 73498.33,
+      "qb": 287.98,
+      "delta": 73210.35,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "INV-6017",
+      "board": "Cloud - Rolling Hills",
+      "studio": 57103.21,
+      "qb": 287.98,
+      "delta": 56815.23,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "IN-10382",
+      "board": "Katke - Puerto Vallarta",
+      "studio": 54044.05,
+      "qb": 287.98,
+      "delta": 53756.07,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "IN-10206",
+      "board": "Renee - Meadowbrook Drive",
+      "studio": 52959.83,
+      "qb": 287.98,
+      "delta": 52671.85,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "RR-12462",
+      "board": "Park City",
+      "studio": 50000,
+      "qb": 287.98,
+      "delta": 49712.02,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "IN-11294",
+      "board": "Cannon Perdido",
+      "studio": 48514.95,
+      "qb": 287.98,
+      "delta": 48226.97,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "RR-12620",
+      "board": "Park City",
+      "studio": 45745.54,
+      "qb": 287.98,
+      "delta": 45457.56,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "RR-12588",
+      "board": "Park City",
+      "studio": 40000,
+      "qb": 287.98,
+      "delta": 39712.02,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "IN-10363",
+      "board": "Katke - Puerto Vallarta",
+      "studio": 39769.75,
+      "qb": 287.98,
+      "delta": 39481.77,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "RR-12586",
+      "board": "Park City",
+      "studio": 38000,
+      "qb": 287.98,
+      "delta": 37712.02,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "RR-12453",
+      "board": "Park City",
+      "studio": 36000,
+      "qb": 287.98,
+      "delta": 35712.02,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "IN-11268",
+      "board": "Hollister Ranch",
+      "studio": 35282.21,
+      "qb": 287.98,
+      "delta": 34994.23,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "RR-12587",
+      "board": "Park City",
+      "studio": 35000,
+      "qb": 287.98,
+      "delta": 34712.02,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "RR-12702",
+      "board": "Park City",
+      "studio": 30000,
+      "qb": 287.98,
+      "delta": 29712.02,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "IN-10847",
+      "board": "Katke - Puerto Vallarta",
+      "studio": 28226.15,
+      "qb": 287.98,
+      "delta": 27938.17,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "IN-10215",
+      "board": "Williams - Santa Clarita",
+      "studio": 27394.74,
+      "qb": 287.98,
+      "delta": 27106.76,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "RR-12482",
+      "board": "Schneider- East Coast Hwy.",
+      "studio": 25736.33,
+      "qb": 287.98,
+      "delta": 25448.35,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "IN-10212",
+      "board": "Bradbury - Blue Bird",
+      "studio": 25579.69,
+      "qb": 287.98,
+      "delta": 25291.71,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "RR-12174",
+      "board": "Bradbury - High Drive",
+      "studio": 25000,
+      "qb": 0,
+      "delta": 25000,
+      "qbNum": "RR-12174"
+    },
+    {
+      "number": "IN-10151",
+      "board": "Bradbury - Blue Bird",
+      "studio": 25604.75,
+      "qb": 1509.11,
+      "delta": 24095.64,
+      "qbNum": "IN-10151HZ"
+    },
+    {
+      "number": "IN-10700",
+      "board": "Hollister Ranch",
+      "studio": 22101.63,
+      "qb": 287.98,
+      "delta": 21813.65,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "RR-12680",
+      "board": "Cloud - Parker",
+      "studio": 21713.52,
+      "qb": 287.98,
+      "delta": 21425.54,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "IN-10410",
+      "board": "Katke - Puerto Vallarta",
+      "studio": 20707.54,
+      "qb": 287.98,
+      "delta": 20419.56,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "IN-10419",
+      "board": "Katke - Puerto Vallarta",
+      "studio": 20552.51,
+      "qb": 287.98,
+      "delta": 20264.53,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "IN-10208",
+      "board": "Renee - Meadowbrook Drive",
+      "studio": 20173.57,
+      "qb": 287.98,
+      "delta": 19885.59,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "IN-11039",
+      "board": "Hollister Ranch",
+      "studio": 19014.03,
+      "qb": 287.98,
+      "delta": 18726.05,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "IN-10197",
+      "board": "Renee - Meadowbrook Drive",
+      "studio": 18366.13,
+      "qb": 287.98,
+      "delta": 18078.15,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "IN-10426",
+      "board": "Katke - Puerto Vallarta",
+      "studio": 18143.15,
+      "qb": 287.98,
+      "delta": 17855.17,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "IN-10628",
+      "board": "Graves - Ocean Blvd.",
+      "studio": 17315.93,
+      "qb": 287.98,
+      "delta": 17027.95,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "IN-10938",
+      "board": "Bradbury - Blue Bird",
+      "studio": 16403.86,
+      "qb": 287.98,
+      "delta": 16115.88,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "RR-12712",
+      "board": "Park City",
+      "studio": 16000,
+      "qb": 287.98,
+      "delta": 15712.02,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "RR-12713",
+      "board": "Park City",
+      "studio": 16000,
+      "qb": 287.98,
+      "delta": 15712.02,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "IN-10420",
+      "board": "Katke - Puerto Vallarta",
+      "studio": 15983.73,
+      "qb": 287.98,
+      "delta": 15695.75,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "IN-10223",
+      "board": "Williams - Santa Clarita",
+      "studio": 15781.67,
+      "qb": 287.98,
+      "delta": 15493.69,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "IN-11001",
+      "board": "Hollister Ranch",
+      "studio": 15616.16,
+      "qb": 287.98,
+      "delta": 15328.18,
+      "qbNum": "IN-00001"
+    },
+    {
+      "number": "IN-10806",
+      "board": "Hollister Ranch",
+      "studio": 15365.28,
+      "qb": 287.98,
+      "delta": 15077.3,
+      "qbNum": "IN-00001"
+    }
+  ],
+  "rollingHillsSpot": [
+    {
+      "result": "AMOUNT_AND_BALANCE_MISMATCH",
+      "matchMethod": "exact",
+      "number": "IN-12958",
+      "boardId": "cloud-rolling-hills",
+      "boardName": "Cloud - Rolling Hills",
+      "studioStored": 13643.88,
+      "studioComputed": 13643.88,
+      "studioPaid": 13643.88,
+      "studioBalance": 0,
+      "studioStatus": "Paid",
+      "studioQbId": "73861",
+      "qbNum": "IN-12958",
+      "qbAmount": 13670.69,
+      "qbOpen": 26.81,
+      "qbPaid": 13643.88,
+      "amountDelta": -26.81,
+      "balanceDelta": -26.81,
+      "qbName": "Tracey Cloud",
+      "qbDate": "12/05/2025",
+      "note": ""
+    },
+    {
+      "result": "MATCH",
+      "matchMethod": "exact",
+      "number": "IN-12946",
+      "boardId": "cloud-rolling-hills",
+      "boardName": "Cloud - Rolling Hills",
+      "studioStored": 43115.48,
+      "studioComputed": 43115.48,
+      "studioPaid": 43115.48,
+      "studioBalance": 0,
+      "studioStatus": "Paid",
+      "studioQbId": "73562",
+      "qbNum": "IN-12946",
+      "qbAmount": 43115.48,
+      "qbOpen": 0,
+      "qbPaid": 43115.48,
+      "amountDelta": 0,
+      "balanceDelta": 0,
+      "qbName": "Tracey Cloud",
+      "qbDate": "10/20/2025",
+      "note": ""
+    },
+    {
+      "result": "AMOUNT_AND_BALANCE_MISMATCH",
+      "matchMethod": "exact",
+      "number": "IN-12902",
+      "boardId": "cloud-rolling-hills",
+      "boardName": "Cloud - Rolling Hills",
+      "studioStored": 15433.35,
+      "studioComputed": 15433.35,
+      "studioPaid": 15645.43,
+      "studioBalance": 1.96,
+      "studioStatus": "Paid",
+      "studioQbId": "71973",
+      "qbNum": "IN-12902",
+      "qbAmount": 15679.67,
+      "qbOpen": 34.24,
+      "qbPaid": 15645.43,
+      "amountDelta": -246.32,
+      "balanceDelta": -32.28,
+      "qbName": "Tracey Cloud",
+      "qbDate": "04/28/2025",
+      "note": ""
+    },
+    {
+      "result": "MATCH",
+      "matchMethod": "exact",
+      "number": "IN-12930",
+      "boardId": "cloud-rolling-hills",
+      "boardName": "Cloud - Rolling Hills",
+      "studioStored": 5211.25,
+      "studioComputed": 5211.25,
+      "studioPaid": 5211.25,
+      "studioBalance": 0,
+      "studioStatus": "Paid",
+      "studioQbId": "73098",
+      "qbNum": "IN-12930",
+      "qbAmount": 5211.25,
+      "qbOpen": 0,
+      "qbPaid": 5211.25,
+      "amountDelta": 0,
+      "balanceDelta": 0,
+      "qbName": "Tracey Cloud",
+      "qbDate": "08/18/2025",
+      "note": ""
+    }
+  ]
+}

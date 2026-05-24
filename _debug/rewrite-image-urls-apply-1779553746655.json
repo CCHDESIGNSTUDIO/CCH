@@ -1,0 +1,99 @@
+{
+  "dryRun": false,
+  "boards": [
+    "cloud-rolling-hills"
+  ],
+  "stats": {
+    "docsScanned": 414,
+    "ivyUrlsFound": 9,
+    "alreadyFirebase": 0,
+    "fixedWould": 8,
+    "fixedApplied": 8,
+    "noMatch": 1,
+    "noStorage": 0,
+    "docsUpdated": 7,
+    "viaClipCanonical": 3,
+    "viaHouzzId": 0,
+    "viaFilename": 0,
+    "viaUnmatched": 5,
+    "imagesArraysCollapsed": 0,
+    "bySource": {
+      "boards/cloud-rolling-hills/clips": 5,
+      "boards/cloud-rolling-hills/invoices": 2,
+      "boards/cloud-rolling-hills/proposals": 2
+    },
+    "byBoard": {
+      "cloud-rolling-hills": 9
+    },
+    "samples": {
+      "fixed": [
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "via": "manifest-ivy-file/33491408",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/258420853/Sc",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "via": "manifest-ivy-file/53446619",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/257101731/zs",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "via": "manifest-ivy-file/33499504",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/262813664/Fr",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/clips",
+          "via": "manifest-ivy-file/52253526",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/262813648/fw",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/invoices",
+          "title": "Freight",
+          "via": "board-clip-canonical",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/262813664/Fr",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/invoices",
+          "title": "Freight / Shipping",
+          "via": "board-clip-canonical",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/262813664/Fr",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/proposals",
+          "title": "Soapstone Slab",
+          "via": "fuzzy-title-clip",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/258556935/Be",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        },
+        {
+          "board": "cloud-rolling-hills",
+          "source": "boards/cloud-rolling-hills/proposals",
+          "title": "HUDSON VALLEY LIGHTINGPlandome",
+          "via": "board-clip-canonical",
+          "old": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/257101731/zs",
+          "new": "https://firebasestorage.googleapis.com/v0/b/cch-design-boards.firebase"
+        }
+      ],
+      "noMatch": [
+        {
+          "path": "imageUrl",
+          "ivy": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/258556935/Belevedere_s"
+        }
+      ]
+    }
+  }
+}

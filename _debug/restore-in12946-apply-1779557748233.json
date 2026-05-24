@@ -1,0 +1,46 @@
+{
+  "mode": "execute",
+  "docId": "ayKQv4sEnjAiDaymije9",
+  "before": {
+    "itemCount": 1,
+    "total": 3970,
+    "paidAmount": 3970
+  },
+  "after": {
+    "itemCount": 4,
+    "total": 43115.48,
+    "linesSubtotal": 39505,
+    "lineShipping": 1500,
+    "remainderToShipping": 2110.48
+  },
+  "items": [
+    {
+      "title": "Lakeview Signature",
+      "qty": 12,
+      "cost": 1010,
+      "amount": 12120,
+      "shipping": 0
+    },
+    {
+      "title": "Lakeview Signature",
+      "qty": 7,
+      "cost": 1205,
+      "amount": 8435,
+      "shipping": 0
+    },
+    {
+      "title": "Lakeview Signature",
+      "qty": 8,
+      "cost": 1685,
+      "amount": 13480,
+      "shipping": 0
+    },
+    {
+      "title": "Lakeview Signature",
+      "qty": 2,
+      "cost": 1985,
+      "amount": 5470,
+      "shipping": 1500
+    }
+  ]
+}

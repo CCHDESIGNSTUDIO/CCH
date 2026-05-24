@@ -1,0 +1,431 @@
+{
+  "qbPath": "C:\\Users\\cindy\\Documents\\CCH Design Inc._Invoice List by Date.xlsx",
+  "minYear": 2020,
+  "studioInvoices": 2583,
+  "qbInvoices": 1224,
+  "stats": {
+    "matched": 1204,
+    "amountOk": 803,
+    "amountMismatch": 401,
+    "balanceMismatch": 357,
+    "studioOnly": 739,
+    "qbOnly": 13,
+    "studioDuplicate": 640,
+    "qbDuplicate": 1,
+    "fuzzyMatch": 146,
+    "noQbMatch": 739
+  },
+  "mismatchCount": 1210,
+  "topAmountMismatches": [
+    {
+      "number": "RR-12174",
+      "board": "Bradbury - High Drive",
+      "studio": 25000,
+      "qb": 0,
+      "delta": 25000,
+      "qbNum": "RR-12174"
+    },
+    {
+      "number": "IN-10151",
+      "board": "Bradbury - Blue Bird",
+      "studio": 25604.75,
+      "qb": 1509.11,
+      "delta": 24095.64,
+      "qbNum": "IN-10151HZ"
+    },
+    {
+      "number": "IN-10089",
+      "board": "Katke - Graceland Dr.",
+      "studio": 1756.95,
+      "qb": 21511.99,
+      "delta": -19755.04,
+      "qbNum": "IN-10089HZ"
+    },
+    {
+      "number": "IN-10154",
+      "board": "Bradbury - Blue Bird",
+      "studio": 14930.91,
+      "qb": 768.75,
+      "delta": 14162.16,
+      "qbNum": "IN-10154HZ"
+    },
+    {
+      "number": "IN-11790",
+      "board": "Shimano - Westridge Lane",
+      "studio": 170691.36,
+      "qb": 158289,
+      "delta": 12402.36,
+      "qbNum": "IN-11790"
+    },
+    {
+      "number": "IN-10096",
+      "board": "Bradbury - Blue Bird",
+      "studio": 12302.59,
+      "qb": 3286.25,
+      "delta": 9016.34,
+      "qbNum": "IN-10096HZ"
+    },
+    {
+      "number": "IN-11955",
+      "board": "Cloud - Huntington Beach",
+      "studio": 88696.51,
+      "qb": 80406.15,
+      "delta": 8290.36,
+      "qbNum": "IN-11955"
+    },
+    {
+      "number": "IN-11970",
+      "board": "Shimano - Westridge Lane",
+      "studio": 17403.7,
+      "qb": 9264.26,
+      "delta": 8139.44,
+      "qbNum": "IN-11970"
+    },
+    {
+      "number": "IN-10016",
+      "board": "Day - 2590 Monaco Drive",
+      "studio": 1362.5,
+      "qb": 7379.28,
+      "delta": -6016.78,
+      "qbNum": "IN-10016HZ"
+    },
+    {
+      "number": "IN-11567",
+      "board": "Skeen - Greenleaf Way",
+      "studio": 122699.19,
+      "qb": 116867.1,
+      "delta": 5832.09,
+      "qbNum": "IN-11567"
+    },
+    {
+      "number": "IN-10150",
+      "board": "Bradbury - Blue Bird",
+      "studio": 12160.6,
+      "qb": 6365.49,
+      "delta": 5795.11,
+      "qbNum": "IN-10150HZ"
+    },
+    {
+      "number": "IN-10044",
+      "board": "Day - 2590 Monaco Drive",
+      "studio": 518.75,
+      "qb": 6103.14,
+      "delta": -5584.39,
+      "qbNum": "IN-10044HZ"
+    },
+    {
+      "number": "IN-10133",
+      "board": "Bradbury - Blue Bird",
+      "studio": 6595.84,
+      "qb": 1085,
+      "delta": 5510.84,
+      "qbNum": "IN-10133HZ"
+    },
+    {
+      "number": "IN-10007",
+      "board": "Day - 2590 Monaco Drive",
+      "studio": 7688.39,
+      "qb": 2221.25,
+      "delta": 5467.14,
+      "qbNum": "IN-24-10007"
+    },
+    {
+      "number": "IN-10101",
+      "board": "Scarborough -139 Claremont, Long Beach",
+      "studio": 1403.75,
+      "qb": 6691.21,
+      "delta": -5287.46,
+      "qbNum": "IN-10101HZ"
+    },
+    {
+      "number": "IN-10173",
+      "board": "Day - 2590 Monaco Drive",
+      "studio": 688.75,
+      "qb": 5891.25,
+      "delta": -5202.5,
+      "qbNum": "IN-24-10173HZ"
+    },
+    {
+      "number": "IN-24-10120",
+      "board": "Holtz Hill",
+      "studio": 5056.25,
+      "qb": 0,
+      "delta": 5056.25,
+      "qbNum": "IN-24-10120HZ"
+    },
+    {
+      "number": "IN-11799",
+      "board": "Shimano - Westridge Lane",
+      "studio": 71963.67,
+      "qb": 66956.45,
+      "delta": 5007.22,
+      "qbNum": "IN-11799"
+    },
+    {
+      "number": "IN-10138",
+      "board": "Smith - Remodel",
+      "studio": 1406.25,
+      "qb": 6168.75,
+      "delta": -4762.5,
+      "qbNum": "IN-24-10138HZ"
+    },
+    {
+      "number": "IN-10076",
+      "board": "7225 Bugletrail",
+      "studio": 76961.22,
+      "qb": 81645.32,
+      "delta": -4684.1,
+      "qbNum": "IN-10076HZ"
+    },
+    {
+      "number": "IN-11561",
+      "board": "Shimano - Westridge Lane",
+      "studio": 66724.56,
+      "qb": 62045.91,
+      "delta": 4678.65,
+      "qbNum": "IN-11561"
+    },
+    {
+      "number": "IN-10148",
+      "board": "Rosenthal - 335 Myrtle St.",
+      "studio": 6455.35,
+      "qb": 1850,
+      "delta": 4605.35,
+      "qbNum": "IN-10148HZ"
+    },
+    {
+      "number": "IN-11774",
+      "board": "Christal Cresta",
+      "studio": 35799.6,
+      "qb": 31277.78,
+      "delta": 4521.82,
+      "qbNum": "IN-11774"
+    },
+    {
+      "number": "IN-11872",
+      "board": "Shimano - Westridge Lane",
+      "studio": 58254.31,
+      "qb": 53765.44,
+      "delta": 4488.87,
+      "qbNum": "IN-11872"
+    },
+    {
+      "number": "IN-10033",
+      "board": "Rosenthal - 335 Myrtle St.",
+      "studio": 5867.16,
+      "qb": 1495,
+      "delta": 4372.16,
+      "qbNum": "IN-24-10033HZ"
+    },
+    {
+      "number": "IN-11661",
+      "board": "Cloud - Mustang",
+      "studio": 27226.95,
+      "qb": 22995.72,
+      "delta": 4231.23,
+      "qbNum": "IN-11661"
+    },
+    {
+      "number": "IN-10092",
+      "board": "Wiesinger",
+      "studio": 604.03,
+      "qb": 4827.5,
+      "delta": -4223.47,
+      "qbNum": "IN-24-10092HZ"
+    },
+    {
+      "number": "IN-12621",
+      "board": "Cloud - Mustang",
+      "studio": 898.75,
+      "qb": 4881.25,
+      "delta": -3982.5,
+      "qbNum": "IN-12621"
+    },
+    {
+      "number": "IN-10125",
+      "board": "Day - 2590 Monaco Drive",
+      "studio": 297.5,
+      "qb": 4052.5,
+      "delta": -3755,
+      "qbNum": "IN-10125HZ"
+    },
+    {
+      "number": "IN-11613",
+      "board": "Shimano - Westridge Lane",
+      "studio": 49579.34,
+      "qb": 45850.18,
+      "delta": 3729.16,
+      "qbNum": "IN-11613"
+    },
+    {
+      "number": "IN-11678",
+      "board": "Cameron- Avenida Evita",
+      "studio": 53520.01,
+      "qb": 49806.48,
+      "delta": 3713.53,
+      "qbNum": "IN-11678"
+    },
+    {
+      "number": "IN-10152",
+      "board": "Bradbury - Blue Bird",
+      "studio": 4051.93,
+      "qb": 381.8,
+      "delta": 3670.13,
+      "qbNum": "IN-10152HZ"
+    },
+    {
+      "number": "IN-11823",
+      "board": "Shimano - Westridge Lane",
+      "studio": 7335,
+      "qb": 3704.74,
+      "delta": 3630.26,
+      "qbNum": "IN-11823"
+    },
+    {
+      "number": "IN-24-10119",
+      "board": "Holtz Hill",
+      "studio": 3507.5,
+      "qb": 0,
+      "delta": 3507.5,
+      "qbNum": "IN-24-10119HZ"
+    },
+    {
+      "number": "IN-11419",
+      "board": "Kruse - Lido",
+      "studio": 55735.43,
+      "qb": 52350.06,
+      "delta": 3385.37,
+      "qbNum": "IN-11419"
+    },
+    {
+      "number": "IN-11850",
+      "board": "Christal Cresta",
+      "studio": 22806.8,
+      "qb": 19489.47,
+      "delta": 3317.33,
+      "qbNum": "IN-11850"
+    },
+    {
+      "number": "IN-24-10118",
+      "board": "Holtz Hill",
+      "studio": 3245,
+      "qb": 0,
+      "delta": 3245,
+      "qbNum": "IN-24-10118HZ"
+    },
+    {
+      "number": "IN-10047",
+      "board": "Rosenthal - 335 Myrtle St.",
+      "studio": 3725,
+      "qb": 575,
+      "delta": 3150,
+      "qbNum": "IN-24-10047HZ"
+    },
+    {
+      "number": "IN-10166",
+      "board": "Bradbury - Blue Bird",
+      "studio": 1521.71,
+      "qb": 4625,
+      "delta": -3103.29,
+      "qbNum": "IN-10166HZ"
+    },
+    {
+      "number": "IN-10108",
+      "board": "Katke - Graceland Dr.",
+      "studio": 8861.35,
+      "qb": 11838.82,
+      "delta": -2977.47,
+      "qbNum": "IN-10108HZ"
+    }
+  ],
+  "rollingHillsSpot": [
+    {
+      "result": "AMOUNT_AND_BALANCE_MISMATCH",
+      "matchMethod": "exact",
+      "number": "IN-12958",
+      "boardId": "cloud-rolling-hills",
+      "boardName": "Cloud - Rolling Hills",
+      "studioStored": 13643.88,
+      "studioComputed": 13643.88,
+      "studioPaid": 13643.88,
+      "studioBalance": 0,
+      "studioStatus": "Paid",
+      "studioQbId": "73861",
+      "qbNum": "IN-12958",
+      "qbAmount": 13670.69,
+      "qbOpen": 26.81,
+      "qbPaid": 13643.88,
+      "amountDelta": -26.81,
+      "balanceDelta": -26.81,
+      "qbName": "Tracey Cloud",
+      "qbDate": "12/05/2025",
+      "note": ""
+    },
+    {
+      "result": "MATCH",
+      "matchMethod": "exact",
+      "number": "IN-12946",
+      "boardId": "cloud-rolling-hills",
+      "boardName": "Cloud - Rolling Hills",
+      "studioStored": 43115.48,
+      "studioComputed": 43115.48,
+      "studioPaid": 43115.48,
+      "studioBalance": 0,
+      "studioStatus": "Paid",
+      "studioQbId": "73562",
+      "qbNum": "IN-12946",
+      "qbAmount": 43115.48,
+      "qbOpen": 0,
+      "qbPaid": 43115.48,
+      "amountDelta": 0,
+      "balanceDelta": 0,
+      "qbName": "Tracey Cloud",
+      "qbDate": "10/20/2025",
+      "note": ""
+    },
+    {
+      "result": "AMOUNT_AND_BALANCE_MISMATCH",
+      "matchMethod": "exact",
+      "number": "IN-12902",
+      "boardId": "cloud-rolling-hills",
+      "boardName": "Cloud - Rolling Hills",
+      "studioStored": 15433.35,
+      "studioComputed": 15433.35,
+      "studioPaid": 15645.43,
+      "studioBalance": 1.96,
+      "studioStatus": "Paid",
+      "studioQbId": "71973",
+      "qbNum": "IN-12902",
+      "qbAmount": 15679.67,
+      "qbOpen": 34.24,
+      "qbPaid": 15645.43,
+      "amountDelta": -246.32,
+      "balanceDelta": -32.28,
+      "qbName": "Tracey Cloud",
+      "qbDate": "04/28/2025",
+      "note": ""
+    },
+    {
+      "result": "MATCH",
+      "matchMethod": "exact",
+      "number": "IN-12930",
+      "boardId": "cloud-rolling-hills",
+      "boardName": "Cloud - Rolling Hills",
+      "studioStored": 5211.25,
+      "studioComputed": 5211.25,
+      "studioPaid": 5211.25,
+      "studioBalance": 0,
+      "studioStatus": "Paid",
+      "studioQbId": "73098",
+      "qbNum": "IN-12930",
+      "qbAmount": 5211.25,
+      "qbOpen": 0,
+      "qbPaid": 5211.25,
+      "amountDelta": 0,
+      "balanceDelta": 0,
+      "qbName": "Tracey Cloud",
+      "qbDate": "08/18/2025",
+      "note": ""
+    }
+  ]
+}

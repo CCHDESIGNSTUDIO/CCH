@@ -1,0 +1,42 @@
+{
+  "dryRun": false,
+  "boards": [
+    "cloud-rolling-hills"
+  ],
+  "stats": {
+    "docsScanned": 414,
+    "ivyUrlsFound": 2,
+    "alreadyFirebase": 0,
+    "fixedWould": 0,
+    "fixedApplied": 0,
+    "noMatch": 1,
+    "noStorage": 1,
+    "docsUpdated": 0,
+    "viaClipCanonical": 0,
+    "viaHouzzId": 0,
+    "viaFilename": 0,
+    "viaUnmatched": 0,
+    "imagesArraysCollapsed": 0,
+    "bySource": {
+      "boards/cloud-rolling-hills/clips": 1,
+      "boards/cloud-rolling-hills/invoices": 1
+    },
+    "byBoard": {
+      "cloud-rolling-hills": 2
+    },
+    "samples": {
+      "fixed": [],
+      "noMatch": [
+        {
+          "path": "imageUrl",
+          "ivy": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/258556935/Belevedere_s"
+        },
+        {
+          "path": "items[0].imageUrl",
+          "title": "Soapstone slabs & backsplash",
+          "ivy": "https://ivy-uploads.s3-us-west-2.amazonaws.com/2426/image/258556935/Belevedere_s"
+        }
+      ]
+    }
+  }
+}
