@@ -6,6 +6,36 @@
 
 ---
 
+## ⚠️ KNOWN GAP IN EXISTING DROPBOX BACKUP (May 24, 2026)
+
+There is an existing partial backup at `C:\Users\cindy\Dropbox\Claude - CCH studio\Studio Firebase back up\` containing 9 zip files totaling **~618 MB**. It includes `boards.zip`, `images.zip`, `projects.zip`, per-project folders, etc.
+
+**It does NOT include the `houzz-products/` folder** — which is **9.97 GB / 20,375 files**, the rescued Houzz product images, and the entire point of the May 25 deadline backup.
+
+**Verify before May 25:** the `houzz-products/` folder MUST be downloaded separately. See "Priority: minimum viable backup" below for the fastest path.
+
+---
+
+## Priority: minimum viable backup (if time-constrained before May 25)
+
+If you only have time/bandwidth for ONE folder, do `houzz-products/` — everything else in the bucket is either small or already backed up to the Dropbox folder above.
+
+```powershell
+gcloud auth login
+gcloud config set project cch-design-boards
+
+$dateStamp = Get-Date -Format 'yyyy-MM-dd'
+$dest = "D:\CCH-Storage-Backup-$dateStamp\houzz-products"
+New-Item -ItemType Directory -Path $dest -Force | Out-Null
+gsutil -m rsync -r gs://cch-design-boards.firebasestorage.app/houzz-products $dest
+```
+
+That's 9.97 GB. At 50–100 Mbps, ~30 minutes. Resumable.
+
+The full-bucket runbook below covers everything else for completeness, but `houzz-products/` is the deadline-critical piece.
+
+---
+
 ## What this backs up
 
 - **Bucket:** `gs://cch-design-boards.firebasestorage.app`
