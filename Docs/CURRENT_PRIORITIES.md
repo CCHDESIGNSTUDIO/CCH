@@ -1,21 +1,24 @@
 # CCH Studio — Current Priorities
 
-**Last updated:** May 24, 2026 (Design Board regressions in progress on staging)
+**Last updated:** May 27, 2026 (rev — Claude added COS Agent spec)
 **Maintainer:** Cynthia Holloway
+**Last revised by:** Claude (May 27, 2026 — added item 3c Chief of Staff Agent v1.0 spec reference)
 
 This file holds time-bound priorities. CLAUDE.md is canon and timeless — anything dated lives here.
-Completed work moves to the "Recently Completed Work" table in `CLAUDE.md` (AI Session Rule #9).
+
+---
+
+## Recently completed (May 2026)
+
+- **Houzz/Ivy CDN rescue** — Ivy S3 URLs migrated; images saved to Firebase Storage / stable URLs. No further Ivy rescue work unless audit finds stragglers.
+- **Firestore rules Phase 1** — `/products` create/update requires `isAuth()` on **staging and production** (deployed May 28, 2026). See `STAGING-HOSTING-SETUP.md` for deploy commands.
+- **PO → Bill → QB (bill-only)** — Studio PO + vendor bill + `pushBillToQB`; PO not pushed to QB. On production hosting + functions; verify end-to-end in QB when ready.
 
 ---
 
 ## URGENT (deadline-driven)
 
-1. **Houzz/Ivy CDN rescue — May 25 deadline.** The `ivy-uploads.s3-us-west-2.amazonaws.com` URLs die May 25.
-   - 6,810 line-item references in Firestore (across products/, productLibrary/, clips, invoice items, PO items, proposal items)
-   - 341 catalog rows in `products/` still pointing at Ivy
-   - Rescue script: `scripts/rewrite-image-urls.js`
-   - Verification: re-run `_scripts/audit-image-hosting.js` — `OTHER_AWS_S3` should drop to near zero
-2. **Verify Firebase Storage backup of `houzz-products/`** (20,375 files / 9.97 GB) is preserved on Toshiba `D:\` before May 25.
+*(none — Ivy May 25 deadline closed)*
 
 ## HIGH (active UI regressions)
 
@@ -25,7 +28,9 @@ Completed work moves to the "Recently Completed Work" table in `CLAUDE.md` (AI S
    - Inspiration tab pull-in (`ideabooks` images via `_ibImageUrlFromEntry`)
    - **Status:** fix in `index.html` `openDesignBoard` — verify on staging before production
 
-3b. **PO → Bill → Client Invoice variance workflow + Discrepancy Report** (Cynthia confirmed May 27, 2026). Replaces the Houzz workflow that forced staff to retro-edit POs when vendors added freight, breaking QB matching. New model: PO is immutable after Send; "Receive Final Bill" captures vendor actuals (PO + freight + tax + extras) as a separate billing record; variance gets auto-classified (shipping/tax/restocking/etc.) and routed to client invoice or marked absorbed. Per-project Discrepancies tab + firm-wide Discrepancy Report + dashboard widget. Profit-protection feature — currently invisible freight overages aren't being invoiced forward to clients. **Full spec: `cch-deploy/Docs/SPEC_PO_Bill_Variance_Workflow_v1.0.md`.** Implementation on staging first per AI Session Rule #8.
+3b. **PO → Bill → Client Invoice variance workflow + Discrepancy Report** (Cynthia confirmed May 27, 2026). Core bill-only path shipped (vendor bill → QB Bill, PO locked after send). **Remaining:** discrepancy tab/report/dashboard, client invoice routing from variance, spec sync (`SPEC_PO_Bill_Variance_Workflow_v1.0.md` still says no bill push to QB — update when reviewing AC).
+
+3c. **Chief of Staff Agent v1.0** (Cynthia approved May 27, 2026 — "the dream COS who always says yes — done, when I ask"). Project expediter / design assistant AI layer on top of Studio. Watches data continuously, generates `attentionItems`, produces daily briefing modal + email, drafts vendor nudges, surfaces stale priorities. 6-8 Cursor sessions to v1.0 production. **Full spec: `Docs/SPEC_Chief_Of_Staff_Agent_v1.0.md`.** First win = daily briefing modal (Phases 1-3, ~3-4 sessions). The "BIG notification" work (item 3a) is the foundation for this — same `notifications` collection pattern.
 
 3a. **BIG notification when items push to QuickBooks** (Cynthia requested May 27, 2026). Currently push-to-QB happens with no visible confirmation, so users can't tell if it worked without checking QB directly. Three-layer notification system:
    - **Modal (click-to-acknowledge)** on FIRST push of a doc — invoice or PO going to QB for the first time. Shows: doc number, amount, QB record ID, link to QB. Blocks UI until clicked OK. Prevents "did it work?" anxiety on new pushes.

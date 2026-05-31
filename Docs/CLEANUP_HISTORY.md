@@ -2,9 +2,16 @@
 
 **Last updated:** May 27, 2026
 **Maintainer:** Cynthia Holloway
+**Last revised by:** Claude (May 27, 2026 — added CCH Canonical Category Taxonomy section + Houzz Project Tracker root-cause analysis)
 **Purpose:** (1) Catalog every cleanup pass that has touched production data, so the work isn't accidentally re-done or undone. (2) Lock in re-import rules so Houzz Project Tracker re-imports don't bring back the bad data that was cleaned up.
 
 This is a living document. Every cleanup pass appends a row. Every re-import script must read the "Re-Import Guard Rules" section before running.
+
+## Revision Log
+| Date | Change | Revised By |
+|---|---|---|
+| May 27, 2026 | Added "CCH Canonical Category Taxonomy (May 27, 2026 — authoritative)" section. Documented 21 product categories + expense/service classifications. Superseded Clipper whitelist. Added Re-Import Guard Rules at top. | Claude |
+| May 27, 2026 | Initial file creation with root cause (Houzz Project Trackers as source of bad data), Re-Import Guard Rules, April 28-29 Foundational Enrichment phases, May 19 tax audit, May 22 invoice edit/view split, May 22-24 image URL rewrites, doc dedup status, all phase manifests. | Claude |
 
 ---
 
@@ -88,8 +95,8 @@ Art · Mirror · Accessories · Fabric & Trim · Furniture · Stone & Tile · Ap
 | Accessories | Standalone accessories (no mirror component) |
 | Furniture & Upholstery | **Canonical** — covers ALL furniture including dining chairs, dining tables, upholstered pieces. Custom upholstery products go here, NOT under "Custom Upholstery". |
 | Fabric & Trim | Includes trim. NOT "Fabric + Trim" or "Fabric" alone. |
-| Hardware | General hardware |
-| Window Hardware | Window-specific hardware (drapery rods, finials) — distinct from general Hardware |
+| Cabinet Hardware | Cabinet pulls, knobs, hinges, bath/cabinet hardware (canonical — was generic **Hardware**) |
+| Window Hardware | Drapery rods, finials, rings, brackets — distinct from Cabinet Hardware |
 | Bedding & Pillows | Off-the-shelf bedding/pillow products |
 | Custom Pillows & Bedding | Custom-made pillows + bedding (CCH terminology — NOT "Custom Bedding and Pillows" from Clipper) |
 | Custom Window Treatments | Custom drapery, shades (CCH terminology — NOT "Custom Window Coverings" from Clipper) |
@@ -127,7 +134,10 @@ Art · Mirror · Accessories · Fabric & Trim · Furniture · Stone & Tile · Ap
 | `Window` | `Windows` |
 | `Pillows` | `Bedding & Pillows` |
 | `Appliances  & Plumbing` (double space) | `Appliances & Plumbing` |
-| `Cabinet Hardware` | `Hardware` |
+| `Hardware` (legacy) | `Cabinet Hardware` |
+| `Cabinet Hardware` | `Cabinet Hardware` |
+| `Window Hardware` | `Window Hardware` |
+| `Window` (tracker, when hardware context) | `Window Hardware` or `Windows` — use title keywords (rod, finial, bracket) for hardware |
 | `Cabinet Door Style` | `Cabinets` |
 | `Solid Surface`, `Grout` | `Stone & Tile` |
 | `Dining Chairs`, `Dining Table` | `Furniture & Upholstery` |
@@ -150,6 +160,8 @@ Art · Mirror · Accessories · Fabric & Trim · Furniture · Stone & Tile · Ap
 - Trim leading + trailing whitespace
 - Collapse multiple internal spaces to one (`Fabric  + Trim` → `Fabric + Trim` → then remap to `Fabric & Trim`)
 - Excel-roundtrip CAN reintroduce trailing whitespace — always re-trim on import
+
+**May 27 (later) — Hardware split:** Canonical **Cabinet Hardware** replaces generic **Hardware**; **Window Hardware** added for drapery rods/finials. Code: `cch-product-categories.js` + `cchNormalizeProductCategory()`. Legacy `Hardware` remaps to Cabinet Hardware on import; window builder strict catalog uses Window Hardware (or legacy Hardware).
 
 **Markers to add on cleanup writes (per Re-Import Guard Rules at top of this file):**
 - `_categoryFixedAt: <timestamp>` — Phase 1.5/1.6 marker, still in use
