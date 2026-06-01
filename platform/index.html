@@ -2974,6 +2974,9 @@
         <button class="nav-item" data-page="financials">
           <span class="nav-icon">◇</span><span class="nav-label">Financials</span>
         </button>
+        <button class="nav-item admin-only-nav" data-page="discrepancyreport" title="PO vs vendor bill variances firm-wide">
+          <span class="nav-icon">⚠</span><span class="nav-label">Discrepancies</span>
+        </button>
         <button class="nav-item admin-only-nav" data-page="quickbooks" title="QuickBooks connection, reconnect, and mapping help">
           <span class="nav-icon" style="color:#2CA01C;">$</span><span class="nav-label">QuickBooks</span>
         </button>
@@ -4358,6 +4361,7 @@
       else if (page === 'feedbackrequests') renderFeedbackRequests();
       else if (page === 'settings') renderSettingsPage();
       else if (page === 'quickbooks') renderQuickBooksPage();
+      else if (page === 'discrepancyreport' && typeof window.renderDiscrepancyReportPage === 'function') window.renderDiscrepancyReportPage();
       else renderProjectsList();
     }
 
@@ -11975,9 +11979,9 @@
         ? ['ideabooks']
         : _clientProjShell
         ? ['designboards', 'boards', 'ideabooks', '_div1', 'proposals', 'invoices', '_div2', 'comms']
-        : ['overview', ...(currentUser ? ['workorders'] : []), 'tasks', 'selections', 'boards', 'ideabooks', 'designboards', 'ffe', 'specbook', '_div1', 'proposals', 'invoices', 'pos', ...(_isAdminUser ? ['financials'] : []), '_div2', 'files', 'time', 'comms', 'notes'];
-      const tabLabels = { overview: 'Overview', tasks: 'Tasks', selections: 'Selections', ideabooks: (_isLibraryProject ? 'Style boards' : 'Inspiration'), boards: 'Room Boards', designboards: 'Design Boards', ffe: 'FFE Tracker', specbook: 'Spec Book', proposals: 'Proposals', invoices: 'Invoices', pos: 'Purchase Orders', financials: 'Financials', workorders: 'Work Orders', files: 'Files & Docs', time: 'Time', comms: 'Communications', notes: 'Notes' };
-      const tabIcons = { overview: '◈', tasks: '✅', selections: '🛍️', ideabooks: '💡', boards: '🏠', designboards: '🎨', ffe: '🛋️', specbook: '📖', proposals: '📋', invoices: '💰', pos: '📦', financials: '📊', workorders: '📐', files: '📁', time: '⏱️', comms: '💬', notes: '📝' };
+        : ['overview', ...(currentUser ? ['workorders'] : []), 'tasks', 'selections', 'boards', 'ideabooks', 'designboards', 'ffe', 'specbook', '_div1', 'proposals', 'invoices', 'pos', 'discrepancies', ...(_isAdminUser ? ['financials'] : []), '_div2', 'files', 'time', 'comms', 'notes'];
+      const tabLabels = { overview: 'Overview', tasks: 'Tasks', selections: 'Selections', ideabooks: (_isLibraryProject ? 'Style boards' : 'Inspiration'), boards: 'Room Boards', designboards: 'Design Boards', ffe: 'FFE Tracker', specbook: 'Spec Book', proposals: 'Proposals', invoices: 'Invoices', pos: 'Purchase Orders', discrepancies: 'Discrepancies', financials: 'Financials', workorders: 'Work Orders', files: 'Files & Docs', time: 'Time', comms: 'Communications', notes: 'Notes' };
+      const tabIcons = { overview: '◈', tasks: '✅', selections: '🛍️', ideabooks: '💡', boards: '🏠', designboards: '🎨', ffe: '🛋️', specbook: '📖', proposals: '📋', invoices: '💰', pos: '📦', discrepancies: '⚠', financials: '📊', workorders: '📐', files: '📁', time: '⏱️', comms: '💬', notes: '📝' };
 
       // Load profit data for summary bar (real projects only — Style Library has no billing surface)
       let _projInvoices = [], _projPOs = [], _projTime = [];
@@ -12234,6 +12238,7 @@
       else if (currentProjectTab === 'proposals') await renderProposalsTab(T, proj);
       else if (currentProjectTab === 'invoices') await renderInvoicesTab(T, proj);
       else if (currentProjectTab === 'pos') await renderPOsTab(T, proj);
+      else if (currentProjectTab === 'discrepancies' && typeof window.renderProjectDiscrepanciesTab === 'function') await window.renderProjectDiscrepanciesTab(T, proj);
       else if (currentProjectTab === 'ffe') await renderFFETab(T, proj);
       else if (currentProjectTab === 'specbook') await renderSpecBookTab(T, proj);
       else if (currentProjectTab === 'financials') await renderFinancialsTab(T, proj);
@@ -12271,8 +12276,13 @@
         return;
       }
       var base = window.location.origin.replace(/\/$/, '') + '/builder/?projectId=' + encodeURIComponent(proj.id);
+      function woBuilderPrintUrl(ids) {
+        if (!ids || !ids.length) return '#';
+        return base + '&printWorkOrderIds=' + encodeURIComponent(ids.join(','));
+      }
       var tdStyle = 'padding:10px 12px;border-bottom:1px solid rgba(15,26,46,0.08);font-size:13px;';
       var thead = '<thead><tr style="background:rgba(15,26,46,0.04);font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-500);">' +
+        '<th style="padding:10px 12px;text-align:center;width:36px;"><input type="checkbox" id="woSelectAll" title="Select all" aria-label="Select all work orders"></th>' +
         '<th style="padding:10px 12px;text-align:left;">Work order #</th>' +
         '<th style="padding:10px 12px;text-align:left;">Category</th>' +
         '<th style="padding:10px 12px;text-align:left;">Room</th>' +
@@ -12294,7 +12304,9 @@
         } catch (e0) {}
         var openU = base + '&workOrderId=' + encodeURIComponent(r.id);
         var dupU = base + '&duplicateFrom=' + encodeURIComponent(r.id);
+        var printU = woBuilderPrintUrl([r.id]);
         return '<tr>' +
+          '<td style="' + tdStyle + 'text-align:center;"><input type="checkbox" class="wo-print-cb" data-wo-id="' + escAttr(r.id) + '" aria-label="Select ' + wo + '"></td>' +
           '<td style="' + tdStyle + 'font-family:var(--font-mono);font-weight:600;color:#0F1A2E;">' + wo + '</td>' +
           '<td style="' + tdStyle + '">' + cat + '</td>' +
           '<td style="' + tdStyle + '">' + rm + '</td>' +
@@ -12302,16 +12314,63 @@
           '<td style="' + tdStyle + 'text-align:center;">' + rev + '</td>' +
           '<td style="' + tdStyle + 'font-size:12px;color:var(--gray-500);">' + esc(upd) + '</td>' +
           '<td style="' + tdStyle + 'text-align:right;white-space:nowrap;">' +
+          '<a class="btn btn-secondary btn-sm" href="' + escAttr(printU) + '" target="_blank" rel="noopener noreferrer" style="margin-right:6px;" title="Print this work order">Print</a>' +
           '<a class="btn btn-secondary btn-sm" href="' + escAttr(openU) + '" target="_blank" rel="noopener noreferrer" style="margin-right:6px;">Open in Builder</a>' +
           '<a class="btn btn-secondary btn-sm" href="' + escAttr(dupU) + '" target="_blank" rel="noopener noreferrer">Duplicate</a>' +
           '</td></tr>';
       }).join('');
       var empty = '<div class="empty-state" style="padding:40px;"><div class="empty-text">No saved work orders yet. Use <strong>Custom Order Builder</strong> to create one for this project.</div></div>';
+      var printBar = rows.length
+        ? '<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">' +
+          '<a class="btn btn-secondary btn-sm" id="woPrintSelectedBtn" href="#" target="_blank" rel="noopener noreferrer" aria-disabled="true" style="pointer-events:none;opacity:.55;text-decoration:none;display:inline-block;">Print selected</a>' +
+          '<a class="btn btn-secondary btn-sm" id="woPrintAllBtn" href="' + escAttr(woBuilderPrintUrl(rows.map(function(r) { return r.id; }))) + '" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:inline-block;">Print all</a>' +
+          '<span id="woPrintCount" style="font-size:12px;color:var(--gray-500);"></span>' +
+          '<span style="font-size:12px;color:var(--gray-400);margin-left:auto;">Opens print view in a new tab · 11×17 landscape · Save as PDF</span>' +
+          '</div>'
+        : '';
       T.innerHTML =
         '<div style="margin-bottom:16px;font-size:13px;color:var(--gray-500);">Work orders from the Custom Order Builder are stored in Firestore. Open an existing order or duplicate it to get a <strong>new</strong> work order number before saving.</div>' +
+        printBar +
         (rows.length
           ? '<div style="overflow-x:auto;border:1px solid rgba(15,26,46,0.1);background:#fff;"><table style="width:100%;border-collapse:collapse;">' + thead + '<tbody>' + body + '</tbody></table></div>'
           : empty);
+      if (rows.length) {
+        var allCb = T.querySelector('#woSelectAll');
+        var cbs = T.querySelectorAll('.wo-print-cb');
+        var printSel = T.querySelector('#woPrintSelectedBtn');
+        var printAllBtn = T.querySelector('#woPrintAllBtn');
+        function selectedWoIds() {
+          return Array.from(cbs).filter(function(c) { return c.checked; }).map(function(c) { return c.getAttribute('data-wo-id'); }).filter(Boolean);
+        }
+        function updateWoPrintUi() {
+          var ids = selectedWoIds();
+          var n = ids.length;
+          if (printSel) {
+            printSel.href = woBuilderPrintUrl(ids);
+            if (n > 0) {
+              printSel.removeAttribute('aria-disabled');
+              printSel.style.pointerEvents = 'auto';
+              printSel.style.opacity = '1';
+            } else {
+              printSel.setAttribute('aria-disabled', 'true');
+              printSel.href = '#';
+              printSel.style.pointerEvents = 'none';
+              printSel.style.opacity = '0.55';
+            }
+          }
+          var cnt = T.querySelector('#woPrintCount');
+          if (cnt) cnt.textContent = n ? (n + ' selected') : '';
+          if (allCb && cbs.length) allCb.checked = n > 0 && n === cbs.length;
+        }
+        cbs.forEach(function(c) { c.addEventListener('change', updateWoPrintUi); });
+        if (allCb) {
+          allCb.addEventListener('change', function() {
+            cbs.forEach(function(c) { c.checked = allCb.checked; });
+            updateWoPrintUi();
+          });
+        }
+        updateWoPrintUi();
+      }
     }
 
     // ----- FILES & DOCUMENTS TAB -----
@@ -12581,12 +12640,87 @@
     function _selSourceTooltip(item) {
       var s = String(item && item.source || '').trim();
       if (s === 'library') return 'Product Library — catalog row linked to this project';
+      if (s === 'products') return 'Product Library — catalog row linked to this project';
       if (s === 'boardclip' || s === 'clip') return 'Room board clip — pinned from an inspiration board';
       if (s === 'invoice') return 'Imported from an invoice line';
       if (s === 'proposal') return 'Imported from a proposal line';
       if (s) return 'Source: ' + s;
       return 'Source';
     }
+
+  async function _selEnsureClipsForProjectProducts(projectId, prodRows) {
+    if (!projectId || !prodRows || !prodRows.length) return 0;
+    var index = await _disBuildProjectClipIndex(projectId);
+    var created = 0;
+    for (var pi = 0; pi < prodRows.length; pi++) {
+      var p = prodRows[pi];
+      if (!p || !p.title) continue;
+      var room = String(p.room || '').trim();
+      if (!room) continue;
+      var existing = _disResolveClipIdFromIndex(index, {
+        title: p.title, vendor: p.vendor, libraryProductId: p.id, _libDocId: p.id
+      });
+      if (existing) continue;
+      var qty = parseFloat(p.qty) || 1;
+      var cost = parseMoney(p.unitCost) || parseMoney(p.cost) || parseMoney(p.costPrice) || parseMoney(p.totalCost) || 0;
+      var sell = parseMoney(p.clientPrice) || parseMoney(p.sellPrice) || parseMoney(p.price) || parseMoney(p.totalSelling) || 0;
+      var newClip = {
+        title: p.title || 'Untitled',
+        description: p.description || '',
+        vendor: p.vendor || '',
+        room: room,
+        category: (p.category || '').trim() || 'General',
+        cost: cost,
+        clientPrice: qty > 0 && sell > 0 ? (sell / qty) : sell,
+        qty: qty,
+        imageUrl: p.imageUrl || p.image || '',
+        sku: p.sku || '',
+        source: 'library',
+        libraryProductId: p.id,
+        addedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      var guard = typeof boardClipWriteAllowedForRoomBoard === 'function'
+        ? boardClipWriteAllowedForRoomBoard(newClip) : { ok: true };
+      if (!guard.ok) continue;
+      try {
+        var ref = await db.collection('boards').doc(projectId).collection('clips').add(newClip);
+        created++;
+        if (p.id) index.byLib[p.id] = ref.id;
+        var tv = (String(newClip.title || '').trim().toLowerCase() + '|' + String(newClip.vendor || '').trim().toLowerCase());
+        if (tv !== '|') {
+          if (!index.byTV[tv]) index.byTV[tv] = [];
+          index.byTV[tv].push({ id: ref.id, room: room });
+        }
+      } catch (eAdd) {
+        console.warn('[Selections] ensure clip for product', p.id, eAdd && eAdd.message ? eAdd.message : eAdd);
+      }
+    }
+    return created;
+  }
+
+  function _selItemsHasCatalogId(items, docId) {
+    return items.some(function(it) {
+      return it.id === docId && (it.source === 'library' || it.source === 'products');
+    });
+  }
+
+  function _selPushCatalogProduct(items, libRoomById, docId, p, source) {
+    if (!p || !p.title || _selItemsHasCatalogId(items, docId)) return;
+    libRoomById[docId] = String(p.room || '').trim();
+    items.push({
+      id: docId, source: source || 'products', title: p.title || '', vendor: p.vendor || '',
+      room: p.room || '', category: p.category || '',
+      image: (typeof getProposalLineHeroImageUrl === 'function' ? getProposalLineHeroImageUrl(p) : '') || p.image || p.imageUrl || '',
+      cost: p.unitCost || p.costPrice || p.cost || p.totalCost || 0,
+      sell: p.sellPrice || p.clientPrice || p.price || p.totalSell || 0,
+      status: p.status || '', sku: p.sku || '', description: p.description || '',
+      notes: _selFirstNonEmpty([p.notes, p.internalNotes, p.personalNotes, p.vendorNotes, p.description]),
+      houzzId: String(p.houzzId || p.houzzProductId || '').trim(),
+      libraryProductId: docId,
+      proposal: p.proposal || p.houzzProposal || '', invoice: p.invoice || p.houzzInvoice || '', po: p.po || p.houzzPO || ''
+    });
+  }
 
     async function renderSelectionsTab(T, proj) {
       if (!proj || !proj.id) {
@@ -12677,14 +12811,21 @@
 
       // Perf fix (Bug #50): fire all independent Firestore queries in parallel so they resolve concurrently.
       // Each query starts immediately; sequential awaits below just collect the already-in-flight results.
+      // Do NOT auto-spawn room-board clips from products/ on every Selections load — that undid Room Board deletes
+      // and forced users to clear room in Selections manually. Clips are created intentionally via setSelectionItemRoom,
+      // clipper, Move to Room Board, or explicit sync — not by opening this tab.
       var _pClips  = db.collection('boards').doc(proj.id).collection('clips').get();
       var _pLibEx  = db.collection('productLibrary').where('project', '==', projName).get();
       var _pProp   = db.collection('proposals').where('projectId', '==', proj.id).get();
       var _pProp2  = db.collection('boards').doc(proj.id).collection('proposals').get();
       var _pPO     = db.collection('purchaseOrders').where('projectId', '==', proj.id).get();
+      var _pPOBoard = db.collection('boards').doc(proj.id).collection('purchaseOrders').get();
       var _pBooks  = db.collection('boards').doc(proj.id).collection('ideabooks').get();
       var _pBoard  = db.collection('boards').doc(proj.id).get();
-      // Invoice query: only fire if not already in memory
+      var _pInvBoard = db.collection('boards').doc(proj.id).collection('invoices').get();
+      var _pProdByPid = db.collection(CCH_PRODUCTS_COLLECTION).where('projectId', '==', proj.id).limit(800).get();
+      var _pProdByName = projName ? db.collection(CCH_PRODUCTS_COLLECTION).where('project', '==', projName).limit(800).get() : null;
+      // Invoice query: legacy top-level only if not already in memory and board subcollection empty
       var _projInvFromMem = (window._allInvoices || []).filter(function(inv) { return inv.projectId === proj.id || (inv.project || '').toLowerCase() === projNameLower; });
       var _pInv = _projInvFromMem.length === 0 ? db.collection('invoices').where('projectId', '==', proj.id).get() : null;
 
@@ -12760,6 +12901,16 @@
         }
       } catch(e) { console.log('Library load error:', e); }
 
+      // 1b. Products from products/ catalog (canonical Product Library — same rows as #/library)
+      try {
+        var _psCat1 = await _pProdByPid;
+        _psCat1.forEach(function(d) { _selPushCatalogProduct(items, libRoomById, d.id, d.data(), 'products'); });
+        if (_pProdByName) {
+          var _psCat2 = await _pProdByName;
+          _psCat2.forEach(function(d) { _selPushCatalogProduct(items, libRoomById, d.id, d.data(), 'products'); });
+        }
+      } catch (eProdLoad) { console.log('Products catalog load error:', eProdLoad); }
+
       items.forEach(function(en) {
         if (en.source !== 'boardclip') return;
         if (String(en.room || '').trim()) return;
@@ -12767,26 +12918,37 @@
         if (lid && libRoomById[lid]) en.room = libRoomById[lid];
       });
 
-      // 2. Items from invoices for this project (from memory or Firestore — query pre-fired above)
+      // 2. Items from invoices for this project (board subcollection + legacy top-level)
       var projInvoices = _projInvFromMem.slice();
-      if (projInvoices.length === 0 && _pInv) {
-        // Try loading directly from Firestore (pre-fired above in parallel)
+      var invById = {};
+      projInvoices.forEach(function(inv) { if (inv && inv.id) invById[inv.id] = inv; });
+      try {
+        var invBoardSnap = await _pInvBoard;
+        invBoardSnap.forEach(function(d) {
+          invById[d.id] = Object.assign({ id: d.id, projectId: proj.id }, d.data());
+        });
+      } catch (eInvB) { console.log('Selections board invoices load:', eInvB); }
+      if (Object.keys(invById).length === 0 && _pInv) {
         try {
           var invSnap = await _pInv;
-          invSnap.forEach(function(d) { projInvoices.push(Object.assign({ id: d.id }, d.data())); });
-        } catch(e) {}
+          invSnap.forEach(function(d) {
+            if (!invById[d.id]) invById[d.id] = Object.assign({ id: d.id }, d.data());
+          });
+        } catch (eInvL) {}
       }
+      projInvoices = Object.values(invById);
       projInvoices.forEach(function(inv) {
         (inv.items || []).forEach(function(item) {
-          if (!item || (!item.description && !item.title)) return;
+          if (!item || (!item.description && !item.title && !item.name)) return;
+          var invNum = inv.invoiceNum || inv.number || inv.id || '';
           items.push({
-            id: inv.id + '-' + (item.description || '').substring(0, 20), source: 'invoice',
-            title: item.description || item.title || '', vendor: item.vendor || '',
+            id: inv.id + '-' + (item.id || item.lineId || (item.title || item.description || '').substring(0, 20)), source: 'invoice',
+            title: item.title || item.description || item.name || '', vendor: item.vendor || '',
             room: item.room || '', category: item.category || '',
             image: item.imageUrl || item.image || '',
-            cost: parseFloat(item.cost) || 0, sell: parseFloat(item.amount) || parseFloat(item.total) || 0,
-            status: 'Invoiced (' + (inv.number || inv.id) + ')', sku: item.sku || '',
-            description: '', notes: _selNotesFromDocLine(item), proposal: '', invoice: inv.number || '', po: '',
+            cost: parseFloat(item.cost) || 0, sell: parseFloat(item.amount) || parseFloat(item.total) || parseFloat(item.price) || 0,
+            status: 'Invoiced (' + invNum + ')', sku: item.sku || '',
+            description: '', notes: _selNotesFromDocLine(item), proposal: '', invoice: invNum, po: '',
             expenseType: item.expenseType || ''
           });
         });
@@ -12827,26 +12989,33 @@
         });
       } catch (e2) {}
 
-      // 4. Items from POs
+      // 4. Items from POs (legacy top-level + board subcollection)
+      var poById = {};
       try {
-        var poSnap = await _pPO; // pre-fired above in parallel
-        poSnap.forEach(function(d) {
-          var po = d.data() || {};
+        var poSnap = await _pPO;
+        poSnap.forEach(function(d) { poById[d.id] = Object.assign({ id: d.id }, d.data()); });
+      } catch (e) {}
+      try {
+        var poBoardSnap = await _pPOBoard;
+        poBoardSnap.forEach(function(d) {
+          poById[d.id] = Object.assign({ id: d.id, projectId: proj.id }, d.data());
+        });
+      } catch (ePOB) { console.log('Selections board PO load:', ePOB); }
+      Object.values(poById).forEach(function(po) {
           (po.items || []).forEach(function(item) {
-            if (!item || (!item.description && !item.title)) return;
+            if (!item || (!item.description && !item.title && !item.name)) return;
             items.push({
-              id: d.id + '-' + (item.description || '').substring(0, 20), source: 'po',
-              title: item.description || item.title || '', vendor: item.vendor || po.vendor || '',
+              id: po.id + '-' + (item.description || item.title || '').substring(0, 20), source: 'po',
+              title: item.description || item.title || item.name || '', vendor: item.vendor || po.vendor || '',
               room: item.room || '', category: item.category || '',
               image: item.imageUrl || item.image || '',
               cost: parseFloat(item.cost) || parseFloat(item.amount) || 0, sell: 0,
-              status: 'PO (' + (po.number || d.id) + ')', sku: item.sku || '',
-              description: '', notes: _selNotesFromDocLine(item), proposal: '', invoice: '', po: po.number || '',
+              status: 'PO (' + (po.number || po.poNum || po.id) + ')', sku: item.sku || '',
+              description: '', notes: _selNotesFromDocLine(item), proposal: '', invoice: '', po: po.number || po.poNum || '',
               expenseType: item.expenseType || ''
             });
           });
-        });
-      } catch(e) {}
+      });
 
       // 5. Clips from boards
       try {
@@ -14014,7 +14183,12 @@
             await db.collection('productLibrary').doc(it.id).delete();
             libDel++;
           } else if (it.source === 'boardclip' && it._clipDocId) {
+            var _clipSnapDel = await db.collection('boards').doc(projectId).collection('clips').doc(it._clipDocId).get();
+            var _clipDelData = _clipSnapDel.exists ? (_clipSnapDel.data() || {}) : null;
             await db.collection('boards').doc(projectId).collection('clips').doc(it._clipDocId).delete();
+            if (_clipDelData) {
+              try { await _clearCatalogRoomForRemovedClip(projectId, _clipDelData); } catch (_eClr) {}
+            }
             clipDel++;
           } else {
             skipped++;
@@ -14050,7 +14224,14 @@
       if (!ok) return;
       try {
         if (canLib) await db.collection('productLibrary').doc(it.id).delete();
-        else if (canClip) await db.collection('boards').doc(projectId).collection('clips').doc(it._clipDocId).delete();
+        else if (canClip) {
+          var _oneSnap = await db.collection('boards').doc(projectId).collection('clips').doc(it._clipDocId).get();
+          var _oneData = _oneSnap.exists ? (_oneSnap.data() || {}) : null;
+          await db.collection('boards').doc(projectId).collection('clips').doc(it._clipDocId).delete();
+          if (_oneData) {
+            try { await _clearCatalogRoomForRemovedClip(projectId, _oneData); } catch (_eClr) {}
+          }
+        }
         showToast('Deleted', 'success');
       } catch (e) {
         showToast('Delete failed: ' + (e && e.message ? e.message : e), 'error');
@@ -15707,7 +15888,7 @@
                 if (_activePOs.length === 0) return '';
                 return '<div class="dpo-section"><div class="dpo-section-title">Purchase Orders</div><div style="border:1px solid rgba(15,26,46,0.06);">' +
                   _activePOs.slice(0, 6).map(function(po) {
-                    return '<div class="dpo-list-row" onclick="navigate(\'#/project/' + proj.id + '/po/' + po.id + '\')"><span>📦</span><div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#0F1A2E;">' + esc(po.number||po.num||po.id.slice(0,8)) + '</div><span style="font-size:10px;color:var(--gray-400);">' + esc(po.vendor||'') + '</span><span class="badge badge-' + (po.status||'draft').toLowerCase() + '" style="font-size:9px;">' + esc(po.status||'Draft') + '</span><span style="font-family:var(--font-mono);font-weight:600;color:#0F1A2E;">' + formatMoney(parseFloat(po.total)||0) + '</span></div>';
+                    return '<div class="dpo-list-row" onclick="navigate(\'#/project/' + proj.id + '/po/' + po.id + '\')"><span>📦</span><div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#0F1A2E;">' + esc(po.number||po.num||po.id.slice(0,8)) + (typeof cchPoBillOnlyListBadgeHtml === 'function' ? cchPoBillOnlyListBadgeHtml(po) : '') + '</div><span style="font-size:10px;color:var(--gray-400);">' + esc(po.vendor||'') + '</span><span class="badge badge-' + (po.status||'draft').toLowerCase() + '" style="font-size:9px;">' + esc(po.status||'Draft') + '</span><span style="font-family:var(--font-mono);font-weight:600;color:#0F1A2E;">' + formatMoney(parseFloat(po.total)||0) + '</span></div>';
                   }).join('') + '</div></div>';
               })()}
             </div>
@@ -16549,9 +16730,11 @@ async function renderBoardsTab(T, proj) {
       } catch(e){}
 
       if (typeof enrichClipsWithProjectDocLinks === 'function') {
-        enrichClipsWithProjectDocLinks(proj.id, clips, { persistToClips: false }).catch(function(_enRich) {
+        try {
+          await enrichClipsWithProjectDocLinks(proj.id, clips, { persistToClips: false });
+        } catch (_enRich) {
           console.warn('[renderBoardsTab] enrichClipsWithProjectDocLinks', _enRich);
-        });
+        }
       }
 
       // Load room cover images
@@ -22123,7 +22306,7 @@ async function renderBoardsTab(T, proj) {
                       ? '<input type="checkbox" class="po-merge-cb" data-poid="' + escAttr(po.id) + '" data-vendor="' + escAttr(String(po._displayVendor || po.vendor || '').toLowerCase().trim()) + '" onclick="event.stopPropagation();poMergeSelChanged()" style="accent-color:var(--gold);cursor:pointer;" title="Select to merge">'
                       : '<span style="color:var(--gray-300);font-size:12px;cursor:not-allowed;" title="' + escAttr(getQbId(po) ? 'Already in QuickBooks — cannot be merged' : (String(po.status||'').toLowerCase() === 'merged' ? 'Already merged' : 'Houzz clip PO — cannot be merged')) + '">🔒</span>'}</td>
                     <td style="font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escAttr(po.number || po.num || '')}">
-                      <span role="button" style="color:var(--gold);font-family:var(--font-mono);text-decoration:underline;cursor:pointer;" onclick="event.stopPropagation();${String(po.id||'').indexOf('clip-po-')===0 ? ("togglePOItems(this.closest('tr'),'"+po.id+"')") : ("navigate('#/project/"+proj.id+"/po/"+po.id+"')")}">#${poNum}</span>
+                      <span role="button" style="color:var(--gold);font-family:var(--font-mono);text-decoration:underline;cursor:pointer;" onclick="event.stopPropagation();${String(po.id||'').indexOf('clip-po-')===0 ? ("togglePOItems(this.closest('tr'),'"+po.id+"')") : ("navigate('#/project/"+proj.id+"/po/"+po.id+"')")}">#${poNum}</span>${typeof cchPoBillOnlyListBadgeHtml==='function'?cchPoBillOnlyListBadgeHtml(po):''}
                       <button type="button" class="btn btn-sm" title="Preview / Print" onclick="event.stopPropagation();previewPO('${proj.id}','${po.id}')" style="padding:2px 6px;margin-left:4px;font-size:14px;line-height:1;vertical-align:middle;border:none;background:transparent;cursor:pointer;color:var(--gray-400);">👁</button>
                     </td>
                     <td class="col-doc-tags" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${poTagRaw ? escAttr(poTagRaw) : escAttr('No tag yet. Open Edit PO → Summary or Document Tags.')}">${poTagRaw ? esc(poTagRaw) : '<span class="doc-tag-empty" title="' + escAttr('No tag yet. Use ⋮ → Edit PO, then Summary or Document Tags.') + '">—</span>'}</td>
@@ -22134,7 +22317,7 @@ async function renderBoardsTab(T, proj) {
                     <td class="col-amount-light" style="color:${_poPaidShow > 0 ? '#5FA56B' : 'var(--gray-400)'};">${_poPaidShow > 0 ? formatMoney(_poPaidShow) : '—'}</td>
                     <td class="col-amount" style="color:${_poBal > 0 ? '#C4A464' : '#5FA56B'};">${formatMoney(_poBal)}</td>
                     <td class="col-date" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;" title="${escAttr(po.shipTo || po.deliverTo || po.receiver || '')}">${esc(po.shipTo || po.deliverTo || po.receiver || '—')}</td>
-                    <td onclick="event.stopPropagation()">${qbCellBadge(getQbId(po), po.qbStatus, po)}</td>
+                    <td onclick="event.stopPropagation()">${typeof cchPoQbListCellHtml==='function'?cchPoQbListCellHtml(po):qbCellBadge(getQbId(po), po.qbStatus, po)}</td>
                     <td class="col-links" onclick="event.stopPropagation()">
                       ${_poProposalId ? '<a onclick="navigate(\'#/project/'+proj.id+'/proposal/'+_poProposalId+'\')" style="color:var(--teal);cursor:pointer;margin-right:4px;" title="Linked Proposal">📋</a>' : ''}
                       ${_poInvoiceId ? '<a onclick="navigate(\'#/project/'+proj.id+'/invoice/'+_poInvoiceId+'\')" style="color:var(--teal);cursor:pointer;margin-right:4px;" title="Linked Invoice">🧾</a>' : ''}
@@ -22149,7 +22332,7 @@ async function renderBoardsTab(T, proj) {
                           <a onclick="window._forceEditMode=true;navigate('#/project/${proj.id}/po/${po.id}');closeAllMenus()">✏️ Edit PO</a>
                           <a onclick="previewPO('${proj.id}','${po.id}');closeAllMenus()">🖨️ Preview / Print</a>
                           <a onclick="linkDocModal('${proj.id}','purchaseOrders','${po.id}');closeAllMenus()">🔗 Link Documents</a>
-                          ${_canPushQB && !getQbId(po) ? '<a onclick="event.stopPropagation();pushDocToQB(\'po\',\'' + proj.id + '\',\'' + po.id + '\');closeAllMenus()">📤 Push to QuickBooks</a>' : ''}
+                          ${_canPushQB && !getQbId(po) && !(typeof window.cchPoQbBillOnlyMode==='function'&&window.cchPoQbBillOnlyMode()) ? '<a onclick="event.stopPropagation();pushDocToQB(\'po\',\'' + proj.id + '\',\'' + po.id + '\');closeAllMenus()">📤 Push to QuickBooks</a>' : ''}
                           <a onclick="setQBSynced('${proj.id}','purchaseOrders','${po.id}');closeAllMenus()">${getQbId(po) ? '↻ Update QB ID' : '📤 Mark QB Synced'}</a>
                           <a onclick="poPromptStatusChange('${proj.id}','${po.id}');closeAllMenus()">📋 Change Status</a>
                           <div class="divider"></div>
@@ -23990,67 +24173,7 @@ async function renderBoardsTab(T, proj) {
     }
 
     // ==================== INVOICES ====================
-    async function showNewInvoiceModal(projectId) {
-      // Skip modal — create a Draft invoice immediately and navigate to it
-      showToast('Creating invoice...', 2000);
-      try {
-        var invNum = await getNextDocNumber('INV');
-        var today = new Date().toISOString().split('T')[0];
-        var due = new Date(Date.now() + 30*86400000).toISOString().split('T')[0];
-
-        // Get project info for client details
-        var projDoc = await db.collection('boards').doc(projectId).get();
-        var projData = projDoc.exists ? projDoc.data() : {};
-
-        // If project has a client reference but no inline client info, try clients collection
-        var cName = projData.clientName || '';
-        var cEmail = projData.clientEmail || '';
-        var cPhone = projData.clientPhone || '';
-        var cAddr = projData.clientAddress || '';
-        if (!cName && projData.clientId) {
-          try {
-            var clientDoc = await db.collection('clients').doc(projData.clientId).get();
-            if (clientDoc.exists) {
-              var cd = clientDoc.data();
-              cName = cd.name || cd.clientName || '';
-              cEmail = cd.email || cd.clientEmail || '';
-              cPhone = cd.phone || cd.clientPhone || '';
-              cAddr = cd.address || cd.clientAddress || '';
-            }
-          } catch(e) {}
-        }
-        // Also try extracting from project name (e.g. "Katke - Graceland Dr")
-        if (!cName && projData.name && projData.name.includes(' - ')) {
-          cName = projData.name.split(' - ')[0].trim();
-        }
-
-        var newInvoice = {
-          invoiceNum: invNum,
-          number: invNum,
-          status: 'Draft',
-          date: today,
-          dueDate: due,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-          items: [],
-          total: 0,
-          notes: 'All fees are non-refundable. Freight and delivery charges will be invoiced separately upon shipment. Payment due within 30 days of invoice date. Please reference invoice number with payment.',
-          clientName: cName,
-          clientEmail: cEmail,
-          clientPhone: cPhone,
-          clientAddress: cAddr,
-          taxRate: parseFloat(projData.taxRate) || 0,
-          payments: [],
-          published: false
-        };
-
-        var docRef = await db.collection('boards').doc(projectId).collection('invoices').add(newInvoice);
-        showToast('✅ Invoice ' + invNum + ' created', 2000);
-        navigate('#/project/' + projectId + '/invoice/' + docRef.id);
-      } catch(e) {
-        console.error('Create invoice error:', e);
-        showToast('❌ Error creating invoice: ' + e.message, 4000);
-      }
-    }
+    // showNewInvoiceModal + saveNewInvoice live in cch-functions.js (loaded after this block).
 
     function recalcInvTotal() {
       var total = 0;
@@ -26848,6 +26971,16 @@ async function renderBoardsTab(T, proj) {
         delete items[idx].additionalNotes;
         delete items[idx].workroomNote;
       }
+      if (collection === 'proposals') {
+        try {
+          await ensureProposalLinesLinkedToRoomBoard(projectId, docId, _propSnapData, [items[idx]]);
+        } catch (_sePre) { console.warn('ensureProposalLinesLinkedToRoomBoard saveDocLineItem', _sePre); }
+      }
+      if (collection === 'invoices') {
+        try {
+          await ensureInvoiceLinesLinkedToRoomBoard(projectId, docId, _propSnapData, [items[idx]]);
+        } catch (_seInvPre) { console.warn('ensureInvoiceLinesLinkedToRoomBoard saveDocLineItem', _seInvPre); }
+      }
       var _patchSave = { items: items, updatedAt: new Date().toISOString() };
       if (collection === 'proposals') {
         const total = items.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
@@ -26868,9 +27001,6 @@ async function renderBoardsTab(T, proj) {
         return;
       }
       if (collection === 'proposals') {
-        try {
-          await syncProposalLinkOntoClips(projectId, docId, _propSnapData, [items[idx]]);
-        } catch (_se) { console.warn('syncProposalLinkOntoClips saveDocLineItem', _se); }
         if (items[idx].libraryProductId) {
           scheduleLibraryAutoSyncFromDocLine(projectId, 'proposals', docId, idx, '_batch');
         }
@@ -29312,6 +29442,23 @@ async function renderBoardsTab(T, proj) {
       const isInvoice = _docEdit.type === 'invoice';
       const isPO = _docEdit.type === 'po';
       const isProposal = _docEdit.type === 'proposal';
+
+      if (!items.length) {
+        var _docTypeLabel = isInvoice ? 'invoice' : (isPO ? 'PO' : 'proposal');
+        el.innerHTML =
+          '<div class="doc-edit-empty-add" role="button" tabindex="0" onclick="openDocItemsSidebar({mode:\'docEdit\'})" ' +
+          'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openDocItemsSidebar({mode:\'docEdit\'});}" ' +
+          'style="cursor:pointer;border:2px dashed rgba(196,164,100,0.45);border-radius:4px;padding:36px 24px;text-align:center;background:#FFFCF7;min-height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;" ' +
+          'onmouseover="this.style.background=\'#FFF8EE\'" onmouseout="this.style.background=\'#FFFCF7\'">' +
+          '<div style="font-size:28px;line-height:1;opacity:0.85;">📋</div>' +
+          '<div style="font-size:14px;font-weight:700;color:#0F1A2E;">No line items yet</div>' +
+          '<div style="font-size:12px;color:#5C6B80;max-width:420px;line-height:1.5;">Click here or use <strong style="color:#0F1A2E;">+ Add item</strong> in the top bar. Start with <strong>Project Selections</strong> (project clips) or Products, Design, Labor, and Expenses — same as proposals.</div>' +
+          '<button type="button" class="btn btn-primary btn-sm" style="margin-top:6px;" onclick="event.stopPropagation();openDocItemsSidebar({mode:\'docEdit\'})">+ Add item</button>' +
+          '</div>';
+        docEditRecalcTotals();
+        return;
+      }
+
       const _hideUnitCol = isInvoice;
       const _poLineColspan = isPO ? 12 : (_hideUnitCol ? 13 : 14);
       const _detailColspan = isPO ? 11 : (_hideUnitCol ? 12 : 13);
@@ -30023,6 +30170,24 @@ async function renderBoardsTab(T, proj) {
             if (d.docData) d.docData.status = 'Unsent';
           }
         }
+        if (d.type === 'proposal') {
+          try {
+            var propEnsure = await ensureProposalLinesLinkedToRoomBoard(d.projectId, d.docId, d.docData, _safeItems);
+            if (propEnsure.changed) {
+              _updatePayload.items = propEnsure.rows;
+              d.items = propEnsure.rows;
+            }
+          } catch (_sePropSave) { console.warn('ensureProposalLinesLinkedToRoomBoard docEditSave', _sePropSave); }
+        }
+        if (d.type === 'invoice') {
+          try {
+            var invEnsure = await ensureInvoiceLinesLinkedToRoomBoard(d.projectId, d.docId, d.docData, _safeItems);
+            if (invEnsure.changed) {
+              _updatePayload.items = invEnsure.rows;
+              d.items = invEnsure.rows;
+            }
+          } catch (_seInvSave) { console.warn('ensureInvoiceLinesLinkedToRoomBoard docEditSave', _seInvSave); }
+        }
         await db.collection('boards').doc(d.projectId).collection(d.collection).doc(d.docId).update(_updatePayload);
         if (d.type === 'invoice' && _savedInvNum) {
           var _pjNm = (window._docEditProjData && window._docEditProjData.name) || d.projectId;
@@ -30382,6 +30547,162 @@ async function renderBoardsTab(T, proj) {
       }));
     }
 
+    /** Product proposal lines → room-board clip (link existing or create one; never duplicate title+vendor). */
+    function _disRowIsRoomBoardProduct(r) {
+      if (!r) return false;
+      if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(r)) return false;
+      var et = String(r.expenseType || '').toLowerCase();
+      if (['service', 'sales_tax', 'shipping', 'handling', 'expense', 'other_expense', 'discount', 'labor'].indexOf(et) >= 0) return false;
+      if (r._isService === true || r.itemType === 'service') return false;
+      var cls = typeof _cchSidebarClassifyItem === 'function' ? _cchSidebarClassifyItem(r) : 'product';
+      if (cls === 'design_service' || cls === 'labor' || cls === 'expense' || cls === 'tax') return false;
+      return true;
+    }
+
+    async function ensureProposalLinesLinkedToRoomBoard(projectId, proposalId, propData, rows) {
+      if (!projectId || !proposalId || !rows || !rows.length) return { rows: rows, changed: false };
+      var prNum = String((propData && (propData.proposalNum || propData.name || propData.number)) || '').trim();
+      var index = await _disBuildProjectClipIndex(projectId);
+      var changed = false;
+      for (var i = 0; i < rows.length; i++) {
+        var r = rows[i];
+        if (!_disRowIsRoomBoardProduct(r)) continue;
+        var cid = _disResolveClipIdFromIndex(index, r);
+        if (cid) {
+          if (String(r.clipId || '') !== cid) { r.clipId = cid; changed = true; }
+          continue;
+        }
+        var cost = parseFloat(r.cost) || 0;
+        var qty = parseFloat(r.qty) || 1;
+        var sell = parseFloat(r.amount) || 0;
+        if (sell <= 0 && cost > 0) {
+          var mk = parseFloat(r.markupPct) || 0;
+          sell = Math.round(cost * qty * (1 + mk / 100) * 100) / 100;
+        }
+        var newClip = {
+          title: r.title || r.name || 'Untitled',
+          description: r.description || '',
+          vendor: r.vendor || '',
+          room: String(r.room || '').trim() || null,
+          category: r.category || 'General',
+          cost: cost,
+          clientPrice: qty > 0 ? (sell / qty) : sell,
+          qty: qty,
+          imageUrl: r.imageUrl || '',
+          images: Array.isArray(r.images) ? r.images : [],
+          sku: r.sku || '',
+          source: 'proposal',
+          libraryProductId: r.libraryProductId || null,
+          proposalId: proposalId,
+          proposalNum: prNum || null,
+          addedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        var guard = typeof boardClipWriteAllowedForRoomBoard === 'function'
+          ? boardClipWriteAllowedForRoomBoard(newClip) : { ok: true };
+        if (!guard.ok) continue;
+        var dupeId = _disResolveClipIdFromIndex(index, newClip);
+        if (dupeId) {
+          r.clipId = dupeId;
+          changed = true;
+          continue;
+        }
+        try {
+          var ref = await db.collection('boards').doc(projectId).collection('clips').add(newClip);
+          r.clipId = ref.id;
+          changed = true;
+          var lib = String(newClip.libraryProductId || '').trim();
+          if (lib) index.byLib[lib] = ref.id;
+          var tv = (String(newClip.title || '').trim().toLowerCase() + '|' + String(newClip.vendor || '').trim().toLowerCase());
+          if (tv !== '|') {
+            if (!index.byTV[tv]) index.byTV[tv] = [];
+            index.byTV[tv].push({ id: ref.id, room: String(newClip.room || '').trim() });
+          }
+        } catch (eAdd) {
+          console.warn('[ensureProposalLinesLinkedToRoomBoard] add clip', eAdd && eAdd.message ? eAdd.message : eAdd);
+        }
+      }
+      try {
+        await syncProposalLinkOntoClips(projectId, proposalId, propData, rows);
+      } catch (eSync) {
+        console.warn('[ensureProposalLinesLinkedToRoomBoard] sync', eSync && eSync.message ? eSync.message : eSync);
+      }
+      return { rows: rows, changed: changed };
+    }
+    window.ensureProposalLinesLinkedToRoomBoard = ensureProposalLinesLinkedToRoomBoard;
+
+    async function ensureInvoiceLinesLinkedToRoomBoard(projectId, invoiceId, invoiceData, rows) {
+      if (!projectId || !invoiceId || !rows || !rows.length) return { rows: rows, changed: false };
+      var invNum = String((invoiceData && (invoiceData.invoiceNum || invoiceData.name || invoiceData.number)) || '').trim();
+      var index = await _disBuildProjectClipIndex(projectId);
+      var changed = false;
+      for (var i = 0; i < rows.length; i++) {
+        var r = rows[i];
+        if (!_disRowIsRoomBoardProduct(r)) continue;
+        var cid = _disResolveClipIdFromIndex(index, r);
+        if (cid) {
+          if (String(r.clipId || '') !== cid) { r.clipId = cid; changed = true; }
+          continue;
+        }
+        var cost = parseFloat(r.cost) || 0;
+        var qty = parseFloat(r.qty) || 1;
+        var sell = parseFloat(r.amount) || 0;
+        if (sell <= 0 && cost > 0) {
+          var mk = parseFloat(r.markupPct) || 0;
+          sell = Math.round(cost * qty * (1 + mk / 100) * 100) / 100;
+        }
+        var newClip = {
+          title: r.title || r.name || r.description || 'Untitled',
+          description: r.description || '',
+          vendor: r.vendor || '',
+          room: String(r.room || '').trim() || null,
+          category: r.category || 'General',
+          cost: cost,
+          clientPrice: qty > 0 ? (sell / qty) : sell,
+          qty: qty,
+          imageUrl: r.imageUrl || '',
+          images: Array.isArray(r.images) ? r.images : [],
+          sku: r.sku || '',
+          source: 'invoice',
+          libraryProductId: r.libraryProductId || null,
+          invoiceId: invoiceId,
+          invoiceNum: invNum || null,
+          addedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        var guard = typeof boardClipWriteAllowedForRoomBoard === 'function'
+          ? boardClipWriteAllowedForRoomBoard(newClip) : { ok: true };
+        if (!guard.ok) continue;
+        var dupeId = _disResolveClipIdFromIndex(index, newClip);
+        if (dupeId) {
+          r.clipId = dupeId;
+          changed = true;
+          continue;
+        }
+        try {
+          var ref = await db.collection('boards').doc(projectId).collection('clips').add(newClip);
+          r.clipId = ref.id;
+          changed = true;
+          var lib = String(newClip.libraryProductId || '').trim();
+          if (lib) index.byLib[lib] = ref.id;
+          var tv = (String(newClip.title || '').trim().toLowerCase() + '|' + String(newClip.vendor || '').trim().toLowerCase());
+          if (tv !== '|') {
+            if (!index.byTV[tv]) index.byTV[tv] = [];
+            index.byTV[tv].push({ id: ref.id, room: String(newClip.room || '').trim() });
+          }
+        } catch (eAdd) {
+          console.warn('[ensureInvoiceLinesLinkedToRoomBoard] add clip', eAdd && eAdd.message ? eAdd.message : eAdd);
+        }
+      }
+      try {
+        await syncInvoiceLinkOntoClips(projectId, invoiceId, invoiceData, rows);
+      } catch (eSync) {
+        console.warn('[ensureInvoiceLinesLinkedToRoomBoard] sync', eSync && eSync.message ? eSync.message : eSync);
+      }
+      return { rows: rows, changed: changed };
+    }
+    window.ensureInvoiceLinesLinkedToRoomBoard = ensureInvoiceLinesLinkedToRoomBoard;
+
     /** Invoice lines with clipId → persist invoice # on room-board clips (does not modify invoice docs). */
     async function syncInvoiceLinkOntoClips(projectId, invoiceId, invoiceSnapOrPlain, rowFragments) {
       if (!projectId || !invoiceId || !rowFragments || !rowFragments.length) return;
@@ -30444,26 +30765,43 @@ async function renderBoardsTab(T, proj) {
       if (!_disSidebarHasTarget()) return Promise.resolve();
       if (t.mode === 'docEdit') {
         var _mkFlagN = 0;
-        rows.forEach(function(r) {
-          if (typeof cchSanitizeStoredMarkupPct === 'function') cchSanitizeStoredMarkupPct(r, window._docEditProjData);
-          if (r.markupDiffersFromProjectDefault) _mkFlagN++;
-          _docEdit.items.push(r);
-        });
-        docEditRenderItems();
-        docEditAutoSave();
-        if (toastMsg) {
-          var _t = toastMsg;
-          if (_mkFlagN) _t += ' — ' + _mkFlagN + ' line' + (_mkFlagN > 1 ? 's' : '') + ' use clipper markup (≠ project default); see Clip badge';
-          showToast(_t, _mkFlagN ? 5000 : 3000);
-        }
-        if (opt.scrollDocEditLast) {
-          var idx = _docEdit.items.length - 1;
-          setTimeout(function() {
-            var el = document.getElementById('docEditRow' + idx);
-            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }, 100);
-        }
-        return Promise.resolve();
+        return (async function() {
+          if (_docEdit && _docEdit.type === 'proposal') {
+            try {
+              await ensureProposalLinesLinkedToRoomBoard(t.projectId, _docEdit.docId, _docEdit.docData, rows);
+            } catch (_sePropAdd) { console.warn('ensureProposalLinesLinkedToRoomBoard docEdit append', _sePropAdd); }
+          }
+          if (_docEdit && _docEdit.type === 'invoice') {
+            try {
+              await ensureInvoiceLinesLinkedToRoomBoard(t.projectId, _docEdit.docId, _docEdit.docData, rows);
+            } catch (_seInvAdd) { console.warn('ensureInvoiceLinesLinkedToRoomBoard docEdit append', _seInvAdd); }
+          }
+          rows.forEach(function(r) {
+            if (typeof cchSanitizeStoredMarkupPct === 'function') cchSanitizeStoredMarkupPct(r, window._docEditProjData);
+            if (r.markupDiffersFromProjectDefault) _mkFlagN++;
+            _docEdit.items.push(r);
+          });
+          docEditRenderItems();
+          docEditAutoSave();
+          if (window._disDocEditRail && _docEdit && _docEdit.items) {
+            window._disProposalExcludeKeys = _disBuildExcludeKeysFromLines(_docEdit.items);
+            if (document.getElementById('docItemsSidebar') && typeof filterDocSidebar === 'function') filterDocSidebar();
+          } else if (typeof _disRefreshProposalExcludeKeys === 'function') {
+            void _disRefreshProposalExcludeKeys();
+          }
+          if (toastMsg) {
+            var _t = toastMsg;
+            if (_mkFlagN) _t += ' — ' + _mkFlagN + ' line' + (_mkFlagN > 1 ? 's' : '') + ' use clipper markup (≠ project default); see Clip badge';
+            showToast(_t, _mkFlagN ? 5000 : 3000);
+          }
+          if (opt.scrollDocEditLast) {
+            var idx = _docEdit.items.length - 1;
+            setTimeout(function() {
+              var el = document.getElementById('docEditRow' + idx);
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+          }
+        })();
       }
       if (t.mode === 'proposal') {
         return (async function() {
@@ -30471,7 +30809,9 @@ async function renderBoardsTab(T, proj) {
             var docRef = db.collection('boards').doc(t.projectId).collection('proposals').doc(t.proposalId);
             var snap = await docRef.get();
             if (!snap.exists) { showToast('Proposal not found', 'error'); return; }
-            var items = snap.data().items || [];
+            var propData = snap.data() || {};
+            var items = propData.items || [];
+            await ensureProposalLinesLinkedToRoomBoard(t.projectId, t.proposalId, propData, rows);
             rows.forEach(function(r) {
               var copy = JSON.parse(JSON.stringify(r));
               if (copy.lineApprovalStatus == null) copy.lineApprovalStatus = 'pending';
@@ -30479,10 +30819,13 @@ async function renderBoardsTab(T, proj) {
             });
             var total = items.reduce(function(s, i) { return s + (parseFloat(i.amount) || 0); }, 0);
             await docRef.update({ items: items, total: total, updatedAt: new Date().toISOString() });
-            await syncProposalLinkOntoClips(t.projectId, t.proposalId, snap, rows);
             if (toastMsg) showToast(toastMsg);
             renderProposalDetail(t.projectId, t.proposalId);
             await _disRefreshProposalExcludeKeys();
+            var tabEl = document.getElementById('projectTabContent');
+            if (tabEl && typeof currentProjectTab !== 'undefined' && currentProjectTab === 'boards' && window._currentProject) {
+              await renderBoardsTab(tabEl, window._currentProject);
+            }
           } catch (e) {
             console.error(e);
             showToast('Error saving line: ' + (e.message || e), 'error');
@@ -30703,6 +31046,12 @@ async function renderBoardsTab(T, proj) {
         }
         var byIdSnap = await db.collection('productLibrary').where('projectId', '==', pid).limit(400).get();
         byIdSnap.forEach(addLibDoc);
+        var prodByPid = await db.collection(CCH_PRODUCTS_COLLECTION).where('projectId', '==', pid).limit(400).get();
+        prodByPid.forEach(addLibDoc);
+        if (projName) {
+          var prodByName = await db.collection(CCH_PRODUCTS_COLLECTION).where('project', '==', projName).limit(400).get();
+          prodByName.forEach(addLibDoc);
+        }
       } catch (e2) {}
       var seen = new Set();
       return out.filter(function(r) {
@@ -30711,6 +31060,18 @@ async function renderBoardsTab(T, proj) {
         seen.add(k);
         return true;
       });
+    }
+
+    function _disBuildExcludeKeysFromLines(lines) {
+      var ex = new Set();
+      (lines || []).forEach(function(line) {
+        if (!line || (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(line))) return;
+        if (line.clipId) ex.add('clip:' + String(line.clipId));
+        if (line.libraryProductId) ex.add('lib:' + String(line.libraryProductId));
+        var dk = selDupKeyForItem({ title: line.title || line.description, vendor: line.vendor });
+        if (dk) ex.add('tv:' + dk);
+      });
+      return ex;
     }
 
     function _disProposalRowExcluded(it) {
@@ -30840,6 +31201,7 @@ async function renderBoardsTab(T, proj) {
       var side = document.getElementById('docItemsSidebar');
       if (side) side.remove();
       window._libraryRailTarget = null;
+      window._disDocEditRail = null;
       if (window._disEscHandler) {
         document.removeEventListener('keydown', window._disEscHandler);
         window._disEscHandler = null;
@@ -30870,10 +31232,18 @@ async function renderBoardsTab(T, proj) {
 
       window._disProposalRail = null;
       window._disSelectionRail = null;
+      window._disDocEditRail = null;
       if (target.mode === 'proposal' && target.projectId && target.proposalId) {
         window._disProposalRail = { projectId: String(target.projectId).trim(), proposalId: String(target.proposalId).trim() };
       } else if (target.mode === 'docEdit' && _docEdit && _docEdit.type === 'proposal' && _docEdit.projectId && _docEdit.docId) {
         window._disProposalRail = { projectId: String(_docEdit.projectId).trim(), proposalId: String(_docEdit.docId).trim() };
+      } else if (target.mode === 'docEdit' && _docEdit && _docEdit.projectId && _docEdit.docId &&
+          (_docEdit.type === 'invoice' || _docEdit.type === 'po')) {
+        window._disDocEditRail = {
+          projectId: String(_docEdit.projectId).trim(),
+          docId: String(_docEdit.docId).trim(),
+          type: _docEdit.type
+        };
       } else if (target.mode === 'selections' && target.projectId) {
         window._disSelectionRail = { projectId: String(target.projectId).trim() };
       }
@@ -30912,7 +31282,7 @@ async function renderBoardsTab(T, proj) {
         '<input id="disSearchInput" placeholder="Search by title, vendor, SKU, description…" style="width:100%;padding:9px 12px;border:1px solid #E2E2E2;border-radius:0;font-size:13px;outline:none;box-sizing:border-box;font-family:DM Sans,sans-serif;" oninput="filterDocSidebarDebounced()">' +
       '</div>';
 
-      var _showProjectSelectionsPill = !!(window._disProposalRail || window._disSelectionRail);
+      var _showProjectSelectionsPill = !!(window._disProposalRail || window._disSelectionRail || window._disDocEditRail);
       var _prSelPill = _showProjectSelectionsPill
         ? '<button type="button" id="disPillProjectSel" onclick="window._disFilter=\'project_selections\';filterDocSidebar()" style="' + pillStyle(false) + 'flex:1.12;border-radius:0;border-left:none;">Project Selections</button>'
         : '';
@@ -30944,7 +31314,7 @@ async function renderBoardsTab(T, proj) {
       };
       document.addEventListener('keydown', window._disEscHandler);
 
-      window._disFilter = (window._disProposalRail || window._disSelectionRail) ? 'project_selections' : 'products';
+      window._disFilter = (window._disProposalRail || window._disSelectionRail || window._disDocEditRail) ? 'project_selections' : 'products';
       window._disProducts = [];
       window._disProposalExcludeKeys = new Set();
       window._disSelectionProducts = [];
@@ -30969,6 +31339,13 @@ async function renderBoardsTab(T, proj) {
         try {
           window._disSelectionProducts = await _loadProjectSelectionSidebarItems(window._disSelectionRail.projectId);
         } catch (eSel1) {
+          window._disSelectionProducts = [];
+        }
+      } else if (window._disDocEditRail) {
+        window._disProposalExcludeKeys = _disBuildExcludeKeysFromLines(_docEdit && _docEdit.items ? _docEdit.items : []);
+        try {
+          window._disSelectionProducts = await _loadProjectSelectionSidebarItems(window._disDocEditRail.projectId);
+        } catch (eSel2) {
           window._disSelectionProducts = [];
         }
       }
@@ -31077,7 +31454,7 @@ async function renderBoardsTab(T, proj) {
       var q = ((document.getElementById('disSearchInput') || {}).value || '').toLowerCase().trim();
       var filter = (window._disFilter || 'products').toLowerCase();
       if (filter === 'all') filter = 'products';
-      if (filter === 'project_selections' && !window._disProposalRail && !window._disSelectionRail) filter = 'products';
+      if (filter === 'project_selections' && !window._disProposalRail && !window._disSelectionRail && !window._disDocEditRail) filter = 'products';
       if (filter === 'products' && typeof window._disEnsureCatalogLoaded === 'function') {
         window._disEnsureCatalogLoaded();
       }
@@ -31107,15 +31484,16 @@ async function renderBoardsTab(T, proj) {
         btn.style.borderColor = active ? '#0F1A2E' : '#B8C0CC';
       });
 
-      if (filter === 'project_selections' && (window._disProposalRail || window._disSelectionRail)) {
+      if (filter === 'project_selections' && (window._disProposalRail || window._disSelectionRail || window._disDocEditRail)) {
         function matchQPS(it) {
           if (!it) return false;
           return _disTokensMatch(it._searchBlob || ((it.title || '') + ' ' + (it.vendor || '') + ' ' + (it.sku || '') + ' ' + (it.description || '') + ' ' + (it.vendorDescription || '')), q);
         }
         var isProposalSelectionRail = !!window._disProposalRail;
+        var isDocEditSelectionRail = !!window._disDocEditRail;
         var selList = (window._disSelectionProducts || []).filter(function(i) {
           if (!matchQPS(i)) return false;
-          if (isProposalSelectionRail && _disProposalRowExcluded(i)) return false;
+          if ((isProposalSelectionRail || isDocEditSelectionRail) && _disProposalRowExcluded(i)) return false;
           if (typeof _cchSidebarClassifyItem === 'function') {
             var _cls = _cchSidebarClassifyItem(i);
             if (_cls !== 'product' && _cls !== 'bundle') return false;
@@ -31166,15 +31544,22 @@ async function renderBoardsTab(T, proj) {
             (price > 0 ? '<div style="font-size:12px;font-weight:700;color:#0F1A2E;font-family:monospace;flex-shrink:0;">' + formatMoney(price) + '</div>' : '') +
           '</div>';
         }
-        var htmlPS = '<div style="padding:8px 14px 6px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:#5C6B80;background:#FAFAFA;border-bottom:1px solid #E2E2E2;">' + (isProposalSelectionRail ? 'Project selections — not on this proposal' : 'Project selections') + '</div>';
+        var _selBandLabel = 'Project selections';
+        if (isProposalSelectionRail) _selBandLabel = 'In this project — selections (not on this proposal yet)';
+        else if (isDocEditSelectionRail && window._disDocEditRail && window._disDocEditRail.type === 'invoice') {
+          _selBandLabel = 'In this project — selections (not on this invoice yet)';
+        } else if (isDocEditSelectionRail) {
+          _selBandLabel = 'In this project — selections (not on this PO yet)';
+        }
+        var htmlPS = '<div style="padding:8px 14px 6px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:#C9A96E;background:#FAFAFA;border-bottom:1px solid #E2E2E2;">' + esc(_selBandLabel) + '</div>';
         if (!selList.length) {
-          htmlPS += '<div style="padding:18px 16px;font-size:12px;color:#5C6B80;line-height:1.45;">' + (isProposalSelectionRail
-            ? 'No items left to add, or nothing matches search. Open the <strong>All Products</strong> tab for the full catalog, or add clips to room boards / library for this project first.'
-            : 'No matching project selections yet. Open <strong>All Products</strong> for the full catalog, or add more room-board clips to this project first.') + '</div>';
+          htmlPS += '<div style="padding:18px 16px;font-size:12px;color:#5C6B80;line-height:1.45;">' + ((isProposalSelectionRail || isDocEditSelectionRail)
+            ? 'No items left to add, or nothing matches search. Open the <strong>Products</strong> tab for the full catalog, or add clips to Selections / room boards first.'
+            : 'No matching project selections yet. Open <strong>Products</strong> for the full catalog, or add more room-board clips to this project first.') + '</div>';
         } else {
           htmlPS += '<div style="padding:0;min-height:0;">' + selList.map(renderItemCardPS).join('') + '</div>';
         }
-        if (isProposalSelectionRail) {
+        if (isProposalSelectionRail || isDocEditSelectionRail) {
           htmlPS += '<div style="padding:12px 14px;font-size:11px;color:#5C6B80;line-height:1.45;border-top:1px solid #E2E2E2;">Use <strong>Design</strong>, <strong>Labor</strong>, and <strong>Expenses</strong> tabs for service and fee lines.</div>';
         }
         c.innerHTML = htmlPS;
@@ -31407,6 +31792,7 @@ async function renderBoardsTab(T, proj) {
       else if (item._source === 'library' && item.id) row.libraryProductId = item.id;
       if (item._clipDocId) row.clipId = item._clipDocId;
       else if (item._clipId) row.clipId = item._clipId;
+      else if (item._source === 'project' && item.id && String(item.id).indexOf('_sel') !== 0) row.clipId = String(item.id);
       if (item._libDocId || item.id) row.libraryProductId = row.libraryProductId || item._libDocId || (item._source === 'library' ? item.id : '');
       if (row.libraryProductId && typeof _applyProductFieldsToLineItem === 'function') {
         _applyProductFieldsToLineItem(row, item);
@@ -31466,6 +31852,7 @@ async function renderBoardsTab(T, proj) {
       else if (item._source === 'library' && item.id) row.libraryProductId = item.id;
       if (item._clipDocId) row.clipId = item._clipDocId;
       else if (item._clipId) row.clipId = item._clipId;
+      else if (item._source === 'project' && item.id && String(item.id).indexOf('_sel') !== 0) row.clipId = String(item.id);
       if (item._libDocId) row.libraryProductId = item._libDocId;
       else if (item._source === 'library' && item.id) row.libraryProductId = item.id;
       if (row.libraryProductId && typeof _applyProductFieldsToLineItem === 'function') {
@@ -32549,20 +32936,83 @@ async function renderBoardsTab(T, proj) {
         });
       } catch (eCov) { console.warn('PO coverage scan failed', eCov); }
 
-      _poGenState = { projectId: projectId, collection: collection, docId: docId, items: items };
-      _renderGeneratePOModal(items, coverageByKey);
+      var vendorOptions = await _poGenLoadVendorOptions(projectId, items);
+      _poGenState = { projectId: projectId, collection: collection, docId: docId, items: items, coverageByKey: coverageByKey, vendorOptions: vendorOptions, _checked: {} };
+      _renderGeneratePOModal();
     }
 
-    function _renderGeneratePOModal(items, coverageByKey) {
+    async function _poGenLoadVendorOptions(projectId, items) {
+      var set = {};
+      (items || []).forEach(function(it) {
+        var v = String(it && it.vendor || '').trim();
+        if (v) set[v] = true;
+      });
+      try {
+        var bs = await db.collection('boards').doc(projectId).get();
+        if (bs.exists) {
+          var d = bs.data() || {};
+          (d.vendors || []).forEach(function(v) {
+            var n = typeof v === 'string' ? v : (v && v.name);
+            if (n) set[String(n).trim()] = true;
+          });
+          if (Array.isArray(d.vendorList)) d.vendorList.forEach(function(n) { if (n) set[String(n).trim()] = true; });
+        }
+      } catch (_eV) {}
+      (vendorsCache || []).forEach(function(v) { if (v && v.name) set[String(v.name).trim()] = true; });
+      return Object.keys(set).filter(Boolean).sort(function(a, b) { return a.localeCompare(b, undefined, { sensitivity: 'base' }); });
+    }
+
+    function _poGenVendorSelectOptions(currentVendor, vendorOptions) {
+      var cur = String(currentVendor || 'No Vendor').trim() || 'No Vendor';
+      var opts = (vendorOptions || []).slice();
+      if (cur && opts.indexOf(cur) < 0) opts.unshift(cur);
+      return opts.map(function(o) {
+        return '<option value="' + escAttr(o) + '"' + (o === cur ? ' selected' : '') + '>' + esc(o) + '</option>';
+      }).join('');
+    }
+
+    function _poGenSyncVendorsFromDom() {
+      var st = _poGenState;
+      if (!st || !st.items) return;
+      Array.prototype.slice.call(document.querySelectorAll('.po-gen-vendor')).forEach(function(inp) {
+        var idx = parseInt(inp.getAttribute('data-idx'), 10);
+        if (isNaN(idx) || !st.items[idx]) return;
+        var v = String(inp.value || '').trim();
+        if (v) st.items[idx].vendor = v;
+      });
+    }
+
+    function _poGenPersistChecks() {
+      var st = _poGenState;
+      if (!st) return;
+      st._checked = st._checked || {};
+      Array.prototype.slice.call(document.querySelectorAll('.po-gen-cb')).forEach(function(cb) {
+        st._checked[cb.getAttribute('data-idx')] = !!cb.checked;
+      });
+      Array.prototype.slice.call(document.querySelectorAll('.po-gen-vall')).forEach(function(m) {
+        st._checked['vall:' + m.getAttribute('data-vid')] = !!m.checked;
+      });
+    }
+
+    function _renderGeneratePOModal() {
+      var st = _poGenState;
+      if (!st || !st.items) return;
+      var items = st.items;
+      var coverageByKey = st.coverageByKey || {};
+      var vendorOptions = st.vendorOptions || [];
+      var checked = st._checked || {};
       var groups = {};
       items.forEach(function(item, idx) {
         if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(item)) return;
-        var vendor = (item.vendor || 'No Vendor').trim();
+        var vendor = String(item.vendor || 'No Vendor').trim() || 'No Vendor';
         var key = _poCoverageKey(item);
         var cov = (key && coverageByKey[key]) ? coverageByKey[key] : null;
-        (groups[vendor] = groups[vendor] || []).push({ idx: idx, item: item, coveredBy: cov ? cov.join(', ') : '' });
+        var idxKey = String(idx);
+        var wasChecked = Object.prototype.hasOwnProperty.call(checked, idxKey) ? checked[idxKey] : !cov;
+        (groups[vendor] = groups[vendor] || []).push({ idx: idx, item: item, coveredBy: cov ? cov.join(', ') : '', checked: wasChecked });
       });
       var vendors = Object.keys(groups).sort();
+      var vendorListHtml = vendorOptions.map(function(v) { return '<option value="' + escAttr(v) + '">'; }).join('');
       var body = '';
       if (!vendors.length) {
         body = '<div style="padding:24px;text-align:center;color:var(--gray-400);">No line items with details to generate POs from.</div>';
@@ -32570,32 +33020,49 @@ async function renderBoardsTab(T, proj) {
         vendors.forEach(function(v) {
           var rows = groups[v];
           var vid = 'pogv-' + v.replace(/[^a-zA-Z0-9]/g, '');
+          var vallChecked = Object.prototype.hasOwnProperty.call(checked, 'vall:' + vid)
+            ? checked['vall:' + vid]
+            : rows.every(function(r) { return r.checked; });
           body += '<div style="margin-bottom:18px;border:1px solid var(--gray-200);border-radius:8px;overflow:hidden;">'
-            + '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--gray-50);border-bottom:1px solid var(--gray-200);">'
-            + '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;color:var(--navy);"><input type="checkbox" class="po-gen-vall" data-vid="' + vid + '" onchange="poGenToggleVendor(this)" style="accent-color:var(--gold);"> ' + esc(v) + '</label>'
-            + '<span style="font-size:11px;color:var(--gray-400);">' + rows.length + ' item' + (rows.length !== 1 ? 's' : '') + '</span>'
+            + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:var(--gray-50);border-bottom:1px solid var(--gray-200);flex-wrap:wrap;">'
+            + '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex-shrink:0;"><input type="checkbox" class="po-gen-vall" data-vid="' + vid + '" ' + (vallChecked ? 'checked' : '') + ' onchange="poGenToggleVendor(this)" style="accent-color:var(--gold);"></label>'
+            + '<select class="po-gen-vendor-head form-input" data-vid="' + vid + '" onchange="poGenVendorHeadChanged(this)" onclick="event.stopPropagation()" style="flex:1;min-width:140px;max-width:280px;font-size:13px;font-weight:600;padding:5px 8px;" title="Change vendor for all items in this group">' + _poGenVendorSelectOptions(v, vendorOptions) + '</select>'
+            + '<span style="font-size:11px;color:var(--gray-400);flex-shrink:0;">' + rows.length + ' item' + (rows.length !== 1 ? 's' : '') + '</span>'
             + '</div><div style="padding:6px 14px;">';
           rows.forEach(function(r) {
             var it = r.item;
             var c = parseFloat(it.cost || it.totalCost || 0) || 0;
             var q = parseFloat(it.qty) || 1;
+            var rowVendor = String(it.vendor || v).trim() || v;
             var badge = r.coveredBy
-              ? '<span style="margin-left:8px;font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(196,164,100,0.15);color:#9c7b3a;white-space:nowrap;" title="Already on ' + escAttr(r.coveredBy) + '">✓ in ' + esc(r.coveredBy) + '</span>'
+              ? '<span style="margin-left:6px;font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(196,164,100,0.15);color:#9c7b3a;white-space:nowrap;" title="Already on ' + escAttr(r.coveredBy) + '">✓ in ' + esc(r.coveredBy) + '</span>'
               : '';
-            body += '<label style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid var(--gray-100);cursor:pointer;' + (r.coveredBy ? 'opacity:0.7;' : '') + '">'
-              + '<input type="checkbox" class="po-gen-cb" data-idx="' + r.idx + '" data-vid="' + vid + '" ' + (r.coveredBy ? '' : 'checked') + ' onchange="poGenSelChanged()" style="accent-color:var(--gold);">'
-              + '<span style="flex:1;font-size:13px;color:var(--gray-700);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(it.title || it.name || it.description || 'Item') + badge + '</span>'
-              + '<span style="font-size:12px;color:var(--gray-400);font-family:var(--font-mono);white-space:nowrap;">' + q + ' &times; ' + formatMoney(c) + '</span>'
-              + '</label>';
+            body += '<div class="po-gen-row" style="display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid var(--gray-100);' + (r.coveredBy ? 'opacity:0.92;' : '') + '">'
+              + '<label class="po-gen-item-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;min-width:0;"><input type="checkbox" class="po-gen-cb" data-idx="' + r.idx + '" data-vid="' + vid + '" ' + (r.checked ? 'checked' : '') + ' onchange="poGenSelChanged()" style="accent-color:var(--gold);flex-shrink:0;">'
+              + '<span class="po-gen-item-title" style="flex:1;font-size:13px;font-weight:500;color:#0F1A2E;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escAttr(it.title || it.name || '') + '">' + esc(it.title || it.name || it.description || 'Item') + badge + '</span></label>'
+              + '<input type="text" class="po-gen-vendor form-input" data-idx="' + r.idx + '" data-vid="' + vid + '" list="poGenVendorList" value="' + escAttr(rowVendor) + '" placeholder="Vendor" title="Vendor for this line on the new PO" onclick="event.stopPropagation()" onchange="poGenVendorRowChanged(this)" style="width:128px;flex-shrink:0;font-size:11px;padding:4px 7px;color:#0F1A2E;background:#fff;">'
+              + '<span class="po-gen-item-price" style="font-size:12px;color:#1B3352;font-weight:600;font-family:var(--font-mono);white-space:nowrap;flex-shrink:0;">' + q + ' &times; ' + formatMoney(c) + '</span>'
+              + '</div>';
           });
           body += '</div></div>';
         });
       }
       var html = '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">'
-        + '<div class="modal" style="width:720px;max-width:95vw;">'
+        + '<div class="modal po-gen-modal" style="width:780px;max-width:95vw;background:#fff;color:#0F1A2E;">'
+        + '<style>'
+        + '.po-gen-modal .po-gen-item-title{color:#0F1A2E!important;font-weight:500!important;}'
+        + '.po-gen-modal .po-gen-item-price{color:#1B3352!important;}'
+        + '.po-gen-modal .po-gen-item-label{color:#0F1A2E!important;}'
+        + '.po-gen-modal .modal-body{color:#0F1A2E!important;background:#fff!important;}'
+        + '.po-gen-modal .modal-header,.po-gen-modal .modal-footer{background:#fff!important;color:#0F1A2E!important;}'
+        + '.po-gen-modal .modal-title{color:#0F1A2E!important;}'
+        + 'body[data-theme="studio"] .po-gen-modal{background:#fff!important;color:#0F1A2E!important;}'
+        + 'body[data-theme="studio"] .po-gen-modal .modal-body,body[data-theme="studio"] .po-gen-modal .modal-header,body[data-theme="studio"] .po-gen-modal .modal-footer{background:#fff!important;color:#0F1A2E!important;}'
+        + '</style>'
         + '<div class="modal-header"><div class="modal-title">Generate Purchase Orders — Select Items</div><button class="modal-close" onclick="closeModal()">&times;</button></div>'
-        + '<div class="modal-body" style="max-height:62vh;overflow:auto;">'
-        + '<div style="font-size:12px;color:var(--gray-500);margin-bottom:14px;line-height:1.5;">Check the items to include in new POs, grouped by vendor. Items already on a purchase order are unchecked and labeled — re-check one only if you intend to order it again.</div>'
+        + '<div class="modal-body" style="max-height:62vh;overflow:auto;background:#fff;color:#0F1A2E;">'
+        + '<datalist id="poGenVendorList">' + vendorListHtml + '</datalist>'
+        + '<div style="font-size:12px;color:#5C6B80;margin-bottom:14px;line-height:1.5;">Check items to include. Change the <strong style="color:#0F1A2E;">vendor</strong> on each line or use the group dropdown — items regroup when you change a vendor. Items already on a PO are unchecked.</div>'
         + body
         + '</div>'
         + '<div class="modal-footer" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
@@ -32614,6 +33081,39 @@ async function renderBoardsTab(T, proj) {
     }
     window.poGenToggleVendor = poGenToggleVendor;
 
+    function poGenVendorHeadChanged(sel) {
+      var vid = sel.getAttribute('data-vid');
+      var v = String(sel.value || '').trim();
+      if (!v) return;
+      _poGenSyncVendorsFromDom();
+      _poGenPersistChecks();
+      var st = _poGenState;
+      if (!st) return;
+      Array.prototype.slice.call(document.querySelectorAll('.po-gen-cb[data-vid="' + vid + '"]')).forEach(function(cb) {
+        var idx = parseInt(cb.getAttribute('data-idx'), 10);
+        if (!isNaN(idx) && st.items[idx]) st.items[idx].vendor = v;
+      });
+      if (st.vendorOptions.indexOf(v) < 0) { st.vendorOptions.push(v); st.vendorOptions.sort(); }
+      _renderGeneratePOModal();
+      poGenSelChanged();
+    }
+    window.poGenVendorHeadChanged = poGenVendorHeadChanged;
+
+    function poGenVendorRowChanged(inp) {
+      var idx = parseInt(inp.getAttribute('data-idx'), 10);
+      var v = String(inp.value || '').trim();
+      if (isNaN(idx) || !_poGenState || !_poGenState.items[idx]) return;
+      _poGenState.items[idx].vendor = v || _poGenState.items[idx].vendor;
+      if (v && _poGenState.vendorOptions.indexOf(v) < 0) {
+        _poGenState.vendorOptions.push(v);
+        _poGenState.vendorOptions.sort();
+      }
+      _poGenPersistChecks();
+      _renderGeneratePOModal();
+      poGenSelChanged();
+    }
+    window.poGenVendorRowChanged = poGenVendorRowChanged;
+
     function poGenSelChanged() {
       var n = document.querySelectorAll('.po-gen-cb:checked').length;
       var cnt = document.getElementById('poGenCount'); if (cnt) cnt.textContent = n;
@@ -32625,13 +33125,19 @@ async function renderBoardsTab(T, proj) {
     async function poGenCreateSelected() {
       var st = _poGenState;
       if (!st || !st.items) { closeModal(); return; }
+      _poGenSyncVendorsFromDom();
       var checked = Array.prototype.slice.call(document.querySelectorAll('.po-gen-cb:checked'));
       if (!checked.length) { await cchAlert('Select at least one item.', 'Generate POs'); return; }
-      var chosen = checked.map(function(cb) { return st.items[parseInt(cb.getAttribute('data-idx'), 10)]; }).filter(Boolean);
+      var chosen = checked.map(function(cb) {
+        var idx = parseInt(cb.getAttribute('data-idx'), 10);
+        var it = st.items[idx];
+        if (!it) return null;
+        return Object.assign({}, it);
+      }).filter(Boolean);
       var groups = {};
       chosen.forEach(function(item) {
         if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(item)) return;
-        var vendor = (item.vendor || 'No Vendor').trim();
+        var vendor = String(item.vendor || 'No Vendor').trim() || 'No Vendor';
         (groups[vendor] = groups[vendor] || []).push(item);
       });
       var vendors = Object.keys(groups);
@@ -34163,9 +34669,10 @@ async function renderBoardsTab(T, proj) {
 
       const itemsHTML = `
         <div class="doc-edit-line-items-card" style="background:#FFFFFF;padding:16px 20px 12px;margin-bottom:12px;border:1px solid rgba(196,164,100,0.08);">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
             <div style="font-size:12px;text-transform:uppercase;letter-spacing:2px;color:#0F1A2E;font-weight:700;">Line Items</div>
-            <div style="display:flex;gap:12px;align-items:center;">
+            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+              <button type="button" class="btn btn-primary btn-sm" onclick="openDocItemsSidebar({ mode: 'docEdit' })">+ Add item</button>
               <span style="color:var(--gold);font-size:12px;">⚙️ Tax Rate: <strong style="cursor:pointer;color:var(--cyan);" onclick="docEditUpdateTaxRate()">${docData.taxRate || 0}%</strong></span>
               <span style="font-size:11px;color:rgba(196,164,100,0.4);font-style:italic;">Changes auto-save</span>
             </div>
@@ -34221,7 +34728,8 @@ async function renderBoardsTab(T, proj) {
         <div id="docEditQBSection" style="margin-top:16px;background:#F4F6FA;padding:16px 18px;border:1px solid rgba(15,26,46,0.08);">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
             <div style="font-size:12px;font-weight:700;color:#0F1A2E;letter-spacing:0.3px;">QuickBooks</div>
-            ${!getQbId(docData) && (type === 'invoice' || type === 'po') ? (docData.qbPushPending ? '<span style="font-size:11px;color:#92400E;font-weight:600;">⏳ Queued for QuickBooks…</span>' : (_canPushQB ? '<button class="btn btn-sm" style="background:#60A5FA;color:white;border:none;font-size:11px;padding:3px 12px;" onclick="pushDocToQB(\'' + type + '\',\'' + projectId + '\',\'' + docId + '\')">Push to QB</button>' : '<span style="font-size:11px;color:var(--gray-400);">QB push not available</span>')) : ''}
+            ${!getQbId(docData) && type === 'invoice' ? (docData.qbPushPending ? '<span style="font-size:11px;color:#92400E;font-weight:600;">⏳ Queued for QuickBooks…</span>' : (_canPushQB ? '<button class="btn btn-sm" style="background:#60A5FA;color:white;border:none;font-size:11px;padding:3px 12px;" onclick="pushDocToQB(\'invoice\',\'' + projectId + '\',\'' + docId + '\')">Push to QB</button>' : '<span style="font-size:11px;color:var(--gray-400);">QB push not available</span>')) : ''}
+            ${type === 'po' && typeof window.cchPoQbBillOnlyMode === 'function' && window.cchPoQbBillOnlyMode() ? (docData.bill && docData.bill.qbBillId ? '<span style="font-size:11px;color:#2E7D32;font-weight:600;">✅ QB Bill synced</span>' : '<span style="font-size:11px;color:#5C6B80;">Receive vendor bill on PO page → Push final bill to QB</span>') : (!getQbId(docData) && type === 'po' ? (docData.qbPushPending ? '<span style="font-size:11px;color:#92400E;font-weight:600;">⏳ Queued…</span>' : (_canPushQB ? '<button class="btn btn-sm" style="background:#60A5FA;color:white;border:none;font-size:11px;padding:3px 12px;" onclick="pushDocToQB(\'po\',\'' + projectId + '\',\'' + docId + '\')">Push to QB</button>' : '<span style="font-size:11px;color:var(--gray-400);">QB push not available</span>')) : '')}
           </div>
           ${docData.qbPushLastError && !getQbId(docData) ? '<div style="margin-top:10px;font-size:11px;color:#B91C1C;line-height:1.4;padding:8px;background:rgba(185,28,28,0.06);border-radius:4px;"><strong>Last QB sync error:</strong> ' + esc(String(docData.qbPushLastError)) + '</div>' : ''}
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -50035,6 +50543,7 @@ async function renderBoardsTab(T, proj) {
         imgs.unshift(downloadUrl);
         pref.images = imgs;
         pref.imageUrl = downloadUrl;
+        pref.heroImageIndex = 0;
         window._lastProductModalPrefill = pref;
         document.getElementById('prodImage').value = downloadUrl;
         const zone = document.getElementById('prodImageZone');
@@ -50224,6 +50733,19 @@ async function renderBoardsTab(T, proj) {
             return gallery;
           })();
           var _clipImagesPersist = _clipGalleryUrls.length ? _clipGalleryUrls : (data.imageUrl ? [data.imageUrl] : []);
+          var _clipHeroIdx = (function() {
+            var pref = window._lastProductModalPrefill || {};
+            if (typeof pref.heroImageIndex === 'number' && !isNaN(pref.heroImageIndex) && _clipImagesPersist.length) {
+              return Math.max(0, Math.min(parseInt(pref.heroImageIndex, 10), _clipImagesPersist.length - 1));
+            }
+            var hero = _sanitizePersistImageUrl(_gv('prodImage'));
+            if (hero && _clipImagesPersist.length) {
+              for (var _ci = 0; _ci < _clipImagesPersist.length; _ci++) {
+                if (String(_clipImagesPersist[_ci] || '').toLowerCase() === String(hero).toLowerCase()) return _ci;
+              }
+            }
+            return _clipImagesPersist.length ? 0 : null;
+          })();
           var clipUpd = {
             title: data.title,
             vendor: data.vendor,
@@ -50231,9 +50753,9 @@ async function renderBoardsTab(T, proj) {
             category: data.category,
             sku: data.sku || null,
             room: data.room || null,
-            imageUrl: (_clipImagesPersist.length ? _clipImagesPersist[0] : null) || data.imageUrl || null,
+            imageUrl: (_clipImagesPersist.length ? _clipImagesPersist[(_clipHeroIdx != null ? _clipHeroIdx : 0)] : null) || data.imageUrl || null,
             images: _clipImagesPersist,
-            heroImageIndex: _clipImagesPersist.length ? 0 : firebase.firestore.FieldValue.delete(),
+            heroImageIndex: _clipHeroIdx != null ? _clipHeroIdx : firebase.firestore.FieldValue.delete(),
             unitCost: data.costPrice != null ? data.costPrice : null,
             cost: data.costPrice != null ? data.costPrice : null,
             clientPrice: data.sellPrice != null ? data.sellPrice : null,
@@ -50274,6 +50796,36 @@ async function renderBoardsTab(T, proj) {
           };
           Object.keys(clipUpd).forEach(function(k) { if (clipUpd[k] === undefined) delete clipUpd[k]; });
           await db.collection('boards').doc(_mctx.clipProjectId).collection('clips').doc(_mctx.clipDocId).update(clipUpd);
+          // Mirror clip edits onto linked products/ row (canonical library) — room-board-only save used to leave library stale.
+          try {
+            var _clipAfter = await db.collection('boards').doc(_mctx.clipProjectId).collection('clips').doc(_mctx.clipDocId).get();
+            var _clipData = _clipAfter.exists ? (_clipAfter.data() || {}) : {};
+            var _libIdMirror = String(data.id || _clipData.libraryProductId || '').trim();
+            if (_libIdMirror) {
+              var _prodMirror = {
+                title: clipUpd.title,
+                vendor: clipUpd.vendor,
+                category: clipUpd.category,
+                room: clipUpd.room,
+                vendorUrl: clipUpd.pageUrl || data.vendorUrl || data.productUrl || null,
+                productUrl: clipUpd.productUrl || data.productUrl || null,
+                pageUrl: clipUpd.pageUrl || data.vendorUrl || null,
+                imageUrl: clipUpd.imageUrl || null,
+                clientDescription: clipUpd.clientDescription || null,
+                description: clipUpd.notes || data.description || null,
+                updatedAt: clipUpd.updatedAt
+              };
+              if (clipUpd.images && clipUpd.images.length) _prodMirror.images = clipUpd.images.slice();
+              if (_clipHeroIdx != null) _prodMirror.heroImageIndex = _clipHeroIdx;
+              Object.keys(_prodMirror).forEach(function(k) { if (_prodMirror[k] == null) delete _prodMirror[k]; });
+              await db.collection('products').doc(_libIdMirror).set(_prodMirror, { merge: true });
+              if (!_clipData.libraryProductId) {
+                await _clipAfter.ref.update({ libraryProductId: _libIdMirror, updatedAt: clipUpd.updatedAt });
+              }
+            }
+          } catch (_clipProdMirrorE) {
+            console.warn('[saveProduct] clip→products mirror', _clipProdMirrorE && _clipProdMirrorE.message ? _clipProdMirrorE.message : _clipProdMirrorE);
+          }
           if (typeof window.invalidateProjectSelectionsCache === 'function') {
             window.invalidateProjectSelectionsCache(_mctx.clipProjectId);
           }
@@ -50770,21 +51322,59 @@ async function renderBoardsTab(T, proj) {
       if (!s) return '';
       return s.toLowerCase().replace(/&amp;/gi, '&');
     }
+    function _libHeroIndex(p) {
+      if (!p) return 0;
+      var imgs = p.images || [];
+      var hi = parseInt(p.heroImageIndex, 10);
+      if (isNaN(hi)) hi = 0;
+      if (imgs.length) return Math.max(0, Math.min(hi, imgs.length - 1));
+      return 0;
+    }
     function _libPrimaryImageUrl(p) {
       if (!p) return '';
-      return String(p.imageUrl || p.img || '').trim() || String((p.images && p.images[0]) || '').trim();
+      var imgs = p.images || [];
+      if (imgs.length) {
+        var hi = _libHeroIndex(p);
+        var fromIdx = String(imgs[hi] || '').trim();
+        if (fromIdx) return fromIdx;
+      }
+      return String(p.imageUrl || p.img || '').trim() || String((imgs[0]) || '').trim();
     }
-    function _libIsPrimaryImage(p, u) {
+    function _libIsPrimaryImage(p, u, idx) {
+      var imgs = p.images || [];
+      if (imgs.length && typeof idx === 'number' && !isNaN(idx)) {
+        return idx === _libHeroIndex(p);
+      }
       var primary = _libNormImgUrl(_libPrimaryImageUrl(p));
       var uu = _libNormImgUrl(u);
       return !!(primary && uu && primary === uu);
     }
     function _peGalleryProductRow(productId) {
-      var prod = libraryProducts.find(function(x) { return x.id === productId; });
-      if (!prod && window._lastProductModalPrefill && window._lastProductModalPrefill.id === productId) {
-        prod = window._lastProductModalPrefill;
+      var pre = window._lastProductModalPrefill;
+      if (pre && (pre._clipDocId || (pre.images && pre.images.length)) && String(pre.id || '') === String(productId || '')) {
+        return pre;
       }
-      return prod || null;
+      var prod = libraryProducts.find(function(x) { return x.id === productId; });
+      if (!prod && pre && pre.id === productId) prod = pre;
+      return prod || pre || null;
+    }
+    function _peClipCtxFromPrefill(pre) {
+      pre = pre || window._lastProductModalPrefill || {};
+      var ctx = window._productModalCtx || {};
+      return {
+        clipProjectId: ctx.clipProjectId || pre._clipProjectId || null,
+        clipDocId: ctx.clipDocId || pre._clipDocId || null
+      };
+    }
+    function _peRefreshGalleryStripFromPrefill() {
+      var strip = document.getElementById('peGalleryStrip');
+      if (!strip) return;
+      var pre = window._lastProductModalPrefill;
+      if (!pre) return;
+      var wrap = document.createElement('div');
+      wrap.innerHTML = _peGalleryStripHtml(pre);
+      var next = wrap.firstElementChild;
+      if (next) strip.replaceWith(next);
     }
     function _peGalleryStripHtml(p) {
       p = p || {};
@@ -50798,8 +51388,8 @@ async function renderBoardsTab(T, proj) {
       var hasClipAdd = !!(p._clipProjectId && p._clipDocId);
       var html = '<div id="peGalleryStrip" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:flex-start;">' +
         '<span style="font-size:10px;color:var(--gray-400);width:100%;line-height:1.4;">Use the <strong>★ Hero</strong> button (or click a thumb) to choose the cover image. Hover a thumb for <strong>×</strong> remove.</span>';
-      imgs.forEach(function(u) {
-        var isPrimary = _libIsPrimaryImage(p, u);
+      imgs.forEach(function(u, idx) {
+        var isPrimary = _libIsPrimaryImage(p, u, idx);
         var escU = escAttr(u);
         if (hasLibId) {
           html += '<div class="pe-gallery-item" data-pe-product-id="' + escAttr(p.id) + '" data-pe-img-url="' + escU + '" style="width:56px;display:flex;flex-direction:column;gap:3px;flex-shrink:0;">' +
@@ -50812,8 +51402,18 @@ async function renderBoardsTab(T, proj) {
               ? '<div style="font-size:8px;text-align:center;color:var(--gold);font-weight:700;padding:1px 0;">★ Hero</div>'
               : '<button type="button" class="btn btn-secondary" style="font-size:9px;padding:3px 5px;line-height:1.2;width:100%;white-space:nowrap;" onclick="event.stopPropagation();window._peSetPrimaryFromEl(this.closest(\'.pe-gallery-item\'))">★ Hero</button>') +
             '</div>';
+        } else if (hasClipAdd) {
+          html += '<div class="pe-gallery-item pe-gallery-clip-only" data-pe-img-url="' + escU + '" data-pe-img-idx="' + idx + '" style="width:56px;display:flex;flex-direction:column;gap:3px;flex-shrink:0;">' +
+            '<div style="position:relative;width:56px;height:56px;border-radius:4px;overflow:hidden;border:2px solid ' + (isPrimary ? 'var(--gold)' : 'var(--gray-200)') + ';cursor:pointer;" onclick="event.stopPropagation();window._peSetPrimaryClipFromEl(this.closest(\'.pe-gallery-item\'))" title="' + (isPrimary ? 'Current hero image' : 'Set as hero') + '">' +
+            '<img src="' + escU + '" style="width:100%;height:100%;object-fit:cover;background:var(--gray-100);" onerror="this.style.opacity=0.4">' +
+            (isPrimary ? '<div style="position:absolute;bottom:0;left:0;right:0;background:var(--gold);color:#fff;font-size:7px;text-align:center;padding:2px 1px;font-weight:700;">HERO</div>' : '') +
+            '</div>' +
+            (isPrimary
+              ? '<div style="font-size:8px;text-align:center;color:var(--gold);font-weight:700;padding:1px 0;">★ Hero</div>'
+              : '<button type="button" class="btn btn-secondary" style="font-size:9px;padding:3px 5px;line-height:1.2;width:100%;white-space:nowrap;" onclick="event.stopPropagation();window._peSetPrimaryClipFromEl(this.closest(\'.pe-gallery-item\'))">★ Hero</button>') +
+            '</div>';
         } else {
-          var clickClip = 'event.stopPropagation();(function(v){var el=document.getElementById(\'prodImage\');if(el){el.value=v;}if(typeof updateImagePreview===\'function\')updateImagePreview(v);})(' + JSON.stringify(u) + ')';
+          var clickClip = 'event.stopPropagation();(function(v,idx){var el=document.getElementById(\'prodImage\');if(el){el.value=v;}if(typeof updateImagePreview===\'function\')updateImagePreview(v);var pre=window._lastProductModalPrefill||{};pre.imageUrl=v;pre.heroImageIndex=idx;window._lastProductModalPrefill=pre;if(typeof _peRefreshGalleryStripFromPrefill===\'function\')_peRefreshGalleryStripFromPrefill();})(' + JSON.stringify(u) + ',' + idx + ')';
           html += '<div style="width:56px;display:flex;flex-direction:column;gap:3px;flex-shrink:0;">' +
             '<div style="position:relative;width:56px;height:56px;border-radius:4px;overflow:hidden;border:2px solid ' + (isPrimary ? 'var(--gold)' : 'var(--gray-200)') + ';cursor:pointer;" onclick="' + clickClip + '" title="' + (isPrimary ? 'Hero' : 'Set as Hero') + '">' +
             '<img src="' + escU + '" style="width:100%;height:100%;object-fit:cover;background:var(--gray-100);" onerror="this.style.opacity=0.4">' +
@@ -50859,29 +51459,78 @@ async function renderBoardsTab(T, proj) {
       var imageUrl = el.getAttribute('data-pe-img-url');
       if (productId && imageUrl) window._peRemoveImg(productId, imageUrl);
     };
-    window._peSetPrimary = function(productId, imageUrl) {
+    window._peSetPrimaryClipFromEl = function(el) {
+      if (!el) return;
+      var imageUrl = el.getAttribute('data-pe-img-url');
+      var idx = parseInt(el.getAttribute('data-pe-img-idx'), 10);
+      if (imageUrl) window._peSetPrimaryClip(imageUrl, isNaN(idx) ? 0 : idx);
+    };
+    window._peSetPrimaryClip = async function(imageUrl, heroIdx) {
+      var pre = window._lastProductModalPrefill || {};
+      var images = (pre.images || []).slice();
+      images = _pdReorderGalleryHero({ images: images, imageUrl: pre.imageUrl }, imageUrl);
+      heroIdx = images.length ? Math.max(0, Math.min(typeof heroIdx === 'number' && !isNaN(heroIdx) ? heroIdx : images.indexOf(imageUrl), images.length - 1)) : 0;
+      if (images.indexOf(imageUrl) >= 0) heroIdx = images.indexOf(imageUrl);
+      var update = { imageUrl: imageUrl, images: images, heroImageIndex: heroIdx, updatedAt: new Date().toISOString() };
+      var clipCtx = _peClipCtxFromPrefill(pre);
+      try {
+        if (clipCtx.clipProjectId && clipCtx.clipDocId) {
+          await db.collection('boards').doc(clipCtx.clipProjectId).collection('clips').doc(clipCtx.clipDocId).update(update);
+        }
+        pre.imageUrl = imageUrl;
+        pre.images = images.slice();
+        pre.heroImageIndex = heroIdx;
+        window._lastProductModalPrefill = pre;
+        var imgIn = document.getElementById('prodImage');
+        if (imgIn) imgIn.value = imageUrl;
+        if (typeof updateImagePreview === 'function') updateImagePreview(imageUrl);
+        _peRefreshGalleryStripFromPrefill();
+        showToast('★ Hero image updated');
+      } catch (e) {
+        console.warn('Set clip hero failed:', e);
+        showToast('Could not set hero: ' + ((e && e.message) || 'save failed'), 'error');
+      }
+    };
+    window._peSetPrimary = async function(productId, imageUrl) {
       var prod = _peGalleryProductRow(productId);
       var images = _pdReorderGalleryHero(prod, imageUrl);
-      _updateLibraryProductDual(productId, { imageUrl: imageUrl, images: images, updatedAt: new Date().toISOString() })
-        .then(function() {
-          if (prod) { prod.imageUrl = imageUrl; prod.images = images; }
-          if (window._lastProductModalPrefill && window._lastProductModalPrefill.id === productId) {
-            window._lastProductModalPrefill.imageUrl = imageUrl;
-            window._lastProductModalPrefill.images = images.slice();
+      var heroIdx = images.length ? Math.max(0, images.indexOf(imageUrl)) : 0;
+      if (heroIdx < 0) heroIdx = 0;
+      var update = { imageUrl: imageUrl, images: images, heroImageIndex: heroIdx, updatedAt: new Date().toISOString() };
+      var clipCtx = _peClipCtxFromPrefill(prod || window._lastProductModalPrefill);
+      try {
+        if (productId) {
+          try { await _updateLibraryProductDual(productId, update); } catch (libErr) {
+            if (!clipCtx.clipDocId) throw libErr;
+            console.warn('Library hero update skipped:', libErr);
           }
-          var imgIn = document.getElementById('prodImage');
-          if (imgIn) imgIn.value = imageUrl;
-          if (typeof updateImagePreview === 'function') updateImagePreview(imageUrl);
-          _peRefreshGalleryStrip(productId);
-          if (currentViewProduct && currentViewProduct.id === productId) {
-            currentViewProduct.imageUrl = imageUrl;
-            currentViewProduct.images = images;
-          }
-          showToast('★ Hero image updated');
-        }).catch(function(e) {
-          console.warn('Set primary failed:', e);
-          showToast('Could not set hero: ' + ((e && e.message) || 'save failed'), 'error');
-        });
+        }
+        if (clipCtx.clipProjectId && clipCtx.clipDocId) {
+          await db.collection('boards').doc(clipCtx.clipProjectId).collection('clips').doc(clipCtx.clipDocId).update(update);
+        }
+        if (prod) { prod.imageUrl = imageUrl; prod.images = images; prod.heroImageIndex = heroIdx; }
+        var pre = window._lastProductModalPrefill;
+        if (pre && (pre.id === productId || clipCtx.clipDocId)) {
+          pre.imageUrl = imageUrl;
+          pre.images = images.slice();
+          pre.heroImageIndex = heroIdx;
+          window._lastProductModalPrefill = pre;
+        }
+        var imgIn = document.getElementById('prodImage');
+        if (imgIn) imgIn.value = imageUrl;
+        if (typeof updateImagePreview === 'function') updateImagePreview(imageUrl);
+        if (productId) _peRefreshGalleryStrip(productId);
+        else _peRefreshGalleryStripFromPrefill();
+        if (currentViewProduct && currentViewProduct.id === productId) {
+          currentViewProduct.imageUrl = imageUrl;
+          currentViewProduct.images = images;
+          currentViewProduct.heroImageIndex = heroIdx;
+        }
+        showToast('★ Hero image updated');
+      } catch (e) {
+        console.warn('Set primary failed:', e);
+        showToast('Could not set hero: ' + ((e && e.message) || 'save failed'), 'error');
+      }
     };
 
     window._peRemoveImg = function(productId, imageUrl) {
@@ -50889,10 +51538,23 @@ async function renderBoardsTab(T, proj) {
       var prod = _peGalleryProductRow(productId);
       var images = (prod && prod.images) ? prod.images.filter(function(u) { return u !== imageUrl; }) : [];
       var update = { images: images, updatedAt: new Date().toISOString() };
-      if (prod && _libNormImgUrl(prod.imageUrl) === _libNormImgUrl(imageUrl)) {
+      var removedWasHero = prod && (_libNormImgUrl(prod.imageUrl) === _libNormImgUrl(imageUrl) || _libHeroIndex(prod) === (prod.images || []).indexOf(imageUrl));
+      if (removedWasHero) {
         update.imageUrl = images.length > 0 ? images[0] : '';
+        update.heroImageIndex = images.length ? 0 : firebase.firestore.FieldValue.delete();
+      } else if (images.length && prod) {
+        var oldHi = _libHeroIndex(prod);
+        var removedIdx = (prod.images || []).indexOf(imageUrl);
+        if (removedIdx >= 0 && removedIdx < oldHi) update.heroImageIndex = Math.max(0, oldHi - 1);
       }
+      var clipCtx = _peClipCtxFromPrefill(prod);
       _updateLibraryProductDual(productId, update)
+        .then(function() {
+          var clipPromise = (clipCtx.clipProjectId && clipCtx.clipDocId)
+            ? db.collection('boards').doc(clipCtx.clipProjectId).collection('clips').doc(clipCtx.clipDocId).update(update)
+            : Promise.resolve();
+          return clipPromise;
+        })
         .then(function() {
           if (prod) {
             prod.images = images;
@@ -50901,6 +51563,7 @@ async function renderBoardsTab(T, proj) {
           if (window._lastProductModalPrefill && window._lastProductModalPrefill.id === productId) {
             window._lastProductModalPrefill.images = images.slice();
             if (update.imageUrl !== undefined) window._lastProductModalPrefill.imageUrl = update.imageUrl;
+            if (update.heroImageIndex !== undefined) window._lastProductModalPrefill.heroImageIndex = update.heroImageIndex;
           }
           var imgIn = document.getElementById('prodImage');
           if (imgIn && update.imageUrl !== undefined) {
@@ -53165,17 +53828,22 @@ async function renderBoardsTab(T, proj) {
           { name: 'Invoices List', status: 'done', note: 'Sortable table with payment status' },
           { name: 'Time Period Filters', status: 'done', note: 'This Week / Month / YTD / All Time' },
           { name: 'New Invoice Modal', status: 'done', note: 'Auto-number INV-6000+, line items, add from project products' },
-          { name: 'Payment Tracking', status: 'partial', note: 'Payment array on invoice — need Houzz payment push ($11.3M)' },
+          { name: 'Payment Tracking', status: 'partial', note: 'Payment array on invoice + QB webhook clearance (two-state model per SPEC). Manual entry working; auto-cleared via qbWebhook.' },
           { name: 'Invoice Status Flow', status: 'done', note: 'Draft → Sent → Paid / Overdue' },
-          { name: 'QuickBooks Sync Column', status: 'partial', note: 'QB sync checkbox — no actual API yet' },
-          { name: 'Houzz Payment Import', status: 'open', note: '$11.3M legacy + new Houzz payments parsed but not pushed' },
+          { name: 'Invoice Edit/View Split', status: 'done', note: 'Edit = line items only · View = totals/payments/QB/client sidebar (May 22, verified on IN-12946)' },
+          { name: 'QuickBooks Sync', status: 'done', note: 'qbWebhook Gen2 live; syncInvoiceBalanceFromQB + batchSyncInvoiceBalancesFromQB; ↻ Sync QB paid UI on All Invoices' },
+          { name: 'Houzz Payment Import', status: 'partial', note: 'Legacy + new-Houzz payments largely applied across Cloud projects. Maverick complete. Remaining: spot-fix invoices with broken totals (IN-10145, IN-10151, IN-10159).' },
+          { name: 'Firm-wide invoice dedup', status: 'partial', note: 'RH, Susan, HB, Parker, Mustang done (179 dupes merged). ~20 boards still have case-variant pairs.' },
         ]},
         { id: 'pos', name: 'Purchase Orders', icon: '📦', features: [
           { name: 'PO List', status: 'done', note: 'Sortable table with vendor, status, amounts' },
           { name: 'Time Period Filters', status: 'done', note: 'This Week / Month / YTD / All Time' },
           { name: 'PO Detail Page', status: 'partial', note: 'Exists but Classic theme shows black boxes' },
           { name: 'New PO Modal', status: 'done', note: 'Quick create with vendor, items, amounts' },
-          { name: 'Numbering (PO-9000+)', status: 'done', note: 'Auto-increment from docCounters' },
+          { name: 'Numbering (PO-400000+)', status: 'done', note: 'Auto-increment from docCounters' },
+          { name: 'PO → Bill → QB workflow (bill-only)', status: 'done', note: 'Shipped May 28 — vendor bill captures actuals incl freight; QB Bill created via pushBillToQB. Replaces Houzz retro-edit pain.' },
+          { name: 'PO lock after Send', status: 'done', note: 'PO total + items immutable once sent. Bill captures variance separately.' },
+          { name: 'PO Variance / Discrepancy Report', status: 'planned', note: 'SPEC_PO_Bill_Variance_Workflow_v1.0.md — discrepancy tab + firm-wide report + dashboard widget. Routes variance to client invoice or absorbs.' },
         ]},
         { id: 'smarttime', name: 'Smart Time', icon: '⏱️', features: [
           { name: 'Desktop Agent (v4)', status: 'done', note: 'Captures every 15s, flushes to Firestore every 5min' },
@@ -53186,12 +53854,13 @@ async function renderBoardsTab(T, proj) {
           { name: 'Member Selector', status: 'done', note: 'Admin can view Vanessa\'s timeline' },
           { name: 'Noise Filter', status: 'done', note: 'Snipping Tool, File Explorer etc. filtered out' },
           { name: 'Service Type Suggestions', status: 'done', note: 'SketchUp→Design, Houzz→Procurement, etc.' },
-          { name: 'Capture Consolidation', status: 'done', note: 'Merge same-app captures within 30min gaps' },
+          { name: 'Capture Consolidation', status: 'bug', note: 'Overcounting active time — Campco 1.25hr shown for 14min actual (Cindy bug, Mar 25). Likely 30-min idle merge inflating gaps.' },
           { name: 'Teams/Zoom Detection', status: 'done', note: 'Meeting titles extracted from window name' },
           { name: 'Batch Editing', status: 'planned', note: 'Select multiple captures → assign to project' },
           { name: 'AI Auto-Draft Timesheets', status: 'planned', note: 'AI learns which captures to log vs ignore' },
           { name: 'Time → Invoice Pipeline', status: 'planned', note: 'Approved time entries flow to invoice line items' },
           { name: 'Ghost Block Fix', status: 'bug', note: 'Logged time showing as capture in timeline' },
+          { name: 'Delete in List View', status: 'bug', note: 'Delete button missing/unwired in Smart Time list (Cindy bug, Mar 24)' },
           { name: 'UTC Timezone Fix', status: 'done', note: 'UTC timestamps now convert to local date correctly' },
         ]},
         { id: 'team', name: 'Team & Contacts', icon: '👥', features: [
@@ -53206,6 +53875,7 @@ async function renderBoardsTab(T, proj) {
           { name: 'Client → Project Association', status: 'partial', note: '47 clients extracted, 26 projects linked' },
           { name: 'Client Detail Page', status: 'planned', note: 'Full client profile with all projects, invoices, payments' },
           { name: 'Add to Project Button', status: 'planned', note: 'Assign client from clients page to project' },
+          { name: 'Client Search Cursor', status: 'bug', note: 'Cursor jumps out of search box after each letter (Vanessa bug, Mar 23). Same class as Selections search bug.' },
         ]},
         { id: 'vendors', name: 'Vendors', icon: '🏪', features: [
           { name: 'Vendor List + Search', status: 'done', note: 'Sortable table with tags, products count' },
@@ -55263,7 +55933,7 @@ async function renderBoardsTab(T, proj) {
                   return `
                   <tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="navigate('#/project/${po.projectId}/po/${po.id}')">
                     <td style="${tdStyle}font-weight:600;font-family:monospace;color:var(--gold);">
-                      ${esc(po.number||po.id.substring(0,8))}
+                      ${esc(po.number||po.id.substring(0,8))}${typeof cchPoBillOnlyListBadgeHtml==='function'?cchPoBillOnlyListBadgeHtml(po):''}
                       ${po.fromProposal ? ' <a style="color:var(--gold);text-decoration:none;font-size:11px;font-weight:400;" onclick="event.stopPropagation();navigate(\'#/project/' + po.projectId + '/proposal/' + po.fromProposal + '\')" title="From proposal">🔗</a>' : ''}
                     </td>
                     <td style="${tdStyle}font-weight:500;" title="${escAttr(po.vendor && String(po.vendor).trim() !== String(po._displayVendor || '').trim() ? ('Stored vendor: ' + po.vendor) : '')}">${esc(po._displayVendor || po.vendor || '—')}</td>
@@ -55280,7 +55950,7 @@ async function renderBoardsTab(T, proj) {
                       return '<td style="' + tdStyle + 'text-align:right;font-family:monospace;color:' + (_pp > 0 ? '#5FA56B' : 'var(--gray-400)') + ';">' + (_pp > 0 ? '$' + _pp.toLocaleString('en-US',{minimumFractionDigits:2}) : '—') + '</td>' +
                         '<td style="' + tdStyle + 'text-align:right;font-weight:600;font-family:monospace;color:' + (_bal > 0 ? '#C4A464' : '#5FA56B') + ';">$' + _bal.toLocaleString('en-US',{minimumFractionDigits:2}) + '</td>';
                     })()}
-                    <td style="${tdStyle}">${qbCellBadge(getQbId(po), po.qbStatus, po)}</td>
+                    <td style="${tdStyle}">${typeof cchPoQbListCellHtml==='function'?cchPoQbListCellHtml(po):qbCellBadge(getQbId(po), po.qbStatus, po)}</td>
                     <td style="${tdStyle}text-align:center;" onclick="event.stopPropagation()">
                       <div class="action-menu-wrap" style="display:flex;align-items:center;justify-content:center;gap:4px;">
                         <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 10px;white-space:nowrap;" onclick="event.stopPropagation();window._forceEditMode=true;navigate('#/project/${po.projectId}/po/${po.id}')">✏️ Edit</button>
@@ -55295,7 +55965,7 @@ async function renderBoardsTab(T, proj) {
                           <a onclick="updatePOStatus('${po.projectId}','${po.id}','Installed');closeAllMenus()">→ Installed</a>
                           <div class="divider"></div>
                           <a onclick="emailVendorPO('${po.projectId}','${po.id}');closeAllMenus()">Email to Vendor</a>
-                          ${_canPushQBGlobal && !getQbId(po) ? '<a onclick="event.stopPropagation();pushDocToQB(\'po\',\'' + po.projectId + '\',\'' + po.id + '\');closeAllMenus()">📤 Push to QuickBooks</a>' : ''}
+                          ${_canPushQBGlobal && !getQbId(po) && !(typeof window.cchPoQbBillOnlyMode==='function'&&window.cchPoQbBillOnlyMode()) ? '<a onclick="event.stopPropagation();pushDocToQB(\'po\',\'' + po.projectId + '\',\'' + po.id + '\');closeAllMenus()">📤 Push to QuickBooks</a>' : ''}
                           <a onclick="setQBSynced('${po.projectId}','purchaseOrders','${po.id}');closeAllMenus()">${getQbId(po) ? 'Update QB ID' : 'Mark QB Synced'}</a>
                           <div class="divider"></div>
                           <a class="danger" onclick="deleteDoc('${po.projectId}','purchaseOrders','${po.id}');closeAllMenus()">Delete</a>
@@ -61152,7 +61822,8 @@ async function renderBoardsTab(T, proj) {
 
       var _specOpen = _clipSpecUrlFromDoc(clip);
       function clipPrefillGallery(libProduct) {
-        var _imgNorm = _normalizeClipImagesForTear(clip);
+        // Use clip gallery only — do not follow libraryProductId redirect inside _normalizeClipImagesForTear
+        var _imgNorm = _normalizeClipImagesForTear(Object.assign({}, clip, { libraryProductId: null, linkedLibraryProductId: null }));
         var _imgs = (_imgNorm.list || []).slice();
         var _heroIdx = typeof _imgNorm.heroIdx === 'number' ? _imgNorm.heroIdx : 0;
         var _heroUrl = _imgs.length ? String(_imgs[_heroIdx] || _imgs[0] || '').trim() : '';
@@ -61634,21 +62305,72 @@ async function renderBoardsTab(T, proj) {
       }
     }
 
+    async function _clearCatalogRoomForRemovedClip(projectId, clipData) {
+      clipData = clipData || {};
+      var ts = new Date().toISOString();
+      var patch = { room: null, updatedAt: ts };
+      var libId = String(clipData.libraryProductId || clipData.libraryId || '').trim();
+      if (libId) {
+        try { await db.collection('products').doc(libId).update(patch); } catch (_e1) {}
+        try { await db.collection('productLibrary').doc(libId).update(patch); } catch (_e2) {}
+      }
+      // Houzz/import dupes: multiple products/ rows share title+vendor+room — clear room on all matches for this project.
+      var title = String(clipData.title || '').trim();
+      var vendor = String(clipData.vendor || '').trim();
+      var room = String(clipData.room || '').trim();
+      if (!title || !room) return;
+      var projName = '';
+      try {
+        var bs = await db.collection('boards').doc(projectId).get();
+        if (bs.exists) projName = String((bs.data() || {}).name || '').trim();
+      } catch (_eB) {}
+      var titleLow = title.toLowerCase();
+      var vendorLow = vendor.toLowerCase();
+      async function clearMatchingRoom(snap) {
+        for (var i = 0; i < snap.docs.length; i++) {
+          var d = snap.docs[i];
+          var p = d.data() || {};
+          if (String(p.room || '').trim() !== room) continue;
+          var t = String(p.title || '').trim().toLowerCase();
+          var v = String(p.vendor || '').trim().toLowerCase();
+          if (t !== titleLow || v !== vendorLow) continue;
+          if (libId && d.id === libId) continue;
+          try { await d.ref.update(patch); } catch (_eU) {}
+        }
+      }
+      try {
+        var q1 = await db.collection('products').where('projectId', '==', projectId).limit(400).get();
+        await clearMatchingRoom(q1);
+      } catch (_eQ1) {}
+      if (projName) {
+        try {
+          var q2 = await db.collection('products').where('project', '==', projName).limit(400).get();
+          await clearMatchingRoom(q2);
+        } catch (_eQ2) {}
+      }
+    }
+
     async function deleteClip(projectId, clipId) {
       if (!confirm('Delete this product? This cannot be undone.')) return;
       try {
         var _clipRoom = '';
         var _clipTitle = clipId;
+        var _clipData = null;
         try {
           var _cd = await db.collection('boards').doc(projectId).collection('clips').doc(clipId).get();
           if (_cd.exists) {
-            var _cv = _cd.data() || {};
-            _clipRoom = _cv.room || '';
-            _clipTitle = _cv.title || clipId;
+            _clipData = _cd.data() || {};
+            _clipRoom = _clipData.room || '';
+            _clipTitle = _clipData.title || clipId;
           }
         } catch (_ce) {}
         closeModal();
         await db.collection('boards').doc(projectId).collection('clips').doc(clipId).delete();
+        if (_clipData) {
+          try { await _clearCatalogRoomForRemovedClip(projectId, _clipData); } catch (_eClr) {
+            console.warn('clearCatalogRoomForRemovedClip', _eClr);
+          }
+        }
         await logBoardUpdate(projectId, _clipRoom || 'Room Board', 'room board item removed: ' + _clipTitle, { boardKind: 'room', room: _clipRoom || '', clipId: clipId, title: _clipTitle });
         showToast('Product deleted');
         try { renderProjectDetail(); } catch(e2) { console.warn('Re-render after delete:', e2); }
@@ -63579,6 +64301,10 @@ async function renderBoardsTab(T, proj) {
               pubBtn = f.published ?
                 '<button class="btn btn-sm" style="font-size:10px;" onclick="toggleCommsPublish(\'' + escAttr(projId) + '\',\'' + escAttr(f._col) + '\',\'' + escAttr(f.id) + '\',false)">Unpublish</button>' :
                 '<button class="btn btn-sm btn-primary" style="font-size:10px;" onclick="toggleCommsPublish(\'' + escAttr(projId) + '\',\'' + escAttr(f._col) + '\',\'' + escAttr(f.id) + '\',true)">Publish for Client</button>';
+              if (f._col === 'messages' || f._col === 'notes') {
+                pubBtn += ' <button class="btn btn-sm" style="font-size:10px;" onclick="showEditCommsItemModal(\'' + escAttr(projId) + '\',\'' + escAttr(f._col) + '\',\'' + escAttr(f.id) + '\')">Edit</button>';
+                pubBtn += ' <button class="btn btn-sm" style="font-size:10px;color:var(--red);" title="Delete permanently" onclick="deleteCommsItem(\'' + escAttr(projId) + '\',\'' + escAttr(f._col) + '\',\'' + escAttr(f.id) + '\')">Delete</button>';
+              }
             }
             if (f._isReport) {
               pubBtn += ' <button class="btn btn-sm" style="font-size:10px;" onclick="previewUpdate(\'' + escAttr(projId) + '\',\'' + escAttr(f.id) + '\')">👁️ Preview</button>';
@@ -63805,6 +64531,91 @@ async function renderBoardsTab(T, proj) {
       if (!confirm('Delete this correspondence entry?')) return;
       try {
         await db.collection('boards').doc(projectId).collection('correspondence').doc(corrId).delete();
+        showToast('Deleted');
+        renderProjectDetail();
+      } catch(e) { alert('Error: ' + e.message); }
+    }
+
+    async function showEditCommsItemModal(projectId, collection, docId) {
+      if (!projectId || !collection || !docId) return;
+      if (collection !== 'messages' && collection !== 'notes') return;
+      try {
+        var snap = await db.collection('boards').doc(projectId).collection(collection).doc(docId).get();
+        if (!snap.exists) {
+          showToast('Message not found', 'error');
+          return;
+        }
+        var data = snap.data() || {};
+        var isNote = collection === 'notes';
+        var titleVal = data.title || '';
+        var textVal = data.text || data.body || data.content || '';
+        var modalTitle = isNote ? 'Edit Note' : 'Edit Message';
+        document.getElementById('modalContainer').innerHTML =
+          '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">' +
+            '<div class="modal" style="width:560px;max-height:90vh;overflow-y:auto;">' +
+              '<div class="modal-header"><div class="modal-title">' + modalTitle + '</div><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+              '<div class="modal-body">' +
+                (isNote ?
+                  '<div class="form-group"><label class="form-label">Title</label><input class="form-input" id="commsEditTitle" value="' + escAttr(titleVal) + '"></div>' :
+                  '') +
+                '<div class="form-group"><label class="form-label">' + (isNote ? 'Note' : 'Message') + '</label>' +
+                  '<textarea class="form-input" id="commsEditText" rows="6" style="resize:vertical;">' + esc(textVal) + '</textarea></div>' +
+                (data.published ? '<p style="font-size:11px;color:var(--gray-400);margin:8px 0 0;">Published on client portal — edits appear there after save.</p>' : '') +
+              '</div>' +
+              '<div class="modal-footer">' +
+                '<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>' +
+                '<button class="btn btn-primary" onclick="saveCommsItemEdit(\'' + escAttr(projectId) + '\',\'' + escAttr(collection) + '\',\'' + escAttr(docId) + '\')">Save</button>' +
+              '</div>' +
+            '</div>' +
+          '</div>';
+      } catch (e) {
+        alert('Error loading message: ' + (e.message || e));
+      }
+    }
+
+    async function saveCommsItemEdit(projectId, collection, docId) {
+      if (!projectId || !collection || !docId) return;
+      if (collection !== 'messages' && collection !== 'notes') return;
+      var textEl = document.getElementById('commsEditText');
+      var text = textEl ? String(textEl.value || '').trim() : '';
+      if (!text) {
+        showToast('Enter some text before saving', 'error');
+        return;
+      }
+      if (/^(blob:|data:)/i.test(text)) {
+        await cchAlert('That text contains a local blob/data URL and cannot be saved. Use a hosted link instead.', 'Save blocked');
+        return;
+      }
+      var patch = { updatedAt: new Date().toISOString() };
+      if (collection === 'messages') {
+        patch.text = text;
+      } else {
+        var titleEl = document.getElementById('commsEditTitle');
+        var title = titleEl ? String(titleEl.value || '').trim() : '';
+        patch.title = title;
+        patch.text = text;
+        patch.body = text;
+        patch.content = text;
+      }
+      try {
+        await db.collection('boards').doc(projectId).collection(collection).doc(docId).update(patch);
+        closeModal();
+        showToast('Saved');
+        renderProjectDetail();
+      } catch (e) {
+        alert('Error saving: ' + (e.message || e));
+      }
+    }
+
+    async function deleteCommsItem(projectId, collection, docId) {
+      if (!projectId || !collection || !docId) return;
+      if (collection !== 'messages' && collection !== 'notes') return;
+      var ok = typeof cchConfirm === 'function'
+        ? await cchConfirm('Delete this note permanently? It will be removed from the client portal if published.', 'Delete message', { confirmText: 'Delete', cancelText: 'Cancel' })
+        : confirm('Delete this note permanently?');
+      if (!ok) return;
+      try {
+        await db.collection('boards').doc(projectId).collection(collection).doc(docId).delete();
         showToast('Deleted');
         renderProjectDetail();
       } catch(e) { alert('Error: ' + e.message); }
@@ -66087,4 +66898,128 @@ ${pages}
             if (qtyMatch) { product.qty = parseInt(qtyMatch[1]); j++; continue; }
 
             // If line looks like vendor (short, no numbers)
-            if (!produc
+            if (!product.vendor && next.length < 60 && !/\d/.test(next) && j === i + 1) {
+              product.vendor = next; j++; continue;
+            }
+            // Skip pure price lines
+            if (PRICE_RE.test(next)) { j++; continue; }
+
+            descLines.push(next);
+            j++;
+          }
+          product.description = descLines.filter(l => !PRICE_RE.test(l)).join(' ').substring(0, 400);
+          i = j;
+          if (product.title && product.title.length > 2) products.push(product);
+          continue;
+        }
+
+        i++;
+      }
+
+      return products;
+    }
+
+    async function confirmTearSheetImport() {
+      if (!_tearImportData || !_tearImportData.length) return;
+      var libOnly = document.getElementById('tearLibraryOnly');
+      if (libOnly && libOnly.checked) {
+        return confirmTearSheetLibraryImport();
+      }
+      if (!_tearImportProjectId) {
+        alert('Open a project and go to its Room Board to import clips to that project. From Product Library, keep "Product Library only" checked.');
+        return;
+      }
+      const btn = document.querySelector('#tearImportFooter .btn-primary');
+      if (btn) { btn.disabled = true; btn.textContent = 'Importing...'; }
+
+      const status = document.getElementById('tearParseStatus');
+      let imported = 0, failed = 0;
+      const batch_size = 10;
+
+      try {
+        for (let i = 0; i < _tearImportData.length; i += batch_size) {
+          const chunk = _tearImportData.slice(i, i + batch_size);
+          const writes = chunk.map(p => {
+            const clipRef = db.collection('boards').doc(_tearImportProjectId).collection('clips').doc();
+            const data = {
+              title: p.title || 'Untitled',
+              room: p.room || 'Unassigned',
+              category: p.room || 'Unassigned',
+              vendor: p.vendor || '',
+              sku: p.itemCode || '',
+              itemCode: p.itemCode || '',
+              clientPrice: parseFloat(p.clientPrice) || 0,
+              qty: parseFloat(p.qty) || 1,
+              totalSelling: (parseFloat(p.clientPrice) || 0) * (parseFloat(p.qty) || 1),
+              description: p.description || '',
+              imageUrl: p.imageDataUrl || '',
+              importedFrom: 'houzz-tearsheet',
+              importedAt: firebase.firestore.FieldValue.serverTimestamp(),
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            };
+            if (typeof boardClipWriteAllowedForRoomBoard === 'function') {
+              var _gTear = boardClipWriteAllowedForRoomBoard(data);
+              if (!_gTear.ok) { failed++; return Promise.resolve(); }
+            }
+            return clipRef.set(data).then(() => imported++).catch(() => failed++);
+          });
+          await Promise.all(writes);
+          if (status) status.innerHTML = `<div style="color:var(--gold);font-weight:600;">Importing... ${Math.min(i + batch_size, _tearImportData.length)} / ${_tearImportData.length}</div>`;
+        }
+
+        closeModal();
+        // Refresh the room board
+        await showPage('projects');
+        alert(`✅ Imported ${imported} product${imported !== 1 ? 's' : ''} to Room Board.${failed > 0 ? ` (${failed} failed)` : ''}`);
+      } catch(err) {
+        console.error('Import error:', err);
+        if (btn) { btn.disabled = false; btn.textContent = '✅ Import to Room Board'; }
+        if (status) status.innerHTML = `<div style="color:var(--red);">Import error: ${esc(err.message)}</div>`;
+      }
+    }
+
+
+    // Remove time billing boards from all projects
+    async function removeTimeBillingBoards() {
+      if (!confirm('Remove all Design Fees / Time Billing / Service items from Room Boards across ALL projects? This removes clips with categories like Design Fees, Design Services, Blended Design, Consultation, Project Management, Pass-Through, Freight, Client Admin etc.')) return;
+      showToast('Scanning projects...');
+      var snap = await getCachedBoards();
+      var totalDeleted = 0;
+      var serviceCategories = ['design fees','design services','blended design fees','blended design services','consultation','project management','pass-through','freight','shipping','client admin','client project services','expense','time track','time tracking','time billing'];
+      for (var doc of snap.docs) {
+        try {
+          var clips = await db.collection('boards').doc(doc.id).collection('clips').get();
+          var batch = db.batch();
+          var count = 0;
+          clips.forEach(function(d) {
+            var c = d.data();
+            var room = (c.room || '').toLowerCase().trim();
+            var cat = (c.category || '').toLowerCase().trim();
+            if (serviceCategories.includes(room) || serviceCategories.includes(cat)) {
+              batch.delete(d.ref);
+              count++;
+            }
+          });
+          if (count > 0) {
+            await batch.commit();
+            totalDeleted += count;
+          }
+        } catch(e) {}
+      }
+      showToast('Removed ' + totalDeleted + ' service/billing items from Room Boards');
+      alert('Done! Removed ' + totalDeleted + ' Design Fees / Time Billing items across all projects.');
+    }
+
+    // ==================== UTILITIES ====================
+    // esc() and escAttr() defined at top of script (line ~1127)
+
+  </script>
+  <script src="cch-invoice-tax-rules.js?v=20260523"></script>
+  <script src="cch-functions.js?v=202605283"></script>
+  <script src="cch-design-board.js?v=1774995200000"></script>
+  <script src="cch-client-board.js?v=1774994684878"></script>
+  <script src="cch-proposals-invoices-fix.js?v=202605284"></script>
+  <script src="cch-qb-dashboard.js?v=20260528"></script>
+  <script src="cch-po-bill-variance.js?v=202605291"></script>
+</body>
+</html>
