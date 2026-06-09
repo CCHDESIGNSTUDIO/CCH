@@ -1,6 +1,6 @@
 /** Gen2 Cloud Functions (matches production deploy — Gen1 manifest caused "Cannot set CPU" errors). */
 const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
-const { onDocumentWritten } = require("firebase-functions/v2/firestore");
+const { onDocumentWritten, onDocumentCreated } = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
 admin.initializeApp();
 
@@ -364,8 +364,189 @@ const QB_ACCOUNTS = {
   C2: "386", // C2 - Studio Freight/Shipping
   C3: "387", // C3 - Studio Sales Tax Paid
   C4: "388", // C4 - Studio Subcontractors
-  C5: "389"  // C5 - Studio Samples
+  C5: "389", // C5 - Studio Samples
+  C6: "261"  // C - Cost of Labor (native QB; used by item Labor 7554)
 };
+
+/** QuickBooks service/non-inventory item IDs for Studio push (production realm). */
+const QB_ITEM_IDS = {
+  product: "7718",
+  designFee: "7719",
+  shipping: "7720",
+  tax: "7721",
+  reimbursable: "7722",
+  subcontractor: "7723",
+  sample: "7724",
+  /** Item "Travel & Expenses" — E - Travel Expense; T&E time-billing lines (not Studio Reimbursable). */
+  travelExpense: "1083",
+  /** Item "Labor" — ExpenseAccountRef C - Cost of Labor (261). Trade/install labor, not C4 Subcontractors. */
+  labor: "7554"
+};
+
+function qbLaborItemRef() {
+  return { value: QB_ITEM_IDS.labor, name: "Labor" };
+}
+
+/** Windows, upholstery, wallpaper install, and category Labor → C - Cost of Labor (not Subcontractors). */
+function qbStudioLineLooksLikeLabor(item) {
+  const et = String(item.expenseType || item.itemType || "").toLowerCase();
+  if (et === "labor") return true;
+  const cat = String(item.category || item.type || "").toLowerCase();
+  if (/\blabor\b/.test(cat)) return true;
+  const title = String(item.title || item.name || "").toLowerCase();
+  if (/\b(install(?:ation)?|wall\s*paper\s*install|wall\s*covering\s*install|upholster|window\s*treat|window\s*install)\b/.test(title)) {
+    return true;
+  }
+  const blob = [title, String(item.description || "").slice(0, 160).toLowerCase()].join(" ");
+  if (/\b(install(?:ation)?|wall\s*paper\s*install|wall\s*covering\s*install|upholster|window\s*treat)\b/.test(blob)) {
+    return true;
+  }
+  return false;
+}
+
+/** True vendor subcontractor lines only — not trade labor / installation. */
+function qbStudioLineLooksLikeSubcontractor(item) {
+  if (qbStudioLineLooksLikeLabor(item)) return false;
+  const blob = [
+    item.category,
+    item.type,
+    item.title,
+    item.name,
+    item.description
+  ]
+    .map((s) => String(s || "").toLowerCase())
+    .join(" ");
+  return /\bsubcontractor\b/.test(blob);
+}
+
+function qbDesignFeeItemRef() {
+  return { value: QB_ITEM_IDS.designFee, name: "Studio Design Fee" };
+}
+
+function qbProductItemRef() {
+  return { value: QB_ITEM_IDS.product, name: "Studio Product" };
+}
+
+function qbTravelExpenseItemRef() {
+  return { value: QB_ITEM_IDS.travelExpense, name: "Travel & Expenses" };
+}
+
+/** T&E / travel time-billing — Travel & Expenses (1083), not Studio Reimbursable. */
+function qbStudioLineLooksLikeTravelExpense(item) {
+  const cat = qbStudioLineCategoryFields(item);
+  const title = String(item.title || item.name || "").toLowerCase();
+  const head = cat + " " + title;
+  if (/\bt&\s*e\b/.test(head)) return true;
+  if (/\btravel\b/.test(head) && /\b(expense|entertainment|mileage|pick\s*up|delivery|site\s+visit)\b/.test(head)) {
+    return true;
+  }
+  return false;
+}
+
+/** Category/service fields only (not description marketing copy). */
+function qbStudioLineCategoryFields(item) {
+  return [
+    item.category,
+    item.qbCategory,
+    item.qbLineCategory,
+    item.qbAccount,
+    item.type,
+    item.billingCategory,
+    item.service
+  ]
+    .map((s) => String(s || "").toLowerCase())
+    .join(" ");
+}
+
+/**
+ * R2 — Studio Design Fees. Authoritative category rules (must run before product heuristics).
+ * Design Service(s), Design Fee, Studio Design, Project Management → never Product Sales.
+ */
+function qbStudioLineIsDesignServiceCategory(item) {
+  if (qbStudioLineLooksLikeTravelExpense(item)) return false;
+  const cat = qbStudioLineCategoryFields(item);
+  if (/design\s+services?|design\s+fee|studio\s+design|project\s+manag/.test(cat)) return true;
+  const title = String(item.title || item.name || "").toLowerCase();
+  if (/^cch\s+(design|client\s+project|project\s+manag|blended\s+design|admin)/.test(title)) return true;
+  if (/\bcch\s+design\b/.test(cat) || /\bclient\s+project\s+support\b/.test(cat)) return true;
+  const et = String(item.expenseType || item.itemType || "").toLowerCase();
+  if (et === "service") {
+    if (/design|project\s+manag|client\s+project|time\s+billing|professional\s+service|consultation|hourly/.test(cat + " " + title)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** R1 — Studio Product Sales. Explicit merchandise categories only. */
+function qbStudioLineIsProductSalesCategory(item) {
+  const cat = qbStudioLineCategoryFields(item);
+  return /\b(product|furniture|lighting|hardware|accessor|inventory)\b/.test(cat);
+}
+
+/** Physical furnishings — never Studio Design Fee (ignore "designed" in marketing copy). */
+function qbStudioLineLooksLikeProduct(item) {
+  if (qbStudioLineIsDesignServiceCategory(item)) return false;
+  const et = String(item.expenseType || item.itemType || "").toLowerCase();
+  if (et === "service") return false;
+  if (et === "product" || et === "sample") return true;
+  if (qbStudioLineIsProductSalesCategory(item)) return true;
+  const title = String(item.title || item.name || "").toLowerCase();
+  const cat = String(item.category || "").toLowerCase();
+  const cost = parseFloat(item.cost) || 0;
+  const mkup = parseFloat(item.markupPct) || 0;
+  if (/\b(bowl|vase|tray|riser|cutting\s+board|display\s+stand|sconce|lantern|chandelier|pendant|picture\s+light|flush\s*mount|semi[- ]?flush|bracketed|homeware|organizer)\b/.test(title)) {
+    return true;
+  }
+  if (/accessor|lighting|furniture|mirror|rug|tile|fabric|bedding|art|wallpaper|homeware|kitchen|furnish/.test(cat) && cost > 0) {
+    return true;
+  }
+  if (cost > 0 && mkup > 0.25) return true;
+  return false;
+}
+
+/**
+ * Single QB ItemRef picker for invoice push, PO push, and vendor bills.
+ * Design services → 7719 (R2). Merchandise → 7718 (R1). Labor → 7554 (C - Cost of Labor).
+ */
+function qbItemRefForStudioLine(item) {
+  if (!item) return qbProductItemRef();
+  if (qbStudioLineLooksLikeLabor(item)) return qbLaborItemRef();
+  if (qbStudioLineLooksLikeTravelExpense(item)) return qbTravelExpenseItemRef();
+
+  const catHead = qbStudioLineCategoryFields(item);
+  if (/\b(shipping|freight|delivery)\b/.test(catHead)) {
+    return { value: QB_ITEM_IDS.shipping, name: "Studio Shipping" };
+  }
+  if (/\btax\b/.test(catHead)) {
+    return { value: QB_ITEM_IDS.tax, name: "Studio Prepaid Tax" };
+  }
+  if (/\bsample\b/.test(catHead)) {
+    return { value: QB_ITEM_IDS.sample, name: "Studio Sample" };
+  }
+
+  if (qbStudioLineIsDesignServiceCategory(item)) return qbDesignFeeItemRef();
+  if (qbStudioLineIsProductSalesCategory(item)) return qbProductItemRef();
+  if (qbStudioLineLooksLikeProduct(item)) return qbProductItemRef();
+
+  const title = String(item.title || item.name || "").toLowerCase();
+  if (/\breimburse/.test(catHead + " " + title)) {
+    return { value: QB_ITEM_IDS.reimbursable, name: "Studio Reimbursable" };
+  }
+  if (qbStudioLineLooksLikeSubcontractor(item)) {
+    return { value: QB_ITEM_IDS.subcontractor, name: "Studio Subcontractor" };
+  }
+
+  const et = String(item.expenseType || item.itemType || "").toLowerCase();
+  if (et === "service") return qbDesignFeeItemRef();
+
+  return qbProductItemRef();
+}
+
+/** PO / vendor bill — same mapping as invoice push. */
+function qbItemRefForStudioExpenseLine(item) {
+  return qbItemRefForStudioLine(item);
+}
 
 const QBConfig = () => ({
   clientId: QB_CLIENT_ID,
@@ -487,7 +668,10 @@ async function getQBAccessToken() {
 
   if (!res.ok) {
     const err = await res.text();
-    throw new HttpsError("internal", "Token refresh failed: " + err);
+    const hint = /invalid_grant|Incorrect Token type or clientID/i.test(err)
+      ? " Reconnect at https://cch-platform.web.app/qbauth.html (Connect to QuickBooks) so admin/qb gets a new refresh token for the current QB_CLIENT_ID secret."
+      : "";
+    throw new HttpsError("failed-precondition", "Token refresh failed: " + err + hint);
   }
 
   const tokens = await res.json();
@@ -501,6 +685,116 @@ async function getQBAccessToken() {
 
   return { accessToken: tokens.access_token, realmId: config.realmId || QB_REALM_ID };
 }
+
+/** Billing admins: verify OAuth refresh works (same path as Sync QB paid). */
+exports.qbConnectionStatus = onCall(QB_CALLABLE, async (request) => {
+  assertQbAdmin(request);
+  try {
+    const { realmId } = await getQBAccessToken();
+    const qbDoc = await db.collection("admin").doc("qb").get();
+    const config = qbDoc.data() || {};
+    return {
+      ok: true,
+      realmId: realmId || config.realmId || QB_REALM_ID,
+      tokenUpdatedAt: config.tokenUpdatedAt || null,
+      connectedAt: config.connectedAt || null
+    };
+  } catch (err) {
+    const msg = err && err.message ? String(err.message) : String(err);
+    return { ok: false, message: msg };
+  }
+});
+
+function clipSourceIsClipper(data) {
+  const s = String((data && data.source) || "").toLowerCase();
+  return s.includes("clipper") || s === "cch-studio-clipper";
+}
+
+/** Process 1: clipper → products/ first, then clip carries libraryProductId (selections use same id). */
+async function createLibraryProductFromClipServer(projectId, item) {
+  const pack = { imageUrl: item.imageUrl || item.image || "", images: Array.isArray(item.images) ? item.images : [] };
+  const imgs = pack.images.length ? pack.images.slice() : (pack.imageUrl ? [String(pack.imageUrl)] : []);
+  const heroIdx = Math.max(0, Math.min(parseInt(item.heroImageIndex, 10) || 0, Math.max(0, imgs.length - 1)));
+  const imageUrl = imgs[heroIdx] || imgs[0] || pack.imageUrl || "";
+  const qty = parseFloat(item.qty) || 1;
+  let cost = parseFloat(item.cost || item.unitCost || item.costPrice) || 0;
+  if (!cost && item.totalCost) cost = parseFloat(item.totalCost) / qty;
+  let price = parseFloat(item.clientPrice || item.sellPrice || item.price) || 0;
+  let defMk = 30;
+  try {
+    const ps = await db.collection("boards").doc(projectId).get();
+    if (ps.exists) {
+      const x = parseFloat(ps.data().defaultProductMarkupPct);
+      if (!isNaN(x)) defMk = x;
+    }
+  } catch (_eMk) { /* ignore */ }
+  let boardName = null;
+  try {
+    const bs = await db.collection("boards").doc(projectId).get();
+    if (bs.exists) boardName = String(bs.data().name || "").trim() || null;
+  } catch (_eBn) { /* ignore */ }
+  const nowIso = new Date().toISOString();
+  const srcLabel = item.source || "cch-studio-clipper";
+  const data = {
+    title: String(item.title || item.name || "Untitled").trim() || "Untitled",
+    vendor: String(item.vendor || item.manufacturer || "").trim(),
+    libraryItemKind: "product",
+    imageUrl: imageUrl || null,
+    projectId,
+    project: boardName,
+    source: clipSourceIsClipper(srcLabel) ? "cch-studio-clipper" : srcLabel,
+    updatedAt: nowIso,
+    createdAt: nowIso,
+    productLifecycle: "active"
+  };
+  if (imgs.length) data.images = imgs;
+  if (item.category) data.category = String(item.category).trim();
+  if (item.room) data.room = String(item.room).trim();
+  if (item.sku) data.sku = String(item.sku).trim();
+  if (cost > 0) data.costPrice = cost;
+  if (price > 0) data.sellPrice = price;
+  const vu = String(item.productUrl || item.vendorUrl || item.pageUrl || item.sourceUrl || "").trim();
+  if (vu) {
+    data.vendorUrl = vu;
+    data.productUrl = vu;
+    data.pageUrl = vu;
+  }
+  const notes = String(item.description || item.clientDescription || "").trim();
+  if (notes) {
+    data.description = notes;
+    data.clientDescription = notes;
+  }
+  const ref = await db.collection("products").add(data);
+  try {
+    await db.collection("productLibrary").doc(ref.id).set(
+      Object.assign({}, data, { unitCost: data.costPrice }),
+      { merge: true }
+    );
+  } catch (_ePl) { /* legacy mirror optional */ }
+  return ref.id;
+}
+
+exports.onClipCreatedEnsureLibraryProduct = onDocumentCreated(
+  { document: "boards/{projectId}/clips/{clipId}", region: REGION },
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+    const data = snap.data() || {};
+    if (String(data.libraryProductId || data.linkedLibraryProductId || "").trim()) return;
+    if (!clipSourceIsClipper(data)) return;
+    const { projectId, clipId } = event.params;
+    try {
+      const libId = await createLibraryProductFromClipServer(projectId, data);
+      await snap.ref.update({
+        libraryProductId: libId,
+        updatedAt: new Date().toISOString()
+      });
+      console.log("[onClipCreatedEnsureLibraryProduct]", projectId, clipId, libId);
+    } catch (err) {
+      console.error("[onClipCreatedEnsureLibraryProduct]", projectId, clipId, err.message || err);
+    }
+  }
+);
 
 // ─── QB API HELPER ───────────────────────────────────────────────
 async function qbApiCall(method, endpoint, accessToken, realmId, body) {
@@ -711,6 +1005,57 @@ function _httpsErrStatus(code) {
   return m[code] || 500;
 }
 
+/** Studio line amount for QB push (merchandise; matches invoiceLineAmountForTotals). */
+function qbStudioInvoiceLineAmount(item) {
+  const qty = Math.max(parseFloat(item.qty || 1) || 1, 0.0001);
+  const cost = parseFloat(item.cost) || 0;
+  const mkup = parseFloat(item.markupPct) || 0;
+  let sell =
+    parseFloat(item.amount || item.clientPrice || item.lineTotal || item.total || item.totalSelling || 0) || 0;
+  const rate = parseFloat(item.rate || item.unitPrice) || 0;
+  if (!sell && rate > 0) sell = Math.round(rate * qty * 100) / 100;
+  if (sell < 0) return sell;
+  if (cost > 0) return Math.round(cost * qty * (1 + mkup / 100) * 100) / 100;
+  return sell || 0;
+}
+
+/** CA-style taxable flag for QB TaxCodeRef (TAX / NON). */
+function qbStudioInvoiceLineTaxable(item) {
+  if (!item) return false;
+  const et = String(item.expenseType || item.itemType || "").toLowerCase();
+  if (et === "sales_tax" || et === "discount") return false;
+  const blob = [item.title, item.name, item.category, item.service, item.billingCategory, item.description]
+    .map((s) => String(s || "").toLowerCase())
+    .join(" ");
+  if (/design\s+service|professional\s+service|time\s+billing|smart\s*time|consultation|hourly|project manag/.test(blob)) {
+    return false;
+  }
+  if (/\blabor\b/.test(String(item.category || "").toLowerCase()) || /\b(install(?:ation)?|wall\s*paper\s*install)\b/.test(blob)) {
+    return false;
+  }
+  if (item.taxable === false || item.taxable === "off" || item.taxable === "non-taxable") return false;
+  if (item.taxable === true || item.taxable === "on" || item.taxable === "taxable") return true;
+  const cat = String(item.category || "").toLowerCase();
+  if (/lighting|furniture|fabric|rug|tile|stone|product|appliance|hardware|bedding|mirror|art|wallpaper/.test(cat)) {
+    return true;
+  }
+  if (et === "service") return false;
+  return (parseFloat(item.cost) || 0) > 0 || et === "product" || !et;
+}
+
+/** Client sales tax for QB — uses taxAmount/tax on doc or computes from taxable lines × taxRate. */
+function qbStudioInvoiceSalesTax(invoice, proj) {
+  const explicit = parseFloat(invoice.tax ?? invoice.taxAmount);
+  if (Number.isFinite(explicit) && explicit > 0.01) return Math.round(explicit * 100) / 100;
+  const taxRate = parseFloat(invoice.taxRate ?? proj.taxRate) || 0;
+  if (taxRate <= 0) return 0;
+  let taxableSub = 0;
+  for (const item of invoice.items || []) {
+    if (qbStudioInvoiceLineTaxable(item)) taxableSub += qbStudioInvoiceLineAmount(item);
+  }
+  return Math.round(taxableSub * (taxRate / 100) * 100) / 100;
+}
+
 /**
  * QuickBooks invoice create/update path. Intuit OAuth is refreshed automatically from
  * Firestore admin/qb (no Intuit login per push). This function has no Firebase user check.
@@ -764,7 +1109,7 @@ async function runPushInvoiceToQBCore(projectId, docId, sendEmail) {
       proj
     );
 
-    const QB_ITEMS = { product: "7718", designFee: "7719", shipping: "7720", tax: "7721", reimbursable: "7722", subcontractor: "7723", sample: "7724" };
+    const QB_ITEMS = QB_ITEM_IDS;
 
     function qbInvoiceLineLabel(item) {
       const t = String((item && (item.title || item.name)) || "").trim();
@@ -785,28 +1130,16 @@ async function runPushInvoiceToQBCore(projectId, docId, sendEmail) {
     }
 
     function pickItemRef(item) {
-      const lineLabel = qbInvoiceLineLabel(item);
-      const cat = (
-        (item.category || item.type || item.itemType || "") +
-        " " + lineLabel + " " + (item.description || "") +
-        " " + (item.title || "") + " " + (item.name || "")
-      ).toLowerCase();
-      if (cat.includes("design") || cat.includes("fee") || cat.includes("labor") || cat.includes("time") ||
-          cat.includes("project manag") || cat.includes("consult")) return { value: QB_ITEMS.designFee, name: "Studio Design Fee" };
-      if (cat.includes("shipping") || cat.includes("freight") || cat.includes("delivery")) return { value: QB_ITEMS.shipping, name: "Studio Shipping" };
-      if (cat.includes("tax")) return { value: QB_ITEMS.tax, name: "Studio Prepaid Tax" };
-      if (cat.includes("sample")) return { value: QB_ITEMS.sample, name: "Studio Sample" };
-      if (cat.includes("reimburse")) return { value: QB_ITEMS.reimbursable, name: "Studio Reimbursable" };
-      if (cat.includes("sub") || cat.includes("contractor") || cat.includes("install")) return { value: QB_ITEMS.subcontractor, name: "Studio Subcontractor" };
-      return { value: QB_ITEMS.product, name: "Studio Product" };
+      return qbItemRefForStudioLine(item);
     }
+
+    const salesTaxForQb = qbStudioInvoiceSalesTax(invoice, proj);
 
     const lineItems = (invoice.items || []).map((item, idx) => {
       const qty = Math.max(parseFloat(item.qty || 1) || 1, 0.0001);
-      const lineTotal = parseFloat(
-        item.amount || item.clientPrice || item.lineTotal || item.total || item.totalSelling || 0
-      ) || 0;
+      const lineTotal = qbStudioInvoiceLineAmount(item);
       const lineLabel = qbInvoiceLineLabel(item);
+      const lineTaxable = qbStudioInvoiceLineTaxable(item);
       let restDesc = String((item && item.description) || "").trim();
       if (restDesc && lineLabel && restDesc.toLowerCase().startsWith(lineLabel.toLowerCase())) {
         restDesc = restDesc.slice(lineLabel.length).replace(/^\s*\([^)]*\)\s*[\u2014—\-]\s*/, "").trim();
@@ -824,12 +1157,14 @@ async function runPushInvoiceToQBCore(projectId, docId, sendEmail) {
         SalesItemLineDetail: {
           ItemRef: pickItemRef(item),
           Qty: qty,
-          UnitPrice: lineTotal / qty
+          UnitPrice: lineTotal / qty,
+          TaxCodeRef: { value: lineTaxable ? "TAX" : "NON" }
         }
       };
     });
 
-    if (invoice.tax && parseFloat(invoice.tax) > 0) {
+    /** Vendor pre-paid tax pass-through only — not client sales tax (that uses TaxCodeRef + TxnTaxDetail). */
+    if (invoice.tax && parseFloat(invoice.tax) > 0 && String(invoice._qbTaxLineKind || "") === "prepaid") {
       lineItems.push({
         Amount: parseFloat(invoice.tax),
         Description: "Prepaid Sales Tax",
@@ -837,7 +1172,8 @@ async function runPushInvoiceToQBCore(projectId, docId, sendEmail) {
         SalesItemLineDetail: {
           ItemRef: { value: QB_ITEMS.tax, name: "Studio Prepaid Tax" },
           Qty: 1,
-          UnitPrice: parseFloat(invoice.tax)
+          UnitPrice: parseFloat(invoice.tax),
+          TaxCodeRef: { value: "NON" }
         }
       });
     }
@@ -869,16 +1205,23 @@ async function runPushInvoiceToQBCore(projectId, docId, sendEmail) {
       CustomerMemo: { value: "Thank you for your business — CCH Design" },
       PrivateNote: "Pushed from CCH Studio. Project: " + (proj.name || projectId)
     };
+    if (salesTaxForQb > 0.02) {
+      qbInvoice.TxnTaxDetail = { TotalTax: salesTaxForQb };
+    }
 
     const result = await qbApiCall("POST", "invoice", accessToken, realmId, qbInvoice);
-    const qbId = result.Invoice.Id;
+    const qbInv = result.Invoice || {};
+    const qbId = qbInv.Id;
 
     await docRef.update({
       qbDocId: qbId,
       qbSyncDate: admin.firestore.FieldValue.serverTimestamp(),
       qbSynced: true,
       qbStatus: "sent",
-      qbInvoiceNum: result.Invoice.DocNumber,
+      qbInvoiceNum: qbInv.DocNumber,
+      qbPushedSalesTax: salesTaxForQb > 0.02 ? salesTaxForQb : 0,
+      qbPushedWithSalesTax: salesTaxForQb > 0.02,
+      taxAmount: salesTaxForQb > 0.02 ? salesTaxForQb : (invoice.taxAmount || null),
       qbPushPending: false,
       qbPushSendEmail: admin.firestore.FieldValue.delete(),
       qbPushLastError: admin.firestore.FieldValue.delete(),
@@ -888,7 +1231,8 @@ async function runPushInvoiceToQBCore(projectId, docId, sendEmail) {
     return {
       success: true,
       qbDocId: qbId,
-      qbInvoiceNum: result.Invoice.DocNumber,
+      qbInvoiceNum: qbInv.DocNumber,
+      qbSalesTaxPushed: salesTaxForQb,
       emailSent: sendEmail !== false && !!clientEmail
     };
   } catch (err) {
@@ -1165,10 +1509,157 @@ async function fetchQBInvoiceForStudio(accessToken, realmId, existing) {
 }
 
 /**
+ * Pull Payment transactions linked to a QB invoice (LinkedTxn + customer fallback query).
+ * @returns {Promise<Array<{amount:number,date:string,method:string,note:string,qbPaymentId:string,qbInvoiceTxnId:string,reference:string}>>}
+ */
+async function pullQbPaymentLinesForInvoice(accessToken, realmId, qbInv) {
+  const out = [];
+  const invId = String((qbInv && qbInv.Id) || "").trim();
+  if (!invId) return out;
+  const seen = new Set();
+
+  async function addFromPaymentEntity(paymentData, fallbackAmt) {
+    if (!paymentData) return;
+    const payId = String(paymentData.Id || "").trim();
+    if (!payId || seen.has(payId)) return;
+    let applied = 0;
+    let matched = false;
+    for (const line of paymentData.Line || []) {
+      const invLinks = (line.LinkedTxn || []).filter(
+        (t) => t.TxnType === "Invoice" && String(t.TxnId) === invId
+      );
+      if (!invLinks.length) continue;
+      matched = true;
+      const lineAmt = parseFloat(line.Amount);
+      applied += Number.isFinite(lineAmt) && lineAmt > 0 ? lineAmt : 0;
+    }
+    if (!matched && fallbackAmt > 0.01) applied = fallbackAmt;
+    if (!matched) return;
+    seen.add(payId);
+    const txnDate =
+      (paymentData.TxnDate && String(paymentData.TxnDate).slice(0, 10)) ||
+      new Date().toISOString().slice(0, 10);
+    out.push({
+      amount: Math.round(applied * 100) / 100,
+      date: txnDate,
+      method: paymentData.PaymentMethodRef
+        ? paymentData.PaymentMethodRef.name || "QuickBooks"
+        : "QuickBooks",
+      note: "Synced from QuickBooks",
+      qbPaymentId: payId,
+      qbInvoiceTxnId: invId,
+      reference: String(paymentData.PaymentRefNum || paymentData.Id || "").trim(),
+      qbPaymentLineKey: payId + "|" + invId + "|" + String(Math.round(applied * 100))
+    });
+  }
+
+  for (const link of qbInv.LinkedTxn || []) {
+    if (link.TxnType !== "Payment" || !link.TxnId) continue;
+    try {
+      const pr = await qbApiCall(
+        "GET",
+        "payment/" + encodeURIComponent(String(link.TxnId)) + "?minorversion=65",
+        accessToken,
+        realmId,
+        null
+      );
+      await addFromPaymentEntity(pr.Payment, parseFloat(pr.Payment && pr.Payment.TotalAmt) || 0);
+    } catch (e) {
+      console.warn("[pullQbPaymentLinesForInvoice] payment GET", link.TxnId, e.message);
+    }
+  }
+
+  if (!out.length && qbInv.CustomerRef && qbInv.CustomerRef.value) {
+    const cust = String(qbInv.CustomerRef.value).replace(/'/g, "\\'");
+    const q =
+      "select * from Payment where CustomerRef = '" + cust + "' MAXRESULTS 200";
+    try {
+      const res = await qbApiCall(
+        "GET",
+        "query?query=" + encodeURIComponent(q) + "&minorversion=65",
+        accessToken,
+        realmId,
+        null
+      );
+      const list = (res.QueryResponse && res.QueryResponse.Payment) || [];
+      const payments = Array.isArray(list) ? list : list ? [list] : [];
+      for (const stub of payments) {
+        if (!stub || !stub.Id) continue;
+        try {
+          const pr = await qbApiCall(
+            "GET",
+            "payment/" + encodeURIComponent(String(stub.Id)) + "?minorversion=65",
+            accessToken,
+            realmId,
+            null
+          );
+          await addFromPaymentEntity(pr.Payment, parseFloat(pr.Payment && pr.Payment.TotalAmt) || 0);
+        } catch (e) {
+          console.warn("[pullQbPaymentLinesForInvoice] customer payment GET", stub.Id, e.message);
+        }
+      }
+    } catch (e) {
+      console.warn("[pullQbPaymentLinesForInvoice] customer query", e.message);
+    }
+  }
+
+  return out;
+}
+
+function mergeQbPaymentRowsIntoPatch(existing, patch, qbPayRows, refTotal, qbBalance) {
+  if (!qbPayRows || !qbPayRows.length) return;
+  const payLines = Array.isArray(existing.payments) ? existing.payments.slice() : [];
+  const byKey = new Set(
+    payLines.map((p) => String(p.qbPaymentLineKey || p.qbPaymentId || "").trim()).filter(Boolean)
+  );
+  qbPayRows.forEach((row) => {
+    const key = String(row.qbPaymentLineKey || row.qbPaymentId || "").trim();
+    if (key && byKey.has(key)) return;
+    if (key) byKey.add(key);
+    payLines.push(row);
+  });
+  const paidSum = payLines.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+  const latestDate = qbPayRows
+    .map((p) => String(p.date || "").slice(0, 10))
+    .filter(Boolean)
+    .sort()
+    .pop();
+  patch.payments = payLines;
+  patch.paymentCount = payLines.length;
+  if (latestDate) {
+    patch.qbPaymentDate = latestDate;
+    if (!existing.datePaid) patch.datePaid = latestDate;
+  }
+  if (refTotal > 0.01 && paidSum >= refTotal - 0.02) {
+    patch.status = "Paid";
+    patch.qbStatus = "paid";
+    patch.paidAmount = paidSum;
+    patch.balance = 0;
+    patch.qbPaymentConfirmation =
+      "QB payment" +
+      (qbPayRows[0] && qbPayRows[0].qbPaymentId ? " " + qbPayRows[0].qbPaymentId : "") +
+      " · $" +
+      paidSum.toFixed(2) +
+      (latestDate ? " on " + latestDate : "");
+  } else if (paidSum > 0.02) {
+    patch.status = "Partially Paid";
+    patch.qbStatus = "partial";
+    patch.paidAmount = paidSum;
+    patch.balance = Math.max(0, refTotal - paidSum);
+    patch.qbPaymentConfirmation =
+      "QB paid $" +
+      paidSum.toFixed(2) +
+      " · Studio total $" +
+      refTotal.toFixed(2) +
+      (latestDate ? " · " + latestDate : "");
+  }
+}
+
+/**
  * Build Firestore patch from QB Invoice GET (TotalAmt, Balance).
  * When Balance is ~0, marks Studio invoice Paid + qbStatus paid and aligns payments if needed.
  */
-function buildFirestorePatchFromQBInvoice(existing, qbInv) {
+function buildFirestorePatchFromQBInvoice(existing, qbInv, qbPayRows) {
   const totalAmt = parseFloat(qbInv.TotalAmt) || 0;
   let balance = qbInv.Balance;
   if (balance == null || balance === "") balance = totalAmt;
@@ -1194,45 +1685,60 @@ function buildFirestorePatchFromQBInvoice(existing, qbInv) {
   }
 
   if (balance <= 0.02) {
-    updates.status = "Paid";
-    updates.qbStatus = "paid";
-    updates.paidAmount = refTotal;
-    if (!existing.datePaid) {
-      updates.datePaid = (qbInv.TxnDate && String(qbInv.TxnDate).slice(0, 10)) || new Date().toISOString().slice(0, 10);
-    }
-    if (Math.abs(paidSum - refTotal) > 0.05) {
-      if (payLines.length === 0) {
+    const payDateFromRows =
+      qbPayRows && qbPayRows.length
+        ? qbPayRows
+            .map((p) => String(p.date || "").slice(0, 10))
+            .filter(Boolean)
+            .sort()
+            .pop()
+        : "";
+    const paidDate =
+      payDateFromRows ||
+      (existing.qbPaymentDate && String(existing.qbPaymentDate).slice(0, 10)) ||
+      (existing.datePaid && String(existing.datePaid).slice(0, 10)) ||
+      (qbInv.TxnDate && String(qbInv.TxnDate).slice(0, 10)) ||
+      new Date().toISOString().slice(0, 10);
+    if (!existing.datePaid) updates.datePaid = paidDate;
+    updates.qbPaymentDate = payDateFromRows || paidDate;
+    if (qbPayRows && qbPayRows.length) {
+      mergeQbPaymentRowsIntoPatch(existing, updates, qbPayRows, refTotal, balance);
+    } else {
+      const qbPaidAmt = Math.round(paidFromQb * 100) / 100;
+      if (payLines.length === 0 && qbPaidAmt > 0.02) {
         updates.payments = [{
-          amount: refTotal,
-          date: updates.datePaid || new Date().toISOString().slice(0, 10),
+          amount: qbPaidAmt,
+          date: paidDate,
           method: "QuickBooks",
-          note: "Paid in QuickBooks (balance sync from CCH Studio)"
+          note: "Paid in QuickBooks (merchandise per QB invoice total)",
+          source: "QuickBooks"
         }];
+        updates.paymentCount = 1;
+      }
+      const rowsPaid = (updates.payments || payLines).reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+      const paidAmt = rowsPaid > 0.02 ? rowsPaid : qbPaidAmt;
+      if (paidAmt >= refTotal - 0.02) {
+        updates.status = "Paid";
+        updates.qbStatus = "paid";
+        updates.paidAmount = paidAmt;
+        updates.balance = 0;
+      } else if (paidAmt > 0.02) {
+        updates.status = "Partially Paid";
+        updates.qbStatus = "partial";
+        updates.paidAmount = paidAmt;
+        updates.balance = Math.max(0, refTotal - paidAmt);
       } else {
-        const gap = refTotal - paidSum;
-        if (gap > 0.02) {
-          payLines.push({
-            amount: gap,
-            date: new Date().toISOString().slice(0, 10),
-            method: "QuickBooks",
-            note: "Additional amount per QuickBooks balance sync"
-          });
-          updates.payments = payLines;
-        }
+        updates.qbStatus = "paid";
       }
     }
   } else if (paidFromQb > 0.02) {
-    updates.status = "Partially Paid";
-    updates.qbStatus = "partial";
-    updates.paidAmount = paidFromQb;
-    if (Math.abs(paidSum - paidFromQb) > 0.05 && paidFromQb > paidSum + 0.02) {
-      payLines.push({
-        amount: paidFromQb - paidSum,
-        date: new Date().toISOString().slice(0, 10),
-        method: "QuickBooks",
-        note: "Partial payment per QuickBooks balance sync"
-      });
-      updates.payments = payLines;
+    if (qbPayRows && qbPayRows.length) {
+      mergeQbPaymentRowsIntoPatch(existing, updates, qbPayRows, refTotal, balance);
+    } else {
+      updates.status = "Partially Paid";
+      updates.qbStatus = "partial";
+      updates.paidAmount = paidFromQb;
+      updates.balance = Math.max(0, refTotal - paidFromQb);
     }
   } else {
     updates.qbStatus = "sent";
@@ -1254,7 +1760,13 @@ exports.syncInvoiceBalanceFromQB = onCall(QB_CALLABLE, async (request) => {
     const existing = snap.data();
     const { accessToken, realmId } = await getQBAccessToken();
     const { qbInv, canonicalQbId } = await fetchQBInvoiceForStudio(accessToken, realmId, existing);
-    const patch = buildFirestorePatchFromQBInvoice(existing, qbInv);
+    let qbPayRows = [];
+    try {
+      qbPayRows = await pullQbPaymentLinesForInvoice(accessToken, realmId, qbInv);
+    } catch (e) {
+      console.warn("[syncInvoiceBalanceFromQB] payment pull", e.message);
+    }
+    const patch = buildFirestorePatchFromQBInvoice(existing, qbInv, qbPayRows);
     const prevQb = String(existing.qbDocId || existing.qbInvoiceId || "").trim();
     if (canonicalQbId && prevQb !== canonicalQbId) {
       patch.qbDocId = canonicalQbId;
@@ -1266,7 +1778,9 @@ exports.syncInvoiceBalanceFromQB = onCall(QB_CALLABLE, async (request) => {
       totalAmt: patch.qbApiTotalAmt,
       balance: patch.qbApiBalance,
       status: patch.status || existing.status,
-      qbStatus: patch.qbStatus || existing.qbStatus
+      qbStatus: patch.qbStatus || existing.qbStatus,
+      qbPaymentDate: patch.qbPaymentDate || existing.qbPaymentDate || "",
+      paymentLinesPulled: qbPayRows.length
     };
   }
 );
@@ -1279,8 +1793,17 @@ exports.batchSyncInvoiceBalancesFromQB = onCall(QB_BATCH_CALLABLE, async (reques
     assertQbPushAllowed(request);
     const rawMax = request.data && request.data.maxInvoices;
     const maxInvoices = Math.min(Math.max(parseInt(String(rawMax != null ? rawMax : 200), 10) || 200, 1), 500);
+    const onlyProjectId = request.data && request.data.projectId
+      ? String(request.data.projectId).trim()
+      : "";
     const { accessToken, realmId } = await getQBAccessToken();
-    const boardsSnap = await db.collection("boards").get();
+    let boardsSnap;
+    if (onlyProjectId) {
+      const one = await db.collection("boards").doc(onlyProjectId).get();
+      boardsSnap = one.exists ? { docs: [one] } : { docs: [] };
+    } else {
+      boardsSnap = await db.collection("boards").get();
+    }
     let scanned = 0;
     let updated = 0;
     let errors = 0;
@@ -1303,7 +1826,13 @@ exports.batchSyncInvoiceBalancesFromQB = onCall(QB_BATCH_CALLABLE, async (reques
         scanned++;
         try {
           const { qbInv, canonicalQbId } = await fetchQBInvoiceForStudio(accessToken, realmId, data);
-          const patch = buildFirestorePatchFromQBInvoice(data, qbInv);
+          let qbPayRows = [];
+          try {
+            qbPayRows = await pullQbPaymentLinesForInvoice(accessToken, realmId, qbInv);
+          } catch (pe) {
+            console.warn("[batchSyncInvoiceBalancesFromQB] payment pull", invDoc.id, pe.message);
+          }
+          const patch = buildFirestorePatchFromQBInvoice(data, qbInv, qbPayRows);
           const prevQb = String(data.qbDocId || data.qbInvoiceId || "").trim();
           if (canonicalQbId && prevQb !== canonicalQbId) {
             patch.qbDocId = canonicalQbId;
@@ -1451,15 +1980,8 @@ exports.pushPOToQB = onCall(QB_CALLABLE, async (request) => {
   const vendorId = await resolveQbVendorIdForPush(accessToken, realmId, vendorName);
 
   // Studio QB Item IDs for PO expense mapping
-  const QB_ITEMS_PO = { product: "7718", shipping: "7720", tax: "7721", sample: "7724", subcontractor: "7723" };
-
   function pickPOItemRef(item) {
-    const cat = ((item.category || item.type || item.itemType || "").toLowerCase());
-    if (cat.includes("shipping") || cat.includes("freight")) return { value: QB_ITEMS_PO.shipping, name: "Studio Shipping" };
-    if (cat.includes("tax")) return { value: QB_ITEMS_PO.tax, name: "Studio Prepaid Tax" };
-    if (cat.includes("sample")) return { value: QB_ITEMS_PO.sample, name: "Studio Sample" };
-    if (cat.includes("sub") || cat.includes("contractor") || cat.includes("install")) return { value: QB_ITEMS_PO.subcontractor, name: "Studio Subcontractor" };
-    return { value: QB_ITEMS_PO.product, name: "Studio Product" };
+    return qbItemRefForStudioExpenseLine(item);
   }
 
   const lineItems = (po.items || []).map((item, idx) => {
@@ -1478,19 +2000,7 @@ exports.pushPOToQB = onCall(QB_CALLABLE, async (request) => {
     };
   });
 
-  // Add tax line if present
-  if (po.tax && parseFloat(po.tax) > 0) {
-    lineItems.push({
-      Amount: parseFloat(po.tax),
-      Description: "Sales Tax",
-      DetailType: "ItemBasedExpenseLineDetail",
-      ItemBasedExpenseLineDetail: {
-        ItemRef: { value: QB_ITEMS_PO.tax, name: "Studio Prepaid Tax" },
-        Qty: 1,
-        UnitPrice: parseFloat(po.tax)
-      }
-    });
-  }
+  // PO documents do not carry tax — vendor tax belongs on the vendor bill (bill.tax / pre-paid tax).
 
   // Add shipping line if present
   if (po.shipping && parseFloat(po.shipping) > 0) {
@@ -1532,6 +2042,270 @@ exports.pushPOToQB = onCall(QB_CALLABLE, async (request) => {
   }
   }
 );
+
+/** Vendor bill on PO doc — lock; create or update same qbBillId. */
+async function beginQbBillPush(docRef) {
+  return db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(docRef);
+    if (!snap.exists) {
+      throw new HttpsError("not-found", "PO not found");
+    }
+    const d = snap.data();
+    const bill = d.bill || {};
+    if (!bill.received) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Receive the vendor bill in Studio first (PO + additional charges), then push the bill to QuickBooks."
+      );
+    }
+    const lockAt = bill.qbPushLockAt;
+    if (lockAt && typeof lockAt.toMillis === "function") {
+      const ageMs = Date.now() - lockAt.toMillis();
+      if (ageMs >= 0 && ageMs < QB_PUSH_LOCK_TTL_MS) {
+        throw new HttpsError(
+          "resource-exhausted",
+          "QuickBooks bill sync already in progress. Wait a minute and try again."
+        );
+      }
+    }
+    transaction.update(docRef, {
+      "bill.qbPushLockAt": admin.firestore.FieldValue.serverTimestamp()
+    });
+    const existingId = bill.qbBillId ? String(bill.qbBillId).trim() : "";
+    return { isUpdate: !!existingId, qbBillId: existingId };
+  });
+}
+
+function vendorInvoiceSourceToQb(source) {
+  const s = String(source || "").toLowerCase();
+  if (s === "freight" || s === "shipping") return "freight";
+  if (s === "tax") return "tax";
+  if (s === "labor" || s === "installation" || s === "install") return "labor";
+  if (s === "price_change" || s === "price") return "price_change";
+  if (s === "merchandise" || s === "product") return "merchandise";
+  return "extra";
+}
+
+/** Build QB Bill line items from Studio po.bill (PO lines + vendorInvoices / charge items). */
+function poLineTitlesFromBill(bill, poLineIds) {
+  if (!Array.isArray(poLineIds) || !poLineIds.length) return [];
+  const lines = Array.isArray(bill.poLines) && bill.poLines.length
+    ? bill.poLines
+    : (Array.isArray(bill.items) ? bill.items.filter((it) => it.source === "po") : []);
+  return poLineIds.map((id) => {
+    const hit = lines.find((l) => l.lineId === id);
+    return hit ? (hit.title || "Item") : null;
+  }).filter(Boolean);
+}
+
+function buildVendorBillQbLineItems(po, bill) {
+  function itemRefForSource(source, poLineItem) {
+    if (poLineItem) return qbItemRefForStudioLine(poLineItem);
+    const s = String(source || "").toLowerCase();
+    if (s === "labor") return qbLaborItemRef();
+    if (s === "freight") return { value: QB_ITEM_IDS.shipping, name: "Studio Shipping" };
+    if (s === "tax") return { value: QB_ITEM_IDS.tax, name: "Studio Prepaid Tax" };
+    if (s === "merchandise") return qbProductItemRef();
+    return qbProductItemRef();
+  }
+  function expenseLine(amount, description, source, lineNum, poLineItem) {
+    const amt = Math.round((parseFloat(amount) || 0) * 100) / 100;
+    if (Math.abs(amt) < 0.01) return null;
+    const ref = itemRefForSource(source, poLineItem);
+    const qty = 1;
+    return {
+      LineNum: lineNum,
+      Amount: Math.abs(amt),
+      Description: description,
+      DetailType: "ItemBasedExpenseLineDetail",
+      ItemBasedExpenseLineDetail: {
+        ItemRef: ref,
+        Qty: qty,
+        UnitPrice: Math.abs(amt) / qty
+      }
+    };
+  }
+
+  const poNum = po.number || po.num || po.poNum || "";
+  const poSubtotal = parseFloat(bill.poSubtotal != null ? bill.poSubtotal : bill.poTotalAtSend) || 0;
+  const lineItems = [];
+  let lineNum = 0;
+
+  const poLinesAll = Array.isArray(bill.poLines) && bill.poLines.length
+    ? bill.poLines
+    : (Array.isArray(bill.items) ? bill.items.filter((it) => it.source === "po") : []);
+  const billedIds = Array.isArray(bill.billedPoLineIds) ? bill.billedPoLineIds : null;
+  const poLines = billedIds && billedIds.length
+    ? poLinesAll.filter((it) => billedIds.includes(it.lineId))
+    : poLinesAll;
+
+  if (poLines.length) {
+    poLines.forEach((it) => {
+      const ln = expenseLine(
+        it.amount,
+        [it.title || "Item", it.sku ? "SKU " + it.sku : ""].filter(Boolean).join(" — ") +
+          " (PO " + poNum + ")",
+        "po",
+        ++lineNum,
+        it
+      );
+      if (ln) lineItems.push(ln);
+    });
+  } else if (poSubtotal > 0.01) {
+    const ln = expenseLine(poSubtotal, "Purchase order " + poNum + " — merchandise", "po", ++lineNum);
+    if (ln) lineItems.push(ln);
+  }
+
+  let charges = [];
+  if (Array.isArray(bill.vendorInvoices) && bill.vendorInvoices.length) {
+    charges = bill.vendorInvoices
+      .filter((r) => Math.abs(parseFloat(r.amount) || 0) > 0.01)
+      .filter((r) => vendorInvoiceSourceToQb(r.type || r.source) !== "merchandise")
+      .map((r) => {
+        const linked = poLineTitlesFromBill(bill, r.poLineIds);
+        let title = r.description || r.type || "Charge";
+        if (linked.length) title += " [" + linked.join(", ") + "]";
+        return {
+          source: vendorInvoiceSourceToQb(r.type || r.source),
+          title,
+          amount: r.amount,
+          vendorInvoiceNumber: r.vendorInvoiceNumber || "",
+          note: r.description || ""
+        };
+      });
+  }
+  if (!charges.length) {
+    const chargeRows = Array.isArray(bill.items)
+      ? bill.items.filter((it) => it.source && it.source !== "po")
+      : [];
+    charges = chargeRows.length
+      ? chargeRows
+      : [
+          { source: "freight", title: "Freight", amount: bill.freight },
+          { source: "tax", title: "Pre-paid tax", amount: bill.tax },
+          { source: "price_change", title: "Price change", amount: bill.priceChange },
+          { source: "extra", title: "Other / extra", amount: bill.extras }
+        ].filter((c) => Math.abs(parseFloat(c.amount) || 0) > 0.01);
+  }
+
+  charges.forEach((c) => {
+    const descParts = [c.title || c.source || "Additional charge"];
+    if (c.vendorInvoiceNumber) descParts.push("Inv " + String(c.vendorInvoiceNumber).trim());
+    if (c.note) descParts.push(String(c.note).trim());
+    const ln = expenseLine(
+      c.amount,
+      descParts.filter(Boolean).join(" — "),
+      c.source,
+      ++lineNum
+    );
+    if (ln) lineItems.push(ln);
+  });
+
+  const txnDate = (bill.vendorInvoiceDate || po.date || new Date().toISOString()).toString().slice(0, 10);
+  const docNumber = String(bill.vendorInvoiceNumber || poNum + "-BILL").trim().slice(0, 21);
+  const privateNote =
+    "CCH Studio vendor bill · PO " + poNum +
+    (bill.billTotal != null ? " · Total $" + bill.billTotal : "");
+
+  return { lineItems, txnDate, docNumber, privateNote };
+}
+
+async function clearQbBillPushLock(docRef) {
+  await docRef.update({
+    "bill.qbPushLockAt": admin.firestore.FieldValue.delete()
+  }).catch(() => {});
+}
+
+// ─── PUSH VENDOR BILL → QB (Bill entity — bank transaction match target) ──
+exports.pushBillToQB = onCall(QB_CALLABLE, async (request) => {
+  assertQbPushAllowed(request);
+
+  const { projectId, docId } = request.data || {};
+  if (!projectId || !docId) {
+    throw new HttpsError("invalid-argument", "projectId and docId required");
+  }
+
+  const docRef = db.collection("boards").doc(projectId).collection("purchaseOrders").doc(docId);
+  const snap = await docRef.get();
+  if (!snap.exists) throw new HttpsError("not-found", "PO not found");
+  const po = snap.data();
+  const bill = po.bill || {};
+
+  const vendorName = po.vendor || po.vendorName || "";
+  if (!vendorName) {
+    throw new HttpsError("failed-precondition", "Vendor name is required on the PO.");
+  }
+
+  const pushState = await beginQbBillPush(docRef);
+
+  try {
+    const { accessToken, realmId } = await getQBAccessToken();
+    const vendorId = await resolveQbVendorIdForPush(accessToken, realmId, vendorName);
+    const poNum = po.number || po.num || po.poNum || docId.slice(0, 10);
+    const { lineItems, txnDate, docNumber, privateNote } = buildVendorBillQbLineItems(po, bill);
+
+    if (!lineItems.length) {
+      throw new HttpsError("failed-precondition", "Vendor bill has no billable lines to push.");
+    }
+
+    let qbBillId;
+    let message;
+
+    if (pushState.isUpdate && pushState.qbBillId) {
+      const fetched = await qbApiCall("GET", "bill/" + pushState.qbBillId, accessToken, realmId);
+      const existing = fetched.Bill;
+      if (!existing || !existing.Id) {
+        throw new HttpsError("not-found", "QuickBooks Bill not found: " + pushState.qbBillId);
+      }
+      const qbBillPayload = {
+        Id: existing.Id,
+        SyncToken: existing.SyncToken,
+        sparse: true,
+        Line: lineItems,
+        VendorRef: existing.VendorRef || { value: vendorId },
+        DocNumber: existing.DocNumber || docNumber,
+        TxnDate: txnDate || existing.TxnDate,
+        PrivateNote: privateNote + " · Project " + projectId
+      };
+      const result = await qbApiCall("POST", "bill", accessToken, realmId, qbBillPayload);
+      qbBillId = result.Bill && result.Bill.Id;
+      if (!qbBillId) {
+        throw new HttpsError("internal", "QuickBooks did not return a Bill Id after update.");
+      }
+      message = "QuickBooks Bill updated with latest charges";
+    } else {
+      const qbBillPayload = {
+        Line: lineItems,
+        VendorRef: { value: vendorId },
+        DocNumber: docNumber,
+        TxnDate: txnDate,
+        PrivateNote: privateNote + " · Project " + projectId
+      };
+      const result = await qbApiCall("POST", "bill", accessToken, realmId, qbBillPayload);
+      qbBillId = result.Bill && result.Bill.Id;
+      if (!qbBillId) {
+        throw new HttpsError("internal", "QuickBooks did not return a Bill Id.");
+      }
+      message = "Vendor bill pushed to QuickBooks";
+    }
+
+    const ts = new Date().toISOString();
+    const billTotal = parseFloat(bill.billTotal) || 0;
+    await docRef.update({
+      "bill.qbBillId": String(qbBillId),
+      "bill.qbSyncedAt": ts,
+      "bill.qbSyncedTotal": billTotal,
+      "bill.qbDocNumber": docNumber,
+      "bill.qbPushLockAt": admin.firestore.FieldValue.delete(),
+      lastQbBillPushAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { success: true, qbBillId: String(qbBillId), message, updated: !!pushState.isUpdate };
+  } catch (err) {
+    await clearQbBillPushLock(docRef);
+    throw err;
+  }
+});
 
 // ─── DELETE FROM QB (when deleted in Studio) ─────────────────────
 exports.deleteFromQB = onCall(QB_CALLABLE, async (request) => {
@@ -1582,7 +2356,8 @@ exports.qbSetupAccounts = onCall(QB_CALLABLE, async (request) => {
     { Name: "C2 - Studio Freight/Shipping", AccountType: "Cost of Goods Sold", AccountSubType: "ShippingFreightDeliveryCos" },
     { Name: "C3 - Studio Sales Tax Paid", AccountType: "Cost of Goods Sold", AccountSubType: "OtherCostsOfServiceCos" },
     { Name: "C4 - Studio Subcontractors", AccountType: "Cost of Goods Sold", AccountSubType: "OtherCostsOfServiceCos" },
-    { Name: "C5 - Studio Samples", AccountType: "Cost of Goods Sold", AccountSubType: "OtherCostsOfServiceCos" }
+    { Name: "C5 - Studio Samples", AccountType: "Cost of Goods Sold", AccountSubType: "OtherCostsOfServiceCos" },
+    { Name: "C6 - Cost of Labor", AccountType: "Cost of Goods Sold", AccountSubType: "OtherCostsOfServiceCos" }
   ];
 
   const created = [];
@@ -1606,6 +2381,19 @@ exports.qbSetupAccounts = onCall(QB_CALLABLE, async (request) => {
   for (const a of [...created, ...skipped]) {
     const key = a.name.split(" - ")[0].trim(); // R1, R2, C1, etc.
     accountMap[key] = a.id;
+  }
+  if (!accountMap.C6) {
+    try {
+      const laborQuery = "select Id, Name from Account where Name like '%Cost of Labor%' MAXRESULTS 5";
+      const laborSearch = await qbApiCall("GET", "query?query=" + encodeURIComponent(laborQuery), accessToken, realmId);
+      const laborHits = (laborSearch.QueryResponse && laborSearch.QueryResponse.Account) || [];
+      if (laborHits.length) {
+        accountMap.C6 = laborHits[0].Id;
+        skipped.push({ name: laborHits[0].Name + " (linked as C6)", id: laborHits[0].Id });
+      }
+    } catch (e) {
+      console.warn("[qbSetupAccounts] C6 Cost of Labor lookup:", e && e.message);
+    }
   }
   await db.collection("admin").doc("qb").update({ accountMap });
 
@@ -1776,13 +2564,124 @@ async function findStudioPoByQbTxnId(qbPoTxnId) {
   return q.empty ? null : q.docs[0];
 }
 
+async function findStudioPoByQbBillId(qbBillTxnId) {
+  const id = String(qbBillTxnId || "").trim();
+  if (!id) return null;
+  const q = await db.collectionGroup("purchaseOrders").where("bill.qbBillId", "==", id).limit(1).get();
+  return q.empty ? null : q.docs[0];
+}
+
+/** BillPayment cleared in QB → update Studio PO (match on bill.qbBillId, not PO). */
+async function applyQbBillPaymentToStudioPo(poDoc, opts) {
+  const { lineAmt, entity, bp, qbBillId } = opts;
+  const existing = poDoc.data();
+  const clearedExisting = existing.paymentCleared || {};
+  if (
+    clearedExisting.qbBillPaymentId &&
+    String(clearedExisting.qbBillPaymentId) === String(entity.id)
+  ) {
+    return;
+  }
+
+  const payments = Array.isArray(existing.payments) ? existing.payments.slice() : [];
+  const fingerprint =
+    "bp|" + String(entity.id) + "|" + String(qbBillId) + "|" + String(Math.round(lineAmt * 100) / 100);
+  if (payments.some((p) => String(p.qbPaymentLineKey || "") === fingerprint)) {
+    return;
+  }
+
+  payments.push({
+    amount: lineAmt,
+    date: bp.TxnDate,
+    method: "QuickBooks",
+    note: "Vendor payment (BillPayment) matched to Studio bill",
+    qbPaymentId: entity.id,
+    qbBillId: String(qbBillId),
+    qbPaymentLineKey: fingerprint
+  });
+
+  const billTotal =
+    (existing.bill && parseFloat(existing.bill.billTotal)) ||
+    parseFloat(existing.bill && existing.bill.poSubtotal) ||
+    studioDocRefTotal(existing);
+  const totalPaid = payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+  const fullyPaid = billTotal > 0.01 && totalPaid >= billTotal - 0.02;
+  const patch = {
+    payments,
+    paidAmount: fullyPaid && billTotal > 0.01 ? billTotal : totalPaid,
+    paymentCount: payments.length,
+    paymentStatus: fullyPaid ? "paid" : "partial",
+    qbPaymentConfirmation:
+      "QB BillPayment " + String(entity.id) + " · $" + lineAmt.toFixed(2)
+  };
+  if (fullyPaid) {
+    patch.status = "Paid";
+    patch.qbStatus = "paid";
+  } else if (totalPaid > 0.02) {
+    patch.qbStatus = "partial";
+  }
+
+  const clearedAt = new Date().toISOString();
+  patch.paymentCleared = {
+    amount: lineAmt,
+    clearedAt,
+    qbBillId: String(qbBillId),
+    qbBillPaymentId: String(entity.id),
+    qbTransactionId: String(bp.Id || entity.id)
+  };
+  patch.poStatus = "cleared";
+
+  await poDoc.ref.update(patch);
+
+  const projectId = projectIdFromBoardSubdocRef(poDoc.ref);
+  const docLabel = existing.number || existing.num || existing.poNum || poDoc.id;
+
+  await db
+    .collection("boards")
+    .doc(projectId)
+    .collection("notifications")
+    .add({
+      type: "qb_payment_matched",
+      poNumber: String(docLabel),
+      poId: poDoc.id,
+      projectId,
+      amount: lineAmt,
+      createdAt: clearedAt,
+      seenBy: [],
+      data: {
+        vendor: existing.vendor || "",
+        clearedAt,
+        qbBillPaymentId: String(entity.id),
+        qbBillId: String(qbBillId)
+      }
+    })
+    .catch((e) => console.warn("[qbWebhook] qb_payment_matched notification", e.message));
+
+  await recordQbPaymentStudioSideEffects({
+    projectId,
+    collection: "purchaseOrders",
+    docId: poDoc.id,
+    docLabel: String(docLabel),
+    amount: lineAmt,
+    newStatus: fullyPaid ? "Paid" : "Partially Paid",
+    paymentStatus: patch.paymentStatus,
+    qbPaymentId: entity.id
+  });
+}
+
 async function refreshInvoiceBalanceFromQb(invDocRef, accessToken, realmId) {
   try {
     const snap = await invDocRef.get();
     if (!snap.exists) return null;
     const existing = snap.data();
     const { qbInv } = await fetchQBInvoiceForStudio(accessToken, realmId, existing);
-    const balancePatch = buildFirestorePatchFromQBInvoice(existing, qbInv);
+    let qbPayRows = [];
+    try {
+      qbPayRows = await pullQbPaymentLinesForInvoice(accessToken, realmId, qbInv);
+    } catch (e) {
+      console.warn("[qbWebhook] payment pull", e.message);
+    }
+    const balancePatch = buildFirestorePatchFromQBInvoice(existing, qbInv, qbPayRows);
     if (Object.keys(balancePatch).length) {
       await invDocRef.update(balancePatch);
     }
@@ -1920,6 +2819,18 @@ async function processQbBillPaymentEntity(entity, accessToken, realmId) {
       }
       if (!bill) continue;
 
+      const qbBillId = String(txn.TxnId);
+      const poByStudioBill = await findStudioPoByQbBillId(qbBillId);
+      if (poByStudioBill) {
+        await applyQbBillPaymentToStudioPo(poByStudioBill, {
+          lineAmt,
+          entity,
+          bp,
+          qbBillId
+        });
+        continue;
+      }
+
       const poLinks = (bill.LinkedTxn || []).filter((t) => t.TxnType === "PurchaseOrder");
       for (const poTxn of poLinks) {
         const poQbId = String(poTxn.TxnId);
@@ -1933,6 +2844,14 @@ async function processQbBillPaymentEntity(entity, accessToken, realmId) {
         }
 
         const existing = poDoc.data();
+        const clearedExisting = existing.paymentCleared || {};
+        if (
+          clearedExisting.qbBillPaymentId &&
+          String(clearedExisting.qbBillPaymentId) === String(entity.id)
+        ) {
+          continue;
+        }
+
         const payments = Array.isArray(existing.payments) ? existing.payments.slice() : [];
         const fingerprint =
           "bp|" + String(entity.id) + "|" + poQbId + "|" + String(Math.round(lineAmt * 100) / 100);
@@ -1968,10 +2887,43 @@ async function processQbBillPaymentEntity(entity, accessToken, realmId) {
           patch.qbStatus = "partial";
         }
 
+        const clearedAt = new Date().toISOString();
+        patch.paymentCleared = {
+          amount: lineAmt,
+          clearedAt,
+          qbBillId: String(txn.TxnId),
+          qbBillPaymentId: String(entity.id),
+          qbTransactionId: String(bp.Id || entity.id)
+        };
+        patch.poStatus = "cleared";
+
         await poDoc.ref.update(patch);
 
         const projectId = projectIdFromBoardSubdocRef(poDoc.ref);
         const docLabel = existing.number || existing.num || existing.poNum || poDoc.id;
+
+        const notifTs = clearedAt;
+        await db
+          .collection("boards")
+          .doc(projectId)
+          .collection("notifications")
+          .add({
+            type: "qb_payment_matched",
+            poNumber: String(docLabel),
+            poId: poDoc.id,
+            projectId,
+            amount: lineAmt,
+            createdAt: notifTs,
+            seenBy: [],
+            data: {
+              vendor: existing.vendor || "",
+              clearedAt,
+              qbBillPaymentId: String(entity.id),
+              qbBillId: String(txn.TxnId)
+            }
+          })
+          .catch((e) => console.warn("[qbWebhook] qb_payment_matched notification", e.message));
+
         await recordQbPaymentStudioSideEffects({
           projectId,
           collection: "purchaseOrders",
