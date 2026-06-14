@@ -15,6 +15,7 @@
 | Date | Change | Revised By |
 |---|---|---|
 | Jun 5, 2026 | Initial session log — 12 feedback intakes, Clipper v3.9.30 fix, Ivy cutover coordination with Cursor, multi-session git triage + 2 commits pushed. | Claude |
+| Jun 5, 2026 (continued) | Appended §11 — post-wrap work: CP108/CP109 added (client inspiration lightbox), O260 root-caused + FIXED end-to-end (Clipper HF srcset comma bug, sidebar.js forward fix + 3-doc backfill + version 3.9.34→3.9.35). | Claude |
 
 ---
 
@@ -294,4 +295,74 @@ Session 3 (Cursor) wrote `ivy-cutover-inventory-staging_BY_CLAUDE_2026-06-08.js`
 
 ---
 
-*End of session log.*
+---
+
+## 11. Continued session — post-wrap work
+
+After this log was originally written and pushed (commit `89f83d6`), the session continued with three more threads:
+
+### 11.1 CP108 + CP109 — Client Inspiration lightbox bugs
+
+Cynthia screenshot from `/clientview/31-whitesail/inspirations/9XdrdmfjMtZqfjRZCf9K` revealed two bugs in the same component (`ib-lightbox-overlay`, index.html line 22595-22603):
+
+| ID | Type | Issue |
+|---|---|---|
+| **CP108** | bug | Lightbox image renders at thumbnail size, not full-screen — CSS constraint on `ib-lb-image-area` + `#ibLbMainImg` |
+| **CP109** | bug | Prev/Next walks ENTIRE ideabook items (17/17) instead of scoped to clicked item's `images[]` array — line 22601-22602 passes wrong `images` |
+
+**Both logged in 3 trackers** (KNOWN_ISSUES.md §5, feedbackRequests `PSPKro3Pr0gEbw7yFSlr` + `mndtvFYqudXbAE5gKpST`, CCH_Feature_Bug_Tracker.html).
+
+**One Cursor session can fix both** — same component, ~30 min. Sprint candidate w/ May 13 revert regressions (Cursor handoff item 2).
+
+### 11.2 O260 — Clipper Hubbardton Forge srcset bug — FIXED END-TO-END
+
+Cynthia screenshot from `/project/west-avalon/designboard/5i3omLU77ABk44ePK3pW` showed 3 brown-box clips. Triaged → was NOT Ivy-related (Ivy work hadn't touched these). Root cause traced through the Clipper.
+
+**Root cause confirmed via code grep:** `bestSrcFromImgEl` in `cch-clipper/CCH-Studio-Clipper-v32/sidebar.js` (line 2306) split srcset on bare `,` — but Cloudflare image URLs contain commas as part of the params (`cdn-cgi/image/width=,height=,quality=85,format=auto/...`). When HF served srcset with multiple sizes, the URL got chopped into fragments starting with `format=auto/media/catalog/...`.
+
+**Firm-wide scope verified read-only:** scanned 124 boards / 153 ideabooks / 6,890 images. Exactly **3 broken** (0.04%), all west-avalon Lighting Options, all HF clipped Jun 12 from individual product pages. Older Jun 1 clips from category pages worked fine.
+
+**Two-part fix applied (Cynthia typed GO "2"):**
+
+| Part | What | Where |
+|---|---|---|
+| **A. Forward fix** | `bestSrcFromImgEl` srcset split now uses lookahead `/,\s+(?=https?:\/\/\|\/\/\|\/)/` — protects URLs containing commas. Added defensive validation in `upgradeClipperImageUrl` rejecting URL fragments lacking proper prefix. | `sidebar.js` line 2241-2260 + 2319-2342 |
+| **B. Backfill** | 3 ideabook image entries on `boards/west-avalon/ideabooks/bNGzUZUlRiLsbUual5UG` rewritten with correct prefix. Old URLs saved to `_imageUrlPrevClipperBroken` for rollback. | `_debug/backfill-west-avalon-hf-clipper-urls-BY-CLAUDE-2026-06-05.js --apply --i-typed-go` |
+| **Version bump** | Manifest 3.9.34 → **3.9.35** | `manifest.json` |
+
+**Status:**
+- KNOWN_ISSUES O260 → **FIXED Jun 5**
+- feedbackRequests `nWbouikRe2Q0v8tPHxBV` → `In Progress` with full fix note
+- CCH_Feature_Bug_Tracker.html → `in-progress`, version 3.9.35
+
+**Cynthia action needed:**
+1. Reload West Avalon design board to verify 3 HF clips now show images (backfill already in prod)
+2. Reinstall Clipper Chrome extension to ship forward fix — bundles O258 + O259 + O260 in v3.9.35
+
+### 11.3 Lesson logged
+
+**Cloudflare image URL pattern (`cdn-cgi/image/width=N,height=N,quality=N,format=auto/path/to/img.jpg`) is becoming common.** Any vendor using this pattern would hit the bare-comma-split bug. The fix is generic — protects all such vendors going forward, not just HF.
+
+### Updated commit/push state
+
+Three commits today, all on `wip/preserve-rh-inspiration-board-2026-04-19`:
+- `f2711e0` — Commit A (Session 1's Quick-PO modal + categories + QB line categories)
+- `3f3255d` — Commit B (Session 3's Ivy cutover inventory script + 5.3 MB CSV output)
+- `89f83d6` — Original session log
+
+**Plus this addendum** — to be committed/pushed as a new commit so Cursor's nightly-session-log protocol sees the latest state.
+
+**Total feedback items logged today: 14** (D89-D92, P63-P65, CP106-CP109, O259, O260 — last three FIXED).
+
+### Updated handoff for next session
+
+| Resume here | Status |
+|---|---|
+| **Ivy apply script** (bugletrail pilot, Step 2 of Cursor's plan) | NOT BUILT — same status as before. CSV inventory at `_backup/ivy-cutover-inventory-staging-2026-06-08/INVENTORY_rows.csv` (5.3 MB) ready for review. |
+| **Chrome extension reinstall** | When Cynthia is ready — ships O258 + O259 + O260 bundled in v3.9.35 |
+| **Cursor's working tree** | 14 modified files + ~233 untracked _debug + ~86 untracked _scripts — same orphan state, no changes to git triage |
+| **Production deploys** | Still untouched. Bundle B (prod isolation v20260603d) is the latest hosting deploy. |
+
+---
+
+*End of session log (updated).*
