@@ -1,0 +1,2598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CCH Studio — Specifications</title>
+
+  <!-- Firebase 9 Compat SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+
+  <style>
+    /* ============================================================
+       DESIGN TOKENS — mirror CCH Studio palette
+    ============================================================ */
+    :root {
+      --cch-cream:     #F5F0E8;
+      --cch-cream-mid: #EDE6D8;
+      --cch-light:     #FAF8F5;
+      --cch-dark:      #2C2C2C;
+      --cch-mid:       #5A5045;
+      --cch-brown:     #8B7355;
+      --cch-gold:      #C9A96E;
+      --cch-gold-lt:   #E8D5B0;
+      --cch-border:    #DDD5C8;
+      --cch-border-lt: #EDE8DF;
+
+      --status-gray:      #9CA3AF;
+      --status-yellow:    #D97706;
+      --status-orange:    #EA580C;
+      --status-blue:      #2563EB;
+      --status-green:     #16A34A;
+      --status-teal:      #0D9488;
+      --status-darkgreen: #166534;
+      --status-red:       #DC2626;
+
+      --sidebar-w: 220px;
+      --panel-w: 420px;
+      --header-h: 56px;
+      --radius: 6px;
+      --shadow: 0 2px 8px rgba(44,44,44,0.08);
+      --shadow-lg: 0 4px 24px rgba(44,44,44,0.13);
+
+      --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-serif: 'Playfair Display', 'Georgia', serif;
+    }
+
+    /* ============================================================
+       RESET & BASE
+    ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: var(--font-body);
+      font-size: 14px;
+      color: var(--cch-dark);
+      background: var(--cch-light);
+      overflow: hidden;
+    }
+
+    /* ============================================================
+       AUTH GATE — shown while checking auth, hidden after
+    ============================================================ */
+    #authGate {
+      position: fixed; inset: 0;
+      background: var(--cch-light);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999;
+      flex-direction: column; gap: 12px;
+    }
+    #authGate .auth-logo {
+      font-family: var(--font-serif);
+      font-size: 22px;
+      color: var(--cch-brown);
+      letter-spacing: 0.04em;
+    }
+    #authGate .auth-sub {
+      font-size: 12px;
+      color: var(--cch-mid);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    /* ============================================================
+       MAIN APP SHELL
+    ============================================================ */
+    #app { display: none; flex-direction: column; height: 100vh; }
+    #app.ready { display: flex; }
+
+    /* ============================================================
+       HEADER
+    ============================================================ */
+    .specs-header {
+      height: var(--header-h);
+      background: var(--cch-dark);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px;
+      gap: 16px;
+      flex-shrink: 0;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .specs-header-left {
+      display: flex; align-items: center; gap: 16px;
+      min-width: 0;
+    }
+
+    .specs-back-btn {
+      display: flex; align-items: center; gap: 6px;
+      background: none; border: none;
+      color: rgba(255,255,255,0.55);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      padding: 4px 0;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: color 0.15s;
+    }
+    .specs-back-btn:hover { color: var(--cch-gold-lt); }
+
+    .specs-header-divider {
+      width: 1px; height: 20px;
+      background: rgba(255,255,255,0.15);
+      flex-shrink: 0;
+    }
+
+    .specs-header-project {
+      font-family: var(--font-serif);
+      font-size: 15px;
+      color: rgba(255,255,255,0.90);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .specs-header-badge {
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--cch-gold);
+      background: rgba(201,169,110,0.12);
+      border: 1px solid rgba(201,169,110,0.25);
+      padding: 2px 8px;
+      border-radius: 3px;
+      white-space: nowrap;
+    }
+
+    .specs-header-right {
+      display: flex; align-items: center; gap: 10px;
+      flex-shrink: 0;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 14px;
+      border-radius: var(--radius);
+      border: none; cursor: pointer;
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: var(--cch-gold);
+      color: #fff;
+    }
+    .btn-primary:hover { background: #b8945a; }
+
+    .btn-ghost {
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.75);
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,0.14); color: #fff; }
+
+    .btn-outline {
+      background: #fff;
+      color: var(--cch-dark);
+      border: 1px solid var(--cch-border);
+    }
+    .btn-outline:hover { border-color: var(--cch-brown); }
+
+    .btn-danger {
+      background: #FEF2F2;
+      color: var(--status-red);
+      border: 1px solid #FECACA;
+    }
+    .btn-danger:hover { background: #FEE2E2; }
+
+    /* Dropdown wrapper */
+    .btn-dropdown-wrap {
+      position: relative;
+    }
+    .btn-dropdown-menu {
+      position: absolute; top: calc(100% + 6px); right: 0;
+      background: #fff;
+      border: 1px solid var(--cch-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      min-width: 200px;
+      z-index: 200;
+      display: none;
+    }
+    .btn-dropdown-menu.open { display: block; }
+    .btn-dropdown-menu button {
+      display: block; width: 100%;
+      padding: 10px 16px;
+      text-align: left;
+      background: none; border: none; cursor: pointer;
+      font-size: 13px;
+      color: var(--cch-dark);
+    }
+    .btn-dropdown-menu button:hover { background: var(--cch-cream); }
+    .btn-dropdown-menu .menu-divider {
+      height: 1px; background: var(--cch-border-lt);
+      margin: 4px 0;
+    }
+
+    /* ============================================================
+       BODY LAYOUT — sidebar + main + detail panel
+    ============================================================ */
+    .specs-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ============================================================
+       SIDEBAR — category nav
+    ============================================================ */
+    .specs-sidebar {
+      width: var(--sidebar-w);
+      background: var(--cch-cream);
+      border-right: 1px solid var(--cch-border);
+      flex-shrink: 0;
+      overflow-y: auto;
+      padding: 12px 0;
+    }
+
+    .sidebar-section-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--cch-mid);
+      padding: 8px 16px 4px;
+      opacity: 0.6;
+    }
+
+    .sidebar-nav-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 9px 16px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--cch-mid);
+      border-left: 3px solid transparent;
+      transition: all 0.12s;
+    }
+    .sidebar-nav-item:hover {
+      background: var(--cch-cream-mid);
+      color: var(--cch-dark);
+    }
+    .sidebar-nav-item.active {
+      background: rgba(201,169,110,0.1);
+      color: var(--cch-brown);
+      border-left-color: var(--cch-gold);
+      font-weight: 600;
+    }
+    .sidebar-nav-item.open-items-nav {
+      color: var(--status-red);
+    }
+    .sidebar-nav-item.open-items-nav.active {
+      background: rgba(220,38,38,0.06);
+      border-left-color: var(--status-red);
+    }
+
+    .sidebar-divider {
+      height: 1px;
+      background: var(--cch-border);
+      margin: 8px 12px;
+    }
+
+    .count-badge {
+      font-size: 11px;
+      background: var(--cch-cream-mid);
+      color: var(--cch-mid);
+      padding: 1px 7px;
+      border-radius: 10px;
+      font-weight: 500;
+    }
+    .count-badge.red {
+      background: #FEE2E2;
+      color: var(--status-red);
+    }
+
+    /* ============================================================
+       MAIN CONTENT
+    ============================================================ */
+    .specs-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--cch-light);
+    }
+
+    /* Toolbar */
+    .specs-toolbar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 20px;
+      background: #fff;
+      border-bottom: 1px solid var(--cch-border-lt);
+      flex-shrink: 0;
+    }
+
+    .specs-toolbar select, .specs-toolbar input {
+      border: 1px solid var(--cch-border);
+      border-radius: var(--radius);
+      padding: 6px 10px;
+      font-family: var(--font-body);
+      font-size: 12px;
+      color: var(--cch-dark);
+      background: var(--cch-light);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .specs-toolbar select:focus, .specs-toolbar input:focus {
+      border-color: var(--cch-gold);
+    }
+
+    .specs-search-input {
+      flex: 1;
+      max-width: 260px;
+    }
+
+    .toolbar-spacer { flex: 1; }
+
+    /* List area */
+    .specs-list-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+    }
+
+    /* Room group */
+    .room-group { margin-bottom: 24px; }
+    .room-group-header {
+      font-family: var(--font-serif);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--cch-brown);
+      letter-spacing: 0.04em;
+      padding: 0 0 8px;
+      border-bottom: 1px solid var(--cch-border-lt);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+
+    /* Spec row */
+    .spec-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: background 0.12s;
+      border: 1px solid transparent;
+    }
+    .spec-row:hover { background: var(--cch-cream); }
+    .spec-row.selected {
+      background: rgba(201,169,110,0.08);
+      border-color: var(--cch-gold-lt);
+    }
+
+    .spec-tag {
+      font-size: 11px;
+      font-weight: 700;
+      font-family: monospace;
+      color: var(--cch-brown);
+      background: var(--cch-cream);
+      border: 1px solid var(--cch-border);
+      padding: 2px 7px;
+      border-radius: 3px;
+      min-width: 42px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .spec-thumb {
+      width: 40px; height: 40px;
+      border-radius: 4px;
+      object-fit: cover;
+      background: var(--cch-cream);
+      border: 1px solid var(--cch-border-lt);
+      flex-shrink: 0;
+    }
+    .spec-thumb-placeholder {
+      width: 40px; height: 40px;
+      border-radius: 4px;
+      background: var(--cch-cream);
+      border: 1px solid var(--cch-border-lt);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+      color: var(--cch-border);
+    }
+
+    .spec-info { flex: 1; min-width: 0; }
+    .spec-name {
+      font-weight: 500;
+      font-size: 13px;
+      color: var(--cch-dark);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .spec-sub {
+      font-size: 11px;
+      color: var(--cch-mid);
+      margin-top: 1px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    .spec-subcat-badge {
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      padding: 2px 7px;
+      border-radius: 3px;
+      background: var(--cch-cream);
+      color: var(--cch-mid);
+      border: 1px solid var(--cch-border-lt);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .spec-row-actions {
+      display: flex; align-items: center; gap: 6px;
+      flex-shrink: 0;
+    }
+
+    /* Status badges */
+    .status-badge {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 3px;
+      white-space: nowrap;
+    }
+    .s-specified    { background: #F3F4F6; color: var(--status-gray); }
+    .s-pending-sample { background: #FEF3C7; color: var(--status-yellow); }
+    .s-hold         { background: #FFF7ED; color: var(--status-orange); }
+    .s-sent         { background: #EFF6FF; color: var(--status-blue); }
+    .s-reviewing    { background: #DBEAFE; color: var(--status-blue); }
+    .s-approved     { background: #DCFCE7; color: var(--status-green); }
+    .s-ordered      { background: #CCFBF1; color: var(--status-teal); }
+    .s-confirmed    { background: #DCFCE7; color: var(--status-darkgreen); }
+    .s-open-item    { background: #FEE2E2; color: var(--status-red); }
+
+    /* Three-dot menu */
+    .row-menu-btn {
+      background: none; border: none; cursor: pointer;
+      color: var(--cch-mid);
+      padding: 4px;
+      border-radius: 3px;
+      font-size: 16px;
+      opacity: 0;
+      transition: opacity 0.12s;
+      line-height: 1;
+    }
+    .spec-row:hover .row-menu-btn { opacity: 1; }
+    .row-menu-btn:hover { background: var(--cch-cream-mid); }
+
+    /* Empty state */
+    .specs-empty {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; text-align: center;
+      flex: 1;
+      padding: 60px 20px;
+      gap: 12px;
+    }
+    .specs-empty-icon { font-size: 40px; opacity: 0.3; }
+    .specs-empty h3 {
+      font-family: var(--font-serif);
+      font-size: 18px;
+      color: var(--cch-brown);
+      font-weight: normal;
+    }
+    .specs-empty p { font-size: 13px; color: var(--cch-mid); }
+
+    /* ============================================================
+       DETAIL / EDIT PANEL (right slide-in)
+    ============================================================ */
+    .specs-detail-panel {
+      width: var(--panel-w);
+      background: #fff;
+      border-left: 1px solid var(--cch-border);
+      display: flex; flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.2s ease;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .specs-detail-panel.open {
+      transform: translateX(0);
+    }
+
+    .panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--cch-border-lt);
+      flex-shrink: 0;
+    }
+    .panel-title {
+      font-family: var(--font-serif);
+      font-size: 15px;
+      color: var(--cch-dark);
+    }
+    .panel-close-btn {
+      background: none; border: none; cursor: pointer;
+      color: var(--cch-mid);
+      font-size: 18px; line-height: 1;
+      padding: 4px;
+      border-radius: 3px;
+    }
+    .panel-close-btn:hover { background: var(--cch-cream); }
+
+    /* Panel tabs */
+    .panel-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--cch-border-lt);
+      background: var(--cch-light);
+      flex-shrink: 0;
+      overflow-x: auto;
+    }
+    .panel-tab {
+      padding: 9px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--cch-mid);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+      transition: all 0.12s;
+    }
+    .panel-tab:hover { color: var(--cch-dark); }
+    .panel-tab.active {
+      color: var(--cch-brown);
+      border-bottom-color: var(--cch-gold);
+      background: #fff;
+    }
+
+    /* Panel content */
+    .panel-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px;
+    }
+
+    .panel-tab-pane { display: none; }
+    .panel-tab-pane.active { display: block; }
+
+    /* Form elements in panel */
+    .form-row { margin-bottom: 14px; }
+    .form-row-2 {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .form-row-3 {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--cch-mid);
+      margin-bottom: 5px;
+    }
+
+    input[type="text"], input[type="number"], input[type="url"],
+    input[type="email"], input[type="tel"], select, textarea {
+      width: 100%;
+      border: 1px solid var(--cch-border);
+      border-radius: var(--radius);
+      padding: 7px 10px;
+      font-family: var(--font-body);
+      font-size: 13px;
+      color: var(--cch-dark);
+      background: #fff;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--cch-gold);
+    }
+    textarea { resize: vertical; min-height: 72px; }
+
+    .form-note {
+      font-size: 11px;
+      color: var(--cch-mid);
+      margin-top: 4px;
+      opacity: 0.8;
+    }
+
+    .audience-label {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 3px;
+      margin-bottom: 6px;
+    }
+    .audience-internal { background: #F3F4F6; color: #4B5563; }
+    .audience-gc       { background: #FEF3C7; color: #92400E; }
+    .audience-client   { background: #DCFCE7; color: #166534; }
+
+    /* Toggle checkboxes */
+    .toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--cch-border-lt);
+    }
+    .toggle-row:last-child { border-bottom: none; }
+    .toggle-label { font-size: 13px; color: var(--cch-dark); }
+    .toggle-sub   { font-size: 11px; color: var(--cch-mid); margin-top: 1px; }
+
+    .toggle {
+      position: relative; display: inline-block;
+      width: 36px; height: 20px;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0;
+      background: var(--cch-border);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 14px; height: 14px;
+      left: 3px; top: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .toggle input:checked + .toggle-slider { background: var(--cch-gold); }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
+
+    /* Image upload area */
+    .image-upload-area {
+      border: 2px dashed var(--cch-border);
+      border-radius: var(--radius);
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s;
+      font-size: 12px;
+      color: var(--cch-mid);
+    }
+    .image-upload-area:hover { border-color: var(--cch-gold); }
+    .image-upload-area input { display: none; }
+
+    .spec-images-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .spec-image-thumb {
+      position: relative;
+      aspect-ratio: 1;
+    }
+    .spec-image-thumb img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      border-radius: 4px;
+      border: 1px solid var(--cch-border-lt);
+    }
+    .spec-image-remove {
+      position: absolute; top: 3px; right: 3px;
+      background: rgba(0,0,0,0.6);
+      color: #fff; border: none; cursor: pointer;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      font-size: 11px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* Surfaces grid (paint) */
+    .surfaces-grid {
+      display: grid; grid-template-columns: auto 1fr;
+      gap: 8px 12px;
+      align-items: center;
+    }
+    .surface-label {
+      font-size: 12px;
+      color: var(--cch-mid);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    /* Status selector */
+    .status-select-wrap {
+      position: relative;
+    }
+    .status-select {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid var(--cch-border);
+      border-radius: var(--radius);
+      font-size: 12px;
+      font-weight: 600;
+      appearance: none;
+      cursor: pointer;
+    }
+
+    /* Open item owner */
+    .open-item-owner-select {
+      margin-top: 8px;
+    }
+
+    /* Panel footer */
+    .panel-footer {
+      padding: 14px 18px;
+      border-top: 1px solid var(--cch-border-lt);
+      display: flex; gap: 10px; justify-content: flex-end;
+      flex-shrink: 0;
+      background: var(--cch-light);
+    }
+
+    /* ============================================================
+       CONTEXT MENU (three-dot)
+    ============================================================ */
+    .context-menu {
+      position: fixed;
+      background: #fff;
+      border: 1px solid var(--cch-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      z-index: 500;
+      min-width: 160px;
+      padding: 4px 0;
+      display: none;
+    }
+    .context-menu.open { display: block; }
+    .context-menu-item {
+      display: block; width: 100%;
+      padding: 8px 14px;
+      text-align: left;
+      background: none; border: none; cursor: pointer;
+      font-size: 13px;
+      color: var(--cch-dark);
+    }
+    .context-menu-item:hover { background: var(--cch-cream); }
+    .context-menu-item.danger { color: var(--status-red); }
+    .context-menu-item.danger:hover { background: #FEF2F2; }
+    .context-menu-divider { height: 1px; background: var(--cch-border-lt); margin: 4px 0; }
+
+    /* ============================================================
+       TOAST
+    ============================================================ */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--cch-dark);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 13px;
+      box-shadow: var(--shadow-lg);
+      z-index: 9000;
+      opacity: 0;
+      transition: opacity 0.2s;
+      pointer-events: none;
+    }
+    #toast.show { opacity: 1; }
+
+    /* ============================================================
+       OPEN ITEMS BANNER
+    ============================================================ */
+    .open-items-banner {
+      background: #FEF2F2;
+      border: 1px solid #FECACA;
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 14px;
+      font-size: 13px;
+      color: var(--status-red);
+    }
+    .open-items-banner .banner-icon { font-size: 16px; }
+    .open-items-banner strong { font-weight: 600; }
+
+    /* ============================================================
+       LOADING SPINNER
+    ============================================================ */
+    .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid var(--cch-border);
+      border-top-color: var(--cch-gold);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ============================================================
+       SECTION LABEL
+    ============================================================ */
+    .panel-section-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--cch-mid);
+      opacity: 0.7;
+      margin: 18px 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--cch-border-lt);
+    }
+    .panel-section-label:first-child { margin-top: 0; }
+
+    /* ============================================================
+       SCROLLBAR
+    ============================================================ */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--cch-border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--cch-brown); }
+  </style>
+</head>
+<body>
+
+  <!-- AUTH GATE -->
+  <div id="authGate">
+    <div class="auth-logo">CCH Studio</div>
+    <div class="auth-sub">Specifications</div>
+    <div class="spinner" style="margin-top:8px;"></div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="app">
+
+    <!-- HEADER -->
+    <header class="specs-header">
+      <div class="specs-header-left">
+        <a id="backBtn" href="index.html" class="specs-back-btn">← CCH Studio</a>
+        <div class="specs-header-divider"></div>
+        <div class="specs-header-project" id="projectNameDisplay">Loading project…</div>
+        <div class="specs-header-badge">Specifications</div>
+      </div>
+      <div class="specs-header-right">
+        <button class="btn btn-ghost" onclick="togglePacketMenu()">Generate Packet ▾</button>
+        <div class="btn-dropdown-wrap" style="position:relative;">
+          <div class="btn-dropdown-menu" id="packetMenu">
+            <button onclick="generateClientSpecSheet()">📄 Client Spec Sheet</button>
+            <button onclick="generateGCPacket()">🔧 GC Trade Packet</button>
+            <button onclick="generateFullSchedule()">📋 Full Schedule (Internal)</button>
+            <div class="menu-divider"></div>
+            <button onclick="exportCSV()">↓ Export as CSV</button>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="openAddPanel()">+ Add Specification</button>
+      </div>
+    </header>
+
+    <!-- BODY: sidebar + main + panel -->
+    <div class="specs-body">
+
+      <!-- SIDEBAR -->
+      <aside class="specs-sidebar">
+        <div class="sidebar-section-label">Categories</div>
+        <div class="sidebar-nav-item active" data-cat="all" onclick="setCategory('all', this)">
+          All Specifications
+          <span class="count-badge" id="cnt-all">0</span>
+        </div>
+        <div class="sidebar-divider"></div>
+        <div class="sidebar-nav-item" data-cat="appliances" onclick="setCategory('appliances', this)">
+          Appliances
+          <span class="count-badge" id="cnt-appliances">0</span>
+        </div>
+        <div class="sidebar-nav-item" data-cat="plumbing" onclick="setCategory('plumbing', this)">
+          Plumbing
+          <span class="count-badge" id="cnt-plumbing">0</span>
+        </div>
+        <div class="sidebar-nav-item" data-cat="stone-tile" onclick="setCategory('stone-tile', this)">
+          Stone &amp; Tile
+          <span class="count-badge" id="cnt-stone-tile">0</span>
+        </div>
+        <div class="sidebar-nav-item" data-cat="flooring" onclick="setCategory('flooring', this)">
+          Flooring
+          <span class="count-badge" id="cnt-flooring">0</span>
+        </div>
+        <div class="sidebar-nav-item" data-cat="walls" onclick="setCategory('walls', this)">
+          Walls &amp; Paint
+          <span class="count-badge" id="cnt-walls">0</span>
+        </div>
+        <div class="sidebar-nav-item" data-cat="millwork" onclick="setCategory('millwork', this)">
+          Millwork
+          <span class="count-badge" id="cnt-millwork">0</span>
+        </div>
+        <div class="sidebar-nav-item" data-cat="interior-doors" onclick="setCategory('interior-doors', this)">
+          Interior Doors
+          <span class="count-badge" id="cnt-interior-doors">0</span>
+        </div>
+        <div class="sidebar-nav-item" data-cat="door-hardware" onclick="setCategory('door-hardware', this)">
+          Door Hardware
+          <span class="count-badge" id="cnt-door-hardware">0</span>
+        </div>
+        <div class="sidebar-nav-item" data-cat="architectural" onclick="setCategory('architectural', this)">
+          Architectural
+          <span class="count-badge" id="cnt-architectural">0</span>
+        </div>
+        <div class="sidebar-divider"></div>
+        <div class="sidebar-nav-item open-items-nav" data-cat="open-items" onclick="setCategory('open-items', this)">
+          ⚠ Open Items
+          <span class="count-badge red" id="cnt-open-items">0</span>
+        </div>
+      </aside>
+
+      <!-- MAIN CONTENT -->
+      <main class="specs-main">
+
+        <!-- Toolbar -->
+        <div class="specs-toolbar">
+          <select id="roomFilter" onchange="renderList()">
+            <option value="">All Rooms</option>
+          </select>
+          <input type="text" class="specs-search-input" id="searchInput"
+                 placeholder="Search by name, model, vendor…" oninput="renderList()">
+          <div class="toolbar-spacer"></div>
+          <span id="toolbarCount" style="font-size:12px;color:var(--cch-mid);"></span>
+        </div>
+
+        <!-- List area -->
+        <div class="specs-list-area" id="specsListArea">
+          <div class="specs-empty" id="specsEmpty" style="display:none;">
+            <div class="specs-empty-icon">📋</div>
+            <h3 id="emptyHeading">No specifications yet</h3>
+            <p id="emptySubtext">Add your first specification to get started.</p>
+            <button class="btn btn-primary" onclick="openAddPanel()" id="emptyAddBtn"
+                    style="margin-top:8px;">+ Add Specification</button>
+          </div>
+          <div id="specsList"></div>
+        </div>
+      </main>
+
+      <!-- DETAIL / EDIT PANEL -->
+      <aside class="specs-detail-panel" id="detailPanel">
+        <div class="panel-header">
+          <div class="panel-title" id="panelTitle">Add Specification</div>
+          <button class="panel-close-btn" onclick="closePanel()">✕</button>
+        </div>
+
+        <div class="panel-tabs" id="panelTabs">
+          <div class="panel-tab active" data-pane="pane-spec" onclick="switchPanelTab(this)">Spec</div>
+          <div class="panel-tab" data-pane="pane-location" onclick="switchPanelTab(this)">Location</div>
+          <div class="panel-tab" data-pane="pane-sourcing" onclick="switchPanelTab(this)">Sourcing</div>
+          <div class="panel-tab" data-pane="pane-notes" onclick="switchPanelTab(this)">Notes</div>
+          <div class="panel-tab" data-pane="pane-surfaces" onclick="switchPanelTab(this)" id="surfacesTab"
+               style="display:none;">Surfaces</div>
+        </div>
+
+        <div class="panel-content" id="panelContent">
+
+          <!-- TAB: SPEC -->
+          <div class="panel-tab-pane active" id="pane-spec">
+
+            <div class="form-row-2">
+              <div>
+                <label>Tag</label>
+                <input type="text" id="fTag" placeholder="Auto (A01)">
+              </div>
+              <div>
+                <label>Category *</label>
+                <select id="fCategory" onchange="onCategoryChange()">
+                  <option value="">Select…</option>
+                  <option value="appliances">Appliances</option>
+                  <option value="plumbing">Plumbing</option>
+                  <option value="stone-tile">Stone &amp; Tile</option>
+                  <option value="flooring">Flooring</option>
+                  <option value="walls">Walls &amp; Paint</option>
+                  <option value="millwork">Millwork</option>
+                  <option value="interior-doors">Interior Doors</option>
+                  <option value="door-hardware">Door Hardware</option>
+                  <option value="architectural">Architectural</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <label>Sub-Category</label>
+              <select id="fSubCategory">
+                <option value="">Select or type below…</option>
+              </select>
+              <input type="text" id="fSubCategoryCustom" placeholder="Or type custom sub-category"
+                     style="margin-top:6px;">
+            </div>
+
+            <div class="form-row">
+              <label>Item Name *</label>
+              <input type="text" id="fName" placeholder="e.g. Sully 55 Natural Gas Range">
+            </div>
+
+            <div class="form-row-2">
+              <div>
+                <label>Manufacturer</label>
+                <input type="text" id="fManufacturer" placeholder="e.g. Lacanche">
+              </div>
+              <div>
+                <label>Model / SKU</label>
+                <input type="text" id="fModelNumber" placeholder="e.g. CULLY1800GT">
+              </div>
+            </div>
+
+            <div class="form-row-2">
+              <div>
+                <label>Finish / Color</label>
+                <input type="text" id="fFinish" placeholder="e.g. Black &amp; Gold">
+              </div>
+              <div>
+                <label>Dimensions</label>
+                <input type="text" id="fDimensions" placeholder="e.g. 55&quot; or 3×6">
+              </div>
+            </div>
+
+            <div class="form-row-2">
+              <div>
+                <label>Quantity</label>
+                <input type="number" id="fQty" value="1" min="1" step="1">
+              </div>
+              <div id="sqftRow" style="display:none;">
+                <label>Sq Ft (tile/stone)</label>
+                <input type="number" id="fSqft" placeholder="0" min="0" step="0.5">
+              </div>
+            </div>
+
+            <!-- Tile/Stone fields (shown for stone-tile and flooring) -->
+            <div id="tileFields" style="display:none;">
+              <div class="form-row-2">
+                <div>
+                  <label>Layout / Pattern</label>
+                  <input type="text" id="fLayoutPattern"
+                         placeholder="e.g. Versailles, Running Bond 45°, Herringbone">
+                </div>
+                <div>
+                  <label>Grout Color</label>
+                  <input type="text" id="fGroutColor"
+                         placeholder="e.g. Mapei Warm Gray #111">
+                </div>
+              </div>
+            </div>
+
+            <!-- Millwork profile field -->
+            <div id="profileFields" style="display:none;" class="form-row">
+              <label>Profile Spec</label>
+              <input type="text" id="fProfileSpec"
+                     placeholder="e.g. 7.5&quot;H base · 3.5&quot;W casing · 4&quot; crown">
+              <div class="form-note">Height (base/crown) or width (casing/apron) of the profile</div>
+            </div>
+
+            <div class="panel-section-label">Status</div>
+            <div class="form-row">
+              <select id="fStatus" onchange="onStatusChange()">
+                <option value="specified">Specified (draft)</option>
+                <option value="pending-sample">Pending Sample</option>
+                <option value="hold">On Hold</option>
+                <option value="sent">Sent to Client/GC</option>
+                <option value="reviewing">Client Reviewing</option>
+                <option value="approved">Client Approved</option>
+                <option value="ordered">Ordered</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="open-item">⚠ Open Item</option>
+              </select>
+            </div>
+
+            <div id="openItemOwnerRow" style="display:none;" class="form-row">
+              <label>Open Item — Owner</label>
+              <select id="fOpenItemOwner">
+                <option value="CCH">CCH (internal task)</option>
+                <option value="CCH + Client">CCH + Client (client must decide)</option>
+                <option value="GC">GC (contractor must act)</option>
+                <option value="GC + Architect">GC + Architect (coordination)</option>
+              </select>
+            </div>
+
+            <div class="panel-section-label">Images</div>
+            <div class="spec-images-grid" id="imagesGrid"></div>
+            <label class="image-upload-area" for="imageUploadInput">
+              <input type="file" id="imageUploadInput" accept="image/*" multiple onchange="handleImageUpload(this)">
+              <div>📷 Click to upload images</div>
+              <div style="font-size:11px;margin-top:4px;opacity:0.7">JPG, PNG, WEBP</div>
+            </label>
+          </div>
+
+          <!-- TAB: LOCATION -->
+          <div class="panel-tab-pane" id="pane-location">
+
+            <div class="form-row">
+              <label>Room *</label>
+              <input type="text" id="fRoom" placeholder="e.g. Kitchen, Master Bath, Suite 4"
+                     list="roomSuggestions">
+              <datalist id="roomSuggestions"></datalist>
+            </div>
+
+            <div class="form-row">
+              <label>Location within Room</label>
+              <input type="text" id="fLocation" placeholder="e.g. Countertop, Shower Walls, Main Flooring">
+            </div>
+
+            <div class="panel-section-label">Drawing References</div>
+
+            <div class="form-row-2">
+              <div>
+                <label>Drawing Ref</label>
+                <input type="text" id="fDrawingRef" placeholder="e.g. Santori K-01">
+              </div>
+              <div>
+                <label>Packet Ref</label>
+                <input type="text" id="fPacketRef" placeholder="e.g. Santori BP-01">
+              </div>
+            </div>
+
+            <div class="panel-section-label">Visibility</div>
+
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Visible to Client</div>
+                <div class="toggle-sub">Show in client portal</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="fIsClientVisible" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Include in GC Packet</div>
+                <div class="toggle-sub">Include in trade / GC packet</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="fIsGCVisible" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- TAB: SOURCING -->
+          <div class="panel-tab-pane" id="pane-sourcing">
+
+            <div class="panel-section-label">Vendor</div>
+
+            <div class="form-row">
+              <label>Vendor Name</label>
+              <input type="text" id="fVendor" placeholder="e.g. Walker Zanger, Reece Bath + Kitchen">
+            </div>
+
+            <div class="form-row">
+              <label>Vendor URL</label>
+              <input type="url" id="fVendorUrl" placeholder="https://...">
+            </div>
+
+            <div class="panel-section-label">Trade Rep</div>
+
+            <div class="form-row">
+              <label>Rep Name</label>
+              <input type="text" id="fTradeRep" placeholder="e.g. Daniella Wayne · Reece">
+            </div>
+
+            <div class="form-row-2">
+              <div>
+                <label>Rep Phone</label>
+                <input type="tel" id="fTradePhone" placeholder="(xxx) xxx-xxxx">
+              </div>
+              <div>
+                <label>Rep Email</label>
+                <input type="email" id="fTradeEmail" placeholder="rep@vendor.com">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <label>CCH Account Number</label>
+              <input type="text" id="fTradeAccountNumber" placeholder="Account / trade ref">
+            </div>
+
+            <div class="panel-section-label">Pricing (Reference Only — not marked up)</div>
+
+            <div class="form-row-2">
+              <div>
+                <label>Unit Price ($)</label>
+                <input type="number" id="fReferencePrice" placeholder="0.00" min="0" step="0.01">
+              </div>
+              <div>
+                <label>Estimated Cost ($)</label>
+                <input type="number" id="fEstimatedCost" placeholder="Auto-calc" min="0" step="0.01">
+              </div>
+            </div>
+
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Show price to client</div>
+                <div class="toggle-sub">Display in client portal</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="fShowPriceToClient">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Show price in GC packet</div>
+                <div class="toggle-sub">GC needs to budget</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="fShowPriceToGC">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="panel-section-label">Cut Sheet</div>
+            <div class="form-row">
+              <label>Cut Sheet URL / PDF Link</label>
+              <input type="url" id="fCutSheetUrl" placeholder="Firebase Storage URL or external link">
+            </div>
+          </div>
+
+          <!-- TAB: NOTES -->
+          <div class="panel-tab-pane" id="pane-notes">
+
+            <div class="form-row">
+              <div class="audience-label audience-internal">🔒 Internal — CCH Only</div>
+              <textarea id="fInternalNotes" rows="4"
+                        placeholder="Internal notes — never shown to client or GC. Status issues, pricing flags, sourcing problems, etc."></textarea>
+            </div>
+
+            <div class="form-row">
+              <div class="audience-label audience-gc">🔧 Install Notes — GC / Trade Packet</div>
+              <textarea id="fInstallNotes" rows="4"
+                        placeholder="Installation instructions, coordination notes, drawing references, clearance requirements…"></textarea>
+              <div class="form-note">Shown in GC packet. NOT shown in client portal.</div>
+            </div>
+
+            <div class="form-row">
+              <div class="audience-label audience-client">✓ Client Notes — Portal</div>
+              <textarea id="fClientNotes" rows="4"
+                        placeholder="What the client sees — selection summary, action required, special notes…"></textarea>
+              <div class="form-note">Shown in client portal (when status is Sent or higher).</div>
+            </div>
+          </div>
+
+          <!-- TAB: SURFACES (paint only) -->
+          <div class="panel-tab-pane" id="pane-surfaces">
+            <p style="font-size:12px;color:var(--cch-mid);margin-bottom:14px;">
+              Paint codes for each surface in this room. Use standard paint shorthand (e.g. BM OC-17, SW 7015).
+            </p>
+            <div class="surfaces-grid">
+              <div class="surface-label">Walls</div>
+              <input type="text" id="sfWalls" placeholder="e.g. BM OC-17">
+
+              <div class="surface-label">Ceiling</div>
+              <input type="text" id="sfCeiling" placeholder="e.g. BM OC-17">
+
+              <div class="surface-label">Casing / Trim</div>
+              <input type="text" id="sfCasing" placeholder="e.g. BM OC-65">
+
+              <div class="surface-label">Beams</div>
+              <input type="text" id="sfBeams" placeholder="e.g. SW 7015">
+
+              <div class="surface-label">Cabinets</div>
+              <input type="text" id="sfCabinets" placeholder="e.g. BM HC-172">
+
+              <div class="surface-label">Doors</div>
+              <input type="text" id="sfDoors" placeholder="e.g. BM OC-65">
+
+              <div class="surface-label">Accent / Other</div>
+              <input type="text" id="sfOther" placeholder="">
+            </div>
+          </div>
+        </div><!-- /panel-content -->
+
+        <!-- PANEL FOOTER -->
+        <div class="panel-footer">
+          <button class="btn btn-danger" id="panelDeleteBtn"
+                  onclick="deleteCurrentSpec()" style="display:none; margin-right:auto;">Delete</button>
+          <button class="btn btn-outline" onclick="closePanel()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveSpec()">Save Specification</button>
+        </div>
+      </aside>
+    </div><!-- /specs-body -->
+  </div><!-- /app -->
+
+  <!-- CONTEXT MENU -->
+  <div class="context-menu" id="contextMenu">
+    <button class="context-menu-item" onclick="contextMenuEdit()">Edit</button>
+    <button class="context-menu-item" onclick="contextMenuStatusChange()">Change Status…</button>
+    <div class="context-menu-divider"></div>
+    <button class="context-menu-item danger" onclick="contextMenuDelete()">Delete</button>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast"></div>
+
+  <!-- ================================================================
+       FIREBASE + APP LOGIC
+  ================================================================ -->
+  <script>
+  /* ----------------------------------------------------------------
+     FIREBASE CONFIG — mirrors index.html dual-environment pattern
+     Staging:    cch-platform-staging.web.app  (cch-studio-staging)
+     Production: cch-platform.web.app           (cch-design-boards)
+  ---------------------------------------------------------------- */
+  const CCH_ENV = (function() {
+    var h = location.hostname || '';
+    if (h.indexOf('staging') >= 0 || h === 'localhost' || h === '127.0.0.1') return 'staging';
+    return 'production';
+  })();
+
+  const firebaseConfig = CCH_ENV === 'staging' ? {
+    apiKey: "AIzaSyBIwwo7uRij6Q0FZg-qmIS1LC8t2AjXrYo",
+    authDomain: "cch-studio-staging.firebaseapp.com",
+    projectId: "cch-studio-staging",
+    storageBucket: "cch-studio-staging.firebasestorage.app",
+    messagingSenderId: "210388013080",
+    appId: "1:210388013080:web:fcd520b30c0d50b149736d"
+  } : {
+    apiKey: "AIzaSyAd24U5ArVGrA24IxNcYD2NYiTVycyF4og",
+    authDomain: "cch-design-boards.firebaseapp.com",
+    projectId: "cch-design-boards",
+    storageBucket: "cch-design-boards.firebasestorage.app",
+    messagingSenderId: "210388013080",
+    appId: "1:210388013080:web:fcd520b30c0d50b149736d"
+  };
+
+  /* ----------------------------------------------------------------
+     APP STATE
+  ---------------------------------------------------------------- */
+  let app, db, auth, storage;
+  let currentUser = null;
+  let projectId   = null;
+  let projectData = {};
+  let allSpecs    = [];            // live array from Firestore snapshot
+  let specsUnsubscribe = null;     // Firestore listener teardown
+  let currentSpecId    = null;     // spec open in panel (null = new)
+  let currentCategory  = 'all';   // sidebar selection
+  let currentImages    = [];       // image URLs for open spec
+  let contextMenuTarget = null;    // spec ID targeted by three-dot
+
+  const CATEGORY_PREFIXES = {
+    appliances:        'A',
+    plumbing:          'P',
+    'stone-tile':      'S',
+    flooring:          'F',
+    walls:             'W',
+    millwork:          'MW',
+    'interior-doors':  'ID',
+    'door-hardware':   'DH',
+    architectural:     'AE'
+  };
+
+  const CATEGORY_LABELS = {
+    appliances:        'Appliances',
+    plumbing:          'Plumbing',
+    'stone-tile':      'Stone & Tile',
+    flooring:          'Flooring',
+    walls:             'Walls & Paint',
+    millwork:          'Millwork',
+    'interior-doors':  'Interior Doors',
+    'door-hardware':   'Door Hardware',
+    architectural:     'Architectural'
+  };
+
+  const CATEGORY_ICONS = {
+    appliances:        '🍳',
+    plumbing:          '🚿',
+    'stone-tile':      '🪨',
+    flooring:          '🪵',
+    walls:             '🖌️',
+    millwork:          '🔨',
+    'interior-doors':  '🚪',
+    'door-hardware':   '🔑',
+    architectural:     '🏛️'
+  };
+
+  // Sub-category options by category
+  const SUBCATEGORY_OPTIONS = {
+    appliances:       ['Range','Cooktop','Oven','Refrigerator','Freezer','Refrigerator/Freezer Drawers','Dishwasher','Microwave','Hood Liner','Hood','Ice Maker','Warming Drawer','Washer','Dryer','Other'],
+    plumbing:         ['Sink','Faucet','Kitchen Faucet','Bar Sink','Shower','Showerhead','Shower Arm','Body Spray','Tub','Tub Filler','Toilet','Bidet','Air Switch','Other'],
+    'stone-tile':     ['Countertop Slab','Island Slab','Backsplash','Shower Tile','Floor Tile','Wall Tile','Tile Trim','Threshold','Niche','Other'],
+    flooring:         ['Hardwood','Engineered Wood','Carpet','LVP','Tile','Threshold','Other'],
+    walls:            ['Wall Paint','Ceiling Paint','Trim Paint','Plaster Walls','Plaster Ceiling','Wood Plank Ceiling','Other'],
+    millwork:         ['Crown Molding','Base Molding','Door Casing','Window Casing','Window Apron','Cabinet Door Style','Wainscoting','Paneling','Built-In Cabinetry','Beams','Fireplace Mantle','Other'],
+    'interior-doors': ['Interior Door','Pocket Door','Barn Door','French Door','Bifold Door','Other'],
+    'door-hardware':  ['Door Lever','Door Knob','Lockset','Passage Set','Privacy Set','Hinge Set','Barn Door Hardware','Pocket Door Hardware','Other'],
+    architectural:    ['Fireplace Insert','Fireplace Surround','Railing','Stair Detail','Roofing','Exterior Stone','Siding','Gate','Garage Door','Pool Decking','Other'],
+  };
+
+  /* ----------------------------------------------------------------
+     INIT
+  ---------------------------------------------------------------- */
+  document.addEventListener('DOMContentLoaded', async () => {
+    // Read project ID from URL ?project=... or #project/...
+    const params = new URLSearchParams(window.location.search);
+    projectId = params.get('project') || params.get('projectId');
+
+    if (!projectId) {
+      // Try hash
+      const hash = window.location.hash.replace('#','').replace('/','');
+      if (hash) projectId = hash;
+    }
+
+    // Update back button to include projectId
+    if (projectId) {
+      document.getElementById('backBtn').href = `index.html#project/${projectId}`;
+    }
+
+    // Init Firebase
+    try {
+      app     = firebase.initializeApp(firebaseConfig);
+      db      = firebase.firestore();
+      auth    = firebase.auth();
+      storage = firebase.storage();
+    } catch(e) {
+      // Firebase not configured yet — show config reminder
+      document.getElementById('authGate').innerHTML = `
+        <div style="max-width:380px;text-align:center;padding:40px 20px;">
+          <div style="font-family:var(--font-serif);font-size:20px;color:var(--cch-brown);margin-bottom:12px;">CCH Studio Specifications</div>
+          <div style="font-size:13px;color:var(--cch-mid);line-height:1.6;">
+            Firebase is not configured yet.<br>
+            Open <strong>specs.html</strong>, find the <code>firebaseConfig</code> object,<br>
+            and paste the config from <strong>index.html</strong>.
+          </div>
+        </div>`;
+      return;
+    }
+
+    // Auth check
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        currentUser = user;
+        onAuthenticated();
+      } else {
+        // Redirect to main app login
+        window.location.href = 'index.html?redirect=specs&project=' + (projectId || '');
+      }
+    });
+  });
+
+  async function onAuthenticated() {
+    // Hide auth gate, show app
+    document.getElementById('authGate').style.display = 'none';
+    document.getElementById('app').classList.add('ready');
+
+    // Load project name
+    if (projectId) {
+      await loadProject();
+    } else {
+      document.getElementById('projectNameDisplay').textContent = 'No project selected';
+    }
+
+    // Subscribe to specs
+    subscribeToSpecs();
+  }
+
+  /* ----------------------------------------------------------------
+     LOAD PROJECT
+  ---------------------------------------------------------------- */
+  async function loadProject() {
+    try {
+      const doc = await db.collection('boards').doc(projectId).get();
+      if (doc.exists) {
+        projectData = doc.data();
+        const name = projectData.projectName || projectData.name || projectData.title || projectId;
+        document.getElementById('projectNameDisplay').textContent = name;
+        document.title = `CCH Studio — Specs — ${name}`;
+      } else {
+        document.getElementById('projectNameDisplay').textContent = 'Unknown Project';
+      }
+    } catch(e) {
+      console.error('loadProject error:', e);
+    }
+  }
+
+  /* ----------------------------------------------------------------
+     FIRESTORE — REAL-TIME LISTENER
+  ---------------------------------------------------------------- */
+  function subscribeToSpecs() {
+    if (!projectId) {
+      allSpecs = [];
+      renderList();
+      updateCounts();
+      return;
+    }
+
+    if (specsUnsubscribe) specsUnsubscribe();
+
+    specsUnsubscribe = db
+      .collection('boards').doc(projectId)
+      .collection('specifications')
+      .orderBy('sortOrder', 'asc')
+      .onSnapshot(snapshot => {
+        allSpecs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        populateRoomFilter();
+        renderList();
+        updateCounts();
+      }, err => {
+        console.error('Specs listener error:', err);
+        showToast('Error loading specifications');
+      });
+  }
+
+  /* ----------------------------------------------------------------
+     FILTERING & RENDERING
+  ---------------------------------------------------------------- */
+  function getFilteredSpecs() {
+    const roomVal   = document.getElementById('roomFilter').value.trim().toLowerCase();
+    const searchVal = document.getElementById('searchInput').value.trim().toLowerCase();
+
+    return allSpecs.filter(s => {
+      // Category filter
+      if (currentCategory === 'open-items') {
+        if (s.status !== 'open-item' && !s.openItemOwner) return false;
+      } else if (currentCategory !== 'all') {
+        if (s.category !== currentCategory) return false;
+      }
+
+      // Room filter
+      if (roomVal && (s.room || '').toLowerCase() !== roomVal) return false;
+
+      // Search
+      if (searchVal) {
+        const hay = [s.name, s.manufacturer, s.modelNumber, s.vendor,
+                     s.subCategory, s.tag, s.finish]
+                    .filter(Boolean).join(' ').toLowerCase();
+        if (!hay.includes(searchVal)) return false;
+      }
+
+      return true;
+    });
+  }
+
+  function renderList() {
+    const specs   = getFilteredSpecs();
+    const listEl  = document.getElementById('specsList');
+    const emptyEl = document.getElementById('specsEmpty');
+
+    document.getElementById('toolbarCount').textContent =
+      specs.length ? `${specs.length} item${specs.length !== 1 ? 's' : ''}` : '';
+
+    if (specs.length === 0) {
+      listEl.innerHTML = '';
+      emptyEl.style.display = 'flex';
+
+      if (currentCategory === 'open-items') {
+        document.getElementById('emptyHeading').textContent = 'No open items';
+        document.getElementById('emptySubtext').textContent = 'All specifications are on track.';
+        document.getElementById('emptyAddBtn').style.display = 'none';
+      } else {
+        document.getElementById('emptyHeading').textContent =
+          currentCategory === 'all' ? 'No specifications yet' : `No ${CATEGORY_LABELS[currentCategory] || 'specifications'} yet`;
+        document.getElementById('emptySubtext').textContent = 'Add your first specification to get started.';
+        document.getElementById('emptyAddBtn').style.display = '';
+      }
+      return;
+    }
+
+    emptyEl.style.display = 'none';
+
+    // Group by room
+    const grouped = {};
+    specs.forEach(s => {
+      const room = s.room || 'Unassigned';
+      if (!grouped[room]) grouped[room] = [];
+      grouped[room].push(s);
+    });
+
+    // Sort rooms alphabetically (Unassigned last)
+    const rooms = Object.keys(grouped).sort((a, b) => {
+      if (a === 'Unassigned') return 1;
+      if (b === 'Unassigned') return -1;
+      return a.localeCompare(b);
+    });
+
+    // Open items banner
+    const openCount = allSpecs.filter(s => s.status === 'open-item' || s.openItemOwner).length;
+
+    let html = '';
+    if (openCount > 0 && currentCategory !== 'open-items') {
+      html += `
+        <div class="open-items-banner">
+          <span class="banner-icon">⚠</span>
+          <span><strong>${openCount} item${openCount !== 1 ? 's' : ''}</strong> require${openCount === 1 ? 's' : ''} attention —
+          <span style="cursor:pointer;text-decoration:underline;" onclick="setCategory('open-items', document.querySelector('[data-cat=open-items]'))">
+            View open items</span></span>
+        </div>`;
+    }
+
+    rooms.forEach(room => {
+      const roomSpecs = grouped[room];
+      // Sort by tag within room
+      roomSpecs.sort((a, b) => tagSort(a.tag, b.tag));
+
+      html += `<div class="room-group">
+        <div class="room-group-header">${escHtml(room)}</div>`;
+
+      roomSpecs.forEach(s => {
+        html += renderSpecRow(s);
+      });
+
+      html += `</div>`;
+    });
+
+    listEl.innerHTML = html;
+  }
+
+  function renderSpecRow(s) {
+    const statusClass = 's-' + (s.status || 'specified');
+    const statusLabel = statusLabel_(s.status);
+    const thumb = (s.images && s.images[0])
+      ? `<img class="spec-thumb" src="${escHtml(s.images[0])}" alt="">`
+      : `<div class="spec-thumb-placeholder">${CATEGORY_ICONS[s.category] || '📋'}</div>`;
+
+    const selected = currentSpecId === s.id ? ' selected' : '';
+
+    return `
+      <div class="spec-row${selected}" id="row-${s.id}"
+           onclick="openEditPanel('${s.id}')">
+        <span class="spec-tag">${escHtml(s.tag || '—')}</span>
+        ${thumb}
+        <div class="spec-info">
+          <div class="spec-name">${escHtml(s.name || 'Untitled')}</div>
+          <div class="spec-sub">
+            ${s.manufacturer ? escHtml(s.manufacturer) : ''}
+            ${s.manufacturer && s.modelNumber ? ' · ' : ''}
+            ${s.modelNumber ? escHtml(s.modelNumber) : ''}
+            ${(s.manufacturer || s.modelNumber) && s.vendor ? ' · ' : ''}
+            ${s.vendor ? escHtml(s.vendor) : ''}
+          </div>
+        </div>
+        ${s.subCategory ? `<span class="spec-subcat-badge">${escHtml(s.subCategory)}</span>` : ''}
+        <span class="status-badge ${statusClass}">${statusLabel}</span>
+        <div class="spec-row-actions">
+          <button class="row-menu-btn" onclick="event.stopPropagation(); openContextMenu(event, '${s.id}')">⋮</button>
+        </div>
+      </div>`;
+  }
+
+  function tagSort(a, b) {
+    // Sort tags like A01, A02, CT1, S5, AE01 numerically within prefix
+    const parseTag = t => {
+      if (!t) return { prefix: '', num: 0 };
+      const m = t.match(/^([A-Z]+)(\d+)$/i);
+      return m ? { prefix: m[1].toUpperCase(), num: parseInt(m[2]) } : { prefix: t, num: 0 };
+    };
+    const ta = parseTag(a), tb = parseTag(b);
+    if (ta.prefix !== tb.prefix) return ta.prefix.localeCompare(tb.prefix);
+    return ta.num - tb.num;
+  }
+
+  function updateCounts() {
+    const cats = ['appliances','plumbing','stone-tile','flooring','walls',
+                  'millwork','interior-doors','door-hardware','architectural'];
+    const openCount = allSpecs.filter(s => s.status === 'open-item' || s.openItemOwner).length;
+
+    document.getElementById('cnt-all').textContent = allSpecs.length;
+    cats.forEach(c => {
+      const el = document.getElementById('cnt-' + c);
+      if (el) el.textContent = allSpecs.filter(s => s.category === c).length;
+    });
+    const openEl = document.getElementById('cnt-open-items');
+    if (openEl) {
+      openEl.textContent = openCount;
+      openEl.className = 'count-badge' + (openCount > 0 ? ' red' : '');
+    }
+  }
+
+  function populateRoomFilter() {
+    const rooms = [...new Set(allSpecs.map(s => s.room).filter(Boolean))].sort();
+    const select = document.getElementById('roomFilter');
+    const current = select.value;
+
+    select.innerHTML = '<option value="">All Rooms</option>';
+    rooms.forEach(r => {
+      select.innerHTML += `<option value="${escHtml(r)}"${r === current ? ' selected' : ''}>${escHtml(r)}</option>`;
+    });
+
+    // Also populate room datalist in panel
+    const dl = document.getElementById('roomSuggestions');
+    if (dl) {
+      dl.innerHTML = rooms.map(r => `<option value="${escHtml(r)}">`).join('');
+    }
+  }
+
+  /* ----------------------------------------------------------------
+     SIDEBAR CATEGORY FILTER
+  ---------------------------------------------------------------- */
+  function setCategory(cat, el) {
+    currentCategory = cat;
+    document.querySelectorAll('.sidebar-nav-item').forEach(n => n.classList.remove('active'));
+    if (el) el.classList.add('active');
+    renderList();
+  }
+
+  /* ----------------------------------------------------------------
+     PANEL — OPEN / CLOSE / TABS
+  ---------------------------------------------------------------- */
+  function openAddPanel() {
+    currentSpecId = null;
+    currentImages = [];
+
+    // Pre-select current category filter if not 'all' or 'open-items'
+    const precat = (currentCategory !== 'all' && currentCategory !== 'open-items')
+                   ? currentCategory : '';
+
+    clearPanelForm();
+    if (precat) document.getElementById('fCategory').value = precat;
+    onCategoryChange();
+
+    document.getElementById('panelTitle').textContent = 'Add Specification';
+    document.getElementById('panelDeleteBtn').style.display = 'none';
+    document.getElementById('detailPanel').classList.add('open');
+    switchPanelTab(document.querySelector('[data-pane="pane-spec"]'));
+    document.getElementById('fName').focus();
+  }
+
+  function openEditPanel(specId) {
+    const spec = allSpecs.find(s => s.id === specId);
+    if (!spec) return;
+
+    currentSpecId = specId;
+    currentImages = [...(spec.images || [])];
+
+    populatePanelForm(spec);
+    document.getElementById('panelTitle').textContent = spec.tag ? `Edit — ${spec.tag}` : 'Edit Specification';
+    document.getElementById('panelDeleteBtn').style.display = '';
+    document.getElementById('detailPanel').classList.add('open');
+    switchPanelTab(document.querySelector('[data-pane="pane-spec"]'));
+
+    // Highlight row
+    document.querySelectorAll('.spec-row').forEach(r => r.classList.remove('selected'));
+    const row = document.getElementById('row-' + specId);
+    if (row) row.classList.add('selected');
+  }
+
+  function closePanel() {
+    document.getElementById('detailPanel').classList.remove('open');
+    document.querySelectorAll('.spec-row').forEach(r => r.classList.remove('selected'));
+    currentSpecId = null;
+  }
+
+  function switchPanelTab(tabEl) {
+    if (!tabEl) return;
+    const paneId = tabEl.dataset.pane || tabEl.getAttribute('data-pane');
+    document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel-tab-pane').forEach(p => p.classList.remove('active'));
+    tabEl.classList.add('active');
+    const pane = document.getElementById(paneId);
+    if (pane) pane.classList.add('active');
+  }
+
+  /* ----------------------------------------------------------------
+     FORM — CLEAR & POPULATE
+  ---------------------------------------------------------------- */
+  function clearPanelForm() {
+    const ids = ['fTag','fName','fManufacturer','fModelNumber',
+                 'fFinish','fDimensions','fRoom','fLocation','fDrawingRef','fPacketRef',
+                 'fVendor','fVendorUrl','fTradeRep','fTradePhone','fTradeEmail',
+                 'fTradeAccountNumber','fCutSheetUrl','fInternalNotes','fInstallNotes','fClientNotes',
+                 'sfWalls','sfCeiling','sfCasing','sfBeams','sfCabinets','sfDoors','sfOther',
+                 'fLayoutPattern','fGroutColor','fProfileSpec','fSubCategoryCustom'];
+    ids.forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+
+    document.getElementById('fQty').value = 1;
+    document.getElementById('fSqft').value = '';
+    document.getElementById('fReferencePrice').value = '';
+    document.getElementById('fEstimatedCost').value = '';
+    document.getElementById('fStatus').value = 'specified';
+    document.getElementById('fOpenItemOwner').value = 'CCH';
+    document.getElementById('fIsClientVisible').checked = true;
+    document.getElementById('fIsGCVisible').checked = true;
+    document.getElementById('fShowPriceToClient').checked = false;
+    document.getElementById('fShowPriceToGC').checked = false;
+    document.getElementById('openItemOwnerRow').style.display = 'none';
+    document.getElementById('imagesGrid').innerHTML = '';
+    currentImages = [];
+  }
+
+  function populatePanelForm(s) {
+    clearPanelForm();
+
+    const set = (id, val) => {
+      const el = document.getElementById(id);
+      if (el && val !== undefined && val !== null) el.value = val;
+    };
+    const setCheck = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.checked = !!val;
+    };
+
+    set('fTag',              s.tag);
+    set('fCategory',         s.category);
+    onCategoryChange(); // populate subcategory dropdown first
+    // Set subcat: if it matches a known option, use dropdown; else use custom field
+    const subOpts = SUBCATEGORY_OPTIONS[s.category] || [];
+    if (subOpts.includes(s.subCategory)) {
+      document.getElementById('fSubCategory').value = s.subCategory;
+    } else if (s.subCategory) {
+      document.getElementById('fSubCategoryCustom').value = s.subCategory;
+    }
+    set('fName',             s.name);
+    set('fManufacturer',     s.manufacturer);
+    set('fModelNumber',      s.modelNumber);
+    set('fFinish',           s.finish);
+    set('fDimensions',       s.dimensions);
+    set('fQty',              s.qty || 1);
+    set('fSqft',             s.sqft);
+    set('fLayoutPattern',    s.layoutPattern);
+    set('fGroutColor',       s.groutColor);
+    set('fProfileSpec',      s.profileSpec);
+    set('fRoom',             s.room);
+    set('fLocation',         s.location);
+    set('fDrawingRef',       s.drawingRef);
+    set('fPacketRef',        s.packetRef);
+    set('fVendor',           s.vendor);
+    set('fVendorUrl',        s.vendorUrl);
+    set('fTradeRep',         s.tradeRep);
+    set('fTradePhone',       s.tradePhone);
+    set('fTradeEmail',       s.tradeEmail);
+    set('fTradeAccountNumber', s.tradeAccountNumber);
+    set('fReferencePrice',   s.referencePrice);
+    set('fEstimatedCost',    s.estimatedCost);
+    set('fCutSheetUrl',      s.cutSheetUrl);
+    set('fInternalNotes',    s.internalNotes);
+    set('fInstallNotes',     s.installNotes);
+    set('fClientNotes',      s.clientNotes);
+    set('fStatus',           s.status || 'specified');
+    set('fOpenItemOwner',    s.openItemOwner || 'CCH');
+
+    setCheck('fIsClientVisible',    s.isClientVisible !== false);
+    setCheck('fIsGCVisible',        s.isGCVisible !== false);
+    setCheck('fShowPriceToClient',  s.showPriceToClient);
+    setCheck('fShowPriceToGC',      s.showPriceToGC);
+
+    // Surfaces
+    if (s.surfaces) {
+      set('sfWalls',    s.surfaces.walls);
+      set('sfCeiling',  s.surfaces.ceiling);
+      set('sfCasing',   s.surfaces.casing);
+      set('sfBeams',    s.surfaces.beams);
+      set('sfCabinets', s.surfaces.cabinets);
+      set('sfDoors',    s.surfaces.doors);
+      set('sfOther',    s.surfaces.other);
+    }
+
+    onCategoryChange();
+    onStatusChange();
+    renderImagesGrid();
+  }
+
+  function onCategoryChange() {
+    const cat = document.getElementById('fCategory').value;
+
+    // Populate sub-category dropdown
+    const subCatSel = document.getElementById('fSubCategory');
+    const opts = SUBCATEGORY_OPTIONS[cat] || [];
+    const currentSub = subCatSel.value;
+    subCatSel.innerHTML = '<option value="">Select…</option>';
+    opts.forEach(o => {
+      subCatSel.innerHTML += `<option value="${o}"${o === currentSub ? ' selected' : ''}>${o}</option>`;
+    });
+
+    // Show/hide surfaces tab (walls only)
+    const surfTab = document.getElementById('surfacesTab');
+    if (cat === 'walls') {
+      surfTab.style.display = '';
+    } else {
+      surfTab.style.display = 'none';
+      if (surfTab.classList.contains('active')) {
+        switchPanelTab(document.querySelector('[data-pane="pane-spec"]'));
+      }
+    }
+
+    // Show/hide sqft row (stone-tile, flooring)
+    const sqftRow = document.getElementById('sqftRow');
+    const isTileOrFloor = (cat === 'stone-tile' || cat === 'flooring');
+    sqftRow.style.display = isTileOrFloor ? '' : 'none';
+
+    // Show/hide tile-specific fields (grout color, layout/pattern)
+    document.getElementById('tileFields').style.display = isTileOrFloor ? '' : 'none';
+
+    // Show/hide millwork profile field
+    document.getElementById('profileFields').style.display = (cat === 'millwork') ? '' : 'none';
+
+    // Set default price visibility by category
+    if (!currentSpecId) {
+      const showGC = (cat === 'stone-tile' || cat === 'plumbing' || cat === 'millwork');
+      document.getElementById('fShowPriceToGC').checked = showGC;
+    }
+
+    // Auto-generate tag hint if tag is empty
+    const tagEl = document.getElementById('fTag');
+    if (!tagEl.value && cat) {
+      const prefix = CATEGORY_PREFIXES[cat] || '';
+      const count = allSpecs.filter(s => s.category === cat && s.id !== currentSpecId).length + 1;
+      tagEl.placeholder = `Auto (${prefix}${String(count).padStart(2, '0')})`;
+    }
+  }
+
+  function onStatusChange() {
+    const status = document.getElementById('fStatus').value;
+    const ownerRow = document.getElementById('openItemOwnerRow');
+    ownerRow.style.display = status === 'open-item' ? '' : 'none';
+  }
+
+  /* ----------------------------------------------------------------
+     IMAGE HANDLING
+  ---------------------------------------------------------------- */
+  function renderImagesGrid() {
+    const grid = document.getElementById('imagesGrid');
+    if (!currentImages.length) { grid.innerHTML = ''; return; }
+    grid.innerHTML = currentImages.map((url, i) => `
+      <div class="spec-image-thumb">
+        <img src="${escHtml(url)}" alt="">
+        <button class="spec-image-remove" onclick="removeImage(${i})" title="Remove">✕</button>
+      </div>`).join('');
+  }
+
+  function removeImage(idx) {
+    currentImages.splice(idx, 1);
+    renderImagesGrid();
+  }
+
+  async function handleImageUpload(input) {
+    if (!input.files || !input.files.length) return;
+    if (!projectId) { showToast('No project selected'); return; }
+
+    const files = Array.from(input.files);
+    showToast(`Uploading ${files.length} image${files.length > 1 ? 's' : ''}…`);
+
+    for (const file of files) {
+      try {
+        const path = `images/specifications/${projectId}/${Date.now()}_${file.name}`;
+        const ref  = storage.ref(path);
+        await ref.put(file);
+        const url = await ref.getDownloadURL();
+        currentImages.push(url);
+      } catch(e) {
+        console.error('Image upload error:', e);
+        showToast('Image upload failed: ' + (e.message || e));
+      }
+    }
+
+    renderImagesGrid();
+    input.value = '';
+  }
+
+  /* ----------------------------------------------------------------
+     SAVE SPEC
+  ---------------------------------------------------------------- */
+  async function saveSpec() {
+    const name = document.getElementById('fName').value.trim();
+    if (!name) {
+      showToast('Item name is required');
+      document.getElementById('fName').focus();
+      return;
+    }
+
+    const cat = document.getElementById('fCategory').value;
+    if (!cat) {
+      showToast('Category is required');
+      switchPanelTab(document.querySelector('[data-pane="pane-spec"]'));
+      document.getElementById('fCategory').focus();
+      return;
+    }
+
+    // Auto-assign tag if blank
+    let tag = document.getElementById('fTag').value.trim();
+    if (!tag) {
+      tag = await generateNextTag(cat);
+    }
+
+    // Count existing items for sortOrder (on new)
+    const sortOrder = currentSpecId
+      ? (allSpecs.find(s => s.id === currentSpecId) || {}).sortOrder || 0
+      : allSpecs.length;
+
+    // Build surfaces if category = walls
+    let surfaces = null;
+    if (cat === 'walls') {
+      surfaces = {
+        walls:    document.getElementById('sfWalls').value.trim(),
+        ceiling:  document.getElementById('sfCeiling').value.trim(),
+        casing:   document.getElementById('sfCasing').value.trim(),
+        beams:    document.getElementById('sfBeams').value.trim(),
+        cabinets: document.getElementById('sfCabinets').value.trim(),
+        doors:    document.getElementById('sfDoors').value.trim(),
+        other:    document.getElementById('sfOther').value.trim(),
+      };
+    }
+
+    const status = document.getElementById('fStatus').value;
+
+    // Resolve subCategory: dropdown takes priority, custom field fallback
+    const subCatDropdown = document.getElementById('fSubCategory').value.trim();
+    const subCatCustom   = document.getElementById('fSubCategoryCustom').value.trim();
+    const subCategory    = subCatDropdown || subCatCustom;
+
+    const data = {
+      tag,
+      category:           cat,
+      subCategory,
+      name,
+      manufacturer:       document.getElementById('fManufacturer').value.trim(),
+      modelNumber:        document.getElementById('fModelNumber').value.trim(),
+      finish:             document.getElementById('fFinish').value.trim(),
+      dimensions:         document.getElementById('fDimensions').value.trim(),
+      qty:                parseFloat(document.getElementById('fQty').value) || 1,
+      sqft:               parseFloat(document.getElementById('fSqft').value) || null,
+      layoutPattern:      document.getElementById('fLayoutPattern').value.trim() || null,
+      groutColor:         document.getElementById('fGroutColor').value.trim() || null,
+      profileSpec:        document.getElementById('fProfileSpec').value.trim() || null,
+      room:               document.getElementById('fRoom').value.trim(),
+      location:           document.getElementById('fLocation').value.trim(),
+      drawingRef:         document.getElementById('fDrawingRef').value.trim(),
+      packetRef:          document.getElementById('fPacketRef').value.trim(),
+      vendor:             document.getElementById('fVendor').value.trim(),
+      vendorUrl:          document.getElementById('fVendorUrl').value.trim(),
+      tradeRep:           document.getElementById('fTradeRep').value.trim(),
+      tradePhone:         document.getElementById('fTradePhone').value.trim(),
+      tradeEmail:         document.getElementById('fTradeEmail').value.trim(),
+      tradeAccountNumber: document.getElementById('fTradeAccountNumber').value.trim(),
+      referencePrice:     parseFloat(document.getElementById('fReferencePrice').value) || null,
+      estimatedCost:      parseFloat(document.getElementById('fEstimatedCost').value) || null,
+      showPriceToClient:  document.getElementById('fShowPriceToClient').checked,
+      showPriceToGC:      document.getElementById('fShowPriceToGC').checked,
+      cutSheetUrl:        document.getElementById('fCutSheetUrl').value.trim(),
+      internalNotes:      document.getElementById('fInternalNotes').value.trim(),
+      installNotes:       document.getElementById('fInstallNotes').value.trim(),
+      clientNotes:        document.getElementById('fClientNotes').value.trim(),
+      status,
+      openItemOwner:      status === 'open-item'
+                            ? document.getElementById('fOpenItemOwner').value : null,
+      isClientVisible:    document.getElementById('fIsClientVisible').checked,
+      isGCVisible:        document.getElementById('fIsGCVisible').checked,
+      images:             [...currentImages],
+      surfaces,
+      updatedAt:          firebase.firestore.FieldValue.serverTimestamp(),
+      projectId,
+      sortOrder,
+    };
+
+    try {
+      const colRef = db.collection('boards').doc(projectId).collection('specifications');
+
+      if (currentSpecId) {
+        await colRef.doc(currentSpecId).update(data);
+        showToast(`Saved — ${tag}`);
+      } else {
+        data.createdAt  = firebase.firestore.FieldValue.serverTimestamp();
+        data.createdBy  = currentUser ? currentUser.email : 'unknown';
+        await colRef.add(data);
+        showToast(`Added — ${tag}`);
+      }
+
+      closePanel();
+    } catch(e) {
+      console.error('saveSpec error:', e);
+      showToast('Error saving: ' + (e.message || e));
+    }
+  }
+
+  /* ----------------------------------------------------------------
+     TAG AUTO-GENERATION
+  ---------------------------------------------------------------- */
+  async function generateNextTag(category) {
+    const prefix = CATEGORY_PREFIXES[category] || category.toUpperCase().slice(0,2);
+    const existing = allSpecs
+      .filter(s => s.category === category && s.id !== currentSpecId && s.tag)
+      .map(s => {
+        const m = (s.tag || '').match(/\d+$/);
+        return m ? parseInt(m[0]) : 0;
+      });
+    const maxNum = existing.length ? Math.max(...existing) : 0;
+    const num    = maxNum + 1;
+    return prefix + String(num).padStart(2, '0');
+  }
+
+  /* ----------------------------------------------------------------
+     DELETE
+  ---------------------------------------------------------------- */
+  async function deleteCurrentSpec() {
+    if (!currentSpecId) return;
+    const spec = allSpecs.find(s => s.id === currentSpecId);
+    const label = spec ? (spec.tag || spec.name || 'this item') : 'this item';
+
+    if (!confirm(`Delete ${label}? This cannot be undone.`)) return;
+
+    try {
+      await db.collection('boards').doc(projectId)
+              .collection('specifications').doc(currentSpecId).delete();
+      showToast(`Deleted — ${label}`);
+      closePanel();
+    } catch(e) {
+      console.error('delete error:', e);
+      showToast('Error deleting: ' + (e.message || e));
+    }
+  }
+
+  /* ----------------------------------------------------------------
+     CONTEXT MENU (three-dot)
+  ---------------------------------------------------------------- */
+  function openContextMenu(event, specId) {
+    contextMenuTarget = specId;
+    const menu = document.getElementById('contextMenu');
+    menu.classList.add('open');
+    menu.style.top  = event.clientY + 'px';
+    menu.style.left = Math.min(event.clientX, window.innerWidth - 180) + 'px';
+  }
+
+  function contextMenuEdit() {
+    closeContextMenu();
+    if (contextMenuTarget) openEditPanel(contextMenuTarget);
+  }
+
+  function contextMenuStatusChange() {
+    closeContextMenu();
+    if (contextMenuTarget) {
+      openEditPanel(contextMenuTarget);
+      // Auto-switch to status select
+      setTimeout(() => { document.getElementById('fStatus').focus(); }, 300);
+    }
+  }
+
+  async function contextMenuDelete() {
+    closeContextMenu();
+    if (!contextMenuTarget) return;
+    const spec = allSpecs.find(s => s.id === contextMenuTarget);
+    const label = spec ? (spec.tag || spec.name || 'this item') : 'this item';
+    if (!confirm(`Delete ${label}? This cannot be undone.`)) return;
+
+    try {
+      await db.collection('boards').doc(projectId)
+              .collection('specifications').doc(contextMenuTarget).delete();
+      showToast(`Deleted — ${label}`);
+    } catch(e) {
+      showToast('Error deleting');
+    }
+  }
+
+  function closeContextMenu() {
+    document.getElementById('contextMenu').classList.remove('open');
+    contextMenuTarget = null;
+  }
+
+  document.addEventListener('click', e => {
+    const menu = document.getElementById('contextMenu');
+    if (!menu.contains(e.target) && !e.target.classList.contains('row-menu-btn')) {
+      closeContextMenu();
+    }
+    const packetMenu = document.getElementById('packetMenu');
+    if (!packetMenu.contains(e.target) && e.target.textContent !== 'Generate Packet ▾') {
+      packetMenu.classList.remove('open');
+    }
+  });
+
+  /* ----------------------------------------------------------------
+     GENERATE PACKET TOGGLE
+  ---------------------------------------------------------------- */
+  function togglePacketMenu() {
+    document.getElementById('packetMenu').classList.toggle('open');
+  }
+
+  /* ----------------------------------------------------------------
+     EXPORT — CLIENT SPEC SHEET (print-ready HTML, opens new tab)
+  ---------------------------------------------------------------- */
+  function generateClientSpecSheet() {
+    const specs = allSpecs.filter(s =>
+      s.isClientVisible !== false &&
+      ['sent','reviewing','approved','ordered','confirmed'].includes(s.status)
+    );
+    openPrintWindow('Client Spec Sheet', buildClientSheetHTML(specs));
+  }
+
+  function buildClientSheetHTML(specs) {
+    const projectName = document.getElementById('projectNameDisplay').textContent;
+    const date        = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+
+    const groupedByRoom = {};
+    specs.forEach(s => {
+      const room = s.room || 'General';
+      if (!groupedByRoom[room]) groupedByRoom[room] = [];
+      groupedByRoom[room].push(s);
+    });
+
+    let body = '';
+    Object.entries(groupedByRoom).forEach(([room, items]) => {
+      body += `<h2 class="room-header">${escHtml(room)}</h2>`;
+      items.sort((a,b) => tagSort(a.tag, b.tag)).forEach(s => {
+        const price = s.showPriceToClient && s.referencePrice
+          ? `<div class="cs-price">Reference: $${s.referencePrice.toLocaleString()}</div>` : '';
+        const clientNote = s.clientNotes
+          ? `<div class="cs-note">${escHtml(s.clientNotes)}</div>` : '';
+        const img = s.images && s.images[0]
+          ? `<img src="${escHtml(s.images[0])}" class="cs-img" alt="">` : '';
+        const vendorBtn = s.vendorUrl
+          ? `<a href="${escHtml(s.vendorUrl)}" class="cs-link">View at ${escHtml(s.vendor || 'Vendor')}</a>` : '';
+
+        body += `
+          <div class="cs-item">
+            ${img}
+            <div class="cs-info">
+              <div class="cs-tag">${escHtml(s.tag || '')}</div>
+              <div class="cs-name">${escHtml(s.name || '')}</div>
+              <div class="cs-detail">${[s.manufacturer,s.modelNumber,s.finish].filter(Boolean).map(escHtml).join(' · ')}</div>
+              ${s.dimensions ? `<div class="cs-dim">${escHtml(s.dimensions)}</div>` : ''}
+              ${price}
+              ${clientNote}
+              ${vendorBtn}
+            </div>
+          </div>`;
+      });
+    });
+
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+      <title>Client Spec Sheet — ${escHtml(projectName)}</title>
+      <style>
+        body { font-family: 'Georgia', serif; font-size: 11pt; color: #2C2C2C;
+               margin: 0; padding: 0; background: #fff; }
+        .cover { padding: 40px 60px; border-bottom: 2px solid #C9A96E; margin-bottom: 30px; }
+        .cover-firm { font-size: 22pt; letter-spacing: 0.1em; color: #8B7355; margin-bottom: 6px; }
+        .cover-project { font-size: 15pt; color: #2C2C2C; margin-bottom: 4px; }
+        .cover-sub { font-size: 10pt; color: #8B7355; letter-spacing: 0.08em; text-transform: uppercase; }
+        .page { padding: 0 60px 40px; }
+        .room-header { font-size: 13pt; color: #8B7355; text-transform: uppercase;
+                       letter-spacing: 0.08em; border-bottom: 1px solid #E0D9CF;
+                       padding-bottom: 6px; margin: 30px 0 14px; }
+        .cs-item { display: flex; gap: 20px; margin-bottom: 20px;
+                   padding-bottom: 20px; border-bottom: 1px solid #F0EBE2; }
+        .cs-img { width: 120px; height: 120px; object-fit: cover;
+                  border: 1px solid #E0D9CF; flex-shrink: 0; }
+        .cs-info { flex: 1; }
+        .cs-tag { font-size: 9pt; font-family: monospace; color: #8B7355;
+                  background: #F5F0E8; padding: 1px 6px; border-radius: 2px;
+                  display: inline-block; margin-bottom: 4px; }
+        .cs-name { font-size: 13pt; font-weight: bold; margin-bottom: 3px; }
+        .cs-detail { font-size: 10pt; color: #5A5045; }
+        .cs-dim { font-size: 10pt; color: #5A5045; margin-top: 2px; }
+        .cs-price { font-size: 10pt; color: #2C2C2C; margin-top: 6px; }
+        .cs-note { font-size: 10pt; color: #5A5045; margin-top: 6px;
+                   font-style: italic; }
+        .cs-link { font-size: 10pt; color: #8B7355; margin-top: 6px; display: block; }
+        .footer { text-align: center; font-size: 8pt; color: #9CA3AF;
+                  border-top: 1px solid #E0D9CF; padding: 12px 60px; margin-top: 30px; }
+        @media print {
+          .cs-item { break-inside: avoid; }
+          .room-header { break-before: auto; }
+        }
+      </style>
+    </head><body>
+      <div class="cover">
+        <div class="cover-firm">CCH Design Inc.</div>
+        <div class="cover-project">${escHtml(projectName)}</div>
+        <div class="cover-sub">Design Specifications · ${escHtml(date)}</div>
+      </div>
+      <div class="page">${body}</div>
+      <div class="footer">
+        These specifications are provided for reference. Items in this document are sourced and
+        purchased directly by your contractor or vendor. CCH Design Inc. is not responsible for
+        pricing, availability, or installation. © CCH Design Inc.
+      </div>
+    </body></html>`;
+  }
+
+  /* ----------------------------------------------------------------
+     GENERATE GC TRADE PACKET
+  ---------------------------------------------------------------- */
+  function generateGCPacket() {
+    const specs = allSpecs.filter(s => s.isGCVisible !== false);
+    openPrintWindow('GC Trade Packet', buildGCPacketHTML(specs));
+  }
+
+  function buildGCPacketHTML(specs) {
+    const projectName = document.getElementById('projectNameDisplay').textContent;
+    const date        = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+
+    // Build vendor contacts
+    const vendors = {};
+    specs.forEach(s => {
+      if (s.vendor && (s.tradeRep || s.tradeEmail || s.tradePhone)) {
+        if (!vendors[s.vendor]) {
+          vendors[s.vendor] = { rep: s.tradeRep, phone: s.tradePhone,
+                                email: s.tradeEmail, account: s.tradeAccountNumber };
+        }
+      }
+    });
+
+    // Build schedule table rows
+    const tableRows = [...specs].sort((a,b) => tagSort(a.tag, b.tag)).map(s => `
+      <tr>
+        <td>${escHtml(s.tag || '')}</td>
+        <td>${escHtml(s.name || '')}</td>
+        <td>${escHtml(s.manufacturer || '')}</td>
+        <td>${escHtml(s.vendor || '')}</td>
+        <td>${escHtml(CATEGORY_LABELS[s.category] || s.category || '')}</td>
+        <td>${escHtml(s.modelNumber || '')}</td>
+        <td>${escHtml(s.finish || '')}</td>
+        <td>${escHtml(s.dimensions || '')}${s.profileSpec ? ' · ' + escHtml(s.profileSpec) : ''}</td>
+        <td>${escHtml(s.layoutPattern || '')}</td>
+        <td>${escHtml(s.groutColor || '')}</td>
+        <td>${escHtml(s.room || '')}</td>
+        <td>${escHtml(s.drawingRef || '')}</td>
+      </tr>`).join('');
+
+    // Room pages
+    const rooms = [...new Set(specs.map(s => s.room).filter(Boolean))].sort();
+    let roomPages = '';
+    rooms.forEach(room => {
+      const roomSpecs = specs.filter(s => s.room === room).sort((a,b) => tagSort(a.tag, b.tag));
+      const items = roomSpecs.map(s => {
+        const notes = s.installNotes
+          ? `<div class="gc-install-note"><strong>Install Notes:</strong> ${escHtml(s.installNotes)}</div>` : '';
+        return `
+          <div class="gc-item">
+            <div class="gc-item-header">
+              <span class="gc-tag">${escHtml(s.tag || '')}</span>
+              <strong>${escHtml(s.name || '')}</strong>
+              <span class="gc-detail">${[s.manufacturer,s.modelNumber].filter(Boolean).map(escHtml).join(' · ')}</span>
+            </div>
+            <div class="gc-item-meta">
+              ${s.vendor ? `Vendor: ${escHtml(s.vendor)}` : ''}
+              ${s.finish ? ` · Finish: ${escHtml(s.finish)}` : ''}
+              ${s.dimensions ? ` · ${escHtml(s.dimensions)}` : ''}
+              ${s.drawingRef ? ` · Dwg: ${escHtml(s.drawingRef)}` : ''}
+              ${s.showPriceToGC && s.referencePrice ? ` · $${s.referencePrice.toLocaleString()}` : ''}
+            </div>
+            ${notes}
+          </div>`;
+      }).join('');
+
+      roomPages += `
+        <div class="room-page">
+          <h2 class="room-header">${escHtml(room)}</h2>
+          ${items}
+        </div>`;
+    });
+
+    // Vendor contacts page
+    const vendorRows = Object.entries(vendors).map(([name, v]) => `
+      <tr>
+        <td>${escHtml(name)}</td>
+        <td>${escHtml(v.rep || '')}</td>
+        <td>${escHtml(v.phone || '')}</td>
+        <td>${escHtml(v.email || '')}</td>
+        <td>${escHtml(v.account || '')}</td>
+      </tr>`).join('');
+
+    // Open items page
+    const openItems = specs.filter(s => s.status === 'open-item' || s.openItemOwner);
+    const openRows  = openItems.map(s => `
+      <tr>
+        <td>${escHtml(s.tag || '')}</td>
+        <td>${escHtml(s.name || '')}</td>
+        <td>${escHtml(s.room || '')}</td>
+        <td>${escHtml(s.openItemOwner || '')}</td>
+        <td>${escHtml(s.installNotes || s.internalNotes || '')}</td>
+      </tr>`).join('');
+
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+      <title>GC Trade Packet — ${escHtml(projectName)}</title>
+      <style>
+        body { font-family: 'Arial', sans-serif; font-size: 10pt; color: #2C2C2C;
+               margin: 0; padding: 0; background: #fff; }
+        .cover { padding: 60px; border-bottom: 3px solid #C9A96E; }
+        .cover-firm { font-size: 24pt; color: #8B7355; margin-bottom: 8px; }
+        .cover-project { font-size: 16pt; margin-bottom: 4px; }
+        .cover-title { font-size: 14pt; color: #8B7355; margin-bottom: 20px; }
+        .cover-meta { font-size: 10pt; color: #5A5045; }
+        .section { padding: 30px 60px; border-top: 2px solid #E0D9CF; }
+        .section-title { font-size: 14pt; color: #8B7355; text-transform: uppercase;
+                         letter-spacing: 0.1em; margin-bottom: 16px; }
+        table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+        th { background: #F5F0E8; padding: 6px 8px; text-align: left;
+             border-bottom: 2px solid #C9A96E; font-size: 9pt; font-weight: bold; }
+        td { padding: 6px 8px; border-bottom: 1px solid #EDE8DF; vertical-align: top; }
+        tr:nth-child(even) { background: #FAF8F5; }
+        .room-header { font-size: 13pt; color: #8B7355; text-transform: uppercase;
+                       letter-spacing: 0.08em; border-bottom: 2px solid #C9A96E;
+                       padding-bottom: 6px; margin: 20px 0 12px; }
+        .gc-item { padding: 10px 0; border-bottom: 1px solid #F0EBE2; }
+        .gc-item-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 3px; }
+        .gc-tag { font-family: monospace; font-size: 9pt; background: #F5F0E8;
+                  padding: 1px 5px; border-radius: 2px; color: #8B7355; }
+        .gc-detail { font-size: 9pt; color: #5A5045; }
+        .gc-item-meta { font-size: 9pt; color: #5A5045; margin-bottom: 4px; }
+        .gc-install-note { font-size: 9pt; background: #FFFBEB; padding: 5px 8px;
+                           border-left: 3px solid #D97706; margin-top: 4px; }
+        .footer { text-align: center; font-size: 8pt; color: #9CA3AF;
+                  border-top: 1px solid #E0D9CF; padding: 12px 60px; margin-top: 30px; }
+        @media print {
+          .gc-item { break-inside: avoid; }
+          .room-page { break-before: page; }
+        }
+      </style>
+    </head><body>
+
+      <div class="cover">
+        <div class="cover-firm">CCH Design Inc.</div>
+        <div class="cover-project">${escHtml(projectName)}</div>
+        <div class="cover-title">GC Trade Packet · Rev 1 · ${escHtml(date)}</div>
+        <div class="cover-meta">
+          Designer: CCH Design Inc. &nbsp;|&nbsp; Generated: ${escHtml(date)}<br>
+          Total items: ${specs.length}
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Full Schedule</div>
+        <table>
+          <thead><tr>
+            <th>Tag</th><th>Item</th><th>Manufacturer</th><th>Vendor</th>
+            <th>Category</th><th>Part Number</th><th>Finish</th>
+            <th>Size / Profile</th><th>Layout / Pattern</th><th>Grout Color</th>
+            <th>Room</th><th>Drawing Ref</th>
+          </tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+
+      ${roomPages}
+
+      ${Object.keys(vendors).length ? `
+      <div class="section">
+        <div class="section-title">Vendor Contacts</div>
+        <table>
+          <thead><tr><th>Vendor</th><th>Rep</th><th>Phone</th><th>Email</th><th>CCH Account</th></tr></thead>
+          <tbody>${vendorRows}</tbody>
+        </table>
+      </div>` : ''}
+
+      ${openItems.length ? `
+      <div class="section">
+        <div class="section-title">⚠ Open Items</div>
+        <table>
+          <thead><tr><th>Tag</th><th>Item</th><th>Room</th><th>Owner</th><th>Notes</th></tr></thead>
+          <tbody>${openRows}</tbody>
+        </table>
+      </div>` : ''}
+
+      <div class="footer">
+        Confidential — for contractor / trade use only. Do not distribute to owner.
+        CCH Design Inc. © ${new Date().getFullYear()}
+      </div>
+    </body></html>`;
+  }
+
+  /* ----------------------------------------------------------------
+     FULL SCHEDULE (internal)
+  ---------------------------------------------------------------- */
+  function generateFullSchedule() {
+    const projectName = document.getElementById('projectNameDisplay').textContent;
+    const date        = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+
+    const rows = [...allSpecs].sort((a,b) => tagSort(a.tag, b.tag)).map(s => `
+      <tr>
+        <td>${escHtml(s.tag || '')}</td>
+        <td>${escHtml(CATEGORY_LABELS[s.category] || '')}</td>
+        <td>${escHtml(s.name || '')}</td>
+        <td>${escHtml(s.manufacturer || '')}</td>
+        <td>${escHtml(s.modelNumber || '')}</td>
+        <td>${escHtml(s.room || '')}</td>
+        <td>${escHtml(s.vendor || '')}</td>
+        <td>${escHtml(s.finish || '')}</td>
+        <td>${escHtml(s.dimensions || '')}</td>
+        <td>${s.referencePrice != null ? '$' + s.referencePrice.toLocaleString() : ''}</td>
+        <td>${escHtml(s.status || '')}</td>
+        <td>${escHtml(s.openItemOwner || '')}</td>
+        <td>${escHtml(s.drawingRef || '')}</td>
+      </tr>`).join('');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+      <title>Full Specification Schedule — ${escHtml(projectName)}</title>
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 9pt; color:#2C2C2C; }
+        h1 { color:#8B7355; font-size:14pt; }
+        .meta { color:#5A5045; font-size:9pt; margin-bottom:14px; }
+        table { width:100%; border-collapse:collapse; font-size:9pt; }
+        th { background:#F5F0E8; padding:5px 7px; border-bottom:2px solid #C9A96E; text-align:left; }
+        td { padding:5px 7px; border-bottom:1px solid #EDE8DF; }
+        tr:nth-child(even) { background:#FAF8F5; }
+        .s-open-item { color:#DC2626; font-weight:bold; }
+        @media print { body { margin: 10mm; } }
+      </style></head><body>
+      <h1>Full Specification Schedule — INTERNAL</h1>
+      <div class="meta">${escHtml(projectName)} · ${escHtml(date)} · ${allSpecs.length} items</div>
+      <table>
+        <thead><tr>
+          <th>Tag</th><th>Category</th><th>Item</th><th>Mfr</th><th>Model</th>
+          <th>Room</th><th>Vendor</th><th>Finish</th><th>Dim</th>
+          <th>Ref Price</th><th>Status</th><th>Open Item Owner</th><th>Drawing Ref</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </body></html>`;
+
+    openPrintWindow('Full Schedule', html);
+  }
+
+  /* ----------------------------------------------------------------
+     EXPORT CSV
+  ---------------------------------------------------------------- */
+  function exportCSV() {
+    const cols = ['tag','category','subCategory','name','manufacturer','modelNumber',
+                  'finish','dimensions','qty','sqft','room','location','vendor',
+                  'referencePrice','status','openItemOwner','drawingRef','internalNotes'];
+
+    const header = cols.join(',');
+    const rows   = allSpecs.map(s =>
+      cols.map(c => {
+        const v = s[c] != null ? String(s[c]) : '';
+        return v.includes(',') || v.includes('"') ? `"${v.replace(/"/g,'""')}"` : v;
+      }).join(',')
+    );
+
+    const csv  = [header, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `specs_${projectId || 'export'}_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('CSV exported');
+  }
+
+  /* ----------------------------------------------------------------
+     PRINT HELPER
+  ---------------------------------------------------------------- */
+  function openPrintWindow(title, html) {
+    const w = window.open('', '_blank', 'width=900,height=700');
+    if (!w) { showToast('Pop-up blocked — allow pop-ups to generate packets'); return; }
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => w.print(), 400);
+  }
+
+  /* ----------------------------------------------------------------
+     UTILITIES
+  ---------------------------------------------------------------- */
+  function escHtml(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
+  }
+
+  function statusLabel_(status) {
+    const map = {
+      'specified':      'Specified',
+      'pending-sample': 'Pending Sample',
+      'hold':           'On Hold',
+      'sent':           'Sent',
+      'reviewing':      'Reviewing',
+      'approved':       'Approved',
+      'ordered':        'Ordered',
+      'confirmed':      'Confirmed',
+      'open-item':      'Open Item'
+    };
+    return map[status] || (status || 'Specified');
+  }
+
+  let toastTimer;
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+  }
+  </script>
+</body>
+</html>

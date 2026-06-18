@@ -2,7 +2,7 @@
   "hosting": {
     "target": "platform",
     "public": "platform",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "**/*.bak", "**/*.bak-*", "**/*.backup-*", "**/*.zip", "**/_*.py", "**/_mojibake_out.txt"],
     "headers": [
       {
         "source": "/",
@@ -23,6 +23,12 @@
         "headers": [
           { "key": "Cache-Control", "value": "no-cache, max-age=0, must-revalidate" },
           { "key": "Content-Type", "value": "text/html; charset=utf-8" }
+        ]
+      },
+      {
+        "source": "cch-design-board.js",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache, max-age=0, must-revalidate" }
         ]
       }
     ]
