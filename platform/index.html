@@ -10625,6 +10625,10 @@
       }
       line._clipSourceTruth = true;
       line._imageLocked = true;
+      var srcSku = String(clipRow.sku || clipRow.model || clipRow.itemCode || '').trim();
+      if (srcSku && !String(line.sku || '').trim()) line.sku = srcSku;
+      var srcFin = String(clipRow.finish || clipRow.color || clipRow.finishColor || '').trim();
+      if (srcFin && !String(line.finish || line.color || '').trim()) line.finish = srcFin;
       if (typeof cchFillLineCategoryFromSource === 'function') {
         cchFillLineCategoryFromSource(line, clipRow);
       }
@@ -27075,7 +27079,7 @@ async function renderBoardsTab(T, proj) {
         if (sell <= 0 && cost > 0) sell = Math.round(cost * qty * (1 + mkup / 100) * 100) / 100;
         var row = {
           title: c.title || 'Untitled',
-          description: c.description || '',
+          description: c.description || c.clientDescription || '',
           category: c.category || 'General',
           room: c.room || '',
           qty: qty,
@@ -27084,6 +27088,8 @@ async function renderBoardsTab(T, proj) {
           shipping: parseFloat(c.shipping) || 0,
           amount: sell,
           vendor: c.vendor || '',
+          sku: String(c.sku || c.model || c.itemCode || '').trim(),
+          finish: String(c.finish || c.color || c.finishColor || '').trim(),
           imageUrl: pack.imageUrl || c.imageUrl || _firstCoercedGalleryUrl(c) || null,
           images: pack.images,
           heroImageIndex: pack.heroImageIndex,
@@ -27248,6 +27254,7 @@ async function renderBoardsTab(T, proj) {
           retailPrice: parseFloat(p.retailPrice) || 0,
           vendor: p.vendor || '',
           sku: p.sku || '',
+          finish: p.finish || p.color || p.finishColor || '',
           productUrl: p.productUrl || p.vendorUrl || p.url || '',
           specUrl: p.specUrl || p.specLink || '',
           specLink: p.specUrl || p.specLink || '',
@@ -28999,6 +29006,10 @@ async function renderBoardsTab(T, proj) {
                       <div class="form-group"><label class="form-label">Room</label><select class="form-input" id="piRoom">${_piRoomOptions(item.room || '', boardRooms)}</select></div>
                       <div class="form-group"><label class="form-label">Ship To</label><select class="form-input" id="piShipTo">${_piShipToOptions(item.shipTo || '')}</select></div>
                     </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                      <div class="form-group"><label class="form-label">SKU / Model</label><input class="form-input" id="piSku" value="${escAttr(item.sku || item.model || item.itemCode || '')}" placeholder="Vendor SKU or model #"></div>
+                      <div class="form-group"><label class="form-label">Finish / Color</label><input class="form-input" id="piFinish" value="${escAttr(item.finish || item.color || item.finishColor || '')}" placeholder="e.g. Matte Black"></div>
+                    </div>
                     <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea clip-detail-textarea-scroll" id="piDesc" rows="3" placeholder="Product description/specs shown on the proposal.">${esc(item.description || '')}</textarea></div>
                     <div class="form-group"><label class="form-label">Tag <span style="font-weight:400;color:var(--gray-500);">(optional)</span></label><input class="form-input" id="piLineTag" value="${escAttr(_piTagVal)}" placeholder="L39, A, B, trim…" maxlength="32" style="max-width:140px;font-weight:600;" title="Fixture code, fabric/trim letter, or custom builder label"></div>
                     <div class="form-group"><label class="form-label">Notes shown under description</label><textarea class="form-textarea clip-detail-textarea-scroll" id="piLineNotes" rows="3" placeholder="Application / install notes, e.g. Banding on leading edge of panel — material application">${esc(_piNotesBody)}</textarea>
@@ -29402,6 +29413,16 @@ async function renderBoardsTab(T, proj) {
         description: document.getElementById('piDesc').value.trim(),
         shipTo: document.getElementById('piShipTo').value.trim()
       };
+      var _piSkuEl = document.getElementById('piSku');
+      if (_piSkuEl) {
+        var _piSkuVal = String(_piSkuEl.value || '').trim();
+        if (_piSkuVal) items[idx].sku = _piSkuVal; else delete items[idx].sku;
+      }
+      var _piFinishEl = document.getElementById('piFinish');
+      if (_piFinishEl) {
+        var _piFinishVal = String(_piFinishEl.value || '').trim();
+        if (_piFinishVal) items[idx].finish = _piFinishVal; else delete items[idx].finish;
+      }
       var tagVal = String((document.getElementById('piLineTag') && document.getElementById('piLineTag').value) || '').trim();
       if (tagVal) items[idx].lineTag = tagVal;
       else delete items[idx].lineTag;
@@ -34233,6 +34254,7 @@ async function renderBoardsTab(T, proj) {
             room: c.room || '',
             shipTo: '',
             sku: c.sku || '',
+            finish: c.finish || c.color || c.finishColor || '',
             category: (typeof cchLineCategoryFromSource === 'function' ? cchLineCategoryFromSource(c, c.title) : '') || String(c.category || '').trim() || 'General',
             qbCategory: c.qbCategory || undefined,
             clipId: d.id,
@@ -35334,6 +35356,7 @@ async function renderBoardsTab(T, proj) {
         amount: sellPerUnit, imageUrl: _packMy.imageUrl || p.imageUrl || p.image || '', images: _packMy.images,
         heroImageIndex: _packMy.heroImageIndex,
         description: p.description || '', sku: p.sku || '',
+        finish: p.finish || p.color || p.finishColor || '',
         shipTo: '', expenseType: p.expenseType || 'product',
         productUrl: p.productUrl || p.url || p.link || p.vendorUrl || '',
         taxable: (p.taxable === 'taxable' || p.taxable === true) ? true : (p.taxable === 'non-taxable' || p.taxable === false) ? false : (typeof getDefaultTaxable === 'function' ? getDefaultTaxable('product') : true)
@@ -35420,7 +35443,8 @@ async function renderBoardsTab(T, proj) {
               qty: qty, cost: cost, markupPct: mkup, shipping: 0,
               amount: sellPerUnit * qty, imageUrl: _packSel.imageUrl || c.imageUrl || c.image || '', images: _packSel.images,
               heroImageIndex: _packSel.heroImageIndex, room: c.room || '',
-              category: c.category || '', sku: c.sku || '', shipTo: '', expenseType: c.expenseType || 'product',
+              category: c.category || '', sku: c.sku || '', finish: c.finish || c.color || c.finishColor || '',
+              shipTo: '', expenseType: c.expenseType || 'product',
             clipId: c.id || '',
             taxable: (c.taxable === 'taxable' || c.taxable === true) ? true : (c.taxable === 'non-taxable' || c.taxable === false) ? false : (typeof getDefaultTaxable === 'function' ? getDefaultTaxable('product') : true)
             });
