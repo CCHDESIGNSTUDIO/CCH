@@ -24909,7 +24909,7 @@ async function renderBoardsTab(T, proj) {
       try {
         var newNum = await getNextDocNumber('PO');
         var nowIso = new Date().toISOString();
-        var mergedRef = await db.collection('boards').doc(projectId).collection('purchaseOrders').add({
+        var mergedRef = await db.collection('boards').doc(projectId).collection('purchaseOrders').add(_stripUndefinedDeep({
           number: newNum,
           vendor: vendorName,
           notes: 'Merged from: ' + srcNums.join(', '),
@@ -24922,7 +24922,7 @@ async function renderBoardsTab(T, proj) {
           createdBy: _cUser,
           createdByEmail: (currentUser && currentUser.email) || '',
           activityLog: [{ action: 'created', details: 'Merged from ' + srcNums.join(', '), userName: _cUser, userEmail: (currentUser && currentUser.email) || '', timestamp: nowIso }]
-        });
+        }));
         for (var j = 0; j < ids.length; j++) {
           try {
             await db.collection('boards').doc(projectId).collection('purchaseOrders').doc(ids[j]).update({
@@ -26871,7 +26871,7 @@ async function renderBoardsTab(T, proj) {
       });
 
       var _cUser = (currentUser && currentUser.displayName) || (currentUser && currentUser.email) || 'Unknown';
-      await db.collection('boards').doc(projectId).collection('purchaseOrders').add({
+      await db.collection('boards').doc(projectId).collection('purchaseOrders').add(_stripUndefinedDeep({
         number: document.getElementById('poNum').value.trim(),
         vendor: document.getElementById('poVendor').value.trim(),
         notes: document.getElementById('poNotes').value.trim(),
@@ -26881,7 +26881,7 @@ async function renderBoardsTab(T, proj) {
         createdBy: _cUser,
         createdByEmail: (currentUser && currentUser.email) || '',
         activityLog: [{ action: 'created', details: 'Vendor: ' + document.getElementById('poVendor').value.trim(), userName: _cUser, userEmail: (currentUser && currentUser.email) || '', timestamp: new Date().toISOString() }]
-      });
+      }));
 
       closeModal();
       renderProjectDetail();
@@ -30238,7 +30238,7 @@ async function renderBoardsTab(T, proj) {
           });
           const total = poItems.reduce((s, i) => s + i.lineTotal, 0);
           var _poNum = await getNextDocNumber('PO');
-          await db.collection('boards').doc(projectId).collection('purchaseOrders').add({
+          await db.collection('boards').doc(projectId).collection('purchaseOrders').add(_stripUndefinedDeep({
             number: _poNum,
             vendor: vendor,
             items: poItems, total,
@@ -30248,7 +30248,7 @@ async function renderBoardsTab(T, proj) {
             createdBy: _cUser,
             createdByEmail: (currentUser && currentUser.email) || '',
             activityLog: [{ action: 'po_generated', details: 'From proposal, vendor: ' + vendor, userName: _cUser, userEmail: (currentUser && currentUser.email) || '', timestamp: new Date().toISOString() }]
-          });
+          }));
         }
         await cchAlert(Object.keys(byVendor).length + ' PO(s) created, grouped by vendor!', 'Create POs');
         navigate('#/project/' + projectId + '/pos');
@@ -36330,7 +36330,7 @@ async function renderBoardsTab(T, proj) {
             return useInvoiceSnapshot ? poLine : cchProtectClipSourcedLine(poLine);
           });
           var nowIso = new Date().toISOString();
-          await db.collection('boards').doc(st.projectId).collection('purchaseOrders').add({
+          var _poDoc = {
             number: poNum, poNum: poNum, vendor: vendor,
             status: 'Draft', total: totalCost, totalSelling: totalSell,
             items: poItems,
@@ -36342,7 +36342,8 @@ async function renderBoardsTab(T, proj) {
             createdBy: _cUser, createdByEmail: (currentUser && currentUser.email) || '',
             activityLog: [{ action: 'po_generated', details: 'Vendor: ' + vendor + ', ' + vitems.length + ' items (item-selected' + (useInvoiceSnapshot ? ', invoice-snapshot no-library' : '') + ')', userName: _cUser, userEmail: (currentUser && currentUser.email) || '', timestamp: nowIso }],
             _poFromInvoiceSnapshot: useInvoiceSnapshot || null
-          });
+          };
+          await db.collection('boards').doc(st.projectId).collection('purchaseOrders').add(typeof _stripUndefinedDeep === 'function' ? _stripUndefinedDeep(_poDoc) : _poDoc);
           created.push(vendor + ' (' + vitems.length + ' items)');
         }
         await cchAlert('Created ' + created.length + ' Purchase Order' + (created.length !== 1 ? 's' : '') + ':\n\n' + created.join('\n'), 'Generate Purchase Orders');
@@ -38646,10 +38647,10 @@ async function renderBoardsTab(T, proj) {
                 if (c.vendor && !vendor) vendor = c.vendor;
               }
             });
-            const newDoc = await db.collection('boards').doc(projectId).collection('purchaseOrders').add({
+            const newDoc = await db.collection('boards').doc(projectId).collection('purchaseOrders').add(_stripUndefinedDeep({
               number: poNum, vendor, status, total, items,
               createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), _fromClips: true
-            });
+            }));
             docData = { id: newDoc.id, number: poNum, vendor, status, total, items };
             poId = newDoc.id;
             window.location.hash = '#/project/' + projectId + '/po/' + poId;
@@ -65989,7 +65990,7 @@ async function renderBoardsTab(T, proj) {
         data.items = data.description.split('\n').filter(Boolean).map(line => ({ description: line.trim(), qty: 1, cost: 0, lineTotal: 0 }));
       }
       try {
-        await db.collection('boards').doc(projectId).collection('purchaseOrders').add(data);
+        await db.collection('boards').doc(projectId).collection('purchaseOrders').add(typeof _stripUndefinedDeep === 'function' ? _stripUndefinedDeep(data) : data);
         closeModal();
         await cchAlert('PO created! Go to the project -> Purchase Orders tab to view it.', 'Create PO');
         navigate('#/project/' + projectId + '/pos');
