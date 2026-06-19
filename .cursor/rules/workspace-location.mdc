@@ -1,0 +1,34 @@
+---
+description: Workspace location — code moved OFF Dropbox; work from C:\dev and sync via GitHub
+alwaysApply: true
+---
+
+# ⚠️ Workspace moved off Dropbox (Jun 19, 2026)
+
+The code repo **no longer lives in Dropbox**. Dropbox syncing the repo (git + `firebase deploy` + two machines churning the 4.4 MB `index.html`) caused full mouse/whole-computer lockups.
+
+## Where to work
+
+- **Machine 1 (Cindy's main):** `C:\dev\CCH-Platform-Deploy\cch-deploy` ← git repo root
+- **Lenovo:** its own clone at `C:\dev\CCH\`
+- **Do NOT open or edit the old Dropbox copy** at `…\Dropbox\CCH-Platform-Deploy\`. It is **deprecated/stale** (being archived to a NAS). Edits there are lost and re-trigger the freeze.
+
+## Sync model — GitHub only
+
+- `git pull` **before** you start; `git push` **when** you finish.
+- Never have two machines editing the **same branch** at the same time.
+- Repo: `github.com/CCHDESIGNSTUDIO/CCH` · active branch `wip/preserve-rh-inspiration-board-2026-04-19`.
+- Unlike Dropbox, git merges overlapping changes safely (or asks). It will not silently overwrite work.
+
+## Other drives
+
+- Dropbox is fine for **small handoff notes** (e.g. `Claude - CCH studio\Cursor1 to cursor2\`) — **never for code**.
+- The Toshiba `D:` drive is Machine 1's **backup only** (USB = one machine at a time), not a shared working drive.
+
+## Deploy (unchanged otherwise)
+
+```
+cd C:\dev\CCH-Platform-Deploy\cch-deploy        # Lenovo: cd C:\dev\CCH
+firebase deploy --only hosting:platform --project staging
+```
+Production only on Cindy's typed GO.

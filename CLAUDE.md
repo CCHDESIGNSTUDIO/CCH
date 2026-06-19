@@ -1,6 +1,38 @@
 # CCH Studio — Claude Code Standing Instructions
 
+> ## ⚠️ WORKSPACE MOVED OFF DROPBOX (Jun 19, 2026) — read this first
+>
+> **The code repo no longer lives in Dropbox.** Dropbox syncing the repo (git + `firebase deploy` + two machines all churning the 4.4 MB `index.html`) caused full mouse/whole-computer lockups.
+>
+> **For every agent — Claude Code, Cursor, Cowork (CW1–3), Grok, Hermes:**
+> - **Work from the machine's internal drive, NOT Dropbox:**
+>   - Machine 1 (Cindy's main): `C:\dev\CCH-Platform-Deploy\cch-deploy` (git repo root)
+>   - Lenovo: its own clone at `C:\dev\CCH\`
+> - **Do NOT open or edit the old Dropbox copy** at `…\Dropbox\CCH-Platform-Deploy\` — it is **deprecated/stale** (being archived to NAS). Edits there are lost and re-trigger the freeze.
+> - **Sync between machines through GitHub only:** `git pull` before you start, `git push` when you finish. Never have two machines on the same branch at the same time. Unlike Dropbox, git merges safely (or asks) — it will not silently overwrite work.
+>   - Repo: `github.com/CCHDESIGNSTUDIO/CCH` · active branch `wip/preserve-rh-inspiration-board-2026-04-19`
+> - Dropbox is fine for **small handoff notes** (e.g. `Claude - CCH studio\Cursor1 to cursor2\`) — never for code.
+> - The Toshiba `D:` drive is Machine 1's **backup only** (USB = one machine at a time), not a shared working drive.
+
 Every session that opens this project must read this file first. No need for Cindy to paste context.
+
+*Last revised by: Claude — Jun 9, 2026 — reconciled the deploy/commit guidance below with the canonical staging-first DEPLOYMENT RULE in the project-root `CLAUDE.md` (removed stale "deploy after every fix / commit and push"). The root CLAUDE.md governs; this file is subordinate.*
+
+---
+
+## ⚠️ Financial documents are isolated (no back-sync)
+
+**Guard module:** `platform/cch-doc-isolation.js` · Cursor rule: `.cursor/rules/document-isolation.mdc`
+
+Proposal / invoice / PO lines are snapshots after they land on a doc. **Doc edit/save must not** push category, vendor, prices, or images to Product Library or project clips. Use variance logging (`cchRecordDocVariance`) instead of silent upstream writes. Explicit UI only: Apply from Library, Link to Room Boards.
+
+---
+
+## ⚠️ Houzz Project Tracker — categories & re-import (read before Houzz/PO/product import)
+
+**Authoritative:** [Docs/CLEANUP_HISTORY.md](Docs/CLEANUP_HISTORY.md) · Cursor rule: `.cursor/rules/houzz-taxonomy-import-guard.mdc`
+
+New-Houzz tracker exports have dirty categories/rooms; May 27 canonical taxonomy + re-import guards apply. Do not audit or import from Houzz reports without that doc. Agent spreadsheets: `*_BY_CLAUDE_*` filenames — never overwrite Cynthia's working files.
 
 ---
 
@@ -33,17 +65,20 @@ On "RELOOK" or "GROUNDING CHECK" from Cindy: stop generating, state the search t
 - **Member doc IDs** are email-prefix based: `cindy` and `vanessa` — never change these
 
 ## How to Deploy
+> **The root `CLAUDE.md` DEPLOYMENT RULE governs; this file is subordinate to it.**
+
+**Staging first — always.** When a fix is ready (work from the **non-Dropbox** copy):
 ```
-cd C:\Users\cindy\Dropbox\CCH-Platform-Deploy\cch-deploy
-firebase deploy --only hosting
+cd C:\dev\CCH-Platform-Deploy\cch-deploy        # Machine 1  (Lenovo: cd C:\dev\CCH)
+firebase deploy --only hosting:platform --project staging
 ```
-Always deploy after every fix. Commit and push to GitHub after deploying.
+Verify on `cch-platform-staging.web.app` (Ctrl+Shift+R). **Production deploys ONLY on Cynthia's typed GO/YES**, via `DEPLOY-PRODUCTION-DANGER.bat`. **AI agents never deploy to production.** Commit/push to GitHub **only when Cynthia asks** — not automatically.
 
 ## How to Edit
 - Edit `platform/index.html` directly — it is the entire platform
 - Use the Edit tool (find exact string, replace it) — do NOT write Node scripts to patch files
-- After editing, deploy immediately, don't batch up changes
-- Always do Ctrl+Shift+R to test in browser after deploy
+- After editing, **ask to deploy when ready and get Cynthia's approval**; on approval, deploy to **staging** to test (batching changes is fine). Never deploy to production without Cynthia's typed GO.
+- Always do Ctrl+Shift+R to test in browser after a **staging** deploy
 
 ## Standing Rules
 1. **Navy #0E1629** — never use pure black for dark UI elements
@@ -83,8 +118,8 @@ Always deploy after every fix. Commit and push to GitHub after deploying.
 - Collection: `timelyEntries`
 
 ## Work Style
-- Work autonomously — don't ask permission to proceed
-- Edit files directly, don't write patch scripts
-- Deploy after every fix
-- Commit with clear message after each task
+- **Recommend first, get Cynthia's approval before any edit / deploy / script** (canonical rule — supersedes the old "work autonomously" guidance)
+- Edit `index.html` directly with the Edit tool; Firestore data work goes through dry-run scripts (reviewed before apply)
+- When a fix is ready, **ask to deploy and get Cynthia's approval**, then deploy to **staging** to test; production only on Cynthia's typed GO/YES
+- Commit/push to GitHub **only when Cynthia asks**
 - If another session is working on a different module, coordinate via git pull before starting
