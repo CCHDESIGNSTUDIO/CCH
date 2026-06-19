@@ -9,8 +9,9 @@
 >   - Machine 1 (Cindy's main): `C:\dev\CCH-Platform-Deploy\cch-deploy` (git repo root)
 >   - Lenovo: its own clone at `C:\dev\CCH\`
 > - **Do NOT open or edit the old Dropbox copy** at `…\Dropbox\CCH-Platform-Deploy\` — it is **deprecated/stale** (being archived to NAS). Edits there are lost and re-trigger the freeze.
-> - **Sync between machines through GitHub only:** `git pull` before you start, `git push` when you finish. Never have two machines on the same branch at the same time. Unlike Dropbox, git merges safely (or asks) — it will not silently overwrite work.
+> - **Sync between machines through GitHub only.** Never have two machines on the same branch at the same time. Unlike Dropbox, git merges safely (or asks) — it will not silently overwrite work.
 >   - Repo: `github.com/CCHDESIGNSTUDIO/CCH` · active branch `wip/preserve-rh-inspiration-board-2026-04-19`
+> - **On Machine 1 you share ONE working copy with ~8 Cursor sessions.** Do **NOT** `git add` / `commit` / `push` or `firebase deploy` yourself — a commit here sweeps up everyone's edits and a deploy ships them all. **Hand your changed‑file list to repo owner #1**, who commits & deploys in coordinated batches. (A *separate machine* like Lenovo `C:\dev\CCH` does `git pull` before / `git push` after its own work.) See `.cursor/rules/commit-deploy-policy.mdc`.
 > - Dropbox is fine for **small handoff notes** (e.g. `Claude - CCH studio\Cursor1 to cursor2\`) — never for code.
 > - The Toshiba `D:` drive is Machine 1's **backup only** (USB = one machine at a time), not a shared working drive.
 
@@ -121,5 +122,5 @@ Verify on `cch-platform-staging.web.app` (Ctrl+Shift+R). **Production deploys ON
 - **Recommend first, get Cynthia's approval before any edit / deploy / script** (canonical rule — supersedes the old "work autonomously" guidance)
 - Edit `index.html` directly with the Edit tool; Firestore data work goes through dry-run scripts (reviewed before apply)
 - When a fix is ready, **ask to deploy and get Cynthia's approval**, then deploy to **staging** to test; production only on Cynthia's typed GO/YES
-- Commit/push to GitHub **only when Cynthia asks**
+- **On the shared Machine‑1 working copy, don't commit/push/deploy** — hand your changed‑file list to repo owner #1 (see the top banner / `commit-deploy-policy.mdc`). A separate-machine clone commits/pushes its own work only when Cynthia asks.
 - If another session is working on a different module, coordinate via git pull before starting
