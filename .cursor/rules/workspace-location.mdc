@@ -1,34 +1,19 @@
 ---
-description: Workspace location — code moved OFF Dropbox; work from C:\dev and sync via GitHub
+description: Canonical workspace location and the no-re-root rule for all agent sessions
 alwaysApply: true
 ---
 
-# ⚠️ Workspace moved off Dropbox (Jun 19, 2026)
+# Workspace location — work from C:\dev, never re-root
 
-The code repo **no longer lives in Dropbox**. Dropbox syncing the repo (git + `firebase deploy` + two machines churning the 4.4 MB `index.html`) caused full mouse/whole-computer lockups.
+The code repo lives **off Dropbox** (Dropbox sync caused computer freezes).
 
-## Where to work
+## Do
+- Work only from the local repo using **full absolute paths**:
+  - This machine: `C:\dev\CCH-Platform-Deploy\cch-deploy`
+  - Lenovo: `C:\dev\CCH`
+- `git pull` / `git fetch` are fine. **Do not commit, push, or deploy** — see `commit-deploy-policy.mdc` (only repo owner #1 does that).
+- One machine per branch at a time. Repo: `github.com/CCHDESIGNSTUDIO/CCH`, branch `wip/preserve-rh-inspiration-board-2026-04-19`.
 
-- **Machine 1 (Cindy's main):** `C:\dev\CCH-Platform-Deploy\cch-deploy` ← git repo root
-- **Lenovo:** its own clone at `C:\dev\CCH\`
-- **Do NOT open or edit the old Dropbox copy** at `…\Dropbox\CCH-Platform-Deploy\`. It is **deprecated/stale** (being archived to a NAS). Edits there are lost and re-trigger the freeze.
-
-## Sync model — GitHub only
-
-- `git pull` **before** you start; `git push` **when** you finish.
-- Never have two machines editing the **same branch** at the same time.
-- Repo: `github.com/CCHDESIGNSTUDIO/CCH` · active branch `wip/preserve-rh-inspiration-board-2026-04-19`.
-- Unlike Dropbox, git merges overlapping changes safely (or asks). It will not silently overwrite work.
-
-## Other drives
-
-- Dropbox is fine for **small handoff notes** (e.g. `Claude - CCH studio\Cursor1 to cursor2\`) — **never for code**.
-- The Toshiba `D:` drive is Machine 1's **backup only** (USB = one machine at a time), not a shared working drive.
-
-## Deploy (unchanged otherwise)
-
-```
-cd C:\dev\CCH-Platform-Deploy\cch-deploy        # Lenovo: cd C:\dev\CCH
-firebase deploy --only hosting:platform --project staging
-```
-Production only on Cindy's typed GO.
+## Do NOT
+- **Do NOT run `move_agent_to_root`** (or any re-root / workspace-root switch). It is unnecessary — just use full `C:\dev` paths. Sessions have wasted time on this; skip it.
+- **Do NOT edit the Dropbox copy** at `...\Dropbox\CCH-Platform-Deploy\`. It is abandoned. All edits, scripts, and deploys target the `C:\dev` path only.

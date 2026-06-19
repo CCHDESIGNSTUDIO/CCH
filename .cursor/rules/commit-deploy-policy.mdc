@@ -1,0 +1,21 @@
+---
+description: Shared C:\dev working copy — only repo owner #1 commits/deploys
+alwaysApply: true
+---
+
+# Commit / deploy policy — only #1 commits
+
+All sessions share ONE working copy at `C:\dev\CCH-Platform-Deploy\cch-deploy`. A commit here
+sweeps up **every session's** uncommitted edits, and a deploy ships them all. So:
+
+## Do NOT (any session except #1)
+- Do NOT run `git add`, `git commit`, `git push`, `git stash`, or anything that stages/commits.
+- Do NOT run any `firebase deploy` (hosting, functions, rules) — staging OR production.
+
+## Do
+- Edit your files normally.
+- When ready, **hand off to #1** (repo/deploy owner): list exactly which files you changed and
+  say they're ready. #1 stages, commits, and deploys in coordinated batches.
+- `git pull` / `git fetch` / read-only `git status` are fine.
+
+Only **#1** commits and deploys.
