@@ -39,3 +39,7 @@ desktop.ini
 # Local-only archive of junk moved out of platform/ (kept on disk, not tracked;
 # old versions remain in git history). See _deploy-archive/.
 _deploy-archive/
+
+# Local shared deploy/staging handoff queue — Machine-1 sessions append, #1 reads.
+# Kept local (not tracked) to avoid commit churn / merge conflicts from many appenders.
+_DEPLOY_QUEUE.md

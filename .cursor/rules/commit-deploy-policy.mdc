@@ -14,8 +14,16 @@ sweeps up **every session's** uncommitted edits, and a deploy ships them all. So
 
 ## Do
 - Edit your files normally.
-- When ready, **hand off to #1** (repo/deploy owner): list exactly which files you changed and
-  say they're ready. #1 stages, commits, and deploys in coordinated batches.
+- When ready, **append one line to `_DEPLOY_QUEUE.md`** (repo root) instead of messaging Cindy:
+  `[YYYY-MM-DD HH:MM] #<n> <name> — <files changed> — <staging|production> — <one-line desc> — STATUS: pending`
+- #1 (Deploy Master) reads `_DEPLOY_QUEUE.md` **hourly (automation)** and on demand, then commits/deploys
+  in coordinated batches and flips your line to `STATUS: done`.
 - `git pull` / `git fetch` / read-only `git status` are fine.
+
+## Staging vs production
+- **Staging** (`cch-platform-staging.web.app`) is a safe test sandbox — **no per-deploy approval from
+  Cindy needed**. #1 deploys queued staging items, serialized so staging stays readable (one session's
+  work at a time). Just queue it.
+- **Production** (`cch-platform.web.app`) ships **only on Cindy's explicit typed GO**.
 
 Only **#1** commits and deploys.
