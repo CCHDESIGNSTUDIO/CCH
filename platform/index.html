@@ -3015,6 +3015,9 @@
         <button class="nav-item" data-page="allpos">
           <span class="nav-icon">◈</span><span class="nav-label">Purchase Orders</span>
         </button>
+        <button class="nav-item" id="navOrderManagement" data-page="ordermanagement" onclick="event.stopImmediatePropagation();navigate('#/ordermanagement/open')" style="display:none;" title="Open PO dashboard — staging Phase 1">
+          <span class="nav-icon">📋</span><span class="nav-label">Order Management</span>
+        </button>
         <button class="nav-item" data-page="vendorbills" onclick="event.stopImmediatePropagation();navigate('#/vendorbills')" title="Vendor bills firm-wide — open balances, awaiting bill, and client variances">
           <span class="nav-icon">📥</span><span class="nav-label">Vendor Bills</span>
         </button>
@@ -4534,6 +4537,21 @@
       else if (page === 'allproposals') { window._proposalsListPreset = parts[1] || ''; renderAllProposals(); }
       else if (page === 'allinvoices') { window._invoicesListPreset = parts[1] || ''; renderAllInvoices(); }
       else if (page === 'allpos') { window._posListPreset = parts[1] || ''; renderAllPOs(); }
+      else if (page === 'ordermanagement' || page === 'ordermgmt') {
+        if (typeof window.renderOrderManagementPage === 'function') {
+          window.renderOrderManagementPage();
+        } else {
+          var _omT = document.getElementById('contentArea');
+          if (_omT) {
+            _omT.innerHTML = '<div style="padding:40px;max-width:560px;"><h1 class="page-title">Order Management</h1>' +
+              '<p style="color:#B45309;font-weight:600;margin:16px 0;">Order Management did not load.</p>' +
+              '<p style="color:var(--gray-500);font-size:13px;line-height:1.5;">Hard refresh (<strong>Ctrl+Shift+R</strong>). ' +
+              'Check the console for errors in <code>cch-order-management.js</code>.</p></div>';
+          }
+          if (typeof window.setBreadcrumb === 'function') window.setBreadcrumb([{ label: 'Order Management' }]);
+          if (typeof window.setTopbarActions === 'function') window.setTopbarActions('');
+        }
+      }
       else if (page === 'vendorbills' || page === 'discrepancyreport') {
         window._vendorBillsPreset = parts[1] || '';
         if (parts[1] === 'variances' || page === 'discrepancyreport') window._vendorBillsTab = 'variances';
@@ -71820,6 +71838,7 @@ ${pages}
   <script src="cch-proposals-invoices-fix.js?v=20260620icons"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
   <script src="cch-po-bill-variance.js?v=20260603vdoctype"></script>
+  <script src="cch-order-management.js?v=20260602om1"></script>
   <script src="cch-ffe-procurement.js?v=20260602"></script>
 </body>
 </html>
