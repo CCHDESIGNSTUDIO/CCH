@@ -5,7 +5,7 @@
 (function() {
   'use strict';
 
-  var OM_BUILD = '20260602om2';
+  var OM_BUILD = '20260602om5';
 
   function esc(t) {
     if (typeof window.esc === 'function') return window.esc(t);
@@ -184,7 +184,8 @@
       { id: 'open', label: 'Open POs', hash: '#/ordermanagement/open' },
       { id: 'noeta', label: 'Missing ETA', hash: '#/ordermanagement/noeta' },
       { id: 'noconfirm', label: 'Missing confirmations', hash: '#/ordermanagement/noconfirm' },
-      { id: 'receiving', label: 'Receiving status', hash: '#/ordermanagement/receiving' }
+      { id: 'receiving', label: 'Receiving status', hash: '#/ordermanagement/receiving' },
+      { id: 'qb', label: 'QuickBooks', hash: '#/ordermanagement/qb' }
     ];
     return '<div style="display:flex;gap:0;margin:20px 0 16px;border-bottom:2px solid rgba(196,164,100,0.15);">' +
       tabs.map(function(t) {
@@ -202,7 +203,10 @@
       window._omSortDir = window._omSortDir === 'asc' ? 'desc' : 'asc';
     } else {
       window._omSortField = field;
-      window._omSortDir = (field === 'age' || field === 'amount' || field === 'missingEta') ? 'desc' : 'asc';
+      window._omSortTouched = true;
+      window._omSortDir = (field === 'age' || field === 'amount' || field === 'missingEta' ||
+        field === 'outstanding' || field === 'bills') ? 'desc' : 'asc';
+      if (field === 'date') window._omSortDir = 'desc';
     }
     window.renderOrderManagementPage();
   };
@@ -212,9 +216,22 @@
     return window._omSortDir === 'asc' ? ' ▲' : ' ▼';
   }
 
+  function omCompareDates(a, b, dir) {
+    var ta = new Date(a || 0).getTime();
+    var tb = new Date(b || 0).getTime();
+    if (isNaN(ta)) ta = 0;
+    if (isNaN(tb)) tb = 0;
+    return (ta - tb) * dir;
+  }
+
   function sortOmRows(rows) {
-    var field = window._omSortField || 'age';
+    var field = window._omSortField || 'date';
     var dir = window._omSortDir === 'asc' ? 1 : -1;
+    if (field === 'date') {
+      return rows.slice().sort(function(a, b) {
+        return omCompareDates(poIssueDate(a), poIssueDate(b), dir);
+      });
+    }
     return rows.slice().sort(function(a, b) {
       var va;
       var vb;
@@ -241,6 +258,12 @@
       } else if (field === 'missingEta') {
         va = window.cchOmMissingEtaLineCount(a);
         vb = window.cchOmMissingEtaLineCount(b);
+      } else if (field === 'confirm') {
+        va = window.cchOmPoConfirmDate(a) || '';
+        vb = window.cchOmPoConfirmDate(b) || '';
+      } else if (field === 'bills') {
+        va = window.cchOmBillsInfo(a).count;
+        vb = window.cchOmBillsInfo(b).count;
       } else if (field === 'amount') {
         va = poTotal(a);
         vb = poTotal(b);
@@ -343,6 +366,9 @@
         '<td style="' + td + '">' + esc(po._displayVendor || po.vendor || '—') + '</td>' +
         '<td style="' + td + 'color:var(--gray-500);">' + esc(po.projectName || po.projectId) + '</td>' +
         '<td style="' + td + '">' + statusHtml + '</td>' +
+        '<td style="' + td + '">' + omConfirmCellHtml(po) + '</td>' +
+        '<td style="' + td + '" onclick="event.stopPropagation()">' + omBillsCellHtml(po) + '</td>' +
+        '<td style="' + td + 'font-size:12px;color:var(--gray-500);white-space:nowrap;">' + esc(fmtDate(poIssueDate(po))) + '</td>' +
         '<td style="' + td + 'font-size:12px;color:' + ageColor + ';font-weight:600;">' + esc(ageTxt) + '</td>' +
         '<td style="' + td + 'font-size:12px;color:var(--gray-500);">' + esc(poEtaDisplay(po)) + '</td>' +
         '<td style="' + td + 'text-align:center;font-size:12px;">' +
@@ -352,12 +378,15 @@
         '</tr>';
     }).join('');
     return '<div class="card" style="overflow:hidden;overflow-x:auto;">' +
-      '<table style="width:100%;min-width:880px;border-collapse:collapse;font-size:13px;">' +
+      '<table style="width:100%;min-width:1040px;border-collapse:collapse;font-size:13px;">' +
       '<thead><tr style="border-bottom:2px solid var(--gray-200);">' +
       thSort('PO #', 'number') +
       thSort('Vendor', 'vendor') +
       thSort('Project', 'project') +
       thSort('Status', 'status') +
+      thSort('Confirm', 'confirm') +
+      thSort('Bills', 'bills', 'text-align:center;') +
+      thSort('Date', 'date') +
       thSort('Age', 'age') +
       thSort('ETA', 'eta') +
       thSort('Lines w/o ETA', 'missingEta', 'text-align:center;') +
@@ -408,11 +437,600 @@
     return openPosTable(rows);
   }
 
-  function comingSoonPanel(title, desc) {
-    return '<div class="card" style="padding:28px 24px;margin-top:8px;">' +
-      '<h3 style="margin:0 0 8px;font-size:16px;">' + esc(title) + '</h3>' +
-      '<p style="color:var(--gray-500);font-size:13px;line-height:1.5;margin:0;">' + esc(desc) + '</p>' +
-      '<p style="font-size:12px;color:var(--gray-400);margin:16px 0 0;">Phase 1 staging — report ships in a follow-up slice.</p></div>';
+  function poNumber(po) {
+    return String(po.number || po.num || po.poNum || po.name || '').trim();
+  }
+
+  /** Vendor invoice rows on this PO (same sources as Vendor Bills list). */
+  window.cchOmBillsInfo = function(po) {
+    po = po || {};
+    var bill = po.bill || {};
+    var items = po.items || [];
+    var hasBill = !!(bill.received || bill.qbBillId);
+    var sent = typeof window.cchPoWasSentToVendor === 'function'
+      ? window.cchPoWasSentToVendor(po).sent
+      : !!(po.poSentAt || po.sentAt);
+    var groups = typeof window.cchPoVendorInvoiceGroupsDisplay === 'function'
+      ? window.cchPoVendorInvoiceGroupsDisplay(po, items)
+      : (Array.isArray(po.vendorInvoiceGroups) ? po.vendorInvoiceGroups : []);
+    var bills = groups.map(function(g) {
+      return {
+        invNum: String(g.vendorInvoiceNumber || g.label || '').trim() || 'Vendor invoice',
+        groupId: String(g.id || '').trim()
+      };
+    }).filter(function(b) { return b.groupId || b.invNum; });
+    if (!bills.length && hasBill) {
+      var inv = String(bill.vendorInvoiceNumber || '').trim();
+      var blRef = typeof window.cchPoQbBillDocNumberFromPo === 'function'
+        ? window.cchPoQbBillDocNumberFromPo(po) : '';
+      bills.push({
+        invNum: inv || blRef || 'Vendor bill',
+        groupId: 'vig_from_bill_primary'
+      });
+    }
+    return {
+      count: bills.length,
+      hasBill: hasBill,
+      awaitingBill: sent && !hasBill,
+      bills: bills
+    };
+  };
+
+  /** Earliest vendor confirmation date on the PO (vendor invoice groups / line meta). */
+  window.cchOmPoConfirmDate = function(po) {
+    po = po || {};
+    var items = po.items || [];
+    var dates = [];
+    var groups = typeof window.cchPoVendorInvoiceGroupsDisplay === 'function'
+      ? window.cchPoVendorInvoiceGroupsDisplay(po, items)
+      : (po.vendorInvoiceGroups || []);
+    groups.forEach(function(g) {
+      var d = String(g.confirmedDate || '').trim();
+      if (d) dates.push(d);
+    });
+    if (!dates.length) {
+      for (var i = 0; i < items.length; i++) {
+        var d2 = '';
+        if (typeof window.cchPoLineEtaMetaForItem === 'function') {
+          d2 = String(window.cchPoLineEtaMetaForItem(po, items[i], i, items).confirmedDate || '').trim();
+        }
+        if (!d2) d2 = String(items[i].confirmedDate || '').trim();
+        if (d2) dates.push(d2);
+      }
+    }
+    if (!dates.length) return '';
+    dates.sort();
+    return dates[0];
+  };
+
+  window.cchOmOpenPoBill = function(projectId, poId, groupId) {
+    groupId = String(groupId || '').trim();
+    if (groupId && typeof window.cchPoOpenVendorInvoiceGroupModal === 'function') {
+      return window.cchPoOpenVendorInvoiceGroupModal(projectId, poId, groupId);
+    }
+    if (typeof window.cchPoOpenReceiveBillModal === 'function') {
+      return window.cchPoOpenReceiveBillModal(projectId, poId, groupId ? 'edit' : '');
+    }
+    navigate('#/project/' + projectId + '/po/' + poId);
+  };
+
+  function omConfirmCellHtml(po) {
+    var raw = window.cchOmPoConfirmDate(po);
+    if (!raw) return '<span style="color:var(--gray-400);">—</span>';
+    return '<span style="font-size:12px;color:var(--gray-600);white-space:nowrap;" title="Vendor order confirmation">' +
+      esc(fmtDate(raw)) + '</span>';
+  }
+
+  function omBillsCellHtml(po) {
+    var info = window.cchOmBillsInfo(po);
+    var pid = escAttr(po.projectId);
+    var poid = escAttr(po.id);
+    if (!info.count) {
+      if (info.awaitingBill) {
+        return '<button type="button" class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 8px;" ' +
+          'onclick="event.stopPropagation();window.cchOmOpenPoBill(\'' + pid + '\',\'' + poid + '\',\'\')">Receive bill</button>';
+      }
+      return '<span style="color:var(--gray-400);font-size:12px;">—</span>';
+    }
+    if (info.count === 1) {
+      var b0 = info.bills[0];
+      var gid0 = escAttr(b0.groupId || '');
+      return '<button type="button" class="btn btn-link btn-sm" style="font-size:12px;font-weight:700;color:var(--gold);padding:0;" ' +
+        'onclick="event.stopPropagation();window.cchOmOpenPoBill(\'' + pid + '\',\'' + poid + '\',\'' + gid0 + '\')" ' +
+        'title="Open vendor invoice ' + escAttr(b0.invNum) + '">1</button>';
+    }
+    var links = info.bills.map(function(b) {
+      return '<button type="button" class="btn btn-link btn-sm" style="font-size:10px;padding:0 4px 0 0;color:#1B3352;font-weight:600;" ' +
+        'onclick="event.stopPropagation();window.cchOmOpenPoBill(\'' + pid + '\',\'' + poid + '\',\'' + escAttr(b.groupId || '') + '\')" ' +
+        'title="Open ' + escAttr(b.invNum) + '">' + esc(b.invNum.length > 12 ? b.invNum.slice(0, 11) + '…' : b.invNum) + '</button>';
+    }).join('<span style="color:var(--gray-300);"> · </span>');
+    return '<div style="line-height:1.4;" onclick="event.stopPropagation()">' +
+      '<span style="font-size:11px;font-weight:700;color:var(--gold);margin-right:6px;">' + info.count + '</span>' +
+      '<span style="font-size:10px;">' + links + '</span></div>';
+  }
+
+  function poNumbersMatch(a, b) {
+    a = String(a || '').trim().replace(/\s+/g, '');
+    b = String(b || '').trim().replace(/\s+/g, '');
+    if (!a || !b) return false;
+    return a === b || a.replace(/^PO-?/i, '') === b.replace(/^PO-?/i, '');
+  }
+
+  function countPoMerchLines(po) {
+    var items = po.items || [];
+    var n = 0;
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      if (typeof window.isProposalGroupHeaderItem === 'function' &&
+          window.isProposalGroupHeaderItem(it)) continue;
+      if (typeof window.cchPoLineIsBillOnlyExpense === 'function' &&
+          window.cchPoLineIsBillOnlyExpense(it)) continue;
+      n++;
+    }
+    return n;
+  }
+
+  function orderStatusBucket(st) {
+    st = String(st || '').trim().toLowerCase();
+    if (st === 'received' || st === 'installed') return 'received';
+    if (st === 'shipped' || st === 'at receiver' || st === 'at workroom' ||
+        st === 'partially received' || st === 'delivered') return 'intransit';
+    return 'outstanding';
+  }
+
+  function findLinkedClipsForPo(po, clipRows) {
+    if (!clipRows || !clipRows.length) return [];
+    var poId = po.id;
+    var num = poNumber(po);
+    return clipRows.filter(function(row) {
+      var c = row.data || {};
+      var linked = (c.poId === poId || c.purchaseOrderId === poId);
+      if (!linked && num) {
+        var cn = String(c.poNum || c.houzzPO || c.purchaseOrderNum || c.po || '').trim();
+        linked = poNumbersMatch(cn, num);
+      }
+      return linked;
+    });
+  }
+
+  window.cchOmReceivingSummary = function(po, clipRows) {
+    var linked = findLinkedClipsForPo(po, clipRows || []);
+    var received = 0;
+    var intransit = 0;
+    var outstanding = 0;
+    linked.forEach(function(row) {
+      var b = orderStatusBucket((row.data || {}).orderStatus || (row.data || {}).status);
+      if (b === 'received') received++;
+      else if (b === 'intransit') intransit++;
+      else outstanding++;
+    });
+    var poLines = countPoMerchLines(po);
+    var unlinkedLines = Math.max(0, poLines - linked.length);
+    var poBucket = orderStatusBucket(po.status);
+    var needsAttention = outstanding > 0 || intransit > 0 || unlinkedLines > 0 ||
+      (linked.length === 0 && poLines > 0 && poBucket !== 'received');
+    return {
+      received: received,
+      intransit: intransit,
+      outstanding: outstanding,
+      linked: linked.length,
+      poLines: poLines,
+      unlinkedLines: unlinkedLines,
+      poBucket: poBucket,
+      needsAttention: needsAttention,
+      location: po.receiver || po.workroom || po.location || po.shipTo || ''
+    };
+  };
+
+  async function cchOmLoadClipsByProject(projectIds) {
+    var map = {};
+    if (!projectIds.length || typeof firebase === 'undefined') return map;
+    await Promise.all(projectIds.map(async function(pid) {
+      try {
+        var snap = await firebase.firestore().collection('boards').doc(pid).collection('clips').get();
+        var rows = [];
+        snap.forEach(function(d) {
+          rows.push({ id: d.id, data: d.data() || {} });
+        });
+        map[pid] = rows;
+      } catch (_e) {
+        map[pid] = [];
+      }
+    }));
+    return map;
+  }
+
+  function recvCountPill(label, count, color) {
+    if (!count) return '';
+    return '<span style="font-size:11px;font-weight:600;color:' + color + ';margin-right:8px;white-space:nowrap;">' +
+      esc(String(count)) + ' ' + esc(label) + '</span>';
+  }
+
+  function receivingFilterToolbar(projList, vendors, totalCount, filteredCount) {
+    var fp = window._omFilterProject || '';
+    var fv = window._omFilterVendor || '';
+    var fr = window._omRecvFilter || 'attention';
+    var kw = window._omFilterKeyword || '';
+    return '<p style="color:var(--gray-400);margin:0 0 8px;font-size:12px;">' +
+      (filteredCount === totalCount
+        ? esc(String(totalCount) + ' PO' + (totalCount !== 1 ? 's' : '') + ' in receiving view')
+        : 'Showing ' + filteredCount + ' of ' + totalCount + ' POs') +
+      ' · Linked room-board selections + PO status · click a row to open PO</p>' +
+      '<div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">' +
+      '<input type="search" placeholder="Search PO #, vendor, project…" class="form-input" ' +
+      'value="' + escAttr(kw) + '" oninput="window._omFilterKeyword=this.value;window.cchOmDebounceRender()" ' +
+      'style="flex:1;min-width:220px;">' +
+      '<select class="form-input" style="width:180px;" onchange="window._omFilterProject=this.value;window.renderOrderManagementPage()">' +
+      '<option value="">All projects</option>' +
+      projList.map(function(p) {
+        return '<option value="' + escAttr(p.id) + '"' + (fp === p.id ? ' selected' : '') + '>' + esc(p.name || p.id) + '</option>';
+      }).join('') +
+      '</select>' +
+      '<select class="form-input" style="width:160px;" onchange="window._omFilterVendor=this.value;window.renderOrderManagementPage()">' +
+      '<option value="">All vendors</option>' +
+      vendors.map(function(v) {
+        return '<option value="' + escAttr(v) + '"' + (fv === v ? ' selected' : '') + '>' + esc(v) + '</option>';
+      }).join('') +
+      '</select>' +
+      '<select class="form-input" style="width:200px;" onchange="window._omRecvFilter=this.value;window.renderOrderManagementPage()">' +
+      '<option value="attention"' + (fr === 'attention' ? ' selected' : '') + '>Needs attention</option>' +
+      '<option value="all"' + (fr === 'all' ? ' selected' : '') + '>All open POs</option>' +
+      '<option value="intransit"' + (fr === 'intransit' ? ' selected' : '') + '>In transit</option>' +
+      '<option value="noclips"' + (fr === 'noclips' ? ' selected' : '') + '>No linked selections</option>' +
+      '</select>' +
+      '</div>';
+  }
+
+  function applyReceivingFilters(rows) {
+    var fp = window._omFilterProject || '';
+    var fv = window._omFilterVendor || '';
+    var fr = window._omRecvFilter || 'attention';
+    var kw = (window._omFilterKeyword || '').trim().toLowerCase();
+    return rows.filter(function(row) {
+      var po = row.po;
+      var r = row.recv;
+      if (fp && po.projectId !== fp) return false;
+      var vend = String(po._displayVendor || po.vendor || '').trim();
+      if (fv && vend !== fv) return false;
+      if (fr === 'attention' && !r.needsAttention) return false;
+      if (fr === 'intransit' && !(r.intransit > 0 || r.poBucket === 'intransit')) return false;
+      if (fr === 'noclips' && !(r.linked === 0 && r.poLines > 0)) return false;
+      if (kw) {
+        var blob = [po.number, po.id, vend, po.projectName, po.status, r.location].join(' ').toLowerCase();
+        if (blob.indexOf(kw) < 0) return false;
+      }
+      return true;
+    });
+  }
+
+  function sortReceivingRows(rows) {
+    var field = window._omSortField || 'outstanding';
+    var dir = window._omSortDir === 'asc' ? 1 : -1;
+    return rows.slice().sort(function(a, b) {
+      var poA = a.po;
+      var poB = b.po;
+      var rA = a.recv;
+      var rB = b.recv;
+      var va;
+      var vb;
+      if (field === 'number') {
+        va = poNumber(poA);
+        vb = poNumber(poB);
+      } else if (field === 'vendor') {
+        va = String(poA._displayVendor || poA.vendor || '').toLowerCase();
+        vb = String(poB._displayVendor || poB.vendor || '').toLowerCase();
+      } else if (field === 'project') {
+        va = String(poA.projectName || poA.projectId || '').toLowerCase();
+        vb = String(poB.projectName || poB.projectId || '').toLowerCase();
+      } else if (field === 'status') {
+        va = String(poA.status || '').toLowerCase();
+        vb = String(poB.status || '').toLowerCase();
+      } else if (field === 'received') {
+        va = rA.received;
+        vb = rB.received;
+      } else if (field === 'intransit') {
+        va = rA.intransit;
+        vb = rB.intransit;
+      } else if (field === 'outstanding') {
+        va = rA.outstanding + rA.unlinkedLines;
+        vb = rB.outstanding + rB.unlinkedLines;
+      } else if (field === 'confirm') {
+        va = window.cchOmPoConfirmDate(poA) || '';
+        vb = window.cchOmPoConfirmDate(poB) || '';
+      } else if (field === 'bills') {
+        va = window.cchOmBillsInfo(poA).count;
+        vb = window.cchOmBillsInfo(poB).count;
+      } else if (field === 'poLines') {
+        va = rA.poLines;
+        vb = rB.poLines;
+      } else if (field === 'amount') {
+        va = poTotal(poA);
+        vb = poTotal(poB);
+      } else {
+        va = poAgeDays(poA);
+        vb = poAgeDays(poB);
+        if (va == null) va = -1;
+        if (vb == null) vb = -1;
+      }
+      if (va < vb) return -1 * dir;
+      if (va > vb) return 1 * dir;
+      return 0;
+    });
+  }
+
+  function receivingStatusReport(allOpen, clipsByProject, projList, vendors) {
+    var enriched = allOpen.map(function(po) {
+      var clips = clipsByProject[po.projectId] || [];
+      return { po: po, recv: window.cchOmReceivingSummary(po, clips) };
+    });
+    var totalPool = enriched.length;
+    var filtered = applyReceivingFilters(enriched);
+    if (!filtered.length) {
+      return receivingFilterToolbar(projList, vendors, totalPool, 0) +
+        '<div class="empty-state"><div class="empty-icon">✓</div><div class="empty-text">No POs match this receiving filter.</div></div>';
+    }
+    var sorted = sortReceivingRows(filtered);
+    var td = 'padding:10px 12px;font-size:13px;';
+    var body = sorted.map(function(row) {
+      var po = row.po;
+      var r = row.recv;
+      var statusHtml = typeof window.cchPoFulfillmentStatusBadgeHtml === 'function'
+        ? window.cchPoFulfillmentStatusBadgeHtml(po, { projectId: po.projectId, poId: po.id, clickable: false })
+        : esc(po.status || 'Draft');
+      var clipSummary = r.linked
+        ? recvCountPill('received', r.received, '#5FA56B') +
+          recvCountPill('in transit', r.intransit, '#C4A464') +
+          recvCountPill('outstanding', r.outstanding, '#E16A5B')
+        : '<span style="font-size:11px;color:var(--gray-400);">No linked selections</span>';
+      var unlinked = r.unlinkedLines > 0
+        ? '<span style="font-size:11px;color:#E16A5B;font-weight:600;">+' + r.unlinkedLines + ' unlinked line' + (r.unlinkedLines !== 1 ? 's' : '') + '</span>'
+        : '—';
+      return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="navigate(\'#/project/' +
+        escAttr(po.projectId) + '/po/' + escAttr(po.id) + '\')">' +
+        '<td style="' + td + 'font-weight:600;font-family:monospace;color:var(--gold);">' + esc(po.number || po.id.substring(0, 8)) + '</td>' +
+        '<td style="' + td + '">' + esc(po._displayVendor || po.vendor || '—') + '</td>' +
+        '<td style="' + td + 'color:var(--gray-500);">' + esc(po.projectName || po.projectId) + '</td>' +
+        '<td style="' + td + '">' + statusHtml + '</td>' +
+        '<td style="' + td + '">' + omConfirmCellHtml(po) + '</td>' +
+        '<td style="' + td + '" onclick="event.stopPropagation()">' + omBillsCellHtml(po) + '</td>' +
+        '<td style="' + td + 'font-size:12px;line-height:1.5;">' + clipSummary + '</td>' +
+        '<td style="' + td + 'text-align:center;font-size:12px;">' + esc(String(r.poLines || '—')) + '</td>' +
+        '<td style="' + td + 'text-align:center;font-size:12px;">' + unlinked + '</td>' +
+        '<td style="' + td + 'font-size:12px;color:var(--gray-500);">' + esc(r.location || '—') + '</td>' +
+        '<td style="' + td + 'text-align:right;font-weight:600;font-family:monospace;">$' +
+        poTotal(po).toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
+        '</tr>';
+    }).join('');
+    return receivingFilterToolbar(projList, vendors, totalPool, filtered.length) +
+      '<div class="card" style="overflow:hidden;overflow-x:auto;">' +
+      '<table style="width:100%;min-width:1160px;border-collapse:collapse;font-size:13px;">' +
+      '<thead><tr style="border-bottom:2px solid var(--gray-200);">' +
+      thSort('PO #', 'number') +
+      thSort('Vendor', 'vendor') +
+      thSort('Project', 'project') +
+      thSort('PO status', 'status') +
+      thSort('Confirm', 'confirm') +
+      thSort('Bills', 'bills', 'text-align:center;') +
+      '<th style="padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Linked selections</th>' +
+      thSort('PO lines', 'poLines', 'text-align:center;') +
+      thSort('Unlinked', 'outstanding', 'text-align:center;') +
+      '<th style="padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Location</th>' +
+      thSort('Total', 'amount', 'text-align:right;') +
+      '</tr></thead><tbody>' + body + '</tbody></table></div>';
+  }
+
+  window.cchOmQbInfo = function(po) {
+    po = po || {};
+    var bill = po.bill || {};
+    var billOnly = typeof window.cchPoQbBillOnlyMode === 'function' && window.cchPoQbBillOnlyMode();
+    var pushAllowed = typeof window.cchPoQbBillPushAllowed === 'function' ? window.cchPoQbBillPushAllowed() : true;
+    var qbBillId = String(bill.qbBillId || '').trim();
+    var legQb = typeof window.getQbId === 'function' ? window.getQbId(po) : String(po.qbDocId || '').trim();
+    var hasBill = !!(bill.received || bill.qbBillId);
+    var sent = typeof window.cchPoWasSentToVendor === 'function'
+      ? window.cchPoWasSentToVendor(po).sent
+      : !!(po.poSentAt || po.sentAt);
+    var blRef = typeof window.cchPoQbBillDocNumberFromPo === 'function'
+      ? window.cchPoQbBillDocNumberFromPo(po) : '';
+    var bucket = 'draft';
+    if (billOnly) {
+      if (qbBillId) bucket = 'synced';
+      else if (hasBill && pushAllowed) bucket = 'ready';
+      else if (hasBill) bucket = 'ready_staging';
+      else if (sent) bucket = 'awaiting_bill';
+    } else if (legQb) {
+      bucket = 'synced';
+    } else if (hasBill || sent) {
+      bucket = 'ready';
+    }
+    return {
+      bucket: bucket,
+      needsAttention: bucket === 'ready' || bucket === 'ready_staging',
+      blRef: blRef,
+      qbBillId: qbBillId,
+      legQb: legQb,
+      hasBill: hasBill,
+      sent: sent,
+      billOnly: billOnly,
+      pushAllowed: pushAllowed
+    };
+  };
+
+  function cchOmPoQbRelevant(po) {
+    if (!window.cchOmIsStudioPo(po)) return false;
+    var q = window.cchOmQbInfo(po);
+    return !!(q.sent || q.hasBill || q.qbBillId || q.legQb);
+  }
+
+  function qbFilterToolbar(projList, vendors, totalCount, filteredCount, stats) {
+    var fp = window._omFilterProject || '';
+    var fv = window._omFilterVendor || '';
+    var fq = window._omQbFilter || 'attention';
+    var kw = window._omFilterKeyword || '';
+    stats = stats || {};
+    var stagingNote = stats.pushBlocked
+      ? ' · Bill push to QuickBooks is disabled on staging — use production to sync'
+      : '';
+    return '<p style="color:var(--gray-400);margin:0 0 8px;font-size:12px;">' +
+      (filteredCount === totalCount
+        ? esc(String(totalCount) + ' Studio PO' + (totalCount !== 1 ? 's' : '') + ' in QB view')
+        : 'Showing ' + filteredCount + ' of ' + totalCount + ' POs') +
+      ' · ' + (stats.ready || 0) + ' ready to push · ' + (stats.synced || 0) + ' synced' + stagingNote + '</p>' +
+      '<div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">' +
+      '<input type="search" placeholder="Search PO #, vendor, bill #…" class="form-input" ' +
+      'value="' + escAttr(kw) + '" oninput="window._omFilterKeyword=this.value;window.cchOmDebounceRender()" ' +
+      'style="flex:1;min-width:220px;">' +
+      '<select class="form-input" style="width:180px;" onchange="window._omFilterProject=this.value;window.renderOrderManagementPage()">' +
+      '<option value="">All projects</option>' +
+      projList.map(function(p) {
+        return '<option value="' + escAttr(p.id) + '"' + (fp === p.id ? ' selected' : '') + '>' + esc(p.name || p.id) + '</option>';
+      }).join('') +
+      '</select>' +
+      '<select class="form-input" style="width:160px;" onchange="window._omFilterVendor=this.value;window.renderOrderManagementPage()">' +
+      '<option value="">All vendors</option>' +
+      vendors.map(function(v) {
+        return '<option value="' + escAttr(v) + '"' + (fv === v ? ' selected' : '') + '>' + esc(v) + '</option>';
+      }).join('') +
+      '</select>' +
+      '<select class="form-input" style="width:190px;" onchange="window._omQbFilter=this.value;window.renderOrderManagementPage()">' +
+      '<option value="attention"' + (fq === 'attention' ? ' selected' : '') + '>Needs QB action</option>' +
+      '<option value="ready"' + (fq === 'ready' ? ' selected' : '') + '>Ready to push</option>' +
+      '<option value="synced"' + (fq === 'synced' ? ' selected' : '') + '>Synced to QB</option>' +
+      '<option value="all"' + (fq === 'all' ? ' selected' : '') + '>All sent / billed POs</option>' +
+      '</select>' +
+      '<a class="btn btn-secondary btn-sm" href="#/quickbooks" onclick="event.preventDefault();navigate(\'#/quickbooks\')">Full QB hub</a>' +
+      '</div>';
+  }
+
+  function applyQbFilters(rows) {
+    var fp = window._omFilterProject || '';
+    var fv = window._omFilterVendor || '';
+    var fq = window._omQbFilter || 'attention';
+    var kw = (window._omFilterKeyword || '').trim().toLowerCase();
+    return rows.filter(function(row) {
+      var po = row.po;
+      var q = row.qb;
+      if (fp && po.projectId !== fp) return false;
+      var vend = String(po._displayVendor || po.vendor || '').trim();
+      if (fv && vend !== fv) return false;
+      if (fq === 'attention' && !q.needsAttention) return false;
+      if (fq === 'ready' && q.bucket !== 'ready' && q.bucket !== 'ready_staging') return false;
+      if (fq === 'synced' && q.bucket !== 'synced') return false;
+      if (kw) {
+        var blob = [po.number, po.id, vend, po.projectName, q.blRef, q.qbBillId, q.legQb].join(' ').toLowerCase();
+        if (blob.indexOf(kw) < 0) return false;
+      }
+      return true;
+    });
+  }
+
+  function sortQbRows(rows) {
+    var field = window._omSortField || 'date';
+    var dir = window._omSortDir === 'asc' ? 1 : -1;
+    if (field === 'date') {
+      return rows.slice().sort(function(a, b) {
+        return omCompareDates(poIssueDate(a.po), poIssueDate(b.po), dir);
+      });
+    }
+    return rows.slice().sort(function(a, b) {
+      var poA = a.po;
+      var poB = b.po;
+      var qA = a.qb;
+      var qB = b.qb;
+      var va;
+      var vb;
+      if (field === 'number') {
+        va = poNumber(poA);
+        vb = poNumber(poB);
+      } else if (field === 'vendor') {
+        va = String(poA._displayVendor || poA.vendor || '').toLowerCase();
+        vb = String(poB._displayVendor || poB.vendor || '').toLowerCase();
+      } else if (field === 'project') {
+        va = String(poA.projectName || poA.projectId || '').toLowerCase();
+        vb = String(poB.projectName || poB.projectId || '').toLowerCase();
+      } else if (field === 'amount') {
+        va = poTotal(poA);
+        vb = poTotal(poB);
+      } else {
+        va = String(qA.blRef || qA.qbBillId || qA.legQb || '').toLowerCase();
+        vb = String(qB.blRef || qB.qbBillId || qB.legQb || '').toLowerCase();
+      }
+      if (va < vb) return -1 * dir;
+      if (va > vb) return 1 * dir;
+      return 0;
+    });
+  }
+
+  function qbStatusReport(studioPos, projList) {
+    var pool = studioPos.filter(cchOmPoQbRelevant);
+    var enriched = pool.map(function(po) {
+      return { po: po, qb: window.cchOmQbInfo(po) };
+    });
+    var stats = { ready: 0, synced: 0, pushBlocked: false };
+    enriched.forEach(function(row) {
+      if (row.qb.bucket === 'synced') stats.synced++;
+      if (row.qb.bucket === 'ready' || row.qb.bucket === 'ready_staging') stats.ready++;
+      if (row.qb.bucket === 'ready_staging') stats.pushBlocked = true;
+    });
+    var vendors = [];
+    pool.forEach(function(po) {
+      var v = String(po._displayVendor || po.vendor || '').trim();
+      if (v && vendors.indexOf(v) < 0) vendors.push(v);
+    });
+    vendors.sort();
+    var filtered = applyQbFilters(enriched);
+    if (!filtered.length) {
+      return qbFilterToolbar(projList, vendors, pool.length, 0, stats) +
+        '<div class="empty-state"><div class="empty-icon">✓</div><div class="empty-text">No POs match this QuickBooks filter.</div></div>';
+    }
+    var sorted = sortQbRows(filtered);
+    var td = 'padding:10px 12px;font-size:13px;';
+    var canPush = typeof window.userCanPushToQB === 'function' && window.userCanPushToQB();
+    var body = sorted.map(function(row) {
+      var po = row.po;
+      var q = row.qb;
+      var pid = escAttr(po.projectId);
+      var poid = escAttr(po.id);
+      var qbHtml = typeof window.cchPoQbListCellHtml === 'function'
+        ? window.cchPoQbListCellHtml(po)
+        : esc(q.bucket);
+      var action = '';
+      if (q.bucket === 'ready' && canPush && q.pushAllowed && typeof window.cchPoPushBillToQB === 'function') {
+        action = '<button type="button" class="btn btn-primary btn-sm" style="font-size:10px;padding:4px 10px;" ' +
+          'onclick="event.stopPropagation();window.cchPoPushBillToQB(\'' + pid + '\',\'' + poid + '\',null)">Push bill</button>';
+      } else if (q.bucket === 'ready_staging') {
+        action = '<span style="font-size:10px;color:var(--gray-400);">Prod only</span>';
+      } else if (q.bucket === 'awaiting_bill') {
+        action = '<button type="button" class="btn btn-secondary btn-sm" style="font-size:10px;padding:4px 10px;" ' +
+          'onclick="event.stopPropagation();window.cchOmOpenPoBill(\'' + pid + '\',\'' + poid + '\',\'\')">Receive bill</button>';
+      }
+      return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="navigate(\'#/project/' +
+        pid + '/po/' + poid + '\')">' +
+        '<td style="' + td + 'font-weight:600;font-family:monospace;color:var(--gold);">' + esc(po.number || po.id.substring(0, 8)) + '</td>' +
+        '<td style="' + td + '">' + esc(po._displayVendor || po.vendor || '—') + '</td>' +
+        '<td style="' + td + 'color:var(--gray-500);">' + esc(po.projectName || po.projectId) + '</td>' +
+        '<td style="' + td + 'font-size:12px;color:var(--gray-500);white-space:nowrap;">' + esc(fmtDate(poIssueDate(po))) + '</td>' +
+        '<td style="' + td + 'font-family:monospace;font-size:12px;font-weight:600;color:#1B3352;">' +
+        (q.blRef ? esc(q.blRef) : '<span style="color:var(--gray-400);font-weight:400;">—</span>') + '</td>' +
+        '<td style="' + td + '">' + qbHtml + '</td>' +
+        '<td style="' + td + 'text-align:right;font-weight:600;font-family:monospace;">$' +
+        poTotal(po).toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
+        '<td style="' + td + 'text-align:center;" onclick="event.stopPropagation()">' + action + '</td>' +
+        '</tr>';
+    }).join('');
+    return qbFilterToolbar(projList, vendors, pool.length, filtered.length, stats) +
+      '<div class="card" style="overflow:hidden;overflow-x:auto;">' +
+      '<table style="width:100%;min-width:980px;border-collapse:collapse;font-size:13px;">' +
+      '<thead><tr style="border-bottom:2px solid var(--gray-200);">' +
+      thSort('PO #', 'number') +
+      thSort('Vendor', 'vendor') +
+      thSort('Project', 'project') +
+      thSort('Date', 'date') +
+      '<th style="padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Bill #</th>' +
+      '<th style="padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">QB status</th>' +
+      thSort('Total', 'amount', 'text-align:right;') +
+      '<th style="padding:10px 12px;text-align:center;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Action</th>' +
+      '</tr></thead><tbody>' + body + '</tbody></table></div>';
   }
 
   window.cchOmDebounceRender = function() {
@@ -442,7 +1060,7 @@
     }
 
     if (!window._omSortField) {
-      window._omSortField = 'age';
+      window._omSortField = 'date';
       window._omSortDir = 'desc';
     }
 
@@ -451,13 +1069,30 @@
     if (hash.indexOf('/noeta') >= 0) tab = 'noeta';
     else if (hash.indexOf('/noconfirm') >= 0) tab = 'noconfirm';
     else if (hash.indexOf('/receiving') >= 0) tab = 'receiving';
+    else if (hash.indexOf('/qb') >= 0) tab = 'qb';
+    if (tab === 'receiving' && window._omLastTab !== 'receiving') {
+      window._omSortField = 'outstanding';
+      window._omSortDir = 'desc';
+      if (!window._omRecvFilter) window._omRecvFilter = 'attention';
+    } else if ((tab === 'open' || tab === 'qb') && window._omLastTab !== tab && !window._omSortTouched) {
+      window._omSortField = 'date';
+      window._omSortDir = 'desc';
+    }
+    if (tab === 'qb' && !window._omQbFilter) window._omQbFilter = 'attention';
+    window._omLastTab = tab;
     window._omTab = tab;
 
-    T.innerHTML = '<div style="padding:40px;color:var(--gray-500);">Loading order management…</div>';
+    var loadingMsg = tab === 'receiving'
+      ? 'Loading receiving status across projects…'
+      : tab === 'qb'
+        ? 'Loading QuickBooks status…'
+        : 'Loading order management…';
+    T.innerHTML = '<div style="padding:40px;color:var(--gray-500);">' + loadingMsg + '</div>';
     if (typeof window.setBreadcrumb === 'function') window.setBreadcrumb([{ label: 'Order Management' }]);
     if (typeof window.setTopbarActions === 'function') {
       window.setTopbarActions(
         '<a class="btn btn-secondary btn-sm" style="margin-right:8px;" href="#/allpos" onclick="event.preventDefault();navigate(\'#/allpos\')">All POs list</a>' +
+        '<a class="btn btn-secondary btn-sm" style="margin-right:8px;" href="#/quickbooks" onclick="event.preventDefault();navigate(\'#/quickbooks\')">QB settings</a>' +
         '<span style="font-size:11px;color:var(--gray-400);">build ' + OM_BUILD + '</span>'
       );
     }
@@ -509,6 +1144,13 @@
     var statuses = Object.keys(statusSet).sort();
 
     var filteredOpen = applyFilters(allOpen);
+    var recvVendors = [];
+    allOpen.forEach(function(po) {
+      var v = String(po._displayVendor || po.vendor || '').trim();
+      if (v && recvVendors.indexOf(v) < 0) recvVendors.push(v);
+    });
+    recvVendors.sort();
+
     var panel = '';
     if (tab === 'open') {
       panel = filterToolbar(projList, vendors, statuses, allOpen.length, filteredOpen.length) + openPosTable(filteredOpen);
@@ -516,9 +1158,15 @@
       panel = missingEtaReport(allOpen);
     } else if (tab === 'noconfirm') {
       panel = missingConfirmReport(noConfirm);
-    } else {
-      panel = comingSoonPanel('Receiving status',
-        'Per-PO and per-project view of received vs outstanding line quantities — linked to existing PO receive workflow, not a duplicate editor.');
+    } else if (tab === 'receiving') {
+      var recvProjectIds = [];
+      allOpen.forEach(function(po) {
+        if (po.projectId && recvProjectIds.indexOf(po.projectId) < 0) recvProjectIds.push(po.projectId);
+      });
+      var clipsByProject = await cchOmLoadClipsByProject(recvProjectIds);
+      panel = receivingStatusReport(allOpen, clipsByProject, projList, recvVendors);
+    } else if (tab === 'qb') {
+      panel = qbStatusReport(studioPos, projList);
     }
 
     T.innerHTML =
