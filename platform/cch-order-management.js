@@ -5,7 +5,7 @@
 (function() {
   'use strict';
 
-  var OM_BUILD = '20260602om1';
+  var OM_BUILD = '20260602om2';
 
   function esc(t) {
     if (typeof window.esc === 'function') return window.esc(t);
@@ -37,6 +37,26 @@
       (location.hostname || '').indexOf('staging') >= 0 ||
       location.hostname === 'localhost' ||
       location.hostname === '127.0.0.1';
+  };
+
+  /** Houzz legacy import POs — excluded from Order Management (Studio workflow only). */
+  window.cchOmIsHouzzPo = function(po) {
+    if (!po) return false;
+    if (po.houzzImport === true) return true;
+    var src = String(po.source || po.dataSource || po.origin || '').trim().toLowerCase();
+    if (src === 'houzz-import' || src === 'houzz_import' || src.indexOf('houzz') >= 0) return true;
+    if (po.houzzBalance != null && po.houzzBalance !== '') return true;
+    if (String(po._qbIdSource || '').toLowerCase() === 'houzz-import') return true;
+    var pays = po.payments || [];
+    for (var i = 0; i < pays.length; i++) {
+      var m = String((pays[i] || {}).method || '').toLowerCase();
+      if (m.indexOf('houzz') >= 0) return true;
+    }
+    return false;
+  };
+
+  window.cchOmIsStudioPo = function(po) {
+    return !window.cchOmIsHouzzPo(po);
   };
 
   function poTotal(po) {
@@ -104,7 +124,7 @@
         window.isProposalGroupHeaderItem(item)) return false;
     if (typeof window.cchPoLineIsBillOnlyExpense === 'function' &&
         window.cchPoLineIsBillOnlyExpense(item)) return false;
-  var et = String(item.expenseType || item.itemType || 'product').trim().toLowerCase();
+    var et = String(item.expenseType || item.itemType || 'product').trim().toLowerCase();
     if (et === 'freight' || et === 'service' || et === 'expense' || et === 'sales_tax') return false;
     if (po.eta) return false;
     var meta = null;
@@ -132,9 +152,6 @@
     if (po.eta) return po.eta;
     var bill = po.bill || {};
     if (bill.etaDate) return fmtDate(bill.etaDate);
-    if (typeof window.cchPoFormatEtaDate === 'function' && bill.etaDate) {
-      return window.cchPoFormatEtaDate(bill.etaDate);
-    }
     return '—';
   }
 
@@ -180,44 +197,106 @@
       '</div>';
   }
 
-  function filterRow(projList, vendors, statuses) {
+  window.cchOmSortBy = function(field) {
+    if (window._omSortField === field) {
+      window._omSortDir = window._omSortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      window._omSortField = field;
+      window._omSortDir = (field === 'age' || field === 'amount' || field === 'missingEta') ? 'desc' : 'asc';
+    }
+    window.renderOrderManagementPage();
+  };
+
+  function sortArrow(field) {
+    if (window._omSortField !== field) return ' ▾';
+    return window._omSortDir === 'asc' ? ' ▲' : ' ▼';
+  }
+
+  function sortOmRows(rows) {
+    var field = window._omSortField || 'age';
+    var dir = window._omSortDir === 'asc' ? 1 : -1;
+    return rows.slice().sort(function(a, b) {
+      var va;
+      var vb;
+      if (field === 'number') {
+        va = String(a.number || a.id || '');
+        vb = String(b.number || b.id || '');
+      } else if (field === 'vendor') {
+        va = String(a._displayVendor || a.vendor || '').toLowerCase();
+        vb = String(b._displayVendor || b.vendor || '').toLowerCase();
+      } else if (field === 'project') {
+        va = String(a.projectName || a.projectId || '').toLowerCase();
+        vb = String(b.projectName || b.projectId || '').toLowerCase();
+      } else if (field === 'status') {
+        va = String(a.status || 'Draft').toLowerCase();
+        vb = String(b.status || 'Draft').toLowerCase();
+      } else if (field === 'age') {
+        va = poAgeDays(a);
+        vb = poAgeDays(b);
+        if (va == null) va = -1;
+        if (vb == null) vb = -1;
+      } else if (field === 'eta') {
+        va = String(poEtaDisplay(a)).toLowerCase();
+        vb = String(poEtaDisplay(b)).toLowerCase();
+      } else if (field === 'missingEta') {
+        va = window.cchOmMissingEtaLineCount(a);
+        vb = window.cchOmMissingEtaLineCount(b);
+      } else if (field === 'amount') {
+        va = poTotal(a);
+        vb = poTotal(b);
+      } else {
+        va = poIssueDate(a);
+        vb = poIssueDate(b);
+      }
+      if (va < vb) return -1 * dir;
+      if (va > vb) return 1 * dir;
+      return 0;
+    });
+  }
+
+  function filterToolbar(projList, vendors, statuses, totalCount, filteredCount) {
     var fp = window._omFilterProject || '';
     var fv = window._omFilterVendor || '';
     var fs = window._omFilterStatus || '';
     var fa = window._omFilterAging || '';
     var kw = window._omFilterKeyword || '';
-    return '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;align-items:center;">' +
-      '<input type="search" placeholder="Search PO, vendor, project…" class="form-input" style="min-width:220px;max-width:320px;" ' +
-      'value="' + escAttr(kw) + '" oninput="window._omFilterKeyword=this.value;window.cchOmDebounceRender()">' +
-      '<select class="form-input" style="min-width:140px;" onchange="window._omFilterProject=this.value;window.renderOrderManagementPage()">' +
+    return '<p style="color:var(--gray-400);margin:0 0 8px;font-size:12px;">' +
+      (filteredCount === totalCount
+        ? esc(String(totalCount) + ' open Studio PO' + (totalCount !== 1 ? 's' : ''))
+        : 'Showing ' + filteredCount + ' of ' + totalCount + ' open Studio POs') +
+      ' · Houzz legacy imports excluded</p>' +
+      '<div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">' +
+      '<input type="search" placeholder="Search PO #, vendor, project…" class="form-input" ' +
+      'value="' + escAttr(kw) + '" oninput="window._omFilterKeyword=this.value;window.cchOmDebounceRender()" ' +
+      'style="flex:1;min-width:220px;">' +
+      '<select class="form-input" style="width:180px;" onchange="window._omFilterProject=this.value;window.renderOrderManagementPage()">' +
       '<option value="">All projects</option>' +
       projList.map(function(p) {
         return '<option value="' + escAttr(p.id) + '"' + (fp === p.id ? ' selected' : '') + '>' + esc(p.name || p.id) + '</option>';
       }).join('') +
       '</select>' +
-      '<select class="form-input" style="min-width:140px;" onchange="window._omFilterVendor=this.value;window.renderOrderManagementPage()">' +
+      '<select class="form-input" style="width:160px;" onchange="window._omFilterVendor=this.value;window.renderOrderManagementPage()">' +
       '<option value="">All vendors</option>' +
       vendors.map(function(v) {
         return '<option value="' + escAttr(v) + '"' + (fv === v ? ' selected' : '') + '>' + esc(v) + '</option>';
       }).join('') +
       '</select>' +
-      '<select class="form-input" style="min-width:140px;" onchange="window._omFilterStatus=this.value;window.renderOrderManagementPage()">' +
+      '<select class="form-input" style="width:150px;" onchange="window._omFilterStatus=this.value;window.renderOrderManagementPage()">' +
       '<option value="">All statuses</option>' +
       statuses.map(function(s) {
         return '<option value="' + escAttr(s) + '"' + (fs === s ? ' selected' : '') + '>' + esc(s) + '</option>';
       }).join('') +
       '</select>' +
-      '<select class="form-input" style="min-width:130px;" onchange="window._omFilterAging=this.value;window.renderOrderManagementPage()">' +
+      '<select class="form-input" style="width:130px;" onchange="window._omFilterAging=this.value;window.renderOrderManagementPage()">' +
       '<option value="">All ages</option>' +
       ['0-7', '8-14', '15-30', '31+', 'unknown'].map(function(b) {
         return '<option value="' + b + '"' + (fa === b ? ' selected' : '') + '>' + esc(agingLabel(b)) + '</option>';
       }).join('') +
       '</select>' +
-      '<button type="button" class="btn btn-secondary btn-sm" onclick="window._omFilterProject=\'\';window._omFilterVendor=\'\';window._omFilterStatus=\'\';window._omFilterAging=\'\';window._omFilterKeyword=\'\';window.renderOrderManagementPage()">Clear filters</button>' +
       '</div>';
   }
 
-  function applyFilters(openPos, projList) {
+  function applyFilters(openPos) {
     var fp = window._omFilterProject || '';
     var fv = window._omFilterVendor || '';
     var fs = window._omFilterStatus || '';
@@ -232,22 +311,25 @@
       var bucket = agingBucket(poAgeDays(po));
       if (fa && bucket !== fa) return false;
       if (kw) {
-        var blob = [
-          po.number, po.id, vend, po.projectName, st, po.eta
-        ].join(' ').toLowerCase();
+        var blob = [po.number, po.id, vend, po.projectName, st, po.eta].join(' ').toLowerCase();
         if (blob.indexOf(kw) < 0) return false;
       }
       return true;
     });
   }
 
+  function thSort(label, field, extraStyle) {
+    var st = 'padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;cursor:pointer;user-select:none;white-space:nowrap;' + (extraStyle || '');
+    return '<th style="' + st + '" onclick="window.cchOmSortBy(\'' + field + '\')">' + esc(label) + sortArrow(field) + '</th>';
+  }
+
   function openPosTable(rows) {
     if (!rows.length) {
-      return '<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">No open POs match your filters.</div></div>';
+      return '<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">No open Studio POs match your filters.</div></div>';
     }
-    var th = 'text-align:left;padding:12px 14px;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--gray-400);font-weight:600;white-space:nowrap;';
-    var td = 'padding:12px 14px;font-size:14px;';
-    var body = rows.map(function(po) {
+    var sorted = sortOmRows(rows);
+    var td = 'padding:10px 12px;font-size:13px;';
+    var body = sorted.map(function(po) {
       var age = poAgeDays(po);
       var ageTxt = age != null ? age + 'd' : '—';
       var ageColor = age == null ? 'var(--gray-400)' : (age > 30 ? '#E16A5B' : (age > 14 ? '#C4A464' : 'var(--gray-500)'));
@@ -267,16 +349,20 @@
         (missEta > 0 ? '<span style="color:#E16A5B;font-weight:600;">' + missEta + '</span>' : '—') + '</td>' +
         '<td style="' + td + 'text-align:right;font-weight:600;font-family:monospace;">$' +
         poTotal(po).toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
-        '<td style="' + td + 'text-align:center;" onclick="event.stopPropagation()">' +
-        '<button type="button" class="btn btn-primary btn-sm" style="font-size:11px;" onclick="event.stopPropagation();navigate(\'#/project/' +
-        escAttr(po.projectId) + '/po/' + escAttr(po.id) + '\')">View PO</button></td>' +
         '</tr>';
     }).join('');
-    return '<div class="card" style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="border-bottom:2px solid var(--gray-200);">' +
-      '<th style="' + th + '">PO #</th><th style="' + th + '">Vendor</th><th style="' + th + '">Project</th>' +
-      '<th style="' + th + '">Status</th><th style="' + th + '">Age</th><th style="' + th + '">ETA</th>' +
-      '<th style="' + th + 'text-align:center;">Lines w/o ETA</th><th style="' + th + 'text-align:right;">Total</th>' +
-      '<th style="' + th + 'text-align:center;">Actions</th></tr></thead><tbody>' + body + '</tbody></table></div>';
+    return '<div class="card" style="overflow:hidden;overflow-x:auto;">' +
+      '<table style="width:100%;min-width:880px;border-collapse:collapse;font-size:13px;">' +
+      '<thead><tr style="border-bottom:2px solid var(--gray-200);">' +
+      thSort('PO #', 'number') +
+      thSort('Vendor', 'vendor') +
+      thSort('Project', 'project') +
+      thSort('Status', 'status') +
+      thSort('Age', 'age') +
+      thSort('ETA', 'eta') +
+      thSort('Lines w/o ETA', 'missingEta', 'text-align:center;') +
+      thSort('Total', 'amount', 'text-align:right;') +
+      '</tr></thead><tbody>' + body + '</tbody></table></div>';
   }
 
   function missingEtaReport(allOpen) {
@@ -288,8 +374,6 @@
         var it = items[i] || {};
         lines.push({
           po: po,
-          item: it,
-          idx: i,
           title: it.title || it.name || 'Line ' + (i + 1)
         });
       }
@@ -297,7 +381,7 @@
     if (!lines.length) {
       return '<div class="empty-state"><div class="empty-icon">✓</div><div class="empty-text">No open line items missing ETA.</div></div>';
     }
-    var th = 'text-align:left;padding:10px 12px;font-size:11px;text-transform:uppercase;color:var(--gray-400);';
+    var th = 'padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;';
     var td = 'padding:10px 12px;font-size:13px;';
     var body = lines.slice(0, 500).map(function(row) {
       var po = row.po;
@@ -310,7 +394,7 @@
         '<td style="' + td + 'font-size:12px;">' + esc(po.status || '') + '</td>' +
         '</tr>';
     }).join('');
-    var more = lines.length > 500 ? '<p style="font-size:12px;color:var(--gray-500);margin:12px 0;">Showing first 500 of ' + lines.length + ' lines.</p>' : '';
+    var more = lines.length > 500 ? '<p style="font-size:12px;color:var(--gray-500);margin:12px 0;">Showing first 500 of ' + lines.length + ' lines. Click a row to open the PO.</p>' : '';
     return more + '<div class="card" style="overflow-x:auto;margin-top:8px;"><table style="width:100%;border-collapse:collapse;">' +
       '<thead><tr style="border-bottom:2px solid var(--gray-200);">' +
       '<th style="' + th + '">PO #</th><th style="' + th + '">Vendor</th><th style="' + th + '">Project</th>' +
@@ -319,7 +403,7 @@
 
   function missingConfirmReport(rows) {
     if (!rows.length) {
-      return '<div class="empty-state"><div class="empty-icon">✓</div><div class="empty-text">No POs waiting on vendor confirmation.</div></div>';
+      return '<div class="empty-state"><div class="empty-icon">✓</div><div class="empty-text">No Studio POs waiting on vendor confirmation.</div></div>';
     }
     return openPosTable(rows);
   }
@@ -357,6 +441,11 @@
       return;
     }
 
+    if (!window._omSortField) {
+      window._omSortField = 'age';
+      window._omSortDir = 'desc';
+    }
+
     var hash = window.location.hash || '';
     var tab = 'open';
     if (hash.indexOf('/noeta') >= 0) tab = 'noeta';
@@ -376,9 +465,6 @@
     var pos = [];
     var projList = [];
     try {
-      if (typeof window.loadFinancialData === 'function') {
-        await window.loadFinancialData();
-      }
       if (typeof window.cchPoLoadAllPosForVendorBills === 'function') {
         var loaded = await window.cchPoLoadAllPosForVendorBills();
         pos = loaded.pos || [];
@@ -404,27 +490,28 @@
       return;
     }
 
-    var allOpen = pos.filter(window.cchOmIsOpenPo);
+    var studioPos = pos.filter(window.cchOmIsStudioPo);
+    var allOpen = studioPos.filter(window.cchOmIsOpenPo);
     var noConfirm = allOpen.filter(window.cchOmNeedsConfirmation);
     var missingEtaLines = 0;
     allOpen.forEach(function(po) { missingEtaLines += window.cchOmMissingEtaLineCount(po); });
     var openValue = allOpen.reduce(function(s, p) { return s + poTotal(p); }, 0);
+    var houzzExcluded = pos.length - studioPos.length;
 
     var vendors = [];
     var statusSet = {};
     allOpen.forEach(function(po) {
       var v = String(po._displayVendor || po.vendor || '').trim();
       if (v && vendors.indexOf(v) < 0) vendors.push(v);
-      var st = po.status || 'Draft';
-      statusSet[st] = true;
+      statusSet[po.status || 'Draft'] = true;
     });
     vendors.sort();
     var statuses = Object.keys(statusSet).sort();
 
-    var filteredOpen = applyFilters(allOpen, projList);
+    var filteredOpen = applyFilters(allOpen);
     var panel = '';
     if (tab === 'open') {
-      panel = filterRow(projList, vendors, statuses) + openPosTable(filteredOpen);
+      panel = filterToolbar(projList, vendors, statuses, allOpen.length, filteredOpen.length) + openPosTable(filteredOpen);
     } else if (tab === 'noeta') {
       panel = missingEtaReport(allOpen);
     } else if (tab === 'noconfirm') {
@@ -437,10 +524,11 @@
     T.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:4px;">' +
       '<div><h1 class="page-title" style="margin:0;">Order Management</h1>' +
-      '<p style="font-size:13px;color:var(--gray-500);margin:8px 0 0;max-width:640px;">Operations dashboard for open POs — status, aging, and ETA gaps. ' +
-      'PO detail and vendor bill variance screens are unchanged; use <strong>View PO</strong> to open the existing PO page.</p></div></div>' +
+      '<p style="font-size:13px;color:var(--gray-500);margin:8px 0 0;max-width:640px;">Studio PO operations — status, aging, and ETA gaps. ' +
+      'Click a row to open the existing PO page. Houzz legacy imports are excluded' +
+      (houzzExcluded > 0 ? ' (' + houzzExcluded + ' hidden)' : '') + '.</p></div></div>' +
       '<div style="display:flex;gap:0;margin-bottom:20px;border-radius:0;overflow:hidden;border:1px solid rgba(196,164,100,0.15);flex-wrap:wrap;">' +
-      kpiCard('Open POs', String(allOpen.length), 'Across all projects', '#C4A464') +
+      kpiCard('Open POs', String(allOpen.length), 'Studio docs only', '#C4A464') +
       kpiCard('Missing confirmation', String(noConfirm.length), 'Sent — no vendor ack', '#E16A5B') +
       kpiCard('Lines without ETA', String(missingEtaLines), 'On open POs', '#C4A464') +
       kpiCard('Open PO value', '$' + openValue.toLocaleString('en-US', { minimumFractionDigits: 2 }), 'Merchandise total', '#1B3352') +
