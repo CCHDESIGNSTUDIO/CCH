@@ -8,7 +8,8 @@
   <div id="status"></div>
 </div>
 <script>
-  var CLIENT_ID = 'ABANZD7ynJxIwmujoEXbztoyHJHO3AHpoRNBGD0J4AJq7pwL33';
+  /** OAuth start must use the same client_id as Cloud Functions secrets (qbAuthStart). */
+  var QB_AUTH_START = 'https://us-central1-cch-design-boards.cloudfunctions.net/qbAuthStart';
   var REDIRECT = 'https://cch-platform.web.app/qbauth.html';
   var REALM_ID = '1389735275';
   var statusEl = document.getElementById('status');
@@ -87,16 +88,9 @@
     }
 
   } else {
-    // No code — show the Connect button
-    var authUrl = 'https://appcenter.intuit.com/connect/oauth2?' +
-      'client_id=' + CLIENT_ID +
-      '&response_type=code' +
-      '&scope=com.intuit.quickbooks.accounting' +
-      '&redirect_uri=' + encodeURIComponent(REDIRECT) +
-      '&state=cchstudio2026';
-
-    statusEl.innerHTML = '<a href="' + authUrl + '" style="display:inline-block;padding:16px 40px;background:#2CA01C;color:white;text-decoration:none;font-size:16px;font-weight:600;border-radius:4px;">Connect to QuickBooks</a>' +
-      '<p style="color:#888;margin-top:16px;font-size:13px;">This will redirect you to Intuit to authorize CCH Studio.</p>';
+    statusEl.innerHTML = '<a href="' + QB_AUTH_START + '" style="display:inline-block;padding:16px 40px;background:#2CA01C;color:white;text-decoration:none;font-size:16px;font-weight:600;border-radius:4px;">Connect to QuickBooks</a>' +
+      '<p style="color:#888;margin-top:16px;font-size:13px;line-height:1.5;">Sign in to CCH Studio first, then click Connect. You will authorize on Intuit and return here to save tokens.</p>' +
+      '<p style="color:#B45309;margin-top:12px;font-size:12px;line-height:1.45;">If Sync QB paid shows <em>invalid_grant</em> or <em>Incorrect Token type or clientID</em>, use this button once to reconnect (server tokens were issued for a different app id).</p>';
   }
 </script>
 </body>

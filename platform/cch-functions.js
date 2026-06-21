@@ -19,22 +19,37 @@ async function deleteFinanceDoc(projectId, collection, docId) {
 }
 
 async function showNewInvoiceModal(projectId) {
+  var invNum = '';
+  try {
+    if (typeof getNextDocNumber === 'function') {
+      invNum = await getNextDocNumber('INV');
+    }
+  } catch (e0) { invNum = ''; }
+  if (!invNum) invNum = 'INV-TEMP-' + String(Date.now());
+  var dueDefault = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+  var invNumAttr = typeof escAttr === 'function' ? escAttr(invNum) : invNum.replace(/"/g, '&quot;');
   document.getElementById('modalContainer').innerHTML =
     '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">' +
     '<div class="modal" style="width:560px;">' +
     '<div class="modal-header"><div class="modal-title">New Invoice</div><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
-    '<div class="modal-body"><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">' +
-    '<div class="form-group"><label class="form-label">Invoice #</label><input class="form-input" id="niNumber"></div>' +
-    '<div class="form-group"><label class="form-label">Total ($)</label><input class="form-input" type="number" id="niTotal"></div>' +
-    '<div class="form-group"><label class="form-label">Status</label><select class="form-input" id="niStatus">' +
-    '<option value="Draft">Draft</option><option value="Sent" selected>Sent</option><option value="Paid">Paid</option><option value="Overdue">Overdue</option>' +
-    '</select></div>' +
-    '<div class="form-group"><label class="form-label">Due Date</label><input class="form-input" type="date" id="niDue"></div>' +
-    '<div class="form-group" style="grid-column:span 2;"><label class="form-label">Notes</label><textarea class="form-textarea" id="niNotes" rows="2"></textarea></div>' +
+    '<div class="modal-body">' +
+    '<p style="font-size:12px;color:var(--gray-500);margin:0 0 14px;line-height:1.45;">Creates a <strong>Draft</strong> invoice and opens the editor. Total is calculated from line items — no need to enter an amount here.</p>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">' +
+    '<div class="form-group"><label class="form-label">Invoice #</label><input class="form-input" id="niNumber" value="' + invNumAttr + '"></div>' +
+    '<div class="form-group"><label class="form-label">Due date</label><input class="form-input" type="date" id="niDue" value="' + dueDefault + '"></div>' +
+    '<div class="form-group" style="grid-column:span 2;"><label class="form-label">Document tag</label>' +
+    '<input class="form-input" id="niDocTag" maxlength="200" placeholder="e.g. Phase 1 furnishing — kitchen install">' +
+    '<p style="font-size:11px;color:var(--gray-500);margin:6px 0 0;line-height:1.4;">Short label for lists and email subject (Houzz-style). Shown on the project Invoices tab.</p></div>' +
+    '<div class="form-group" style="grid-column:span 2;"><label class="form-label">Notes <span style="font-weight:400;color:var(--gray-400);">(optional)</span></label>' +
+    '<textarea class="form-textarea" id="niNotes" rows="2" placeholder="Payment terms, scope, etc."></textarea></div>' +
     '</div></div>' +
     '<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">Cancel</button>' +
     '<button class="btn btn-primary" onclick="saveNewInvoice(\'' + projectId + '\')">Create Invoice</button></div>' +
     '</div></div>';
+  setTimeout(function() {
+    var tagEl = document.getElementById('niDocTag');
+    if (tagEl) tagEl.focus();
+  }, 80);
 }
 
 async function saveNewInvoice(projectId) {
@@ -44,15 +59,80 @@ async function saveNewInvoice(projectId) {
       try { niNum = await getNextDocNumber('INV'); } catch (e0) { niNum = ''; }
     }
     if (!niNum) niNum = 'INV-TEMP-' + String(Date.now());
-    await db.collection('boards').doc(projectId).collection('invoices').add({
+    var docTag = document.getElementById('niDocTag') ? String(document.getElementById('niDocTag').value || '').trim() : '';
+    var notesRaw = document.getElementById('niNotes') ? document.getElementById('niNotes').value.trim() : '';
+    var defaultNotes = 'All fees are non-refundable. Freight and delivery charges will be invoiced separately upon shipment. Payment due within 30 days of invoice date. Please reference invoice number with payment.';
+    var today = new Date().toISOString().split('T')[0];
+    var dueEl = document.getElementById('niDue');
+    var due = dueEl && dueEl.value ? dueEl.value : new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+
+    var cName = '';
+    var cEmail = '';
+    var cPhone = '';
+    var cAddr = '';
+    var taxRate = 0;
+    try {
+      var projDoc = await db.collection('boards').doc(projectId).get();
+      var projData = projDoc.exists ? projDoc.data() : {};
+      cName = projData.clientName || '';
+      cEmail = projData.clientEmail || '';
+      cPhone = projData.clientPhone || '';
+      cAddr = projData.clientAddress || '';
+      taxRate = parseFloat(projData.taxRate) || 0;
+      if (!cName && projData.clientId) {
+        try {
+          var clientDoc = await db.collection('clients').doc(projData.clientId).get();
+          if (clientDoc.exists) {
+            var cd = clientDoc.data();
+            cName = cd.name || cd.clientName || '';
+            cEmail = cd.email || cd.clientEmail || '';
+            cPhone = cd.phone || cd.clientPhone || '';
+            cAddr = cd.address || cd.clientAddress || '';
+          }
+        } catch (e1) {}
+      }
+      if (!cName && projData.name && projData.name.indexOf(' - ') !== -1) {
+        cName = projData.name.split(' - ')[0].trim();
+      }
+    } catch (e2) {}
+
+    if (!taxRate && window._companyTaxConfig && window._companyTaxConfig.defaultTaxRate > 0) {
+      taxRate = window._companyTaxConfig.defaultTaxRate;
+    }
+
+    var newInvoice = {
+      invoiceNum: niNum,
       number: niNum,
-      total: parseFloat(document.getElementById('niTotal').value)||0,
-      status: document.getElementById('niStatus').value,
-      dueDate: document.getElementById('niDue').value,
-      notes: document.getElementById('niNotes').value.trim(),
-      items: [], createdAt: new Date().toISOString(), owner: currentUser.email
-    });
-    closeModal(); navigate(window.location.hash);
+      status: 'Draft',
+      date: today,
+      dueDate: due,
+      total: 0,
+      documentTags: docTag,
+      shortDescription: docTag,
+      tags: docTag,
+      notes: notesRaw || defaultNotes,
+      items: [],
+      clientName: cName,
+      clientEmail: cEmail,
+      clientPhone: cPhone,
+      clientAddress: cAddr,
+      taxRate: taxRate,
+      payments: [],
+      published: false,
+      createdAt: typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue
+        ? firebase.firestore.FieldValue.serverTimestamp()
+        : new Date().toISOString(),
+      owner: currentUser && currentUser.email ? currentUser.email : ''
+    };
+
+    var docRef = await db.collection('boards').doc(projectId).collection('invoices').add(newInvoice);
+    closeModal();
+    if (typeof showToast === 'function') showToast('Invoice ' + niNum + ' created', 2200);
+    if (typeof navigate === 'function') {
+      navigate('#/project/' + projectId + '/invoice/' + docRef.id);
+    } else {
+      navigate(window.location.hash);
+    }
   } catch(e) { if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'New invoice'); }
 }
 
@@ -478,6 +558,30 @@ function renderClientsView(query) {
       '<th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
 
+function _clParseCity(c) {
+  if (c.city) return c.city;
+  var a = c.address || '';
+  if (!a || !a.includes(',')) return '';
+  var parts = a.split(',').map(function(s) { return s.trim(); });
+  if (parts.length >= 2) return parts[parts.length - 2] || parts[1] || '';
+  return '';
+}
+function _clParseState(c) {
+  if (c.state) return c.state;
+  var a = c.address || '';
+  if (!a || !a.includes(',')) return '';
+  var last = a.split(',').pop().trim();
+  var m = last.match(/^([A-Z]{2})\s/);
+  return m ? m[1] : '';
+}
+function _clParseZip(c) {
+  if (c.zip || c.postalCode) return c.zip || c.postalCode;
+  var a = c.address || '';
+  if (!a) return '';
+  var m = a.match(/(\d{5}(-\d{4})?)$/);
+  return m ? m[1] : '';
+}
+
 async function showNewClientModal(existingId) {
   var c = {};
   if (existingId) { var cd = await db.collection('clients').doc(existingId).get(); if (cd.exists) c = cd.data(); }
@@ -497,8 +601,13 @@ async function showNewClientModal(existingId) {
     '<div class="form-group"><label class="form-label">Company</label><input class="form-input" id="clCompany" value="' + escAttr(c.company||'') + '"></div>' +
     '<div class="form-group"><label class="form-label">Email</label><input class="form-input" id="clEmail" type="email" value="' + escAttr(c.email||'') + '"></div>' +
     '<div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="clPhone" value="' + escAttr(c.phone||'') + '"></div>' +
-    '<div class="form-group" style="grid-column:span 2;"><label class="form-label">Primary Address</label><input class="form-input" id="clAddress" value="' + escAttr(c.address||'') + '"></div>' +
-    '<div class="form-group" style="grid-column:span 2;"><label class="form-label">Secondary Address</label><input class="form-input" id="clAddress2" value="' + escAttr(c.address2||'') + '"></div>' +
+    '<div class="form-group" style="grid-column:span 2;"><label class="form-label">Street Address</label><input class="form-input" id="clAddress" value="' + escAttr(c.street || c.clientAddressLine1 || ((!c.city && !c.state && !c.zip) ? (c.address||'').split(',')[0].trim() : (c.address||'')) || '') + '"></div>' +
+    '<div class="form-group" style="grid-column:span 2;"><label class="form-label">Address Line 2</label><input class="form-input" id="clAddress2" value="' + escAttr(c.address2||'') + '" placeholder="Suite, unit, etc (optional)"></div>' +
+    '<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:16px;grid-column:span 2;">' +
+    '<div class="form-group"><label class="form-label">City</label><input class="form-input" id="clCity" value="' + escAttr(c.city || _clParseCity(c) || '') + '"></div>' +
+    '<div class="form-group"><label class="form-label">State</label><input class="form-input" id="clState" value="' + escAttr(c.state || _clParseState(c) || '') + '"></div>' +
+    '<div class="form-group"><label class="form-label">Zip</label><input class="form-input" id="clZip" value="' + escAttr(c.zip || c.postalCode || _clParseZip(c) || '') + '"></div>' +
+    '</div>' +
     '<div class="form-group" style="grid-column:span 2;"><label class="form-label">Notes</label><textarea class="form-textarea" id="clNotes" rows="2">' + esc(c.notes||'') + '</textarea></div>' +
     '</div></div>' +
     modalFooter +
@@ -508,12 +617,21 @@ async function showNewClientModal(existingId) {
 async function saveClient(existingId) {
   var name = document.getElementById('clName').value.trim();
   if (!name) { if (typeof cchAlert === 'function') await cchAlert('Name is required.', 'Client'); return; }
+  var _clStreet = document.getElementById('clAddress').value.trim();
+  var _clCity = document.getElementById('clCity').value.trim();
+  var _clState = document.getElementById('clState').value.trim();
+  var _clZip = document.getElementById('clZip').value.trim();
+  var _clComposed = [_clStreet, [_clCity, _clState].filter(Boolean).join(', '), _clZip].filter(Boolean).join(', ');
   var data = {
     name: name,
     company: document.getElementById('clCompany').value.trim(),
     email: document.getElementById('clEmail').value.trim(),
     phone: document.getElementById('clPhone').value.trim(),
-    address: document.getElementById('clAddress').value.trim(),
+    street: _clStreet,
+    city: _clCity,
+    state: _clState,
+    zip: _clZip,
+    address: _clComposed,
     address2: document.getElementById('clAddress2').value.trim(),
     notes: document.getElementById('clNotes').value.trim(),
     updatedAt: new Date().toISOString(),
@@ -913,6 +1031,7 @@ async function loadVendorProducts(vendorName) {
 
 function renderVendorProductsTab() {
   var C = document.getElementById('vendorTabContent');
+  if (!C || !window._vendorDetail) return;
   var products = window._vendorDetail.products;
   if (!products) { C.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400);">Loading...</div>'; return; }
 

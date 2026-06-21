@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "categories": [
     "Art",
     "Mirror",
@@ -8,7 +8,8 @@
     "Furniture",
     "Stone & Tile",
     "Appliances & Plumbing",
-    "Hardware",
+    "Cabinet Hardware",
+    "Window Hardware",
     "Floor Covering",
     "Florals",
     "Wall",

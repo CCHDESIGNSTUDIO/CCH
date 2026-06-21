@@ -61,13 +61,11 @@
    */
   function cchInvoiceLineCaliforniaTaxableDefault(it) {
     var f = lineFields(it);
-    if (blobHasKeyword(f.category, CCH_CA_NON_TAXABLE_KEYWORDS) ||
-        blobHasKeyword(f.title, CCH_CA_NON_TAXABLE_KEYWORDS) ||
-        blobHasKeyword(f.description, CCH_CA_NON_TAXABLE_KEYWORDS)) {
-      return false;
-    }
     if (blobHasKeyword(f.category, CCH_CA_TAXABLE_CATEGORY_KEYWORDS)) {
       return true;
+    }
+    if (blobHasKeyword(f.category, CCH_CA_NON_TAXABLE_KEYWORDS)) {
+      return false;
     }
     if (f.itemType.indexOf('product') >= 0 || f.cost > 0) {
       return true;
@@ -78,11 +76,10 @@
   /** Non-taxable professional / design row (for markup=0 and audits). */
   function cchInvoiceLineIsNonTaxableService(it) {
     if (!it) return false;
+    var f = lineFields(it);
+    if (blobHasKeyword(f.category, CCH_CA_TAXABLE_CATEGORY_KEYWORDS)) return false;
     if (cchInvoiceLineCaliforniaTaxableDefault(it) === false) {
-      var f = lineFields(it);
-      if (blobHasKeyword(f.category, CCH_CA_NON_TAXABLE_KEYWORDS) ||
-          blobHasKeyword(f.title, CCH_CA_NON_TAXABLE_KEYWORDS) ||
-          blobHasKeyword(f.description, CCH_CA_NON_TAXABLE_KEYWORDS)) {
+      if (blobHasKeyword(f.category, CCH_CA_NON_TAXABLE_KEYWORDS)) {
         return true;
       }
       if (f.itemType === 'service' || f.itemType.indexOf('service') >= 0) return true;
@@ -115,6 +112,25 @@
     return false;
   }
 
+  /** Furnishings / accessories — not design-fee service (QB Studio Product). */
+  function cchInvoiceLineLooksLikePhysicalProduct(it) {
+    if (!it) return false;
+    var f = lineFields(it);
+    var title = f.title;
+    if (/\b(bowl|vase|tray|riser|cutting\s+board|display\s+stand|sconce|lantern|chandelier|pendant|mirror|rug|pillow|flush\s*mount|homeware|organizer)\b/.test(title)) {
+      return true;
+    }
+    if (blobHasKeyword(f.category, CCH_CA_TAXABLE_CATEGORY_KEYWORDS)) {
+      if (f.cost > 0) return true;
+    }
+    if (/accessor|homeware|kitchen|furnish|decor\b|lighting|furniture|mirror/.test(f.category)) {
+      if (f.cost > 0) return true;
+    }
+    var mk = parseFloat(it.markupPct);
+    if (f.cost > 0 && !isNaN(mk) && mk > 0.25) return true;
+    return false;
+  }
+
   /** Apply CA rules to a line object (mutates). Returns true if changed. */
   function cchApplyCaliforniaTaxRulesToLine(it) {
     if (!it) return false;
@@ -140,6 +156,7 @@
     cchCaliforniaInvoiceLineIsTaxable: cchCaliforniaInvoiceLineIsTaxable,
     cchInvoiceLineIsTaxable: cchCaliforniaInvoiceLineIsTaxable,
     cchInvoiceLineWasWronglyTaxed: cchInvoiceLineWasWronglyTaxed,
+    cchInvoiceLineLooksLikePhysicalProduct: cchInvoiceLineLooksLikePhysicalProduct,
     cchApplyCaliforniaTaxRulesToLine: cchApplyCaliforniaTaxRulesToLine,
   };
 });
