@@ -2987,11 +2987,15 @@
   window.cchPoVendorInvoicePayStatusBadgeHtml = function(paid, due) {
     paid = parseFloat(paid) || 0;
     due = parseFloat(due) || 0;
+    var omUi = typeof window.cchOmIsActive === 'function' && window.cchOmIsActive();
     if (due <= 0.02 && paid > 0.01) {
       return '<span class="badge" style="font-size:10px;font-weight:700;padding:3px 10px;background:rgba(46,125,50,0.14);color:#1B5E20;border:1px solid rgba(46,125,50,0.25);white-space:nowrap;">Paid</span>';
     }
     if (due > 0.02) {
-      return '<span class="badge" style="font-size:10px;font-weight:700;padding:3px 10px;background:rgba(180,83,9,0.12);color:#92400E;border:1px solid rgba(180,83,9,0.22);white-space:nowrap;">Due ' + fmt(due) + '</span>';
+      var dueBg = omUi ? 'rgba(15,26,46,0.08)' : 'rgba(180,83,9,0.12)';
+      var dueColor = omUi ? '#0F1A2E' : '#92400E';
+      var dueBorder = omUi ? 'rgba(15,26,46,0.18)' : 'rgba(180,83,9,0.22)';
+      return '<span class="badge" style="font-size:10px;font-weight:700;padding:3px 10px;background:' + dueBg + ';color:' + dueColor + ';border:1px solid ' + dueBorder + ';white-space:nowrap;">Due ' + fmt(due) + '</span>';
     }
     return '<span style="font-size:11px;color:#9CA3AF;">Unpaid</span>';
   };
@@ -4652,6 +4656,9 @@
   };
 
   async function cchPoBuildFirmVariancePanelHtml() {
+    var omUi = typeof window.cchOmIsActive === 'function' && window.cchOmIsActive();
+    var readyAccent = omUi ? '#0F1A2E' : '#B45309';
+    var cardStyle = 'padding:14px 18px;min-width:160px;background:#fff;border:1px solid rgba(15,26,46,0.12);';
     var allRows = await window.cchPoCollectVarianceRows();
     window.__cchVarBatchRows = allRows.filter(function(r) { return r.readyToBill; });
     var filter = window._poDiscFilter || 'ready_to_bill';
@@ -4685,12 +4692,12 @@
         '</div>'
       : '';
 
-    return '<p style="font-size:13px;color:var(--gray-500);max-width:760px;line-height:1.5;margin:0 0 10px;">PO vendor bill vs locked PO total — <strong>bill the client</strong> for freight, tax, and fees above the PO. To <strong>pay the vendor</strong>, use the <button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px;vertical-align:baseline;" onclick="cchPoSetVendorBillsTab(\'bills\')">Vendor bills</button> tab in Order Management.</p>' +
+    return '<p style="font-size:13px;color:#5C6B80;max-width:760px;line-height:1.5;margin:0 0 10px;">PO vendor bill vs locked PO total — <strong>bill the client</strong> for freight, tax, and fees above the PO. To <strong>pay the vendor</strong>, use the <button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px;vertical-align:baseline;" onclick="cchPoSetVendorBillsTab(\'bills\')">Vendor bills</button> tab in Order Management.</p>' +
       '<div style="display:flex;flex-wrap:wrap;gap:12px;margin:16px 0;">' +
-        '<div class="card" style="padding:14px 18px;min-width:160px;"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Ready to bill</div>' +
-          '<div style="font-size:22px;font-weight:700;color:#B45309;">' + readyRows.length + '</div></div>' +
-        '<div class="card" style="padding:14px 18px;min-width:160px;"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Ready total</div>' +
-          '<div style="font-size:22px;font-weight:700;color:#1B3352;">' + fmt(readySum) + '</div></div>' +
+        '<div class="card" style="' + cardStyle + '"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Ready to bill</div>' +
+          '<div style="font-size:22px;font-weight:700;color:' + readyAccent + ';">' + readyRows.length + '</div></div>' +
+        '<div class="card" style="' + cardStyle + '"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Ready total</div>' +
+          '<div style="font-size:22px;font-weight:700;color:#0F1A2E;">' + fmt(readySum) + '</div></div>' +
       '</div>' +
       '<div style="margin-bottom:14px;">' + chips + '</div>' + batchBar +
       '<table class="data-table"><thead><tr><th style="width:36px;"></th><th>Project</th><th>PO</th><th>Vendor</th>' +
@@ -4890,6 +4897,9 @@
   function cchPoBuildVendorBillsPanelHtml(pos, projNames, preset) {
     projNames = projNames || {};
     preset = preset || '';
+    var omUi = typeof window.cchOmIsActive === 'function' && window.cchOmIsActive();
+    var openAccent = omUi ? '#0F1A2E' : '#B45309';
+    var cardStyle = 'padding:14px 18px;min-width:140px;background:#fff;border:1px solid rgba(15,26,46,0.12);';
     if (preset === 'open' || preset === 'pending' || preset === 'paid' || preset === 'all') {
       window._vendorBillsFilter = preset === 'pending' ? 'awaiting_bill' : preset;
     }
@@ -4926,14 +4936,19 @@
 
     function chip(id, label, count) {
       var on = filter === id;
+      var chipBorder = on ? (omUi ? '#0F1A2E' : '#C4A464') : 'rgba(15,26,46,0.18)';
+      var chipBg = on ? (omUi ? 'rgba(15,26,46,0.08)' : 'rgba(196,164,100,0.22)') : '#fff';
+      var chipColor = on ? (omUi ? '#0F1A2E' : '#5C4A2A') : '#0F1A2E';
       return '<button type="button" onclick="cchPoSetVendorBillsFilter(\'' + escJs(id) + '\')" style="padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;border:1px solid ' +
-        (on ? '#C4A464' : 'rgba(15,26,46,0.18)') + ';background:' + (on ? 'rgba(196,164,100,0.22)' : '#fff') + ';color:' + (on ? '#5C4A2A' : '#0F1A2E') + ';">' +
+        chipBorder + ';background:' + chipBg + ';color:' + chipColor + ';">' +
         esc(label) + (count != null ? ' (' + count + ')' : '') + '</button>';
     }
 
     var presetBanner = '';
     if (window._vendorBillsFilter === 'open' && window.location.hash.indexOf('/open') >= 0) {
-      presetBanner = '<div style="font-size:12px;color:var(--gold);margin-bottom:12px;padding:10px 14px;border:1px solid rgba(196,164,100,0.35);background:rgba(196,164,100,0.06);">Showing open vendor bills (balance due). <a href="#" onclick="event.preventDefault();cchPoSetVendorBillsFilter(\'all\');return false;" style="color:var(--cyan);font-weight:600;">Show all</a></div>';
+      presetBanner = omUi
+        ? '<div style="font-size:12px;color:#0F1A2E;margin-bottom:12px;padding:10px 14px;border:1px solid rgba(15,26,46,0.15);background:#fff;">Showing open vendor bills (balance due). <a href="#" onclick="event.preventDefault();cchPoSetVendorBillsFilter(\'all\');return false;" style="color:#1B3352;font-weight:600;">Show all</a></div>'
+        : '<div style="font-size:12px;color:var(--gold);margin-bottom:12px;padding:10px 14px;border:1px solid rgba(196,164,100,0.35);background:rgba(196,164,100,0.06);">Showing open vendor bills (balance due). <a href="#" onclick="event.preventDefault();cchPoSetVendorBillsFilter(\'all\');return false;" style="color:var(--cyan);font-weight:600;">Show all</a></div>';
     }
 
     var tbody = rows.length ? rows.map(function(r) {
@@ -4959,14 +4974,14 @@
       return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;' + rowBg + '" onclick="navigate(\'' + escJs(poHash) + '\')">' +
         '<td style="padding:12px 14px;font-size:13px;">' + esc(r.projectName) + '</td>' +
         '<td style="padding:12px 14px;">' + billNumCell + '</td>' +
-        '<td style="padding:12px 14px;font-family:monospace;font-weight:600;color:var(--gold);">' + esc(r.poNumber || r.poId.slice(0, 8)) + '</td>' +
+        '<td style="padding:12px 14px;font-family:monospace;font-weight:600;color:' + (omUi ? '#0F1A2E' : 'var(--gold)') + ';">' + esc(r.poNumber || r.poId.slice(0, 8)) + '</td>' +
         '<td style="padding:12px 14px;font-size:13px;">' + esc(r.vendor || '—') + '</td>' +
         '<td style="padding:12px 14px;font-size:12px;font-weight:600;color:#0F1A2E;">' + invRefCell + '</td>' +
         '<td style="padding:12px 14px;font-size:12px;color:var(--gray-500);">' + esc(recvStr) + '</td>' +
         '<td style="padding:12px 14px;font-size:12px;font-weight:600;color:#1B3352;white-space:nowrap;">' + (etaStr !== '—' ? esc(etaStr) : '<span style="color:var(--gray-400);font-weight:400;">—</span>') + '</td>' +
         '<td style="padding:12px 14px;text-align:right;font-family:var(--font-mono);font-weight:600;">' + fmt(r.billTotal) + (r.hasBill ? '' : '<div style="font-size:10px;color:var(--gray-400);font-weight:400;">PO est.</div>') + '</td>' +
         '<td style="padding:12px 14px;text-align:right;font-family:var(--font-mono);color:' + (r.paid > 0.01 ? '#1B5E20' : 'var(--gray-400)') + ';">' + (r.hasBill ? fmt(r.paid) : '—') + '</td>' +
-        '<td style="padding:12px 14px;text-align:right;font-family:var(--font-mono);font-weight:700;color:' + (r.due > 0.02 ? '#B45309' : (r.hasBill ? '#1B5E20' : 'var(--gray-400)') ) + ';">' + (r.hasBill ? fmt(r.due) : '—') + '</td>' +
+        '<td style="padding:12px 14px;text-align:right;font-family:var(--font-mono);font-weight:700;color:' + (r.due > 0.02 ? openAccent : (r.hasBill ? '#1B5E20' : 'var(--gray-400)') ) + ';">' + (r.hasBill ? fmt(r.due) : '—') + '</td>' +
         '<td style="padding:12px 14px;font-size:11px;white-space:nowrap;">' + qbCell + '</td>' +
         '<td style="padding:12px 14px;text-align:center;">' + statusBadge + '</td>' +
         window.cchPoVendorBillRowActionsHtml(r) + '</tr>';
@@ -4975,26 +4990,26 @@
       : '<tr><td colspan="13" style="padding:40px;text-align:center;color:var(--gray-400);">No sent POs or received vendor bills yet. Send a PO to the vendor, then receive their invoice — those rows appear here.</td></tr>');
 
     var footerRow = recvInView.length
-      ? '<tr style="border-top:2px solid var(--gold);background:#FFFDF8;font-weight:700;">' +
-          '<td colspan="7" style="padding:12px 14px;font-size:12px;text-align:right;color:var(--gray-600);">Totals (' + recvInView.length + ' bill' + (recvInView.length !== 1 ? 's' : '') + ' in view)</td>' +
+      ? '<tr style="border-top:2px solid ' + (omUi ? '#0F1A2E' : 'var(--gold)') + ';background:#fff;font-weight:700;">' +
+          '<td colspan="7" style="padding:12px 14px;font-size:12px;text-align:right;color:#5C6B80;">Totals (' + recvInView.length + ' bill' + (recvInView.length !== 1 ? 's' : '') + ' in view)</td>' +
           '<td style="padding:12px 14px;text-align:right;font-family:var(--font-mono);color:#0F1A2E;">' + fmt(sumTotal) + '</td>' +
           '<td style="padding:12px 14px;text-align:right;font-family:var(--font-mono);color:#1B5E20;">' + fmt(sumPaid) + '</td>' +
-          '<td style="padding:12px 14px;text-align:right;font-family:var(--font-mono);color:' + (sumBalance > 0.02 ? '#B45309' : '#1B5E20') + ';">' + fmt(sumBalance) + '</td>' +
+          '<td style="padding:12px 14px;text-align:right;font-family:var(--font-mono);color:' + (sumBalance > 0.02 ? openAccent : '#1B5E20') + ';">' + fmt(sumBalance) + '</td>' +
           '<td colspan="3"></td></tr>'
       : '';
 
-    return '<p style="font-size:13px;color:var(--gray-500);max-width:820px;line-height:1.55;margin:0 0 16px;">Each row is one <strong>vendor invoice</strong> on a Studio bill (<strong>Bill #</strong> BL-9017 = one QuickBooks Bill per PO). <strong>Vendor inv #</strong> is the vendor&apos;s paper invoice. Line items and PO detail live on the <strong>PO page</strong> — not here. Legacy Houzz POs synced to QB as PO stay on <strong>All POs</strong>.</p>' +
+    return '<p style="font-size:13px;color:#5C6B80;max-width:820px;line-height:1.55;margin:0 0 16px;">Each row is one <strong>vendor invoice</strong> on a Studio bill (<strong>Bill #</strong> BL-9017 = one QuickBooks Bill per PO). <strong>Vendor inv #</strong> is the vendor&apos;s paper invoice. Line items and PO detail live on the <strong>PO page</strong> — not here. Legacy Houzz POs synced to QB as PO stay on <strong>All POs</strong>.</p>' +
       '<div style="display:flex;flex-wrap:wrap;gap:12px;margin:16px 0;">' +
-        '<div class="card" style="padding:14px 18px;min-width:140px;"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Open bills</div>' +
-          '<div style="font-size:22px;font-weight:700;color:#B45309;">' + openRows.length + '</div></div>' +
-        '<div class="card" style="padding:14px 18px;min-width:140px;"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Total</div>' +
+        '<div class="card" style="' + cardStyle + '"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Open bills</div>' +
+          '<div style="font-size:22px;font-weight:700;color:' + openAccent + ';">' + openRows.length + '</div></div>' +
+        '<div class="card" style="' + cardStyle + '"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Total</div>' +
           '<div style="font-size:22px;font-weight:700;color:#0F1A2E;font-family:var(--font-mono);">' + fmt(sumTotal) + '</div>' +
-          '<div style="font-size:10px;color:var(--gray-500);margin-top:4px;">bills in this view</div></div>' +
-        '<div class="card" style="padding:14px 18px;min-width:140px;"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Paid</div>' +
+          '<div style="font-size:10px;color:#5C6B80;margin-top:4px;">bills in this view</div></div>' +
+        '<div class="card" style="' + cardStyle + '"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Paid</div>' +
           '<div style="font-size:22px;font-weight:700;color:#1B5E20;font-family:var(--font-mono);">' + fmt(sumPaid) + '</div></div>' +
-        '<div class="card" style="padding:14px 18px;min-width:140px;"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Balance</div>' +
-          '<div style="font-size:22px;font-weight:700;color:' + (sumBalance > 0.02 ? '#B45309' : '#1B5E20') + ';font-family:var(--font-mono);">' + fmt(sumBalance) + '</div>' +
-          '<div style="font-size:10px;color:var(--gray-500);margin-top:4px;">' + awaiting.length + ' awaiting bill</div></div>' +
+        '<div class="card" style="' + cardStyle + '"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Balance</div>' +
+          '<div style="font-size:22px;font-weight:700;color:' + (sumBalance > 0.02 ? openAccent : '#1B5E20') + ';font-family:var(--font-mono);">' + fmt(sumBalance) + '</div>' +
+          '<div style="font-size:10px;color:#5C6B80;margin-top:4px;">' + awaiting.length + ' awaiting bill</div></div>' +
       '</div>' + presetBanner +
       '<div style="display:flex;flex-wrap:wrap;gap:0;margin-bottom:16px;border:1px solid rgba(10,31,61,0.14);width:fit-content;">' +
         chip('open', 'Open', openRows.length) +

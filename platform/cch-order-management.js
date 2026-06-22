@@ -5,7 +5,10 @@
 (function() {
   'use strict';
 
-  var OM_BUILD = '20260602om7';
+  var OM_BUILD = '20260602om8';
+  var OM_NAVY = '#0F1A2E';
+  var OM_NAVY_MID = '#1B3352';
+  var OM_BORDER = 'rgba(15,26,46,0.12)';
 
   function esc(t) {
     if (typeof window.esc === 'function') return window.esc(t);
@@ -172,10 +175,10 @@
   }
 
   function kpiCard(label, value, sub, color) {
-    return '<div style="flex:1;padding:18px 22px;background:linear-gradient(135deg,rgba(196,164,100,0.06),rgba(196,164,100,0.02));border-right:1px solid rgba(196,164,100,0.1);min-width:160px;">' +
-      '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);margin-bottom:6px;">' + esc(label) + '</div>' +
-      '<div style="font-size:24px;font-weight:700;color:' + color + ';font-family:var(--font-mono);">' + esc(value) + '</div>' +
-      (sub ? '<div style="font-size:11px;color:var(--gray-500);margin-top:4px;">' + esc(sub) + '</div>' : '') +
+    return '<div style="flex:1;padding:18px 22px;background:#fff;border-right:1px solid ' + OM_BORDER + ';min-width:160px;">' +
+      '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#5C6B80;margin-bottom:6px;">' + esc(label) + '</div>' +
+      '<div style="font-size:24px;font-weight:700;color:' + (color || OM_NAVY) + ';font-family:var(--font-mono);">' + esc(value) + '</div>' +
+      (sub ? '<div style="font-size:11px;color:#5C6B80;margin-top:4px;">' + esc(sub) + '</div>' : '') +
       '</div>';
   }
 
@@ -208,8 +211,8 @@
 
   function tabBar(active) {
     var varBadge = window._omVarianceReady > 0
-      ? ' <span id="cchOmVarBadge" style="font-size:10px;color:#B45309;font-weight:700;">(' + window._omVarianceReady + ')</span>'
-      : ' <span id="cchOmVarBadge" style="font-size:10px;color:#B45309;font-weight:700;display:none;"></span>';
+      ? ' <span id="cchOmVarBadge" style="font-size:10px;color:' + OM_NAVY_MID + ';font-weight:700;">(' + window._omVarianceReady + ')</span>'
+      : ' <span id="cchOmVarBadge" style="font-size:10px;color:' + OM_NAVY_MID + ';font-weight:700;display:none;"></span>';
     var tabs = [
       { id: 'open', label: 'Open POs', hash: '#/ordermanagement/open' },
       { id: 'noeta', label: 'Missing ETA', hash: '#/ordermanagement/noeta' },
@@ -219,13 +222,13 @@
       { id: 'variances', label: 'Bill variances', hash: '#/ordermanagement/variances', badge: true },
       { id: 'qb', label: 'QuickBooks', hash: '#/ordermanagement/qb' }
     ];
-    return '<div style="display:flex;gap:0;margin:20px 0 16px;border-bottom:2px solid rgba(196,164,100,0.15);flex-wrap:wrap;">' +
+    return '<div style="display:flex;gap:0;margin:20px 0 16px;border-bottom:2px solid ' + OM_BORDER + ';flex-wrap:wrap;background:#fff;">' +
       tabs.map(function(t) {
         var on = active === t.id;
         var labelHtml = esc(t.label) + (t.badge ? varBadge : '');
         return '<button type="button" class="btn btn-sm" style="border:none;border-bottom:3px solid ' +
-          (on ? '#C4A464' : 'transparent') + ';background:' + (on ? 'rgba(196,164,100,0.08)' : 'transparent') +
-          ';color:' + (on ? '#C4A464' : 'var(--gray-500)') + ';font-weight:' + (on ? '700' : '500') +
+          (on ? OM_NAVY : 'transparent') + ';background:' + (on ? 'rgba(15,26,46,0.06)' : '#fff') +
+          ';color:' + (on ? OM_NAVY : '#5C6B80') + ';font-weight:' + (on ? '700' : '500') +
           ';padding:10px 14px;margin-bottom:-2px;white-space:nowrap;" onclick="navigate(\'' + t.hash + '\')">' +
           labelHtml + '</button>';
       }).join('') +
@@ -405,7 +408,7 @@
     var body = sorted.map(function(po) {
       var age = poAgeDays(po);
       var ageTxt = age != null ? age + 'd' : '—';
-      var ageColor = age == null ? 'var(--gray-400)' : (age > 30 ? '#E16A5B' : (age > 14 ? '#C4A464' : 'var(--gray-500)'));
+      var ageColor = age == null ? '#9CA3AF' : (age > 30 ? OM_NAVY : (age > 14 ? OM_NAVY_MID : '#5C6B80'));
       var missEta = window.cchOmMissingEtaLineCount(po);
       var statusHtml = omStatusCellHtml(po);
       return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="navigate(\'#/project/' +
@@ -420,7 +423,7 @@
         '<td style="' + td + 'font-size:12px;color:' + ageColor + ';font-weight:600;">' + esc(ageTxt) + '</td>' +
         '<td style="' + td + '" onclick="event.stopPropagation()">' + omEtaCellHtml(po) + '</td>' +
         '<td style="' + td + 'text-align:center;font-size:12px;">' +
-        (missEta > 0 ? '<span style="color:#E16A5B;font-weight:600;">' + missEta + '</span>' : '—') + '</td>' +
+        (missEta > 0 ? '<span style="color:' + OM_NAVY_MID + ';font-weight:600;">' + missEta + '</span>' : '—') + '</td>' +
         '<td style="' + td + 'text-align:right;font-weight:600;font-family:monospace;">$' +
         poTotal(po).toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
         '</tr>';
@@ -994,10 +997,10 @@
       var clipSummary = r.linked
         ? recvCountPill('received', r.received, '#5FA56B') +
           recvCountPill('in transit', r.intransit, '#C4A464') +
-          recvCountPill('outstanding', r.outstanding, '#E16A5B')
+          recvCountPill('outstanding', r.outstanding, OM_NAVY_MID)
         : '<span style="font-size:11px;color:var(--gray-400);">No linked selections</span>';
       var unlinked = r.unlinkedLines > 0
-        ? '<span style="font-size:11px;color:#E16A5B;font-weight:600;">+' + r.unlinkedLines + ' unlinked line' + (r.unlinkedLines !== 1 ? 's' : '') + '</span>'
+        ? '<span style="font-size:11px;color:' + OM_NAVY_MID + ';font-weight:600;">+' + r.unlinkedLines + ' unlinked line' + (r.unlinkedLines !== 1 ? 's' : '') + '</span>'
         : '—';
       return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="navigate(\'#/project/' +
         escAttr(po.projectId) + '/po/' + escAttr(po.id) + '\')">' +
@@ -1344,7 +1347,7 @@
       }
     } catch (err) {
       T.innerHTML = '<h1 class="page-title">Order Management</h1>' +
-        '<div class="card" style="padding:24px;color:#B45309;">Could not load purchase orders: ' + esc(err.message || err) + '</div>';
+        '<div class="card" style="padding:24px;color:' + OM_NAVY_MID + ';">Could not load purchase orders: ' + esc(err.message || err) + '</div>';
       return;
     }
 
@@ -1397,36 +1400,38 @@
         panel = window.cchPoBuildVendorBillsPanelHtml(pos, projNames, vbPreset);
         window._vendorBillsPreset = '';
       } else {
-        panel = '<div class="card" style="padding:24px;color:#B45309;">Vendor bills module not loaded.</div>';
+        panel = '<div class="card" style="padding:24px;color:' + OM_NAVY_MID + ';">Vendor bills module not loaded.</div>';
       }
     } else if (tab === 'variances') {
       if (typeof window.cchPoBuildFirmVariancePanelHtml === 'function') {
         panel = await window.cchPoBuildFirmVariancePanelHtml();
         window._omVarianceReady = (window.__cchVarBatchRows || []).filter(function(r) { return r.readyToBill; }).length;
       } else {
-        panel = '<div class="card" style="padding:24px;color:#B45309;">Bill variances module not loaded.</div>';
+        panel = '<div class="card" style="padding:24px;color:' + OM_NAVY_MID + ';">Bill variances module not loaded.</div>';
       }
     }
 
     var showFulfillmentKpis = tab === 'open' || tab === 'noeta' || tab === 'noconfirm' || tab === 'receiving';
     var kpiBlock = showFulfillmentKpis
-      ? '<div style="display:flex;gap:0;margin-bottom:20px;border-radius:0;overflow:hidden;border:1px solid rgba(196,164,100,0.15);flex-wrap:wrap;">' +
-        kpiCard('Open POs', String(allOpen.length), 'Studio docs only', '#C4A464') +
-        kpiCard('Missing confirmation', String(noConfirm.length), 'Sent — no vendor ack', '#E16A5B') +
-        kpiCard('Lines without ETA', String(missingEtaLines), 'On open POs', '#C4A464') +
-        kpiCard('Open PO value', '$' + openValue.toLocaleString('en-US', { minimumFractionDigits: 2 }), 'Merchandise total', '#1B3352') +
+      ? '<div style="display:flex;gap:0;margin-bottom:20px;border-radius:0;overflow:hidden;border:1px solid ' + OM_BORDER + ';flex-wrap:wrap;background:#fff;">' +
+        kpiCard('Open POs', String(allOpen.length), 'Studio docs only', OM_NAVY) +
+        kpiCard('Missing confirmation', String(noConfirm.length), 'Sent — no vendor ack', OM_NAVY_MID) +
+        kpiCard('Lines without ETA', String(missingEtaLines), 'On open POs', OM_NAVY) +
+        kpiCard('Open PO value', '$' + openValue.toLocaleString('en-US', { minimumFractionDigits: 2 }), 'Merchandise total', OM_NAVY) +
         '</div>'
       : '';
 
     T.innerHTML =
+      '<div class="cch-om-page" style="background:#fff;color:' + OM_NAVY + ';">' +
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:4px;">' +
-      '<div><h1 class="page-title" style="margin:0;">Order Management</h1>' +
-      '<p style="font-size:13px;color:var(--gray-500);margin:8px 0 0;max-width:720px;">' + esc(omPageSubtitle(tab)) +
+      '<div><h1 class="page-title" style="margin:0;color:' + OM_NAVY + ';">Order Management</h1>' +
+      '<p style="font-size:13px;color:#5C6B80;margin:8px 0 0;max-width:720px;">' + esc(omPageSubtitle(tab)) +
       (showFulfillmentKpis && houzzExcluded > 0 ? ' (' + houzzExcluded + ' Houzz POs hidden on track tabs.)' : '') +
       '</p></div></div>' +
       kpiBlock +
       tabBar(tab) +
-      panel;
+      panel +
+      '</div>';
 
     if (tab !== 'variances') omDeferVarianceBadge();
   };
