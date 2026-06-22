@@ -28557,6 +28557,48 @@ async function renderBoardsTab(T, proj) {
       return addr;
     }
 
+    /** Multiline ship-to body (street, city/state/zip, phone) — no company name line. */
+    function _shipToBodyFromRecord(rec, phone) {
+      rec = rec || {};
+      phone = String(phone || rec.phone || rec.contactPhone || '').trim();
+      var parts = cchCoerceStructuredAddressParts(cchAddressPartsFromRecord(rec));
+      var lines = [];
+      var body = cchComposeAddressMultiline(parts);
+      if (body) lines.push(body);
+      else {
+        var legacy = String(rec.address || rec.addr || rec.vnAddress || rec.mailingAddress || '').trim();
+        if (legacy) lines.push(legacy.replace(/\s*·\s*/g, '\n'));
+      }
+      if (phone) lines.push(phone);
+      return lines.join('\n');
+    }
+
+    /** Contact row for PO ship-to picklists — dropdown value is name; display is multiline on PO. */
+    function _shipToContactEntry(name, rec, phone) {
+      name = String(name || '').trim();
+      rec = rec || {};
+      phone = String(phone || rec.phone || rec.contactPhone || '').trim();
+      var body = _shipToBodyFromRecord(rec, phone);
+      var displayText = body ? (name + '\n' + body) : name;
+      var legacyAddr = _shipToContactAddrLine(name, rec.address || rec.addr || cchComposeAddressMultiline(cchAddressPartsFromRecord(rec)), phone);
+      return { name: name, addr: name, displayText: displayText, legacyAddr: legacyAddr };
+    }
+
+    function _shipToMatchContact(shipToVal, contact) {
+      if (!contact || shipToVal == null) return false;
+      var s = String(shipToVal).trim();
+      if (!s) return false;
+      var low = s.toLowerCase();
+      var rn = String(contact.name || '').trim();
+      if (!rn) return false;
+      if (low === rn.toLowerCase()) return true;
+      if (s === contact.addr) return true;
+      if (contact.legacyAddr && s === contact.legacyAddr) return true;
+      if (contact.displayText && s === contact.displayText) return true;
+      if (s.indexOf(rn) === 0 && (s.length === rn.length || s.charAt(rn.length) === ' ' || s.charAt(rn.length) === '·' || s.charAt(rn.length) === '\n')) return true;
+      return false;
+    }
+
     function _shipToContactPicklistOptions(contacts, selectedName, emptyLabel) {
       var sel = String(selectedName || '').trim();
       var html = '<option value="">' + esc(emptyLabel || '— Select —') + '</option>';
@@ -28587,24 +28629,23 @@ async function renderBoardsTab(T, proj) {
       _shipToWorkrooms = [];
       var wrSeen = {};
       var rcSeen = {};
-      function pushWorkroom(name, addr) {
+      function pushWorkroom(name, entry) {
         name = String(name || '').trim();
         if (!name) return;
         var k = name.toLowerCase();
         if (wrSeen[k]) return;
         wrSeen[k] = true;
-        _shipToWorkrooms.push({ name: name, addr: addr || name });
+        if (typeof entry === 'string') entry = { name: name, addr: name, displayText: entry, legacyAddr: entry };
+        _shipToWorkrooms.push(entry);
       }
-      function pushReceiver(name, addr) {
+      function pushReceiver(name, entry) {
         name = String(name || '').trim();
         if (!name) return;
         var k = name.toLowerCase();
         if (rcSeen[k]) return;
         rcSeen[k] = true;
-        _shipToReceivers.push({ name: name, addr: addr || name });
-      }
-      function vendorAddr(v, name) {
-        return _shipToContactAddrLine(name, v.address || v.addr || v.vnAddress || v.mailingAddress, v.phone || v.contactPhone);
+        if (typeof entry === 'string') entry = { name: name, addr: name, displayText: entry, legacyAddr: entry };
+        _shipToReceivers.push(entry);
       }
       function isWorkroomVendor(v) {
         var cat = String(v.category || '').trim();
@@ -28623,9 +28664,9 @@ async function renderBoardsTab(T, proj) {
           var t = d.data() || {};
           var name = t.name || t.company || '';
           if (!name) return;
-          var addr = _shipToContactAddrLine(name, t.address, t.phone);
-          if (t.role === 'receiver') pushReceiver(name, addr);
-          if (t.role === 'workroom') pushWorkroom(name, addr);
+          var entry = _shipToContactEntry(name, t, t.phone);
+          if (t.role === 'receiver') pushReceiver(name, entry);
+          if (t.role === 'workroom') pushWorkroom(name, entry);
         });
       } catch (e) { console.warn('Could not load team contacts for ship-to:', e); }
       try {
@@ -28633,8 +28674,7 @@ async function renderBoardsTab(T, proj) {
         ws.forEach(function(d) {
           var w = d.data() || {};
           var name = String(w.name || w.title || w.workroomName || '').trim() || d.id;
-          var addr = _shipToContactAddrLine(name, w.address || w.addr, w.phone);
-          pushWorkroom(name, addr);
+          pushWorkroom(name, _shipToContactEntry(name, w, w.phone));
         });
       } catch (e) { console.warn('Could not load workrooms collection for ship-to:', e); }
       try {
@@ -28643,9 +28683,9 @@ async function renderBoardsTab(T, proj) {
           var v = d.data() || {};
           var name = String(v.name || v.company || v.vendor || '').trim();
           if (!name) return;
-          var addr = vendorAddr(v, name);
-          if (isWorkroomVendor(v)) pushWorkroom(name, addr);
-          if (isReceiverVendor(v)) pushReceiver(name, addr);
+          var entry = _shipToContactEntry(name, v, v.phone || v.contactPhone);
+          if (isWorkroomVendor(v)) pushWorkroom(name, entry);
+          if (isReceiverVendor(v)) pushReceiver(name, entry);
         });
       } catch (e) { console.warn('Could not load vendors for ship-to:', e); }
       if (!_shipToWorkrooms.length && !_shipToReceivers.length) {
@@ -31347,6 +31387,9 @@ async function renderBoardsTab(T, proj) {
       return p;
     }
     window.cchCoerceStructuredAddressParts = cchCoerceStructuredAddressParts;
+    window.cchComposeAddressMultiline = cchComposeAddressMultiline;
+    window.cchAddressPartsFromRecord = cchAddressPartsFromRecord;
+    window.cchParseLooseAddressString = cchParseLooseAddressString;
 
     function cchProjectAddressPartsFromBoard(p) {
       p = p || {};
@@ -40718,9 +40761,25 @@ async function renderBoardsTab(T, proj) {
 
     /** Owner-only gate for seeing/invoicing ALL members' Smart Time (ledger, captures, reconciliation, team time edits). Contractors (e.g. Vanessa) are restricted to their own time only. Each log line still stores its own `member`/activity attribution. Project invoices & proposals remain shared for collaboration; this flag only gates the studio time/billing UX. */
     function canInvoiceFromAllMembersTime() {
-      // Owner-only (Cindy). Contractors (e.g. Vanessa) see/invoice ONLY their own time.
-      // Changed 2026-06-22 per owner request: contractors must not see other members' time.
+      // Owner-only (Cindy): sees ALL members' time everywhere, unconditionally.
+      // Contractors (e.g. Vanessa) are project-scoped instead — see canInvoiceTime / getFilteredTimeEntries.
+      // Changed 2026-06-22 per owner request: contractors must not browse other members' time.
       return isTimeAdmin();
+    }
+
+    /** Current signed-in user is a TEAM_CONFIG contractor (e.g. Vanessa). */
+    function isCurrentUserContractor() {
+      if (!currentUser || !currentUser.email) return false;
+      var e = currentUser.email.toLowerCase();
+      return (TEAM_CONFIG.contractors || []).some(function(c) {
+        return (c.names || []).some(function(n) { return n && e.indexOf(n) >= 0; });
+      });
+    }
+    /** May use the Smart Time billing/ledger UI (row checkboxes, create invoice). Owner + contractors.
+     *  Contractors are still data-scoped: own time everywhere, plus other members' BILLABLE PROJECT time
+     *  only when a project/client is selected in the Ledger (enforced in getFilteredTimeEntries). */
+    function canInvoiceTime() {
+      return isTimeAdmin() || isCurrentUserContractor();
     }
 
     /** Cindy-level admin or billing coordinator — may set member/rate on time entries and see team desktop activity (still attributed per person in saved data). */
@@ -42518,10 +42577,16 @@ async function renderBoardsTab(T, proj) {
           timeEntries = timeEntries.filter(t => {
             const m = (t.member || '').toLowerCase().trim();
             const email = (t.team || t.email || '').toLowerCase();
-            return m === myName.toLowerCase() ||
+            const isOwn = m === myName.toLowerCase() ||
                    m.includes(myFirst) ||
                    email.includes(myFirst) ||
                    m === myFirst;
+            if (isOwn) return true;
+            // Project-scoped: retain other members' BILLABLE, project-attributed time so a contractor
+            // can invoice a client for the whole project (own + others). These rows stay hidden in the
+            // general view and are only revealed in the Ledger when a project/client is selected
+            // (see getFilteredTimeEntries). Other members' non-billable / personal / non-project time is dropped here.
+            return !!t.billable && !!String(t.project || '').trim();
           });
         }
       }
@@ -44071,7 +44136,12 @@ async function renderBoardsTab(T, proj) {
       if (window.cache && cache.projects) {
         cache.projects.forEach(function(p) { if (p.clientName) _projClientMap[p.name || p.id] = p.clientName; });
       }
+      var _contractorScope = !canInvoiceFromAllMembersTime();
+      var _projOrClientSelected = !!(timeFilter.project || timeFilter.client);
       return timeEntries.filter(t => {
+        // Contractor (e.g. Vanessa): other members' rows appear ONLY when a project or client is
+        // selected (project-scoped invoicing). With no project/client filter the view stays own-only.
+        if (_contractorScope && !_projOrClientSelected && !ledgerEntryBelongsToCurrentUser(t)) return false;
         if (timeFilter.project && !_timeEntryMatchesProjectFilter(t, timeFilter.project)) return false;
         if (timeFilter.client) {
           var entryClient = _projClientMap[t.project] || '';
@@ -44120,7 +44190,7 @@ async function renderBoardsTab(T, proj) {
     function _renderTimeViewInner() {
       const T = document.getElementById('contentArea');
       const admin = isTimeAdmin();
-      const ledgerFull = admin || canInvoiceFromAllMembersTime();
+      const ledgerFull = admin || canInvoiceTime();
       const allProjects = buildTimeLedgerProjectDropdownList(timeEntries, window._timeLedgerBoardsCache || []);
       // Build client list from cached projects
       const _projClientLookup = {};
@@ -44276,7 +44346,7 @@ async function renderBoardsTab(T, proj) {
     // ===== TIME RECONCILIATION VIEW =====
     function renderReconciliationView(container, filtered) {
       var ownerAdmin = isTimeAdmin();
-      var ledgerFullRecon = ownerAdmin || canInvoiceFromAllMembersTime();
+      var ledgerFullRecon = ownerAdmin || canInvoiceTime();
       var admin = ledgerFullRecon;
       if (!window._reconExpandedDays) window._reconExpandedDays = {};
       // Member filter for reconciliation
