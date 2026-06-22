@@ -40716,14 +40716,11 @@ async function renderBoardsTab(T, proj) {
       return currentUser && ADMIN_EMAILS.includes(currentUser.email.toLowerCase());
     }
 
-    /** Billing coordinators (contractors in TEAM_CONFIG, e.g. Vanessa): full Smart Time ledger, invoice from any member's rows, optional team time edits — while each log line still stores its own `member` / activity attribution for reporting. Project invoices & proposals under each board are already shared for collaboration; this flag gates studio billing/time UX only. */
+    /** Owner-only gate for seeing/invoicing ALL members' Smart Time (ledger, captures, reconciliation, team time edits). Contractors (e.g. Vanessa) are restricted to their own time only. Each log line still stores its own `member`/activity attribution. Project invoices & proposals remain shared for collaboration; this flag only gates the studio time/billing UX. */
     function canInvoiceFromAllMembersTime() {
-      if (isTimeAdmin()) return true;
-      if (!currentUser || !currentUser.email) return false;
-      var e = currentUser.email.toLowerCase();
-      return (TEAM_CONFIG.contractors || []).some(function(c) {
-        return (c.names || []).some(function(n) { return e.indexOf(n) >= 0; });
-      });
+      // Owner-only (Cindy). Contractors (e.g. Vanessa) see/invoice ONLY their own time.
+      // Changed 2026-06-22 per owner request: contractors must not see other members' time.
+      return isTimeAdmin();
     }
 
     /** Cindy-level admin or billing coordinator — may set member/rate on time entries and see team desktop activity (still attributed per person in saved data). */
