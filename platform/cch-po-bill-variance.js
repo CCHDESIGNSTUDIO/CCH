@@ -989,6 +989,66 @@
     return label;
   };
 
+  /** Multiline remit-to / vendor address from a vendors catalog record. */
+  window.cchVendorCatalogAddressText = function(v) {
+    if (!v) return '';
+    if (typeof window.cchComposeAddressMultiline === 'function' &&
+        typeof window.cchAddressPartsFromRecord === 'function' &&
+        typeof window.cchCoerceStructuredAddressParts === 'function') {
+      var composed = window.cchComposeAddressMultiline(
+        window.cchCoerceStructuredAddressParts(window.cchAddressPartsFromRecord(v))
+      );
+      if (composed) return composed;
+    }
+    return String(v.address || v.vendorAddress || '').trim();
+  };
+
+  /** Find vendor by display name (cache, then Firestore). */
+  window.cchLookupVendorRecordByName = async function(name) {
+    name = String(name || '').trim();
+    if (!name) return null;
+    var low = name.toLowerCase();
+    try {
+      if (typeof vendorsCache !== 'undefined' && vendorsCache && vendorsCache.length) {
+        var hit = vendorsCache.find(function(v) {
+          return v && String(v.name || '').trim().toLowerCase() === low;
+        });
+        if (hit) return hit;
+      }
+    } catch (_cacheErr) { /* ignore */ }
+    try {
+      var snap = await db.collection('vendors').where('name', '==', name).limit(1).get();
+      if (!snap.empty) {
+        var d0 = snap.docs[0];
+        return Object.assign({ id: d0.id }, d0.data());
+      }
+      var all = await db.collection('vendors').get();
+      var found = null;
+      all.forEach(function(d) {
+        if (found) return;
+        var v = d.data() || {};
+        if (String(v.name || '').trim().toLowerCase() === low) {
+          found = Object.assign({ id: d.id }, v);
+        }
+      });
+      return found;
+    } catch (e) {
+      console.warn('[cchLookupVendorRecordByName]', e);
+      return null;
+    }
+  };
+
+  /** PO vendor address: saved on doc, else vendors catalog. */
+  window.cchPoVendorAddressResolved = async function(docData) {
+    docData = docData || {};
+    var stored = String(docData.vendorAddress || '').trim();
+    if (stored) return stored;
+    var vend = String(docData.vendor || '').trim();
+    if (!vend) return '';
+    var rec = await window.cchLookupVendorRecordByName(vend);
+    return window.cchVendorCatalogAddressText(rec);
+  };
+
   /** Bill, paid, balance, variance cells for All POs / project PO lists. */
   window.cchPoListAllPosFinancialCellsHtml = function(po, tdStyle) {
     tdStyle = tdStyle || 'padding:12px 14px;font-size:14px;';

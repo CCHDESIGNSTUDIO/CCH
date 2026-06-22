@@ -328,7 +328,7 @@
   };
 
   function sortArrow(field) {
-    if (window._omSortField !== field) return ' ▾';
+    if (window._omSortField !== field) return '';
     return window._omSortDir === 'asc' ? ' ▲' : ' ▼';
   }
 
@@ -361,8 +361,8 @@
         va = String(a.projectName || a.projectId || '').toLowerCase();
         vb = String(b.projectName || b.projectId || '').toLowerCase();
       } else if (field === 'shipTo') {
-        va = cchOmPoShipToDisplay(a).toLowerCase();
-        vb = cchOmPoShipToDisplay(b).toLowerCase();
+        va = (typeof window.cchPoListShipToLabel === 'function' ? window.cchPoListShipToLabel(a) : cchOmPoShipToDisplay(a)).toLowerCase();
+        vb = (typeof window.cchPoListShipToLabel === 'function' ? window.cchPoListShipToLabel(b) : cchOmPoShipToDisplay(b)).toLowerCase();
       } else if (field === 'status') {
         va = String(a.status || 'Draft').toLowerCase();
         vb = String(b.status || 'Draft').toLowerCase();

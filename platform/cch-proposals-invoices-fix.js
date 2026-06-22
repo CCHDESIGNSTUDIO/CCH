@@ -3409,7 +3409,14 @@
       var _poDateStr = _poDateRaw && typeof formatDate === 'function' ? formatDate(_poDateRaw) : '';
       var _poVendor = String(docData.vendor || '').trim();
       var _poVendorAddr = String(docData.vendorAddress || '').trim();
-      var _poShipTo = String(docData.shipTo || docData.deliverTo || '').trim();
+      var _poShipToRaw = String(docData.shipTo || docData.deliverTo || '').trim();
+      var _poShipTo = _poShipToRaw;
+      if (_poShipToRaw && typeof window.resolvePOShipToDisplayText === 'function') {
+        try {
+          var _poShipResolved = window.resolvePOShipToDisplayText(_poShipToRaw, projData, docData);
+          if (_poShipResolved && String(_poShipResolved).trim()) _poShipTo = String(_poShipResolved).trim();
+        } catch (_ePoViewShip) {}
+      }
       var poDetailsHTML = '';
       if (_poVendor || _poVendorAddr || _poShipTo) {
         poDetailsHTML =
@@ -3423,7 +3430,7 @@
               '</div>' +
               '<div>' +
                 '<div style="font-size:9px;text-transform:uppercase;letter-spacing:0.06em;color:#9CA3AF;margin-bottom:6px;">Ship to</div>' +
-                (_poShipTo ? '<div style="white-space:pre-wrap;">' + esc(_poShipTo) + '</div>' : '<span style="color:var(--gray-400);">—</span>') +
+                (_poShipTo ? '<div style="white-space:pre-wrap;">' + esc(_poShipTo).replace(/\n/g, '<br>') + '</div>' : '<span style="color:var(--gray-400);">—</span>') +
               '</div>' +
             '</div>' +
             (_poDateStr ? '<div style="margin-top:12px;font-size:12px;color:#5C6B80;"><span style="font-size:9px;text-transform:uppercase;letter-spacing:0.06em;color:#9CA3AF;">PO date</span> <strong style="color:#1B3352;">' + esc(_poDateStr) + '</strong></div>' : '') +
@@ -3972,6 +3979,13 @@
       } catch (_eShipRes) {}
     }
 
+    var vendorAddrPremium = String(docData.vendorAddress || '').trim();
+    if (type === 'po' && !vendorAddrPremium && docData.vendor && typeof window.cchPoVendorAddressResolved === 'function') {
+      try {
+        vendorAddrPremium = await window.cchPoVendorAddressResolved(docData);
+      } catch (_eVenPrem) {}
+    }
+
     var docNum = docData.invoiceNum || docData.number || docData.proposalNum || docData.name || docId.slice(0,8);
     var docDate = type === 'po'
       ? (docData.date || docData.issueDate || docData.orderDate || docData.poDate || docData.createdAt || '')
@@ -4343,8 +4357,16 @@
 
     var infoSectionHtml = '';
     if (type === 'po') {
+      var vendorBlockHtml = '';
+      if (docData.vendor) {
+        vendorBlockHtml = '<strong>' + esc(docData.vendor) + '</strong>';
+        if (vendorAddrPremium) {
+          vendorBlockHtml += '<div style="margin-top:6px;color:#5C6B80;font-size:12px;line-height:1.55;">' +
+            esc(vendorAddrPremium).replace(/\n/g, '<br>') + '</div>';
+        }
+      }
       infoSectionHtml = '<div class="info-section info-section-po">' +
-        (docData.vendor ? '<div class="info-block"><div class="info-label">Vendor</div><div class="info-value"><strong>' + esc(docData.vendor) + '</strong></div></div>' : '') +
+        (vendorBlockHtml ? '<div class="info-block"><div class="info-label">Bill to (vendor)</div><div class="info-value">' + vendorBlockHtml + '</div></div>' : '') +
         '<div class="info-block info-block-ship-to"><div class="info-label">Ship To</div><div class="info-value">' + shipToHtml + '</div></div>' +
       '</div>';
     } else {

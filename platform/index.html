@@ -30863,6 +30863,12 @@ async function renderBoardsTab(T, proj) {
           if (_slR && String(_slR).trim()) shipToLegacyRaw = String(_slR).trim();
         } catch (_lse) {}
       }
+      var vendorAddrPreview = String(docData.vendorAddress || '').trim();
+      if (type === 'po' && !vendorAddrPreview && docData.vendor && typeof window.cchPoVendorAddressResolved === 'function') {
+        try {
+          vendorAddrPreview = await window.cchPoVendorAddressResolved(docData);
+        } catch (_eVaPrev) {}
+      }
       var shipToLegacyHtml = shipToLegacyRaw
         ? esc(shipToLegacyRaw).replace(/\n/g, '<br>')
         : '<span style="color:#bbb;font-size:12px;">Set ship-to on the PO or project address.</span>';
@@ -30999,9 +31005,9 @@ async function renderBoardsTab(T, proj) {
         totalsHtml += '<tr class="total"><td><strong>Balance Due</strong></td><td class="right"><strong>' + formatMoney(_pvGrand - totalPaid) + '</strong></td></tr>';
       }
 
-      var vendorBlock = (type === 'po' && (docData.vendor || docData.vendorAddress)) ?
+      var vendorBlock = (type === 'po' && (docData.vendor || vendorAddrPreview)) ?
         '<div class="info-block"><div class="info-label">Bill To</div><div class="info-value"><strong>' + esc(docData.vendor || 'Vendor') + '</strong>' +
-        (docData.vendorAddress ? '<br>' + esc(String(docData.vendorAddress)).replace(/\n/g, '<br>') : '') +
+        (vendorAddrPreview ? '<br>' + esc(String(vendorAddrPreview)).replace(/\n/g, '<br>') : '') +
         '</div></div>' : '';
       var projectBlockLegacy = '<div class="info-block"><div class="info-label">Project</div><div class="info-value"><strong>' + esc(proj.name||projectId) + '</strong>' +
         (projectAddressLegacy ? '<br><span style="color:#5C6B80;font-size:12px;">' + esc(projectAddressLegacy).replace(/\n/g, '<br>') + '</span>' : '') +
@@ -33296,6 +33302,24 @@ async function renderBoardsTab(T, proj) {
         _docEdit.docData.orderDate = ds;
       }
       docEditUpdatePOShipToResolvedPreview();
+      docEditAutoSave();
+    }
+
+    async function docEditPOVendorNameChange() {
+      if (!_docEdit || _docEdit.type !== 'po') return;
+      var elV = document.getElementById('docEditPOVendor');
+      var elA = document.getElementById('docEditPOVendorAddress');
+      var name = elV ? elV.value.trim() : '';
+      _docEdit.docData.vendor = name;
+      if (elA && !elA.value.trim() && name && typeof window.cchPoVendorAddressResolved === 'function') {
+        try {
+          var resolved = await window.cchPoVendorAddressResolved({ vendor: name });
+          if (resolved) {
+            elA.value = resolved;
+            _docEdit.docData.vendorAddress = resolved;
+          }
+        } catch (_eVenFill) {}
+      }
       docEditAutoSave();
     }
 
@@ -38099,6 +38123,12 @@ async function renderBoardsTab(T, proj) {
           }
         });
       }
+      if (type === 'po' && !String(docData.vendorAddress || '').trim() && docData.vendor && typeof window.cchPoVendorAddressResolved === 'function') {
+        try {
+          var _resolvedVa = await window.cchPoVendorAddressResolved(docData);
+          if (_resolvedVa) docData.vendorAddress = _resolvedVa;
+        } catch (_eVaEdit) {}
+      }
 
       // Store in shared state
       _docEdit = { type, projectId, docId, collection, items: JSON.parse(JSON.stringify(items)), rooms, vendors, docData: { ...docData } };
@@ -38232,7 +38262,7 @@ async function renderBoardsTab(T, proj) {
             <div>
               <div style="font-size:12px;text-transform:uppercase;letter-spacing:2px;color:#0F1A2E;font-weight:700;margin-bottom:10px;">Bill to (vendor)</div>
               <label style="font-size:11px;color:#0F1A2E;font-weight:600;display:block;margin-bottom:4px;">Vendor name</label>
-              <input class="form-input" id="docEditPOVendor" value="${escAttr(docData.vendor || '')}" placeholder="Vendor / payee name" onchange="docEditPOVendorShipChange()" style="font-size:14px;padding:10px 12px;">
+              <input class="form-input" id="docEditPOVendor" value="${escAttr(docData.vendor || '')}" placeholder="Vendor / payee name" onchange="docEditPOVendorNameChange()" style="font-size:14px;padding:10px 12px;">
               <label style="font-size:11px;color:#0F1A2E;font-weight:600;display:block;margin-top:12px;margin-bottom:4px;">Vendor address <span style="font-weight:400;color:var(--gray-500);">(optional)</span></label>
               <textarea class="form-textarea" id="docEditPOVendorAddress" rows="3" placeholder="Street, city, state — remit-to / vendor billing" onchange="docEditPOVendorShipChange()" style="font-size:13px;">${esc(docData.vendorAddress || '')}</textarea>
             </div>
@@ -39109,6 +39139,12 @@ async function renderBoardsTab(T, proj) {
           _invalidateShipToContactsCache();
         }
         await _loadShipToContacts(true);
+      }
+      if (!String(docData.vendorAddress || '').trim() && docData.vendor && typeof window.cchPoVendorAddressResolved === 'function') {
+        try {
+          var _poViewVa = await window.cchPoVendorAddressResolved(docData);
+          if (_poViewVa) docData.vendorAddress = _poViewVa;
+        } catch (_ePoViewVa) {}
       }
       if (window._forceEditMode) {
         window._forceEditMode = false;
