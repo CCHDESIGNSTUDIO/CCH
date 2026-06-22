@@ -1,11 +1,11 @@
 /**
  * Order Management — firm-wide PO hub: track orders, pay vendors, bill variances, QuickBooks.
- * Vendor Bills / Bill variances nav fold in here on staging (cchOmPageEnabled).
+ * Vendor Bills / Bill variances nav fold into Order Management (staging + production).
  */
 (function() {
   'use strict';
 
-  var OM_BUILD = '20260602om8';
+  var OM_BUILD = '20260602om9';
   var OM_NAVY = '#0F1A2E';
   var OM_NAVY_MID = '#1B3352';
   var OM_BORDER = 'rgba(15,26,46,0.12)';
@@ -35,11 +35,13 @@
     }
   }
 
+  /** Order Management — enabled on production and staging (Studio staff; not client guests). */
   window.cchOmPageEnabled = function() {
-    return window._cchEnv === 'staging' ||
-      (location.hostname || '').indexOf('staging') >= 0 ||
-      location.hostname === 'localhost' ||
-      location.hostname === '127.0.0.1';
+    var env = String(window._cchEnv || '').toLowerCase();
+    if (env === 'production' || env === 'staging') return true;
+    var h = location.hostname || '';
+    return h === 'localhost' || h === '127.0.0.1' || h.indexOf('staging') >= 0 ||
+      h.indexOf('cch-platform') >= 0;
   };
 
   /** Houzz legacy import POs — excluded from Order Management (Studio workflow only). */
@@ -1263,8 +1265,7 @@
 
     if (!window.cchOmPageEnabled()) {
       T.innerHTML = '<h1 class="page-title">Order Management</h1>' +
-        '<div class="card" style="padding:24px;margin-top:16px;"><p style="margin:0;color:var(--gray-500);">Order Management is enabled on <strong>staging</strong> first. Open ' +
-        '<a href="https://cch-platform-staging.web.app/#/ordermanagement" style="color:var(--cyan);">cch-platform-staging.web.app</a>.</p></div>';
+        '<div class="card" style="padding:24px;margin-top:16px;"><p style="margin:0;color:var(--gray-500);">Order Management is not available in this environment.</p></div>';
       if (typeof window.setBreadcrumb === 'function') window.setBreadcrumb([{ label: 'Order Management' }]);
       if (typeof window.setTopbarActions === 'function') window.setTopbarActions('');
       return;
