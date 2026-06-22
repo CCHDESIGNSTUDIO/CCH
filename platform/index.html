@@ -28542,25 +28542,90 @@ async function renderBoardsTab(T, proj) {
       }).join('');
     }
 
-    // Cache for receivers and workrooms from team collection
+    // Cache for receivers and workrooms — Team & Contacts, workrooms catalog, vendor receivers
     var _shipToReceivers = null;
     var _shipToWorkrooms = null;
+
+    function _shipToContactAddrLine(name, address, phone) {
+      name = String(name || '').trim();
+      if (!name) return '';
+      var addr = name;
+      if (address) addr += ' · ' + String(address).trim();
+      if (phone) addr += ' · ' + String(phone).trim();
+      return addr;
+    }
+
+    function _shipToContactPicklistOptions(contacts, selectedName, emptyLabel) {
+      var sel = String(selectedName || '').trim();
+      var html = '<option value="">' + esc(emptyLabel || '— Select —') + '</option>';
+      var seen = {};
+      (contacts || []).forEach(function(c) {
+        var n = String((c && c.name) || '').trim();
+        if (!n) return;
+        var k = n.toLowerCase();
+        if (seen[k]) return;
+        seen[k] = true;
+        html += '<option value="' + escAttr(n) + '"' + (n === sel ? ' selected' : '') + '>' + esc(n) + '</option>';
+      });
+      if (sel && !seen[sel.toLowerCase()]) {
+        html += '<option value="' + escAttr(sel) + '" selected>' + esc(sel) + ' (saved)</option>';
+      }
+      return html;
+    }
 
     async function _loadShipToContacts() {
       if (_shipToReceivers != null && _shipToWorkrooms != null) return;
       _shipToReceivers = [];
       _shipToWorkrooms = [];
+      var wrSeen = {};
+      var rcSeen = {};
+      function pushWorkroom(name, addr) {
+        name = String(name || '').trim();
+        if (!name) return;
+        var k = name.toLowerCase();
+        if (wrSeen[k]) return;
+        wrSeen[k] = true;
+        _shipToWorkrooms.push({ name: name, addr: addr || name });
+      }
+      function pushReceiver(name, addr) {
+        name = String(name || '').trim();
+        if (!name) return;
+        var k = name.toLowerCase();
+        if (rcSeen[k]) return;
+        rcSeen[k] = true;
+        _shipToReceivers.push({ name: name, addr: addr || name });
+      }
       try {
         var snap = await db.collection('team').get();
         snap.forEach(function(d) {
-          var t = d.data();
+          var t = d.data() || {};
           var name = t.name || t.company || '';
           if (!name) return;
-          var addr = name + (t.address ? ' · ' + t.address : '') + (t.phone ? ' · ' + t.phone : '');
-          if (t.role === 'receiver') _shipToReceivers.push({ name: name, addr: addr });
-          if (t.role === 'workroom') _shipToWorkrooms.push({ name: name, addr: addr });
+          var addr = _shipToContactAddrLine(name, t.address, t.phone);
+          if (t.role === 'receiver') pushReceiver(name, addr);
+          if (t.role === 'workroom') pushWorkroom(name, addr);
         });
-      } catch(e) { console.warn('Could not load team contacts for ship-to:', e); }
+      } catch (e) { console.warn('Could not load team contacts for ship-to:', e); }
+      try {
+        var ws = await db.collection('workrooms').get();
+        ws.forEach(function(d) {
+          var w = d.data() || {};
+          var name = String(w.name || w.title || w.workroomName || '').trim() || d.id;
+          var addr = _shipToContactAddrLine(name, w.address || w.addr, w.phone);
+          pushWorkroom(name, addr);
+        });
+      } catch (e) { console.warn('Could not load workrooms collection for ship-to:', e); }
+      try {
+        var vs = await db.collection('vendors').get();
+        vs.forEach(function(d) {
+          var v = d.data() || {};
+          if (v.type !== 'receiver' && !v.isReceiver) return;
+          var name = String(v.name || v.company || '').trim();
+          if (!name) return;
+          var addr = _shipToContactAddrLine(name, v.address || v.mailingAddress, v.phone || v.contactPhone);
+          pushReceiver(name, addr);
+        });
+      } catch (e) { console.warn('Could not load vendor receivers for ship-to:', e); }
     }
 
     // Pre-load on page init (non-blocking)
@@ -28585,7 +28650,7 @@ async function renderBoardsTab(T, proj) {
           opts.push({ group: 'Receiver', label: r.name, addr: r.addr });
         });
       } else {
-        opts.push({ group: 'Receiver', label: 'Receiver (none saved — add in Team & Contacts)', addr: 'Receiver' });
+        opts.push({ group: 'Receiver', label: 'Receiver (none saved — add in Team & Contacts or mark a vendor as receiver)', addr: 'Receiver' });
       }
 
       // Workrooms from team contacts
@@ -28594,7 +28659,7 @@ async function renderBoardsTab(T, proj) {
           opts.push({ group: 'Workroom', label: w.name, addr: w.addr });
         });
       } else {
-        opts.push({ group: 'Workroom', label: 'Workroom (none saved — add in Team & Contacts)', addr: 'Workroom' });
+        opts.push({ group: 'Workroom', label: 'Workroom (none saved — add in Team & Contacts or Workrooms)', addr: 'Workroom' });
       }
 
       opts.push({ group: 'Other', label: 'Vendor Direct to Client', addr: 'Vendor Direct to Client' });
@@ -28875,13 +28940,16 @@ async function renderBoardsTab(T, proj) {
     function editDocLineItem(projectId, collection, docId, idx) {
       collection = String(collection || 'proposals').trim() || 'proposals';
       if (typeof docEditCancelPendingSave === 'function') docEditCancelPendingSave();
+      if (collection === 'purchaseOrders' && typeof _loadShipToContacts === 'function') {
+        void _loadShipToContacts();
+      }
       Promise.all([
         db.collection('boards').doc(projectId).collection(collection).doc(docId).get(),
         db.collection('boards').doc(projectId).get(),
         db.collection('boards').doc(projectId).collection('roomMeta').get()
       ]).then(async function(results) {
         var doc = results[0];
-        if (!doc.exists) { await cchAlert('Proposal not found.', 'Proposal'); return; }
+        if (!doc.exists) { await cchAlert('Document not found.', 'Line item'); return; }
         var _propOpen = doc.data() || {};
         if (collection === 'proposals') {
           var _openLock = proposalDesignerLineEditLocked(_propOpen);
@@ -28890,9 +28958,14 @@ async function renderBoardsTab(T, proj) {
             return;
           }
         }
+        var boardSnap = results[1];
+        if (boardSnap.exists) window._docEditProjData = Object.assign({ id: projectId }, boardSnap.data() || {});
+        var items = (_docEdit && _docEdit.projectId === projectId && _docEdit.docId === docId && _docEdit.collection === collection && Array.isArray(_docEdit.items) && _docEdit.items.length)
+          ? _docEdit.items
+          : (doc.data().items || []);
+        var item = items[idx] || {};
         window._piLineCtx = { projectId: projectId, collection: collection, docId: docId, idx: idx };
         window._piLibraryIdLocked = cchDocLineHasLockedLibraryId(item);
-        var boardSnap = results[1];
         var boardCats = boardSnap.exists ? (boardSnap.data().categories || []) : [];
         var boardRooms = boardSnap.exists ? [].concat(boardSnap.data().rooms || []) : [];
         var rmSnapPi = results[2];
@@ -30290,7 +30363,9 @@ async function renderBoardsTab(T, proj) {
         });
         for (const [vendor, vItems] of Object.entries(byVendor)) {
           const poItems = vItems.map(i => {
-            var o = { description: i.title, qty: parseInt(i.qty) || 1, cost: parseFloat(i.cost || i.amount) || 0, lineTotal: parseFloat(i.amount) || 0, room: i.room || i.category || '' };
+            var _poTag = (typeof cchLineTagText === 'function' ? cchLineTagText(i) : '') ||
+              String(i.lineTag || i.lineTagCode || i.fixtureTag || '').trim();
+            var o = { description: i.title, qty: parseInt(i.qty) || 1, cost: parseFloat(i.cost || i.amount) || 0, lineTotal: parseFloat(i.amount) || 0, room: i.room || i.category || '', lineTag: _poTag || null };
             if (cchLineHasAdditionalNotes(i)) { o.includeAdditionalNote = true; o.additionalNotes = cchLineAdditionalNotesText(i); }
             return o;
           });
@@ -31244,6 +31319,7 @@ async function renderBoardsTab(T, proj) {
     async function showEditProjectModal(projectId) {
       const doc = await db.collection('boards').doc(projectId).get();
       const p = doc.exists ? doc.data() : {};
+      if (typeof _loadShipToContacts === 'function') await _loadShipToContacts();
 
       // Build client list from BOTH existing projects AND clients collection
       let clientNames = [];
@@ -31395,10 +31471,11 @@ async function renderBoardsTab(T, proj) {
                   <option value="workroom" ${shipMode==='workroom'?'selected':''}>Workroom</option>
                   <option value="receiver" ${shipMode==='receiver'?'selected':''}>Receiver</option>
                 </select>
+                <div style="font-size:11px;color:var(--gray-500);margin-top:6px;line-height:1.4;">When mode is Workroom or Receiver, pick from your company list below — same list used on PO ship-to.</div>
               </div>
-              <div class="form-group"><label class="form-label">Workroom name</label><input class="form-input" id="epWorkroomName" value="${escAttr(p.shipToWorkroomName || '')}" placeholder="Link to existing vendor or nickname"></div>
-              <div class="form-group"><label class="form-label">Workroom URL / notes</label><input class="form-input" id="epWorkroomUrl" value="${escAttr(p.shipToWorkroomUrl || '')}" placeholder="https://… or internal ref"></div>
-              <div class="form-group"><label class="form-label">Receiver name</label><input class="form-input" id="epReceiverName" value="${escAttr(p.shipToReceiverName || '')}" placeholder="Receiver contact or location"></div>
+              <div class="form-group"><label class="form-label">Workroom</label><select class="form-select" id="epWorkroomName">${_shipToContactPicklistOptions(_shipToWorkrooms, p.shipToWorkroomName || '', '— Select workroom —')}</select></div>
+              <div class="form-group"><label class="form-label">Workroom URL / notes</label><input class="form-input" id="epWorkroomUrl" value="${escAttr(p.shipToWorkroomUrl || '')}" placeholder="https://… or internal ref (optional)"></div>
+              <div class="form-group"><label class="form-label">Receiver</label><select class="form-select" id="epReceiverName">${_shipToContactPicklistOptions(_shipToReceivers, p.shipToReceiverName || '', '— Select receiver —')}</select></div>
               <div class="form-row">
                 <div class="form-group"><label class="form-label">CCH Studio ship address (optional)</label><input class="form-input" id="epShipCchStudio" value="${escAttr(p.shipAddressCchStudio || '')}" placeholder="Override when mode = CCH Studio"></div>
                 <div class="form-group"><label class="form-label">CCH Vanessa ship address (optional)</label><input class="form-input" id="epShipVanessa" value="${escAttr(p.shipAddressCchVanessa || '')}" placeholder="Override when mode = CCH Vanessa"></div>
@@ -32300,14 +32377,16 @@ async function renderBoardsTab(T, proj) {
       }
 
       const _hideUnitCol = isInvoice;
-      const _poLineColspan = isPO ? 12 : (_hideUnitCol ? 13 : 14);
-      const _detailColspan = isPO ? 11 : (_hideUnitCol ? 12 : 13);
+      const _poLineColspan = isPO ? 14 : (_hideUnitCol ? 13 : 14);
+      const _detailColspan = isPO ? 13 : (_hideUnitCol ? 12 : 13);
       const thead = '<thead><tr>' +
         '<th style="width:48px;" title="Reorder lines">↕</th>' +
         '<th style="min-width:200px;">Item</th>' +
         '<th style="min-width:90px;">Vendor</th>' +
         '<th style="min-width:90px;">Category</th>' +
         '<th style="text-align:center;width:44px;" title="Fixture / trim code (optional)">Tag</th>' +
+        (isPO ? '<th style="min-width:88px;" title="Finish / color for vendor PO">Finish</th>' +
+        '<th style="min-width:120px;" title="Delivery destination for this line">Ship to</th>' : '') +
         '<th style="text-align:center;width:44px;" title="Linked docs">Docs</th>' +
         '<th style="text-align:center;width:52px;" title="Quantity">Qty</th>' +
         '<th style="text-align:right;width:76px;" title="Trade cost (per unit)">Cost</th>' +
@@ -32401,6 +32480,14 @@ async function renderBoardsTab(T, proj) {
         }
 
         var tagCell = '<td style="text-align:center;vertical-align:middle;"><input type="text" value="' + escAttr(_lineTagTxt) + '" data-idx="' + idx + '" data-field="lineTag" onchange="docEditFieldChange(this)" placeholder="—" maxlength="32" title="Optional label: L39, A, B, trim…" style="width:44px;text-align:center;font-size:11px;font-weight:700;padding:4px 3px;border:1px solid rgba(15,26,46,0.12);"></td>';
+        var _finVal = String(item.finish || item.color || item.finishColor || '').trim();
+        var finishCell = isPO
+          ? '<td style="vertical-align:middle;"><input type="text" value="' + escAttr(_finVal) + '" data-idx="' + idx + '" data-field="finish" onchange="docEditFieldChange(this)" placeholder="Finish" maxlength="64" title="Finish / color for vendor" style="width:100%;max-width:100px;font-size:11px;padding:4px 6px;border:1px solid rgba(15,26,46,0.12);box-sizing:border-box;"></td>'
+          : '';
+        var _lineShipTo = String(item.shipTo || item.deliverTo || '').trim();
+        var shipToLineCell = isPO
+          ? '<td style="vertical-align:middle;"><select class="doc-edit-room-select" data-idx="' + idx + '" data-field="shipTo" onchange="docEditFieldChange(this)" title="Line ship-to (overrides PO default when set)" style="font-size:10px;width:100%;max-width:130px;box-sizing:border-box;">' + _piShipToOptions(_lineShipTo) + '</select></td>'
+          : '';
         var _canReorderUp = docEditCanReorderItem(idx, -1);
         var _canReorderDn = docEditCanReorderItem(idx, 1);
         var reorderHtml = '<div class="doc-edit-reorder" style="padding-top:0;margin-bottom:5px;">' +
@@ -32432,6 +32519,8 @@ async function renderBoardsTab(T, proj) {
               '<input id="docEditVendorCustom' + idx + '" class="doc-edit-name" value="' + escAttr(item.vendor || '') + '" placeholder="Vendor name" data-idx="' + idx + '" onchange="docEditVendorCustomChange(this)" style="display:none;margin-top:4px;font-size:11px;padding:4px 6px;border:1px solid rgba(15,26,46,0.12);width:100%;box-sizing:border-box;">') + '</td>' +
           '<td><select class="doc-edit-room-select" data-idx="' + idx + '" data-field="category" onchange="docEditFieldChange(this)" style="font-size:11px;width:100%;max-width:140px;">' + docEditBuildCategoryOptions(item.category || '', (window._docEditProjData && window._docEditProjData.categories) || [], (_docEdit && _docEdit.rooms) || []) + '</select></td>' +
           tagCell +
+          finishCell +
+          shipToLineCell +
           '<td style="text-align:center;">' + docsCell + '</td>' +
           '<td style="text-align:center;"><input type="text" inputmode="decimal" class="doc-edit-num-input doc-edit-num-field doc-edit-num-field--qty" value="' + qty + '" data-idx="' + idx + '" data-field="qty" onchange="docEditNumChange(this)" title="Quantity"></td>' +
           '<td style="text-align:right;">' + costCell + '</td>' +
@@ -32467,7 +32556,7 @@ async function renderBoardsTab(T, proj) {
 
         var notesRow = '<tr class="doc-edit-notes-row" id="docEditNotesRow' + idx + '" style="display:none;background:#FFFDF8;">' +
           '<td></td>' +
-          '<td colspan="' + (isPO ? 9 : 11) + '">' +
+          '<td colspan="' + (isPO ? 13 : 11) + '">' +
             '<div class="doc-edit-field-label" style="margin-bottom:4px;">Notes (under description on preview/PDF)</div>' +
             '<textarea class="doc-edit-notes doc-edit-tight" rows="3" data-idx="' + idx + '" data-field="lineNotes" oninput="docEditFieldChange(this)" onchange="docEditFieldChange(this)" placeholder="Notes shown under this line item description on preview/PDF." style="min-height:64px;font-size:12px;line-height:1.45;background:#fff;">' + esc(_lineNotesTxt) + '</textarea>' +
             '<div style="display:flex;gap:6px;margin-top:8px;">' +
@@ -32482,7 +32571,6 @@ async function renderBoardsTab(T, proj) {
           '<td colspan="' + _detailColspan + '">' +
             '<div class="doc-edit-detail-grid">' +
               (isPO ? '<div><div class="doc-edit-field-label">SKU / Model</div><input class="form-input" value="' + escAttr(item.sku || '') + '" data-idx="' + idx + '" data-field="sku" onchange="docEditFieldChange(this)" style="width:100%;font-size:12px;padding:6px 8px;"></div>' +
-              '<div><div class="doc-edit-field-label">Finish / Color</div><input class="form-input" value="' + escAttr(item.finish || item.color || '') + '" data-idx="' + idx + '" data-field="finish" onchange="docEditFieldChange(this)" style="width:100%;font-size:12px;padding:6px 8px;"></div>' +
               '<div style="grid-column:1/-1;"><div class="doc-edit-field-label">Dimensions</div><input class="form-input" value="' + escAttr(item.dimensions || '') + '" data-idx="' + idx + '" data-field="dimensions" onchange="docEditFieldChange(this)" style="width:100%;font-size:12px;padding:6px 8px;"></div>' : '') +
               (isInvoice && isServiceLine ? '<div><div class="doc-edit-field-label">Cost (optional)</div><input type="number" step="0.01" value="' + cost.toFixed(2) + '" data-idx="' + idx + '" data-field="cost" onchange="docEditNumChange(this)" style="width:100%;padding:6px 8px;border:1px solid rgba(15,26,46,0.12);"></div>' : '') +
               '<div><div class="doc-edit-field-label">Retail / MSRP</div>' +
@@ -32968,7 +33056,7 @@ async function renderBoardsTab(T, proj) {
 
     function docEditUpdatePOShipToResolvedPreview() {
       if (!_docEdit || _docEdit.type !== 'po') return;
-      var el = document.getElementById('docEditPOShipToResolved');
+      var el = document.getElementById('docEditPOShipToAddress');
       if (!el) return;
       var raw = '';
       var sel = document.getElementById('docEditPOShipTo');
@@ -32979,7 +33067,7 @@ async function renderBoardsTab(T, proj) {
       var txt = (typeof resolvePOShipToDisplayText === 'function')
         ? resolvePOShipToDisplayText(raw, pd, dd)
         : raw;
-      el.textContent = txt || '—';
+      if (txt && String(txt).trim()) el.value = String(txt).trim();
     }
 
     function docEditPOVendorShipChange() {
@@ -32987,10 +33075,15 @@ async function renderBoardsTab(T, proj) {
       var elV = document.getElementById('docEditPOVendor');
       var elA = document.getElementById('docEditPOVendorAddress');
       var elS = document.getElementById('docEditPOShipTo');
+      var elAddr = document.getElementById('docEditPOShipToAddress');
       var elD = document.getElementById('docEditPODate');
       if (elV) _docEdit.docData.vendor = elV.value.trim();
       if (elA) _docEdit.docData.vendorAddress = elA.value.trim();
-      if (elS) _docEdit.docData.shipTo = elS.value.trim();
+      if (elS) {
+        _docEdit.docData.shipTo = elS.value.trim();
+        if (elAddr && document.activeElement === elS) docEditUpdatePOShipToResolvedPreview();
+      }
+      if (elAddr) _docEdit.docData.shipToAddress = elAddr.value.trim();
       if (elD && elD.value && /^\d{4}-\d{2}-\d{2}$/.test(elD.value.trim())) {
         var ds = elD.value.trim();
         _docEdit.docData.date = ds;
@@ -33135,6 +33228,11 @@ async function renderBoardsTab(T, proj) {
           if (_ps) {
             d.docData.shipTo = String(_ps.value || '').trim();
             _updatePayload.shipTo = d.docData.shipTo;
+          }
+          var _psa = document.getElementById('docEditPOShipToAddress');
+          if (_psa) {
+            d.docData.shipToAddress = String(_psa.value || '').trim();
+            _updatePayload.shipToAddress = d.docData.shipToAddress;
           }
           if (_pdt && _pdt.value && /^\d{4}-\d{2}-\d{2}$/.test(String(_pdt.value).trim())) {
             var _pds = String(_pdt.value).trim();
@@ -36368,9 +36466,12 @@ async function renderBoardsTab(T, proj) {
           var totalCost = vitems.reduce(function(s, i) { return s + ((parseFloat(i.cost || i.totalCost || 0)) * (parseFloat(i.qty) || 1)); }, 0);
           var totalSell = vitems.reduce(function(s, i) { return s + (parseFloat(i.amount || i.totalSelling || i.clientPrice || 0)); }, 0);
           var poItems = vitems.map(function(item) {
+            var _poLineTag = (typeof cchLineTagText === 'function' ? cchLineTagText(item) : '') ||
+              String(item.lineTag || item.lineTagCode || item.fixtureTag || '').trim();
             var poLine = Object.assign({
               title: item.title || item.name || '', description: item.description || '', vendor: vendor,
               room: item.room || item.category || '', qty: item.qty || 1,
+              lineTag: _poLineTag || null,
               sku: item.sku || '', finish: item.finish || '', dimensions: item.dimensions || '',
               cost: parseFloat(item.cost || item.totalCost || 0),
               unitCost: parseFloat(item.cost || item.totalCost || 0) / (parseFloat(item.qty) || 1),
@@ -37920,7 +38021,16 @@ async function renderBoardsTab(T, proj) {
               <p style="font-size:11px;color:var(--gray-500);margin:0 0 10px;line-height:1.45;">Delivery destination for this PO. Options include CCH, client, receivers, and workrooms from <strong>Team & Contacts</strong>.</p>
               <select class="form-input" id="docEditPOShipTo" onchange="docEditPOVendorShipChange()" style="font-size:14px;padding:10px 12px;">${_piShipToOptions(docData.shipTo || docData.deliverTo || '')}</select>
               <label style="font-size:11px;color:#0F1A2E;font-weight:600;display:block;margin-top:12px;margin-bottom:4px;">Vendor-facing ship-to address</label>
-              <div id="docEditPOShipToResolved" style="font-size:13px;line-height:1.5;color:#0F1A2E;padding:10px 12px;background:rgba(15,26,46,0.04);border:1px solid rgba(15,26,46,0.1);border-radius:4px;white-space:pre-wrap;min-height:2.8em;">—</div>
+              <textarea class="form-textarea" id="docEditPOShipToAddress" rows="3" placeholder="Full delivery address as it should appear on the PO to the vendor" onchange="docEditPOVendorShipChange()" style="font-size:13px;line-height:1.5;">${esc((function() {
+                var manual = String(docData.shipToAddress || '').trim();
+                if (manual) return manual;
+                var raw = String(docData.shipTo || docData.deliverTo || '').trim();
+                if (raw && typeof resolvePOShipToDisplayText === 'function') {
+                  return resolvePOShipToDisplayText(raw, projData, docData) || raw;
+                }
+                return raw;
+              })())}</textarea>
+              <div style="font-size:10px;color:var(--gray-500);margin-top:6px;line-height:1.4;">Pick a destination above, then edit this text if needed. Saves to the PO and prints on vendor PDFs.</div>
             </div>
           </div>
         </div>` : '';
@@ -38696,6 +38806,7 @@ async function renderBoardsTab(T, proj) {
                 var _poL = { title: c.title || '', vendor: c.vendor || '', category: c.category || '', room: c.room || '',
                   qty: c.qty || 1, cost: c.totalCost || c.cost || 0, markupPct: c.markupPct || 0, shipping: 0,
                   amount: c.totalCost || c.cost || 0, imageUrl: c.imageUrl || '', description: c.description || '',
+                  lineTag: (typeof cchLineTagText === 'function' ? cchLineTagText(c) : '') || String(c.lineTag || c.lineTagCode || c.fixtureTag || '').trim() || null,
                   libraryProductId: c.libraryProductId || '' };
                 if (cchLineHasAdditionalNotes(c)) {
                   _poL.includeAdditionalNote = true;
@@ -71857,7 +71968,7 @@ ${pages}
   <script src="cch-proposals-invoices-fix.js?v=20260620icons"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
   <script src="cch-po-bill-variance.js?v=20260603vdoctype"></script>
-  <script src="cch-order-management.js?v=20260602om9"></script>
+  <script src="cch-order-management.js?v=20260602om11"></script>
   <script src="cch-ffe-procurement.js?v=20260602"></script>
 </body>
 </html>
