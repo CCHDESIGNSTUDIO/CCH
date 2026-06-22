@@ -28631,18 +28631,76 @@ async function renderBoardsTab(T, proj) {
     // Pre-load on page init (non-blocking)
     setTimeout(function() { _loadShipToContacts(); }, 2000);
 
+    function _poClientShipToAddrs(projData) {
+      projData = projData || window._docEditProjData || {};
+      var cName = String(projData.clientName || '').trim();
+      var cAddr = String(projData.clientAddress || projData.address || '').trim();
+      var jobAddr = String(projData.projectAddress || projData.siteAddress || projData.jobSiteAddress || '').trim();
+      var clientHome = cName ? (cName + (cAddr ? ' · ' + cAddr : '')) : 'Client Home';
+      var clientJob = cName
+        ? (cName + ' Job Site' + (jobAddr ? ' · ' + jobAddr : (cAddr ? ' · ' + cAddr : '')))
+        : (jobAddr ? ('Client Job Site · ' + jobAddr) : 'Client Job Site');
+      return { clientHome: clientHome, clientJob: clientJob };
+    }
+
+    /** Map legacy PO shipTo ("client") to a real dropdown value (Client Home / Job Site). */
+    function _normalizePoShipToSelection(selected, projData) {
+      var s = String(selected || '').trim();
+      if (!s) return '';
+      var addrs = _poClientShipToAddrs(projData);
+      var low = s.toLowerCase().replace(/\s+/g, ' ').trim();
+      if (low === 'client' || low === 'client home' || low === 'billing' || /^client\s*\(?use billing/.test(low)) {
+        return addrs.clientHome;
+      }
+      if (low.indexOf('job site') >= 0 || low === 'jobsite' || low === 'client job site' || low === 'project_site') {
+        return addrs.clientJob;
+      }
+      return s;
+    }
+    window._normalizePoShipToSelection = _normalizePoShipToSelection;
+
+    function _poDefaultShipToValue(projData) {
+      projData = projData || window._docEditProjData || {};
+      var addrs = _poClientShipToAddrs(projData);
+      var mode = String(projData.shipToDefaultMode || 'project_site').trim();
+      if (mode === 'client_billing') return addrs.clientHome;
+      if (mode === 'cch_studio') return 'CCH Design Studio · 2481 N. Riverside Dr, Santa Ana, CA 92706';
+      if (mode === 'cch_vanessa') return 'VH Warehouse · Vanessa Holloway';
+      if (mode === 'workroom' && projData.shipToWorkroomName) {
+        var wn = String(projData.shipToWorkroomName).trim();
+        if (_shipToWorkrooms && _shipToWorkrooms.length) {
+          for (var i = 0; i < _shipToWorkrooms.length; i++) {
+            if (String(_shipToWorkrooms[i].name || '').trim() === wn) return _shipToWorkrooms[i].addr;
+          }
+        }
+        return wn;
+      }
+      if (mode === 'receiver' && projData.shipToReceiverName) {
+        var rn = String(projData.shipToReceiverName).trim();
+        if (_shipToReceivers && _shipToReceivers.length) {
+          for (var j = 0; j < _shipToReceivers.length; j++) {
+            if (String(_shipToReceivers[j].name || '').trim() === rn) return _shipToReceivers[j].addr;
+          }
+        }
+        return rn;
+      }
+      return addrs.clientJob;
+    }
+    window._poDefaultShipToValue = _poDefaultShipToValue;
+
     function _piShipToOptions(selected) {
+      var pd = window._docEditProjData || {};
+      selected = _normalizePoShipToSelection(selected, pd);
+      var addrs = _poClientShipToAddrs(pd);
       var opts = [
         { group: 'CCH', label: 'CCH Design Studio', addr: 'CCH Design Studio · 2481 N. Riverside Dr, Santa Ana, CA 92706' },
         { group: 'CCH', label: 'VH Warehouse', addr: 'VH Warehouse · Vanessa Holloway' }
       ];
 
       // Client options — fill from project data
-      var pd = window._docEditProjData || {};
       var cName = pd.clientName || '';
-      var cAddr = pd.clientAddress || pd.address || '';
-      opts.push({ group: 'Client', label: 'Client Home', addr: cName ? cName + (cAddr ? ' · ' + cAddr : '') : 'Client Home' });
-      opts.push({ group: 'Client', label: 'Client Job Site', addr: cName ? cName + ' Job Site' + (cAddr ? ' · ' + cAddr : '') : 'Client Job Site' });
+      opts.push({ group: 'Client', label: 'Client Home', addr: addrs.clientHome });
+      opts.push({ group: 'Client', label: 'Client Job Site', addr: addrs.clientJob });
 
       // Receivers from team contacts
       if (_shipToReceivers && _shipToReceivers.length > 0) {
@@ -33061,7 +33119,7 @@ async function renderBoardsTab(T, proj) {
       var raw = '';
       var sel = document.getElementById('docEditPOShipTo');
       if (sel && sel.value) raw = String(sel.value).trim();
-      else raw = String((_docEdit.docData.shipTo || _docEdit.docData.deliverTo || '')).trim();
+      else raw = _normalizePoShipToSelection((_docEdit.docData.shipTo || _docEdit.docData.deliverTo || ''), pd);
       var pd = window._docEditProjData || {};
       var dd = _docEdit.docData || {};
       var txt = (typeof resolvePOShipToDisplayText === 'function')
@@ -36457,6 +36515,13 @@ async function renderBoardsTab(T, proj) {
       if (!vendors.length) { await cchAlert('Nothing to create.', 'Generate POs'); return; }
       closeModal();
       try {
+        if (typeof _loadShipToContacts === 'function') await _loadShipToContacts();
+        if (!window._docEditProjData || window._docEditProjData.id !== st.projectId) {
+          try {
+            var _poGenBoard = await db.collection('boards').doc(st.projectId).get();
+            if (_poGenBoard.exists) window._docEditProjData = Object.assign({ id: st.projectId }, _poGenBoard.data() || {});
+          } catch (_ePoGenProj) {}
+        }
         var created = [];
         var _cUser = (currentUser && currentUser.displayName) || (currentUser && currentUser.email) || 'Unknown';
         for (var vi = 0; vi < vendors.length; vi++) {
@@ -36499,7 +36564,7 @@ async function renderBoardsTab(T, proj) {
             sourceItemKeys: poItems.map(function(p) { return p._srcKey; }).filter(Boolean),
             linkedInvoiceId: st.collection === 'invoices' ? st.docId : null,
             linkedProposalId: st.collection === 'proposals' ? st.docId : null,
-            shipTo: 'client',
+            shipTo: (typeof _poDefaultShipToValue === 'function' ? _poDefaultShipToValue(window._docEditProjData) : '') || 'Client Job Site',
             createdAt: nowIso, date: nowIso.split('T')[0],
             createdBy: _cUser, createdByEmail: (currentUser && currentUser.email) || '',
             activityLog: [{ action: 'po_generated', details: 'Vendor: ' + vendor + ', ' + vitems.length + ' items (item-selected' + (useInvoiceSnapshot ? ', invoice-snapshot no-library' : '') + ')', userName: _cUser, userEmail: (currentUser && currentUser.email) || '', timestamp: nowIso }],
@@ -38024,7 +38089,7 @@ async function renderBoardsTab(T, proj) {
               <textarea class="form-textarea" id="docEditPOShipToAddress" rows="3" placeholder="Full delivery address as it should appear on the PO to the vendor" onchange="docEditPOVendorShipChange()" style="font-size:13px;line-height:1.5;">${esc((function() {
                 var manual = String(docData.shipToAddress || '').trim();
                 if (manual) return manual;
-                var raw = String(docData.shipTo || docData.deliverTo || '').trim();
+                var raw = _normalizePoShipToSelection(docData.shipTo || docData.deliverTo || '', projData);
                 if (raw && typeof resolvePOShipToDisplayText === 'function') {
                   return resolvePOShipToDisplayText(raw, projData, docData) || raw;
                 }
@@ -38237,7 +38302,17 @@ async function renderBoardsTab(T, proj) {
         docEditRenderPayments();
         docEditRenderAttachments();
       }
-      if (type === 'po') docEditUpdatePOShipToResolvedPreview();
+      if (type === 'po') {
+        docEditUpdatePOShipToResolvedPreview();
+        var _poShipSel = document.getElementById('docEditPOShipTo');
+        if (_poShipSel && _docEdit && _docEdit.docData) {
+          var _poShipNorm = _normalizePoShipToSelection(_docEdit.docData.shipTo || _docEdit.docData.deliverTo || '', projData);
+          if (_poShipNorm && _poShipSel.value !== _poShipNorm) {
+            _poShipSel.value = _poShipNorm;
+            _docEdit.docData.shipTo = _poShipNorm;
+          }
+        }
+      }
       if (type === 'invoice' && Array.isArray(_docEdit.docData.timeEntryIds) && _docEdit.docData.timeEntryIds.length) {
         docEditEnrichInvoiceNotesFromTimeEntries().catch(function(err) {
           console.warn('[invoice] enrich notes:', err);
