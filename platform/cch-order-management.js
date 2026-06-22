@@ -5,7 +5,7 @@
 (function() {
   'use strict';
 
-  var OM_BUILD = '20260602om9';
+  var OM_BUILD = '20260602om11';
   var OM_NAVY = '#0F1A2E';
   var OM_NAVY_MID = '#1B3352';
   var OM_BORDER = 'rgba(15,26,46,0.12)';
@@ -184,6 +184,63 @@
       '</div>';
   }
 
+  function cchOmPatchCachedPo(projectId, poId, patch) {
+    if (!window._omPosCache || !Array.isArray(window._omPosCache.pos)) return;
+    patch = patch || {};
+    for (var i = 0; i < window._omPosCache.pos.length; i++) {
+      var p = window._omPosCache.pos[i];
+      if (p.projectId === projectId && p.id === poId) {
+        window._omPosCache.pos[i] = Object.assign({}, p, patch);
+        return;
+      }
+    }
+  }
+
+  window.cchOmSoftRefresh = function() {
+    window._omSoftRender = true;
+    return window.renderOrderManagementPage();
+  };
+
+  window.cchOmInvalidateCache = function() {
+    window._omPosCache = null;
+    window._omClipsCache = null;
+    window._omDedupeHidden = 0;
+  };
+
+  function cchOmPoShipToRaw(po) {
+    po = po || {};
+    var raw = String(po.shipTo || po.deliverTo || po.receiver || po.workroom || po.location || '').trim();
+    if (!raw) {
+      var items = po.items || [];
+      var seen = {};
+      var fromLines = [];
+      items.forEach(function(it) {
+        var s = String((it && (it.shipTo || it.deliverTo)) || '').trim();
+        if (s && !seen[s]) {
+          seen[s] = true;
+          fromLines.push(s);
+        }
+      });
+      if (fromLines.length === 1) raw = fromLines[0];
+      else if (fromLines.length > 1) raw = fromLines.join(' · ');
+    }
+    return raw;
+  }
+
+  function cchOmPoShipToDisplay(po) {
+    var raw = cchOmPoShipToRaw(po);
+    if (!raw) return '—';
+    if (typeof window.resolvePOShipToDisplayText === 'function') {
+      try {
+        var resolved = window.resolvePOShipToDisplayText(raw, {}, po);
+        if (resolved && String(resolved).trim()) {
+          return String(resolved).trim().replace(/\s*\n+\s*/g, ', ');
+        }
+      } catch (_e) { /* ignore */ }
+    }
+    return raw.replace(/\s*\n+\s*/g, ', ');
+  }
+
   window.cchOmIsActive = function() {
     var h = window.location.hash || '';
     return h.indexOf('/ordermanagement') >= 0 || h.indexOf('/ordermgmt') >= 0;
@@ -224,7 +281,7 @@
       { id: 'variances', label: 'Bill variances', hash: '#/ordermanagement/variances', badge: true },
       { id: 'qb', label: 'QuickBooks', hash: '#/ordermanagement/qb' }
     ];
-    return '<div style="display:flex;gap:0;margin:20px 0 16px;border-bottom:2px solid ' + OM_BORDER + ';flex-wrap:wrap;background:#fff;">' +
+    return '<div id="cchOmTabBar" style="display:flex;gap:0;margin:20px 0 16px;border-bottom:2px solid ' + OM_BORDER + ';flex-wrap:wrap;background:#fff;">' +
       tabs.map(function(t) {
         var on = active === t.id;
         var labelHtml = esc(t.label) + (t.badge ? varBadge : '');
@@ -299,6 +356,9 @@
       } else if (field === 'project') {
         va = String(a.projectName || a.projectId || '').toLowerCase();
         vb = String(b.projectName || b.projectId || '').toLowerCase();
+      } else if (field === 'shipTo') {
+        va = cchOmPoShipToDisplay(a).toLowerCase();
+        vb = cchOmPoShipToDisplay(b).toLowerCase();
       } else if (field === 'status') {
         va = String(a.status || 'Draft').toLowerCase();
         vb = String(b.status || 'Draft').toLowerCase();
@@ -338,13 +398,17 @@
     var fs = window._omFilterStatus || '';
     var fa = window._omFilterAging || '';
     var kw = window._omFilterKeyword || '';
+    var dedupeNote = (window._omDedupeHidden > 0)
+      ? ' · ' + window._omDedupeHidden + ' duplicate PO doc' + (window._omDedupeHidden !== 1 ? 's' : '') +
+        ' hidden (same # per project)'
+      : '';
     return '<p style="color:var(--gray-400);margin:0 0 8px;font-size:12px;">' +
       (filteredCount === totalCount
         ? esc(String(totalCount) + ' open Studio PO' + (totalCount !== 1 ? 's' : ''))
         : 'Showing ' + filteredCount + ' of ' + totalCount + ' open Studio POs') +
-      ' · Houzz legacy imports excluded</p>' +
+      dedupeNote + ' · Houzz legacy imports excluded</p>' +
       '<div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">' +
-      '<input type="search" placeholder="Search PO #, vendor, project…" class="form-input" ' +
+      '<input type="search" placeholder="Search PO #, vendor, project, ship to…" class="form-input" ' +
       'value="' + escAttr(kw) + '" oninput="window._omFilterKeyword=this.value;window.cchOmDebounceRender()" ' +
       'style="flex:1;min-width:220px;">' +
       '<select class="form-input" style="width:180px;" onchange="window._omFilterProject=this.value;window.renderOrderManagementPage()">' +
@@ -389,7 +453,7 @@
       var bucket = agingBucket(poAgeDays(po));
       if (fa && bucket !== fa) return false;
       if (kw) {
-        var blob = [po.number, po.id, vend, po.projectName, st, po.eta].join(' ').toLowerCase();
+        var blob = [po.number, po.id, vend, po.projectName, st, po.eta, cchOmPoShipToRaw(po)].join(' ').toLowerCase();
         if (blob.indexOf(kw) < 0) return false;
       }
       return true;
@@ -413,11 +477,19 @@
       var ageColor = age == null ? '#9CA3AF' : (age > 30 ? OM_NAVY : (age > 14 ? OM_NAVY_MID : '#5C6B80'));
       var missEta = window.cchOmMissingEtaLineCount(po);
       var statusHtml = omStatusCellHtml(po);
+      var shipToTxt = cchOmPoShipToDisplay(po);
+      var poNum = esc(po.number || po.id.substring(0, 8));
+      if (po._omDedupeSiblings > 0) {
+        poNum += ' <span style="font-size:9px;color:#9CA3AF;font-weight:500;" title="' +
+          po._omDedupeSiblings + ' duplicate doc(s) hidden — open PO for merge/delete">dup</span>';
+      }
       return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="navigate(\'#/project/' +
         escAttr(po.projectId) + '/po/' + escAttr(po.id) + '\')">' +
-        '<td style="' + td + 'font-weight:600;font-family:monospace;color:var(--gold);">' + esc(po.number || po.id.substring(0, 8)) + '</td>' +
+        '<td style="' + td + 'font-weight:600;font-family:monospace;color:var(--gold);">' + poNum + '</td>' +
         '<td style="' + td + '">' + esc(po._displayVendor || po.vendor || '—') + '</td>' +
         '<td style="' + td + 'color:var(--gray-500);">' + esc(po.projectName || po.projectId) + '</td>' +
+        '<td style="' + td + 'font-size:12px;color:#0F1A2E;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' +
+        escAttr(shipToTxt) + '">' + esc(shipToTxt) + '</td>' +
         '<td style="' + td + '" onclick="event.stopPropagation()">' + statusHtml + '</td>' +
         '<td style="' + td + '" onclick="event.stopPropagation()">' + omConfirmCellHtml(po) + '</td>' +
         '<td style="' + td + '" onclick="event.stopPropagation()">' + omBillsCellHtml(po) + '</td>' +
@@ -431,11 +503,12 @@
         '</tr>';
     }).join('');
     return '<div class="card" style="overflow:hidden;overflow-x:auto;">' +
-      '<table style="width:100%;min-width:1040px;border-collapse:collapse;font-size:13px;">' +
+      '<table style="width:100%;min-width:1180px;border-collapse:collapse;font-size:13px;">' +
       '<thead><tr style="border-bottom:2px solid var(--gray-200);">' +
       thSort('PO #', 'number') +
       thSort('Vendor', 'vendor') +
       thSort('Project', 'project') +
+      thSort('Ship to', 'shipTo') +
       thSort('Status', 'status') +
       thSort('Confirm', 'confirm') +
       thSort('Bills', 'bills', 'text-align:center;') +
@@ -650,27 +723,32 @@
       patch.bill = bill;
     }
     await ref.update(patch);
-    if (typeof window._cacheTime !== 'undefined') window._cacheTime = 0;
+    cchOmPatchCachedPo(projectId, poId, patch);
     if (typeof window.invalidateSearchCache === 'function') window.invalidateSearchCache();
     if (typeof window.showToast === 'function') window.showToast('Saved', 'success');
-    await window.renderOrderManagementPage();
   };
 
   window.cchOmSaveConfirmDate = async function(projectId, poId, el) {
     var val = String(el && el.value || '').trim();
+    if (el) el.disabled = true;
     try {
       await window.cchOmPatchPrimaryVendorDates(projectId, poId, { confirmedDate: val });
     } catch (e) {
       if (typeof window.showToast === 'function') window.showToast(e.message || 'Could not save confirm date', 'error');
+    } finally {
+      if (el) el.disabled = false;
     }
   };
 
   window.cchOmSaveEtaDate = async function(projectId, poId, el) {
     var val = String(el && el.value || '').trim();
+    if (el) el.disabled = true;
     try {
       await window.cchOmPatchPrimaryVendorDates(projectId, poId, { etaDate: val });
     } catch (e) {
       if (typeof window.showToast === 'function') window.showToast(e.message || 'Could not save ETA', 'error');
+    } finally {
+      if (el) el.disabled = false;
     }
   };
 
@@ -682,6 +760,8 @@
       el.value = prev;
       return;
     }
+    window._omInlineSaveActive = true;
+    el.disabled = true;
     try {
       if (status === 'At Receiver' || status === 'At Workroom') {
         var label = status === 'At Receiver' ? 'receiver' : 'workroom';
@@ -699,11 +779,14 @@
       } else if (typeof window.updatePOStatus === 'function') {
         await window.updatePOStatus(projectId, poId, status);
       }
-      if (typeof window._cacheTime !== 'undefined') window._cacheTime = 0;
-      await window.renderOrderManagementPage();
+      cchOmPatchCachedPo(projectId, poId, { status: status });
+      el.setAttribute('data-prev-status', status);
     } catch (e) {
       el.value = prev;
       if (typeof window.showToast === 'function') window.showToast(e.message || 'Could not save status', 'error');
+    } finally {
+      window._omInlineSaveActive = false;
+      el.disabled = false;
     }
   };
 
@@ -1290,6 +1373,12 @@
     else if (hash.indexOf('/variances') >= 0 && hash.indexOf('/ordermanagement') >= 0) tab = 'variances';
     else if (hash.indexOf('/bills') >= 0 && hash.indexOf('/ordermanagement') >= 0) tab = 'bills';
     else if (hash.indexOf('/qb') >= 0) tab = 'qb';
+
+    var forceLoad = !!window._omForceLoad;
+    window._omForceLoad = false;
+    var hasShell = !!document.getElementById('cchOmPanel');
+    var useCache = hasShell && window._omPosCache && window._omPosCache.pos && !forceLoad;
+
     if (tab === 'receiving' && window._omLastTab !== 'receiving') {
       window._omSortField = 'outstanding';
       window._omSortDir = 'desc';
@@ -1301,6 +1390,7 @@
     if (tab === 'qb' && !window._omQbFilter) window._omQbFilter = 'attention';
     if (tab === 'bills') window._vendorBillsTab = 'bills';
     if (tab === 'variances') window._vendorBillsTab = 'variances';
+    var prevTab = window._omLastTab;
     window._omLastTab = tab;
     window._omTab = tab;
 
@@ -1313,7 +1403,10 @@
           : tab === 'variances'
             ? 'Loading bill variances…'
             : 'Loading order management…';
-    T.innerHTML = '<div style="padding:40px;color:var(--gray-500);">' + loadingMsg + '</div>';
+
+    if (!useCache) {
+      T.innerHTML = '<div style="padding:40px;color:var(--gray-500);">' + loadingMsg + '</div>';
+    }
     if (typeof window.setBreadcrumb === 'function') window.setBreadcrumb([{ label: 'Order Management' }]);
     if (typeof window.setTopbarActions === 'function') {
       window.setTopbarActions(
@@ -1327,10 +1420,19 @@
     var projList = [];
     var projNames = {};
     try {
-      if (typeof window.cchPoLoadAllPosForVendorBills === 'function') {
+      if (useCache) {
+        pos = window._omPosCache.pos;
+        projNames = window._omPosCache.projNames || {};
+        projList = Object.keys(projNames).map(function(id) {
+          return { id: id, name: projNames[id] };
+        }).sort(function(a, b) {
+          return String(a.name).localeCompare(String(b.name));
+        });
+      } else if (typeof window.cchPoLoadAllPosForVendorBills === 'function') {
         var loaded = await window.cchPoLoadAllPosForVendorBills();
         pos = loaded.pos || [];
         projNames = loaded.projNames || {};
+        window._omDedupeHidden = loaded.dedupeHidden || 0;
         projList = Object.keys(projNames).map(function(id) {
           return { id: id, name: projNames[id] };
         }).sort(function(a, b) {
@@ -1345,6 +1447,11 @@
             projList.push({ id: p.projectId, name: p.projectName || p.projectId });
           }
         });
+      }
+      if (!useCache && pos.length) {
+        window._omPosCache = { pos: pos, projNames: projNames, dedupeHidden: window._omDedupeHidden || 0 };
+      } else if (useCache && window._omPosCache) {
+        window._omDedupeHidden = window._omPosCache.dedupeHidden || 0;
       }
     } catch (err) {
       T.innerHTML = '<h1 class="page-title">Order Management</h1>' +
@@ -1390,7 +1497,11 @@
       allOpen.forEach(function(po) {
         if (po.projectId && recvProjectIds.indexOf(po.projectId) < 0) recvProjectIds.push(po.projectId);
       });
-      var clipsByProject = await cchOmLoadClipsByProject(recvProjectIds);
+      var clipsByProject = window._omClipsCache;
+      if (!clipsByProject || forceLoad || prevTab !== 'receiving') {
+        clipsByProject = await cchOmLoadClipsByProject(recvProjectIds);
+        window._omClipsCache = clipsByProject;
+      }
       panel = receivingStatusReport(allOpen, clipsByProject, projList, recvVendors);
     } else if (tab === 'qb') {
       panel = qbStatusReport(studioPos, projList);
@@ -1413,14 +1524,35 @@
     }
 
     var showFulfillmentKpis = tab === 'open' || tab === 'noeta' || tab === 'noconfirm' || tab === 'receiving';
-    var kpiBlock = showFulfillmentKpis
-      ? '<div style="display:flex;gap:0;margin-bottom:20px;border-radius:0;overflow:hidden;border:1px solid ' + OM_BORDER + ';flex-wrap:wrap;background:#fff;">' +
-        kpiCard('Open POs', String(allOpen.length), 'Studio docs only', OM_NAVY) +
+    var kpiInner = showFulfillmentKpis
+      ? kpiCard('Open POs', String(allOpen.length), 'Studio docs only', OM_NAVY) +
         kpiCard('Missing confirmation', String(noConfirm.length), 'Sent — no vendor ack', OM_NAVY_MID) +
         kpiCard('Lines without ETA', String(missingEtaLines), 'On open POs', OM_NAVY) +
-        kpiCard('Open PO value', '$' + openValue.toLocaleString('en-US', { minimumFractionDigits: 2 }), 'Merchandise total', OM_NAVY) +
-        '</div>'
+        kpiCard('Open PO value', '$' + openValue.toLocaleString('en-US', { minimumFractionDigits: 2 }), 'Merchandise total', OM_NAVY)
       : '';
+    var kpiBlock = showFulfillmentKpis
+      ? '<div id="cchOmKpis" style="display:flex;gap:0;margin-bottom:20px;border-radius:0;overflow:hidden;border:1px solid ' + OM_BORDER + ';flex-wrap:wrap;background:#fff;">' +
+        kpiInner + '</div>'
+      : '<div id="cchOmKpis" style="display:none;"></div>';
+
+    if (useCache) {
+      var kpiEl = document.getElementById('cchOmKpis');
+      var tabEl = document.getElementById('cchOmTabBar');
+      var panelEl = document.getElementById('cchOmPanel');
+      if (kpiEl) {
+        if (showFulfillmentKpis) {
+          kpiEl.style.display = 'flex';
+          kpiEl.innerHTML = kpiInner;
+        } else {
+          kpiEl.style.display = 'none';
+          kpiEl.innerHTML = '';
+        }
+      }
+      if (tabEl) tabEl.outerHTML = tabBar(tab);
+      if (panelEl) panelEl.innerHTML = panel;
+      if (tab !== 'variances') omDeferVarianceBadge();
+      return;
+    }
 
     T.innerHTML =
       '<div class="cch-om-page" style="background:#fff;color:' + OM_NAVY + ';">' +
@@ -1431,7 +1563,7 @@
       '</p></div></div>' +
       kpiBlock +
       tabBar(tab) +
-      panel +
+      '<div id="cchOmPanel">' + panel + '</div>' +
       '</div>';
 
     if (tab !== 'variances') omDeferVarianceBadge();

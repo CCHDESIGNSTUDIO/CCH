@@ -264,6 +264,60 @@
     return out;
   }
 
+  /** Normalize PO # for per-project dedup (matches project PO tab). */
+  function cchPoNormPoNumberKey(s) {
+    return String(s || '').trim().replace(/^#/, '').toUpperCase();
+  }
+
+  function cchPoPoDedupeScore(po) {
+    var s = 0;
+    if (String(po.id || '').indexOf('clip-po-') !== 0) s += 1e6;
+    if (typeof window.getQbId === 'function' && window.getQbId(po)) s += 1e5;
+    if (po.bill && po.bill.received) s += 5e4;
+    if (po.poLocked || po.poSentAt || po.sentAt) s += 2e4;
+    s += (po.items || []).length * 100;
+    var paid = typeof window.cchPoPaidTotal === 'function' ? window.cchPoPaidTotal(po) : 0;
+    s += paid * 10;
+    var ts = new Date(po.updatedAt || po.poSentAt || po.createdAt || 0).getTime();
+    if (!isNaN(ts)) s += ts / 1e6;
+    return s;
+  }
+
+  /** One row per PO # per project — hides duplicate Firestore docs (imports / clip-po stubs). */
+  window.cchPoDedupePosByProjectNumber = function(allPos) {
+    if (!allPos || !allPos.length) return { pos: allPos || [], hidden: 0 };
+    var byPid = {};
+    allPos.forEach(function(po) {
+      var pid = po.projectId || '__none';
+      if (!byPid[pid]) byPid[pid] = [];
+      byPid[pid].push(po);
+    });
+    var out = [];
+    var hidden = 0;
+    Object.keys(byPid).forEach(function(pid) {
+      var buckets = {};
+      byPid[pid].forEach(function(po) {
+        var k = cchPoNormPoNumberKey(po.number || po.num || po.poNum || '');
+        if (!k) k = '__id:' + (po.id || '');
+        if (!buckets[k]) buckets[k] = [];
+        buckets[k].push(po);
+      });
+      Object.keys(buckets).forEach(function(k) {
+        var arr = buckets[k];
+        if (arr.length === 1) {
+          out.push(arr[0]);
+          return;
+        }
+        hidden += arr.length - 1;
+        arr.sort(function(a, b) { return cchPoPoDedupeScore(b) - cchPoPoDedupeScore(a); });
+        var keep = arr[0];
+        keep._omDedupeSiblings = arr.length - 1;
+        out.push(keep);
+      });
+    });
+    return { pos: out, hidden: hidden };
+  };
+
   /** Firm-wide PO load — same Firestore path as bill variances (not limited to loadFinancialData cache). */
   window.cchPoLoadAllPosForVendorBills = async function() {
     var boards = await cchPoBoardList();
@@ -288,7 +342,8 @@
     }));
     var pos = [];
     chunks.forEach(function(part) { pos = pos.concat(part); });
-    return { pos: pos, projNames: projNames };
+    var deduped = window.cchPoDedupePosByProjectNumber(pos);
+    return { pos: deduped.pos, projNames: projNames, dedupeHidden: deduped.hidden };
   };
 
   window.cchPoDocTotal = function(doc) {
@@ -486,6 +541,7 @@
     var h = window.location.hash || '';
     if ((h.indexOf('/vendorbills') >= 0 || h.indexOf('/ordermanagement') >= 0) &&
         typeof window.cchPoRefreshFinancePage === 'function') {
+      if (h.indexOf('/ordermanagement') >= 0 && window._omInlineSaveActive) return;
       window.cchPoRefreshFinancePage();
       return;
     }
@@ -4597,8 +4653,8 @@
 
   window.cchPoRefreshFinancePage = function() {
     if (typeof window.cchOmIsActive === 'function' && window.cchOmIsActive() &&
-        typeof window.renderOrderManagementPage === 'function') {
-      return window.renderOrderManagementPage();
+        typeof window.cchOmSoftRefresh === 'function') {
+      return window.cchOmSoftRefresh();
     }
     if (typeof window.renderAllVendorBillsPage === 'function') {
       return window.renderAllVendorBillsPage();
