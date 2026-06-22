@@ -5,7 +5,7 @@
 (function() {
   'use strict';
 
-  var OM_BUILD = '20260602om5';
+  var OM_BUILD = '20260602om6';
 
   function esc(t) {
     if (typeof window.esc === 'function') return window.esc(t);
@@ -357,20 +357,18 @@
       var ageTxt = age != null ? age + 'd' : '—';
       var ageColor = age == null ? 'var(--gray-400)' : (age > 30 ? '#E16A5B' : (age > 14 ? '#C4A464' : 'var(--gray-500)'));
       var missEta = window.cchOmMissingEtaLineCount(po);
-      var statusHtml = typeof window.cchPoFulfillmentStatusBadgeHtml === 'function'
-        ? window.cchPoFulfillmentStatusBadgeHtml(po, { projectId: po.projectId, poId: po.id, clickable: false })
-        : esc(po.status || 'Draft');
+      var statusHtml = omStatusCellHtml(po);
       return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="navigate(\'#/project/' +
         escAttr(po.projectId) + '/po/' + escAttr(po.id) + '\')">' +
         '<td style="' + td + 'font-weight:600;font-family:monospace;color:var(--gold);">' + esc(po.number || po.id.substring(0, 8)) + '</td>' +
         '<td style="' + td + '">' + esc(po._displayVendor || po.vendor || '—') + '</td>' +
         '<td style="' + td + 'color:var(--gray-500);">' + esc(po.projectName || po.projectId) + '</td>' +
-        '<td style="' + td + '">' + statusHtml + '</td>' +
-        '<td style="' + td + '">' + omConfirmCellHtml(po) + '</td>' +
+        '<td style="' + td + '" onclick="event.stopPropagation()">' + statusHtml + '</td>' +
+        '<td style="' + td + '" onclick="event.stopPropagation()">' + omConfirmCellHtml(po) + '</td>' +
         '<td style="' + td + '" onclick="event.stopPropagation()">' + omBillsCellHtml(po) + '</td>' +
         '<td style="' + td + 'font-size:12px;color:var(--gray-500);white-space:nowrap;">' + esc(fmtDate(poIssueDate(po))) + '</td>' +
         '<td style="' + td + 'font-size:12px;color:' + ageColor + ';font-weight:600;">' + esc(ageTxt) + '</td>' +
-        '<td style="' + td + 'font-size:12px;color:var(--gray-500);">' + esc(poEtaDisplay(po)) + '</td>' +
+        '<td style="' + td + '" onclick="event.stopPropagation()">' + omEtaCellHtml(po) + '</td>' +
         '<td style="' + td + 'text-align:center;font-size:12px;">' +
         (missEta > 0 ? '<span style="color:#E16A5B;font-weight:600;">' + missEta + '</span>' : '—') + '</td>' +
         '<td style="' + td + 'text-align:right;font-weight:600;font-family:monospace;">$' +
@@ -459,6 +457,13 @@
         groupId: String(g.id || '').trim()
       };
     }).filter(function(b) { return b.groupId || b.invNum; });
+    var seen = {};
+    bills = bills.filter(function(b) {
+      var key = (b.groupId || '') + '|' + b.invNum;
+      if (seen[key]) return false;
+      seen[key] = true;
+      return true;
+    });
     if (!bills.length && hasBill) {
       var inv = String(bill.vendorInvoiceNumber || '').trim();
       var blRef = typeof window.cchPoQbBillDocNumberFromPo === 'function'
@@ -514,11 +519,169 @@
     navigate('#/project/' + projectId + '/po/' + poId);
   };
 
+  function omDateInputValue(raw) {
+    if (!raw) return '';
+    var s = String(raw).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    try {
+      var dt = new Date(s);
+      if (!isNaN(dt.getTime())) return dt.toISOString().slice(0, 10);
+    } catch (_e) { /* ignore */ }
+    return '';
+  }
+
+  window.cchOmPoEtaDateIso = function(po) {
+    po = po || {};
+    if (po.eta) return omDateInputValue(po.eta);
+    var bill = po.bill || {};
+    if (bill.etaDate) return omDateInputValue(bill.etaDate);
+    var items = po.items || [];
+    var groups = typeof window.cchPoVendorInvoiceGroupsDisplay === 'function'
+      ? window.cchPoVendorInvoiceGroupsDisplay(po, items) : [];
+    for (var i = 0; i < groups.length; i++) {
+      var d = omDateInputValue(groups[i].etaDate || groups[i].estimatedShipDate);
+      if (d) return d;
+    }
+    return '';
+  };
+
+  window.cchOmPatchPrimaryVendorDates = async function(projectId, poId, fields) {
+    fields = fields || {};
+    var ref = firebase.firestore().collection('boards').doc(projectId).collection('purchaseOrders').doc(poId);
+    var snap = await ref.get();
+    if (!snap.exists) return;
+    var doc = snap.data() || {};
+    var items = doc.items || [];
+    var groups = [];
+    if (typeof window.cchPoVendorInvoiceGroupsUser === 'function') {
+      groups = window.cchPoVendorInvoiceGroupsUser(doc).map(function(g) { return Object.assign({}, g); });
+    } else if (Array.isArray(doc.vendorInvoiceGroups)) {
+      groups = doc.vendorInvoiceGroups.map(function(g) { return Object.assign({}, g); });
+    }
+    if (!groups.length) {
+      var lineIds = [];
+      for (var i = 0; i < items.length; i++) {
+        if (typeof window.isProposalGroupHeaderItem === 'function' &&
+            window.isProposalGroupHeaderItem(items[i])) continue;
+        if (typeof window.cchPoLineIsBillOnlyExpense === 'function' &&
+            window.cchPoLineIsBillOnlyExpense(items[i])) continue;
+        var lid = typeof window.cchPoResolveLineId === 'function'
+          ? window.cchPoResolveLineId(items[i], i) : ('line_' + i);
+        if (lid) lineIds.push(lid);
+      }
+      groups.push({
+        id: 'vig_om_' + Date.now(),
+        vendorInvoiceNumber: String((doc.bill || {}).vendorInvoiceNumber || '').trim(),
+        vendorInvoiceDate: '',
+        poLineIds: lineIds,
+        confirmedDate: fields.confirmedDate != null ? fields.confirmedDate : '',
+        etaDate: fields.etaDate != null ? fields.etaDate : '',
+        status: '',
+        label: 'Order Management'
+      });
+    } else {
+      if (fields.confirmedDate !== undefined) groups[0].confirmedDate = fields.confirmedDate;
+      if (fields.etaDate !== undefined) groups[0].etaDate = fields.etaDate;
+    }
+    var patch = {
+      vendorInvoiceGroups: groups,
+      updatedAt: new Date().toISOString()
+    };
+    if (fields.etaDate !== undefined) {
+      patch.eta = fields.etaDate || firebase.firestore.FieldValue.delete();
+      var bill = Object.assign({}, doc.bill || {});
+      if (fields.etaDate) bill.etaDate = fields.etaDate;
+      else delete bill.etaDate;
+      patch.bill = bill;
+    }
+    await ref.update(patch);
+    if (typeof window._cacheTime !== 'undefined') window._cacheTime = 0;
+    if (typeof window.invalidateSearchCache === 'function') window.invalidateSearchCache();
+    if (typeof window.showToast === 'function') window.showToast('Saved', 'success');
+    await window.renderOrderManagementPage();
+  };
+
+  window.cchOmSaveConfirmDate = async function(projectId, poId, el) {
+    var val = String(el && el.value || '').trim();
+    try {
+      await window.cchOmPatchPrimaryVendorDates(projectId, poId, { confirmedDate: val });
+    } catch (e) {
+      if (typeof window.showToast === 'function') window.showToast(e.message || 'Could not save confirm date', 'error');
+    }
+  };
+
+  window.cchOmSaveEtaDate = async function(projectId, poId, el) {
+    var val = String(el && el.value || '').trim();
+    try {
+      await window.cchOmPatchPrimaryVendorDates(projectId, poId, { etaDate: val });
+    } catch (e) {
+      if (typeof window.showToast === 'function') window.showToast(e.message || 'Could not save ETA', 'error');
+    }
+  };
+
+  window.cchOmSaveStatus = async function(projectId, poId, el) {
+    if (!el) return;
+    var status = String(el.value || '').trim();
+    var prev = el.getAttribute('data-prev-status') || '';
+    if (!status) {
+      el.value = prev;
+      return;
+    }
+    try {
+      if (status === 'At Receiver' || status === 'At Workroom') {
+        var label = status === 'At Receiver' ? 'receiver' : 'workroom';
+        var loc = typeof window.cchPrompt === 'function'
+          ? await window.cchPrompt('Enter ' + label + ' name:', '', 'PO location') : '';
+        if (!loc) {
+          el.value = prev;
+          return;
+        }
+        if (typeof window.cchPoSetFulfillmentStatus === 'function') {
+          await window.cchPoSetFulfillmentStatus(projectId, poId, status, { location: String(loc).trim() });
+        }
+      } else if (typeof window.cchPoSetFulfillmentStatus === 'function') {
+        await window.cchPoSetFulfillmentStatus(projectId, poId, status, {});
+      } else if (typeof window.updatePOStatus === 'function') {
+        await window.updatePOStatus(projectId, poId, status);
+      }
+      if (typeof window._cacheTime !== 'undefined') window._cacheTime = 0;
+      await window.renderOrderManagementPage();
+    } catch (e) {
+      el.value = prev;
+      if (typeof window.showToast === 'function') window.showToast(e.message || 'Could not save status', 'error');
+    }
+  };
+
+  function omStatusCellHtml(po) {
+    var pid = escAttr(po.projectId);
+    var poid = escAttr(po.id);
+    var cur = String(po.status || '').trim();
+    var opts = typeof window.cchPoFulfillmentStatusOptionsHtml === 'function'
+      ? window.cchPoFulfillmentStatusOptionsHtml(cur)
+      : '<option value="">—</option>';
+    return '<select class="form-input" style="font-size:11px;padding:4px 28px 4px 8px;min-width:130px;max-width:170px;" ' +
+      'data-prev-status="' + escAttr(cur) + '" onclick="event.stopPropagation()" onfocus="this.setAttribute(\'data-prev-status\',this.value)" ' +
+      'onchange="window.cchOmSaveStatus(\'' + pid + '\',\'' + poid + '\',this)">' + opts + '</select>';
+  }
+
   function omConfirmCellHtml(po) {
-    var raw = window.cchOmPoConfirmDate(po);
-    if (!raw) return '<span style="color:var(--gray-400);">—</span>';
-    return '<span style="font-size:12px;color:var(--gray-600);white-space:nowrap;" title="Vendor order confirmation">' +
-      esc(fmtDate(raw)) + '</span>';
+    var pid = escAttr(po.projectId);
+    var poid = escAttr(po.id);
+    var val = omDateInputValue(window.cchOmPoConfirmDate(po));
+    return '<input type="date" class="form-input" style="font-size:11px;padding:4px 6px;width:128px;" ' +
+      'value="' + escAttr(val) + '" onclick="event.stopPropagation()" ' +
+      'onchange="window.cchOmSaveConfirmDate(\'' + pid + '\',\'' + poid + '\',this)" ' +
+      'title="Vendor order confirmation date — syncs to vendor invoice group">';
+  }
+
+  function omEtaCellHtml(po) {
+    var pid = escAttr(po.projectId);
+    var poid = escAttr(po.id);
+    var val = window.cchOmPoEtaDateIso(po);
+    return '<input type="date" class="form-input" style="font-size:11px;padding:4px 6px;width:128px;" ' +
+      'value="' + escAttr(val) + '" onclick="event.stopPropagation()" ' +
+      'onchange="window.cchOmSaveEtaDate(\'' + pid + '\',\'' + poid + '\',this)" ' +
+      'title="Delivery ETA — syncs to vendor invoice group and PO">';
   }
 
   function omBillsCellHtml(po) {
@@ -537,16 +700,19 @@
       var gid0 = escAttr(b0.groupId || '');
       return '<button type="button" class="btn btn-link btn-sm" style="font-size:12px;font-weight:700;color:var(--gold);padding:0;" ' +
         'onclick="event.stopPropagation();window.cchOmOpenPoBill(\'' + pid + '\',\'' + poid + '\',\'' + gid0 + '\')" ' +
-        'title="Open vendor invoice ' + escAttr(b0.invNum) + '">1</button>';
+        'title="Open ' + escAttr(b0.invNum) + '">1 bill</button>';
     }
-    var links = info.bills.map(function(b) {
-      return '<button type="button" class="btn btn-link btn-sm" style="font-size:10px;padding:0 4px 0 0;color:#1B3352;font-weight:600;" ' +
-        'onclick="event.stopPropagation();window.cchOmOpenPoBill(\'' + pid + '\',\'' + poid + '\',\'' + escAttr(b.groupId || '') + '\')" ' +
-        'title="Open ' + escAttr(b.invNum) + '">' + esc(b.invNum.length > 12 ? b.invNum.slice(0, 11) + '…' : b.invNum) + '</button>';
-    }).join('<span style="color:var(--gray-300);"> · </span>');
-    return '<div style="line-height:1.4;" onclick="event.stopPropagation()">' +
-      '<span style="font-size:11px;font-weight:700;color:var(--gold);margin-right:6px;">' + info.count + '</span>' +
-      '<span style="font-size:10px;">' + links + '</span></div>';
+    var menuItems = info.bills.map(function(b) {
+      return '<a onclick="event.stopPropagation();window.cchOmOpenPoBill(\'' + pid + '\',\'' + poid + '\',\'' +
+        escAttr(b.groupId || '') + '\');if(typeof closeAllMenus===\'function\')closeAllMenus()">' +
+        esc(b.invNum) + '</a>';
+    }).join('');
+    return '<div class="action-menu-wrap" style="display:inline-block;" onclick="event.stopPropagation()">' +
+      '<button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 10px;font-weight:700;white-space:nowrap;" ' +
+      'onclick="event.stopPropagation();if(typeof toggleActionMenu===\'function\')toggleActionMenu(this)" ' +
+      'title="View vendor invoices">' + info.count + ' bills ▾</button>' +
+      '<div class="action-dropdown" style="display:none;min-width:200px;max-width:280px;text-align:left;">' +
+      menuItems + '</div></div>';
   }
 
   function poNumbersMatch(a, b) {
@@ -774,9 +940,7 @@
     var body = sorted.map(function(row) {
       var po = row.po;
       var r = row.recv;
-      var statusHtml = typeof window.cchPoFulfillmentStatusBadgeHtml === 'function'
-        ? window.cchPoFulfillmentStatusBadgeHtml(po, { projectId: po.projectId, poId: po.id, clickable: false })
-        : esc(po.status || 'Draft');
+      var statusHtml = omStatusCellHtml(po);
       var clipSummary = r.linked
         ? recvCountPill('received', r.received, '#5FA56B') +
           recvCountPill('in transit', r.intransit, '#C4A464') +
@@ -790,8 +954,8 @@
         '<td style="' + td + 'font-weight:600;font-family:monospace;color:var(--gold);">' + esc(po.number || po.id.substring(0, 8)) + '</td>' +
         '<td style="' + td + '">' + esc(po._displayVendor || po.vendor || '—') + '</td>' +
         '<td style="' + td + 'color:var(--gray-500);">' + esc(po.projectName || po.projectId) + '</td>' +
-        '<td style="' + td + '">' + statusHtml + '</td>' +
-        '<td style="' + td + '">' + omConfirmCellHtml(po) + '</td>' +
+        '<td style="' + td + '" onclick="event.stopPropagation()">' + statusHtml + '</td>' +
+        '<td style="' + td + '" onclick="event.stopPropagation()">' + omConfirmCellHtml(po) + '</td>' +
         '<td style="' + td + '" onclick="event.stopPropagation()">' + omBillsCellHtml(po) + '</td>' +
         '<td style="' + td + 'font-size:12px;line-height:1.5;">' + clipSummary + '</td>' +
         '<td style="' + td + 'text-align:center;font-size:12px;">' + esc(String(r.poLines || '—')) + '</td>' +
