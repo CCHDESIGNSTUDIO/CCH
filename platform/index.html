@@ -24833,7 +24833,7 @@ async function renderBoardsTab(T, proj) {
                     <td class="col-amount">${formatMoney(typeof cchPoListPoTotal==='function'?cchPoListPoTotal(po):(po.total||0))}</td>
                     ${typeof cchPoListAllPosFinancialCellsHtml==='function'?cchPoListAllPosFinancialCellsHtml(po, 'padding:10px 14px;font-size:13px;'):'<td class="col-amount">—</td><td class="col-amount">—</td><td class="col-amount">—</td><td class="col-amount">—</td>'}
                     <td class="col-date" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;" title="${escAttr(po.shipTo || po.deliverTo || po.receiver || '')}">${esc(po.shipTo || po.deliverTo || po.receiver || '—')}</td>
-                    <td onclick="event.stopPropagation()">${typeof cchPoQbListCellHtml==='function'?cchPoQbListCellHtml(po):qbCellBadge(getQbId(po), po.qbStatus, po)}</td>
+                    <td style="text-align:center;" onclick="event.stopPropagation()">${typeof cchPoQbDotCellHtml==='function'?cchPoQbDotCellHtml(po):(typeof cchPoQbListCellHtml==='function'?cchPoQbListCellHtml(po):qbCellBadge(getQbId(po), po.qbStatus, po))}</td>
                     <td class="col-links" onclick="event.stopPropagation()">
                       ${_poProposalId ? '<a onclick="navigate(\'#/project/'+proj.id+'/proposal/'+_poProposalId+'\')" style="color:var(--teal);cursor:pointer;margin-right:4px;" title="Linked Proposal">📋</a>' : ''}
                       ${_poInvoiceId ? '<a onclick="navigate(\'#/project/'+proj.id+'/invoice/'+_poInvoiceId+'\')" style="color:var(--teal);cursor:pointer;margin-right:4px;" title="Linked Invoice">🧾</a>' : ''}
@@ -60232,7 +60232,7 @@ async function renderBoardsTab(T, proj) {
                   <th style="${thStyle}text-align:right;cursor:pointer;" onclick="sortByField('paidAmount','pos')">Paid${sortArrow('paidAmount','pos')}</th>
                   <th style="${thStyle}text-align:right;cursor:pointer;" onclick="sortByField('balance','pos')">Balance${sortArrow('balance','pos')}</th>
                   <th style="${thStyle}text-align:right;cursor:pointer;" onclick="sortByField('variance','pos')">Variance${sortArrow('variance','pos')}</th>
-                  <th style="${thStyle}cursor:pointer;" onclick="sortByField('qb','pos')">QB Sync${sortArrow('qb','pos')}</th>
+                  <th style="${thStyle}text-align:center;cursor:pointer;" onclick="sortByField('qb','pos')" title="QuickBooks — green synced, red failed, dash not pushed">QB${sortArrow('qb','pos')}</th>
                   <th style="${thStyle}text-align:center;">Actions</th>
                 </tr>
               </thead>
@@ -60257,7 +60257,7 @@ async function renderBoardsTab(T, proj) {
                     <td style="${tdStyle}color:var(--gray-500);font-size:12px;">${esc(po.eta||'—')}</td>
                     <td style="${tdStyle}text-align:right;font-weight:600;font-family:monospace;">$${((typeof cchPoListPoTotal==='function'?cchPoListPoTotal(po):(parseFloat(po.total)||0))).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
                     ${typeof cchPoListAllPosFinancialCellsHtml==='function'?cchPoListAllPosFinancialCellsHtml(po, tdStyle):'<td style="'+tdStyle+'">—</td><td style="'+tdStyle+'">—</td><td style="'+tdStyle+'">—</td><td style="'+tdStyle+'">—</td>'}
-                    <td style="${tdStyle}">${typeof cchPoQbListCellHtml==='function'?cchPoQbListCellHtml(po):qbCellBadge(getQbId(po), po.qbStatus, po)}</td>
+                    <td style="${tdStyle}text-align:center;" onclick="event.stopPropagation()">${typeof cchPoQbDotCellHtml==='function'?cchPoQbDotCellHtml(po):(typeof cchPoQbListCellHtml==='function'?cchPoQbListCellHtml(po):qbCellBadge(getQbId(po), po.qbStatus, po))}</td>
                     <td style="${tdStyle}text-align:center;" onclick="event.stopPropagation()">
                       <div class="action-menu-wrap" style="display:flex;align-items:center;justify-content:center;gap:4px;">
                         <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 10px;white-space:nowrap;" onclick="event.stopPropagation();window._forceEditMode=true;navigate('#/project/${po.projectId}/po/${po.id}')">✏️ Edit</button>
@@ -72115,7 +72115,7 @@ ${pages}
   <script src="cch-proposals-invoices-fix.js?v=20260620icons"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
   <script src="cch-po-bill-variance.js?v=20260622qbdot"></script>
-  <script src="cch-order-management.js?v=20260602om11"></script>
+  <script src="cch-order-management.js?v=20260622om12"></script>
   <script src="cch-ffe-procurement.js?v=20260602"></script>
 </body>
 </html>

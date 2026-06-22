@@ -5,7 +5,7 @@
 (function() {
   'use strict';
 
-  var OM_BUILD = '20260602om11';
+  var OM_BUILD = '20260622om12';
   var OM_NAVY = '#0F1A2E';
   var OM_NAVY_MID = '#1B3352';
   var OM_BORDER = 'rgba(15,26,46,0.12)';
@@ -1305,9 +1305,11 @@
       var q = row.qb;
       var pid = escAttr(po.projectId);
       var poid = escAttr(po.id);
-      var qbHtml = typeof window.cchPoQbListCellHtml === 'function'
-        ? window.cchPoQbListCellHtml(po)
-        : esc(q.bucket);
+      var qbHtml = typeof window.cchPoQbDotCellHtml === 'function'
+        ? window.cchPoQbDotCellHtml(po)
+        : (typeof window.cchPoQbListCellHtml === 'function'
+          ? window.cchPoQbListCellHtml(po)
+          : esc(q.bucket));
       var action = '';
       if (q.bucket === 'ready' && canPush && q.pushAllowed && typeof window.cchPoPushBillToQB === 'function') {
         action = '<button type="button" class="btn btn-primary btn-sm" style="font-size:10px;padding:4px 10px;" ' +
@@ -1326,7 +1328,7 @@
         '<td style="' + td + 'font-size:12px;color:var(--gray-500);white-space:nowrap;">' + esc(fmtDate(poIssueDate(po))) + '</td>' +
         '<td style="' + td + 'font-family:monospace;font-size:12px;font-weight:600;color:#1B3352;">' +
         (q.blRef ? esc(q.blRef) : '<span style="color:var(--gray-400);font-weight:400;">—</span>') + '</td>' +
-        '<td style="' + td + '">' + qbHtml + '</td>' +
+        '<td style="' + td + 'text-align:center;">' + qbHtml + '</td>' +
         '<td style="' + td + 'text-align:right;font-weight:600;font-family:monospace;">$' +
         poTotal(po).toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
         '<td style="' + td + 'text-align:center;" onclick="event.stopPropagation()">' + action + '</td>' +
@@ -1341,7 +1343,7 @@
       thSort('Project', 'project') +
       thSort('Date', 'date') +
       '<th style="padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Bill #</th>' +
-      '<th style="padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">QB status</th>' +
+      '<th style="padding:10px 12px;text-align:center;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;" title="QuickBooks — green synced, red failed, dash not pushed">QB</th>' +
       thSort('Total', 'amount', 'text-align:right;') +
       '<th style="padding:10px 12px;text-align:center;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Action</th>' +
       '</tr></thead><tbody>' + body + '</tbody></table></div>';
