@@ -3956,7 +3956,7 @@
       else if (_stk.length > 1) shipToRaw = _stk.join(' · ');
     }
 
-    var shipToDisplay = shipToRaw;
+    var shipToDisplay = String(docData.shipToAddress || '').trim() || shipToRaw;
     if (type === 'po' && typeof window.resolvePOShipToDisplayText === 'function') {
       try {
         var projForShip = Object.assign({}, proj);

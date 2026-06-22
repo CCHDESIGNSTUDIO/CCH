@@ -776,6 +776,12 @@ async function showNewVendorModal(existingId, categoryHint) {
   var cat = categoryHint || 'Vendor';
   var v = {};
   if (existingId) { var vd = await db.collection('vendors').doc(existingId).get(); if (vd.exists) { v = vd.data(); cat = v.category || cat; } }
+  var addrParts = { line1: '', line2: '', city: '', state: '', zip: '' };
+  if (typeof window.cchCoerceStructuredAddressParts === 'function' && typeof window.cchAddressPartsFromRecord === 'function') {
+    addrParts = window.cchCoerceStructuredAddressParts(window.cchAddressPartsFromRecord(v));
+  } else if (v.address) {
+    addrParts.line1 = String(v.address).trim();
+  }
   var typeList = ['Showroom','Upholsterer','Window Fabricator','Freight / Receiver','Stone Supplier','Lighting','Furniture','Fabric','Wallcovering','Hardware','Tile / Stone','Custom Upholstery','Workroom','Delivery','Installer'];
   var typeOpts = typeList.map(function(x){ return '<option value="' + x + '">'; }).join('');
   var title = (existingId ? 'Edit ' : 'New ') + cat;
@@ -799,7 +805,12 @@ async function showNewVendorModal(existingId, categoryHint) {
     '<div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="vnPhone" value="' + escAttr(v.phone||'') + '"></div>' +
     '<div class="form-group"><label class="form-label">Email</label><input class="form-input" id="vnEmail" value="' + escAttr(v.email||'') + '"></div>' +
     '<div class="form-group"><label class="form-label">Account #</label><input class="form-input" id="vnAccount" value="' + escAttr(v.account||'') + '"></div>' +
-    '<div class="form-group" style="grid-column:span 2;"><label class="form-label">Ship-To Address</label><input class="form-input" id="vnAddress" value="' + escAttr(v.address||'') + '"></div>' +
+    '<div class="form-group" style="grid-column:span 2;"><label class="form-label">Address</label><input class="form-input" id="vnAddress1" value="' + escAttr(addrParts.line1) + '" placeholder="Street address"></div>' +
+    '<div class="form-group" style="grid-column:span 2;"><label class="form-label">Address 2</label><input class="form-input" id="vnAddress2" value="' + escAttr(addrParts.line2) + '" placeholder="Suite, unit, etc (optional)"></div>' +
+    '<div class="form-group" style="grid-column:span 2;display:grid;grid-template-columns:1fr 120px 120px;gap:12px;">' +
+    '<div><label class="form-label">City</label><input class="form-input" id="vnCity" value="' + escAttr(addrParts.city) + '"></div>' +
+    '<div><label class="form-label">State</label><input class="form-input" id="vnState" value="' + escAttr(addrParts.state) + '"></div>' +
+    '<div><label class="form-label">Zip</label><input class="form-input" id="vnZip" value="' + escAttr(addrParts.zip) + '"></div></div>' +
     '<div class="form-group"><label class="form-label">Lead Time</label><input class="form-input" id="vnLeadTime" value="' + escAttr(v.leadTime||'') + '"></div>' +
     '<div class="form-group"><label class="form-label">Website</label><input class="form-input" id="vnWebsite" value="' + escAttr(v.website||'') + '"></div>' +
     '<div class="form-group"><label class="form-label">Description</label><input class="form-input" id="vnDescription" value="' + escAttr(v.description||'') + '" placeholder="e.g. Showroom, Custom Upholstery..."></div>' +
@@ -823,6 +834,16 @@ async function saveVendor(existingId, category) {
   var cat = category || 'Vendor';
   var name = document.getElementById('vnName').value.trim();
   if (!name) { if (typeof cchAlert === 'function') await cchAlert('Name is required.', 'Vendor'); return; }
+  var addrParts = {
+    line1: document.getElementById('vnAddress1').value.trim(),
+    line2: document.getElementById('vnAddress2').value.trim(),
+    city: document.getElementById('vnCity').value.trim(),
+    state: document.getElementById('vnState').value.trim(),
+    zip: document.getElementById('vnZip').value.trim()
+  };
+  var composed = typeof window.cchComposeAddressMultiline === 'function'
+    ? window.cchComposeAddressMultiline(addrParts)
+    : [addrParts.line1, addrParts.line2, [addrParts.city, addrParts.state].filter(Boolean).join(', '), addrParts.zip].filter(Boolean).join('\n');
   var data = {
     name: name,
     category: cat,
@@ -831,7 +852,12 @@ async function saveVendor(existingId, category) {
     phone: document.getElementById('vnPhone').value.trim(),
     email: document.getElementById('vnEmail').value.trim(),
     website: document.getElementById('vnWebsite').value.trim(),
-    address: document.getElementById('vnAddress').value.trim(),
+    address: composed,
+    addressLine1: addrParts.line1,
+    addressLine2: addrParts.line2,
+    city: addrParts.city,
+    state: addrParts.state,
+    zip: addrParts.zip,
     account: document.getElementById('vnAccount').value.trim(),
     leadTime: document.getElementById('vnLeadTime').value.trim(),
     description: document.getElementById('vnDescription').value.trim(),
@@ -845,6 +871,7 @@ async function saveVendor(existingId, category) {
   try {
     if (existingId) { await db.collection('vendors').doc(existingId).update(data); }
     else { data.createdAt = new Date().toISOString(); await db.collection('vendors').add(data); }
+    if (typeof window._invalidateShipToContactsCache === 'function') window._invalidateShipToContactsCache();
     closeModal();
     if (cat === 'Workroom') renderWorkrooms();
     else if (cat === 'Delivery / Receiver') renderDeliveryReceivers();
@@ -857,6 +884,7 @@ async function deleteVendor(id, category) {
   if (!(await cchConfirm('Delete this record?', 'Delete vendor', { confirmText: 'Delete', danger: true }))) return;
   try {
     await db.collection('vendors').doc(id).delete();
+    if (typeof window._invalidateShipToContactsCache === 'function') window._invalidateShipToContactsCache();
     closeModal();
     if (category === 'Workroom') renderWorkrooms();
     else if (category === 'Delivery / Receiver') renderDeliveryReceivers();
@@ -869,6 +897,7 @@ async function moveVendorCategory(docId, newCategory) {
   if (!(await cchConfirm('Move this record to ' + newCategory + '?', 'Move vendor', { confirmText: 'Move' }))) return;
   try {
     await db.collection('vendors').doc(docId).update({ category: newCategory, movedAt: new Date().toISOString() });
+    if (typeof window._invalidateShipToContactsCache === 'function') window._invalidateShipToContactsCache();
     closeModal();
     renderVendors();
   } catch(e) { if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Move vendor'); }
@@ -1238,7 +1267,13 @@ function renderVendorInfoTab() {
 
   var fields = [
     ['Name', v.name], ['Type', v.type], ['Contact', v.contact], ['Phone', v.phone],
-    ['Email', v.email], ['Account #', v.account], ['Ship-To Address', v.address],
+    ['Email', v.email], ['Account #', v.account],
+    ['Address', (function() {
+      if (typeof window.cchComposeAddressMultiline === 'function' && typeof window.cchCoerceStructuredAddressParts === 'function' && typeof window.cchAddressPartsFromRecord === 'function') {
+        return window.cchComposeAddressMultiline(window.cchCoerceStructuredAddressParts(window.cchAddressPartsFromRecord(v)));
+      }
+      return v.address;
+    })()],
     ['Lead Time', v.leadTime], ['Website', v.website], ['Description', v.description],
     ['Tags', v.tags], ['Notes', v.notes]
   ].filter(function(f) { return f[1]; });
@@ -1248,6 +1283,7 @@ function renderVendorInfoTab() {
     var val = f[1];
     if (f[0] === 'Email') val = '<a href="mailto:' + esc(f[1]) + '" style="color:var(--gold);">' + esc(f[1]) + '</a>';
     else if (f[0] === 'Website') val = '<a href="' + esc(f[1]) + '" target="_blank" style="color:var(--gold);">' + esc(f[1]) + '</a>';
+    else if (f[0] === 'Address') val = esc(val).replace(/\n/g, '<br>');
     else val = esc(val);
     html += '<div><div style="font-size:11px;text-transform:uppercase;color:var(--gray-400);font-weight:600;margin-bottom:4px;">' + f[0] + '</div><div style="font-size:14px;">' + val + '</div></div>';
   });

@@ -28827,6 +28827,14 @@ async function renderBoardsTab(T, proj) {
     function resolvePOShipToDisplayText(shipToRaw, projData, docData) {
       projData = projData || {};
       docData = docData || {};
+      var manualAddr = String(docData.shipToAddress || '').trim();
+      if (manualAddr) {
+        if (manualAddr.indexOf('\n') >= 0) return manualAddr;
+        if ((manualAddr.indexOf('·') >= 0 || manualAddr.indexOf('\u00b7') >= 0) && typeof cchFormatLegacyShipToDots === 'function') {
+          return cchFormatLegacyShipToDots(manualAddr);
+        }
+        return manualAddr;
+      }
       var s = String(shipToRaw == null ? '' : shipToRaw).trim();
       if (!s) return '';
 
@@ -28885,7 +28893,7 @@ async function renderBoardsTab(T, proj) {
         if (nm0 && low.indexOf(nm0) === 0) {
           if (hl.length > s.length + 8 || (_hasZip(hl) && !_hasZip(s)) || (hl.length > s.length + 3 && _hasZip(hl))) return hl;
         }
-        if (_looksLikeCompleteVendorShip(s)) return s;
+        if (_looksLikeCompleteVendorShip(s) && typeof cchFormatLegacyShipToDots === 'function') return cchFormatLegacyShipToDots(s);
       }
 
       if (low === 'client' || low === 'client home' || low === 'billing' || /^client\s*\(?use billing/.test(low)) {
@@ -28907,19 +28915,13 @@ async function renderBoardsTab(T, proj) {
       if (_shipToReceivers && _shipToReceivers.length) {
         for (var ir = 0; ir < _shipToReceivers.length; ir++) {
           var rr = _shipToReceivers[ir];
-          var rn = (rr.name || '').trim();
-          if (!rn) continue;
-          if (low === rn.toLowerCase()) return rr.addr;
-          if (s === rr.addr) return rr.addr;
+          if (_shipToMatchContact(s, rr)) return rr.displayText || rr.addr;
         }
       }
       if (_shipToWorkrooms && _shipToWorkrooms.length) {
         for (var iw = 0; iw < _shipToWorkrooms.length; iw++) {
           var ww = _shipToWorkrooms[iw];
-          var wn = (ww.name || '').trim();
-          if (!wn) continue;
-          if (low === wn.toLowerCase()) return ww.addr;
-          if (s === ww.addr) return ww.addr;
+          if (_shipToMatchContact(s, ww)) return ww.displayText || ww.addr;
         }
       }
 
@@ -28936,6 +28938,9 @@ async function renderBoardsTab(T, proj) {
         if (sn === cn) return clientHomeLine();
       }
 
+      if ((s.indexOf('·') >= 0 || s.indexOf('\u00b7') >= 0) && typeof cchFormatLegacyShipToDots === 'function') {
+        return cchFormatLegacyShipToDots(s);
+      }
       return s;
     }
     window.resolvePOShipToDisplayText = resolvePOShipToDisplayText;
@@ -30831,7 +30836,8 @@ async function renderBoardsTab(T, proj) {
         ? window.cchProjectAddressFromData(proj, docData)
         : String(proj.projectAddress || proj.address || docData.projectAddress || '').trim();
 
-      var shipToLegacyRaw = (docData.shipTo || docData.deliverTo || '').trim() ||
+      var shipToLegacyRaw = String(docData.shipToAddress || '').trim() ||
+        (docData.shipTo || docData.deliverTo || '').trim() ||
         (proj.projectAddress || proj.address || proj.siteAddress || proj.jobSiteAddress || '').trim();
       if (!shipToLegacyRaw) {
         var __st = {};
@@ -31390,6 +31396,31 @@ async function renderBoardsTab(T, proj) {
     window.cchComposeAddressMultiline = cchComposeAddressMultiline;
     window.cchAddressPartsFromRecord = cchAddressPartsFromRecord;
     window.cchParseLooseAddressString = cchParseLooseAddressString;
+
+    /** Convert legacy "Name · street, city, state zip · phone" ship-to strings to multiline blocks. */
+    function cchFormatLegacyShipToDots(s) {
+      s = String(s || '').trim();
+      if (!s || s.indexOf('\n') >= 0) return s;
+      if (s.indexOf('·') < 0 && s.indexOf('\u00b7') < 0) return s;
+      var parts = s.split(/[·\u00b7]/).map(function(x) { return String(x || '').trim(); }).filter(Boolean);
+      if (parts.length < 2) return s;
+      var name = parts[0];
+      var phone = '';
+      var last = parts[parts.length - 1];
+      if (parts.length > 2 && /^[\(\+\d]/.test(last) && /[\d\-\(\)\+\s\.]{7,}/.test(last)) {
+        phone = last;
+        parts = parts.slice(0, -1);
+      }
+      var addrStr = parts.slice(1).join(', ');
+      var parsed = cchCoerceStructuredAddressParts(cchAddressPartsFromRecord({ address: addrStr }));
+      var body = cchComposeAddressMultiline(parsed);
+      if (!body && addrStr) body = addrStr;
+      var lines = [name];
+      if (body) lines.push(body);
+      if (phone) lines.push(phone);
+      return lines.join('\n');
+    }
+    window.cchFormatLegacyShipToDots = cchFormatLegacyShipToDots;
 
     function cchProjectAddressPartsFromBoard(p) {
       p = p || {};
@@ -39064,6 +39095,12 @@ async function renderBoardsTab(T, proj) {
       }
 
       // View-first parity with invoices: read-only page shows payment history; Edit opens full editor.
+      if (typeof _loadShipToContacts === 'function') {
+        if (!_shipToWorkrooms || !_shipToReceivers || (!_shipToWorkrooms.length && !_shipToReceivers.length)) {
+          _invalidateShipToContactsCache();
+        }
+        await _loadShipToContacts(true);
+      }
       if (window._forceEditMode) {
         window._forceEditMode = false;
         await renderDocEditPage('po', projectId, poId, docData, items, projData);
@@ -57306,6 +57343,8 @@ async function renderBoardsTab(T, proj) {
         });
       } catch(e) {}
 
+      var _tmAddr = cchCoerceStructuredAddressParts(cchAddressPartsFromRecord(m));
+
       document.getElementById('modalContainer').innerHTML = `
         <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
           <div class="modal" style="max-width:520px;">
@@ -57324,12 +57363,12 @@ async function renderBoardsTab(T, proj) {
               <div class="form-group"><label class="form-label">Specialty</label><input class="form-input" id="tmSpecialty" value="${escAttr(m.specialty || '')}" placeholder="e.g. Lighting, Upholstery, Tile"></div>
                 <div class="form-group"><label class="form-label">Rate ($/hr)</label><input class="form-input" id="tmRate" type="number" step="0.01" value="${escAttr(m.rate || '')}"></div>
               </div>
-              <div class="form-group"><label class="form-label">Address</label><input class="form-input" id="tmAddress1" value="${escAttr(m.addressLine1 || m.address || '')}" placeholder="Street address"></div>
-              <div class="form-group"><label class="form-label">Address 2</label><input class="form-input" id="tmAddress2" value="${escAttr(m.addressLine2 || m.address2 || '')}" placeholder="Suite, unit, etc (optional)"></div>
+              <div class="form-group"><label class="form-label">Address</label><input class="form-input" id="tmAddress1" value="${escAttr(_tmAddr.line1)}" placeholder="Street address"></div>
+              <div class="form-group"><label class="form-label">Address 2</label><input class="form-input" id="tmAddress2" value="${escAttr(_tmAddr.line2)}" placeholder="Suite, unit, etc (optional)"></div>
               <div class="form-row">
-                <div class="form-group"><label class="form-label">City</label><input class="form-input" id="tmCity" value="${escAttr(m.city || '')}"></div>
-                <div class="form-group"><label class="form-label">State</label><input class="form-input" id="tmState" value="${escAttr(m.state || '')}"></div>
-                <div class="form-group"><label class="form-label">Zip</label><input class="form-input" id="tmZip" value="${escAttr(m.zip || m.postalCode || '')}"></div>
+                <div class="form-group"><label class="form-label">City</label><input class="form-input" id="tmCity" value="${escAttr(_tmAddr.city)}"></div>
+                <div class="form-group"><label class="form-label">State</label><input class="form-input" id="tmState" value="${escAttr(_tmAddr.state)}"></div>
+                <div class="form-group"><label class="form-label">Zip</label><input class="form-input" id="tmZip" value="${escAttr(_tmAddr.zip)}"></div>
               </div>
               <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="tmNotes" rows="2">${esc(m.notes || '')}</textarea></div>
               <div class="form-group"><label class="form-label">Linked Projects</label><div style="max-height:140px;overflow-y:auto;border:1px solid var(--border);padding:8px;border-radius:0;">${projOptions || '<div style="color:var(--gray-500);font-size:12px;">No projects</div>'}</div></div>
@@ -57407,6 +57446,7 @@ async function renderBoardsTab(T, proj) {
       if (!existingId) data.createdAt = new Date().toISOString();
       try {
         await db.collection('team').doc(slug).set(data, { merge: true });
+        if (typeof window._invalidateShipToContactsCache === 'function') window._invalidateShipToContactsCache();
         closeModal();
         renderTeamPage();
       } catch(e) { alert('Error saving: ' + e.message); }
@@ -57769,6 +57809,7 @@ async function renderBoardsTab(T, proj) {
           createdAt: new Date().toISOString(),
           owner: currentUser.email
         });
+        if (typeof window._invalidateShipToContactsCache === 'function') window._invalidateShipToContactsCache();
         closeModal();
         renderVendors();
       } catch(e) { alert('Error saving vendor: ' + e.message); }
@@ -57777,7 +57818,7 @@ async function renderBoardsTab(T, proj) {
     function editVendorInline(vendorName) {
       var v = vendorsCache.find(function(x) { return x.name === vendorName; });
       if (!v) return;
-      var _evAddress = cchAddressPartsFromRecord(v);
+      var _evAddress = cchCoerceStructuredAddressParts(cchAddressPartsFromRecord(v));
       document.getElementById('modalContainer').innerHTML = '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">' +
         '<div class="modal" style="width:500px;">' +
           '<div class="modal-header"><div class="modal-title">Edit Vendor: ' + esc(vendorName) + '</div><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
@@ -57837,6 +57878,7 @@ async function renderBoardsTab(T, proj) {
           data.owner = currentUser.email;
           await db.collection('vendors').add(data);
         }
+        if (typeof window._invalidateShipToContactsCache === 'function') window._invalidateShipToContactsCache();
         closeModal();
         renderVendors();
       } catch(e) { alert('Error saving: ' + e.message); }
