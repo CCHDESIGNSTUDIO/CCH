@@ -3015,13 +3015,13 @@
         <button class="nav-item" data-page="allpos">
           <span class="nav-icon">◈</span><span class="nav-label">Purchase Orders</span>
         </button>
-        <button class="nav-item" id="navOrderManagement" data-page="ordermanagement" onclick="event.stopImmediatePropagation();navigate('#/ordermanagement/open')" style="display:none;" title="Open PO dashboard — staging Phase 1">
+        <button class="nav-item" id="navOrderManagement" data-page="ordermanagement" onclick="event.stopImmediatePropagation();navigate('#/ordermanagement/open')" style="display:none;" title="PO operations — track, pay vendors, variances, QuickBooks">
           <span class="nav-icon">📋</span><span class="nav-label">Order Management</span>
         </button>
-        <button class="nav-item" data-page="vendorbills" onclick="event.stopImmediatePropagation();navigate('#/vendorbills')" title="Vendor bills firm-wide — open balances, awaiting bill, and client variances">
+        <button class="nav-item" id="navVendorBills" data-page="vendorbills" onclick="event.stopImmediatePropagation();navigate('#/vendorbills')" title="Vendor bills firm-wide — open balances, awaiting bill, and client variances">
           <span class="nav-icon">📥</span><span class="nav-label">Vendor Bills</span>
         </button>
-        <button class="nav-item" data-page="vendorbills" onclick="event.stopImmediatePropagation();navigate('#/vendorbills/variances')" style="padding-left:40px;font-size:12px;" title="Freight/tax over PO — batch to client invoice">
+        <button class="nav-item" id="navBillVariances" data-page="vendorbills" onclick="event.stopImmediatePropagation();navigate('#/vendorbills/variances')" style="padding-left:40px;font-size:12px;" title="Freight/tax over PO — batch to client invoice">
           <span class="nav-icon" style="font-size:10px;">◦</span><span class="nav-label">Bill variances</span>
         </button>
         <div style="height:1px;background:rgba(15,26,46,0.03);margin:8px 20px;"></div>
@@ -4556,6 +4556,15 @@
         window._vendorBillsPreset = parts[1] || '';
         if (parts[1] === 'variances' || page === 'discrepancyreport') window._vendorBillsTab = 'variances';
         else window._vendorBillsTab = 'bills';
+        if (typeof window.cchOmPageEnabled === 'function' && window.cchOmPageEnabled() &&
+            typeof window.renderOrderManagementPage === 'function') {
+          var omHash = window._vendorBillsTab === 'variances' ? '#/ordermanagement/variances' : '#/ordermanagement/bills';
+          if (typeof history !== 'undefined' && history.replaceState) history.replaceState(null, '', omHash);
+          window.renderOrderManagementPage();
+          if (typeof window.setBreadcrumb === 'function') window.setBreadcrumb([{ label: 'Order Management' }]);
+          if (typeof window.setTopbarActions === 'function') window.setTopbarActions('');
+          return;
+        }
         if (typeof window.renderAllVendorBillsPage === 'function') {
           window.renderAllVendorBillsPage();
         } else {
@@ -71838,7 +71847,7 @@ ${pages}
   <script src="cch-proposals-invoices-fix.js?v=20260620icons"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
   <script src="cch-po-bill-variance.js?v=20260603vdoctype"></script>
-  <script src="cch-order-management.js?v=20260602om6"></script>
+  <script src="cch-order-management.js?v=20260602om7"></script>
   <script src="cch-ffe-procurement.js?v=20260602"></script>
 </body>
 </html>

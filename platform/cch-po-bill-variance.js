@@ -484,8 +484,9 @@
     if (typeof window.invalidateSearchCache === 'function') window.invalidateSearchCache();
     if (typeof window._cacheTime !== 'undefined') window._cacheTime = 0;
     var h = window.location.hash || '';
-    if (h.indexOf('/vendorbills') >= 0 && typeof window.renderAllVendorBillsPage === 'function') {
-      window.renderAllVendorBillsPage();
+    if ((h.indexOf('/vendorbills') >= 0 || h.indexOf('/ordermanagement') >= 0) &&
+        typeof window.cchPoRefreshFinancePage === 'function') {
+      window.cchPoRefreshFinancePage();
       return;
     }
     if (h.indexOf('/po/' + poId) >= 0 && typeof window.renderDocViewPage === 'function') {
@@ -3460,7 +3461,7 @@
       if (pending) {
         varCard += window.cchPoVarianceResolveFormHtml(projectId, poId, docData);
         varCard += '<div style="margin-top:10px;font-size:11px;"><a href="#" onclick="event.preventDefault();navigate(\'#/project/' + escJs(projectId) + '/discrepancies\');return false;" style="color:var(--cyan);font-weight:600;">Open Bill variances for this project →</a> · ' +
-          '<a href="#" onclick="event.preventDefault();navigate(\'#/vendorbills/variances\');return false;" style="color:var(--cyan);font-weight:600;">Firm-wide Bill variances →</a></div>';
+          '<a href="#" onclick="event.preventDefault();navigate(\'' + escJs(typeof window.cchPoFinanceRoute === 'function' ? window.cchPoFinanceRoute('variances') : '#/vendorbills/variances') + '\');return false;" style="color:var(--cyan);font-weight:600;">Firm-wide Bill variances →</a></div>';
       } else {
         varCard += '<div style="font-size:12px;color:var(--gray-600);">Resolution: <strong>' + esc(variance.resolution) + '</strong></div>';
       }
@@ -4560,8 +4561,8 @@
     T.innerHTML = '<div class="page-header" style="display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px;">' +
       '<div><div class="page-title">Bill variances</div>' +
       '<div class="page-subtitle">This project · select multiple PO variances and add to one client invoice</div></div>' +
-      '<button type="button" class="btn btn-secondary btn-sm" onclick="navigate(\'#/vendorbills/variances\')">Open firm-wide Bill variances</button></div>' +
-      '<p style="font-size:12px;color:#5C6B80;max-width:720px;margin:0 0 14px;line-height:1.5;">Freight, tax, and other charges above the locked PO total. Firm-wide list: Finance → <strong>Vendor Bills → Bill variances</strong>.</p>' +
+      '<button type="button" class="btn btn-secondary btn-sm" onclick="navigate(\'' + escJs(typeof window.cchPoFinanceRoute === 'function' ? window.cchPoFinanceRoute('variances') : '#/vendorbills/variances') + '\')">Open firm-wide Bill variances</button></div>' +
+      '<p style="font-size:12px;color:#5C6B80;max-width:720px;margin:0 0 14px;line-height:1.5;">Freight, tax, and other charges above the locked PO total. Firm-wide list: Finance → <strong>Order Management → Bill variances</strong>.</p>' +
       '<div style="margin-bottom:14px;">' + chips + '</div>' + batchBar +
       '<table class="data-table"><thead><tr><th style="width:36px;"></th><th>PO</th><th>Vendor</th>' +
       '<th style="text-align:right;">PO total</th><th style="text-align:right;">Bill total</th><th style="text-align:right;">Variance</th>' +
@@ -4572,13 +4573,32 @@
   window.cchPoSetFirmVarianceFilter = function(f) {
     window._poDiscFilter = f;
     window._vendorBillsTab = 'variances';
-    window.renderAllVendorBillsPage();
+    window.cchPoRefreshFinancePage();
   };
 
   window.cchPoFirmVarianceProjectChanged = function(projectId) {
     window._poVarFirmProject = projectId || 'all';
     window._vendorBillsTab = 'variances';
-    window.renderAllVendorBillsPage();
+    window.cchPoRefreshFinancePage();
+  };
+
+  window.cchPoFinanceRoute = function(tab) {
+    if (typeof window.cchOmPageEnabled === 'function' && window.cchOmPageEnabled()) {
+      if (tab === 'variances') return '#/ordermanagement/variances';
+      return '#/ordermanagement/bills';
+    }
+    if (tab === 'variances') return '#/vendorbills/variances';
+    return '#/vendorbills';
+  };
+
+  window.cchPoRefreshFinancePage = function() {
+    if (typeof window.cchOmIsActive === 'function' && window.cchOmIsActive() &&
+        typeof window.renderOrderManagementPage === 'function') {
+      return window.renderOrderManagementPage();
+    }
+    if (typeof window.renderAllVendorBillsPage === 'function') {
+      return window.renderAllVendorBillsPage();
+    }
   };
 
   function cchPoVendorBillsTabBarHtml(activeTab, varianceReady) {
@@ -4625,9 +4645,9 @@
   window.cchPoSetVendorBillsTab = function(tab) {
     window._vendorBillsTab = tab === 'variances' ? 'variances' : 'bills';
     if (typeof window.navigate === 'function') {
-      window.navigate(window._vendorBillsTab === 'variances' ? '#/vendorbills/variances' : '#/vendorbills');
+      window.navigate(window.cchPoFinanceRoute(window._vendorBillsTab === 'variances' ? 'variances' : 'bills'));
     } else {
-      window.renderAllVendorBillsPage();
+      window.cchPoRefreshFinancePage();
     }
   };
 
@@ -4665,7 +4685,7 @@
         '</div>'
       : '';
 
-    return '<p style="font-size:13px;color:var(--gray-500);max-width:760px;line-height:1.5;margin:0 0 10px;">PO vendor bill vs locked PO total — <strong>bill the client</strong> for freight, tax, and fees above the PO. To <strong>pay the vendor</strong>, use the <button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px;vertical-align:baseline;" onclick="cchPoSetVendorBillsTab(\'bills\')">Vendor bills</button> tab.</p>' +
+    return '<p style="font-size:13px;color:var(--gray-500);max-width:760px;line-height:1.5;margin:0 0 10px;">PO vendor bill vs locked PO total — <strong>bill the client</strong> for freight, tax, and fees above the PO. To <strong>pay the vendor</strong>, use the <button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px;vertical-align:baseline;" onclick="cchPoSetVendorBillsTab(\'bills\')">Vendor bills</button> tab in Order Management.</p>' +
       '<div style="display:flex;flex-wrap:wrap;gap:12px;margin:16px 0;">' +
         '<div class="card" style="padding:14px 18px;min-width:160px;"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Ready to bill</div>' +
           '<div style="font-size:22px;font-weight:700;color:#B45309;">' + readyRows.length + '</div></div>' +
@@ -4678,9 +4698,17 @@
       '<th>Reason</th><th>Status</th><th>Client invoice</th></tr></thead><tbody>' +
       cchPoBuildVarianceTableRowsHtml(rows, true) + '</tbody></table>';
   }
+  window.cchPoBuildFirmVariancePanelHtml = cchPoBuildFirmVariancePanelHtml;
 
   window.renderDiscrepancyReportPage = async function() {
     window._vendorBillsTab = 'variances';
+    if (typeof window.cchOmPageEnabled === 'function' && window.cchOmPageEnabled() &&
+        typeof window.renderOrderManagementPage === 'function') {
+      if (typeof history !== 'undefined' && history.replaceState) {
+        history.replaceState(null, '', '#/ordermanagement/variances');
+      }
+      return window.renderOrderManagementPage();
+    }
     return window.renderAllVendorBillsPage();
   };
 
@@ -4991,10 +5019,13 @@
         '<th style="text-align:center;padding:12px 14px;font-size:11px;text-transform:uppercase;color:var(--gray-400);">Actions</th>' +
       '</tr></thead><tbody>' + tbody + footerRow + '</tbody></table></div>';
   }
+  window.cchPoBuildVendorBillsPanelHtml = cchPoBuildVendorBillsPanelHtml;
 
   window.cchPoDashboardVarianceWidgetHtml = function(pendingCount, pendingSum) {
     if (!pendingCount) return '';
-    return '<div class="card" style="padding:14px 18px;margin-bottom:16px;border-left:4px solid #CA8A04;cursor:pointer;" onclick="navigate(\'#/vendorbills/variances\')">' +
+    var varHash = typeof window.cchPoFinanceRoute === 'function'
+      ? window.cchPoFinanceRoute('variances') : '#/vendorbills/variances';
+    return '<div class="card" style="padding:14px 18px;margin-bottom:16px;border-left:4px solid #CA8A04;cursor:pointer;" onclick="navigate(\'' + escJs(varHash) + '\')">' +
       '<div style="font-size:13px;font-weight:700;color:#92400E;">⚠ ' + pendingCount + ' bill variance' + (pendingCount > 1 ? 's' : '') + ' ready</div>' +
       '<div style="font-size:12px;color:var(--gray-600);">' + fmt(pendingSum) + ' to bill · <span style="color:var(--gold);font-weight:600;">Open Bill variances →</span></div></div>';
   };
@@ -5065,7 +5096,7 @@
   window.cchPoSetVendorBillsFilter = function(filter) {
     window._vendorBillsFilter = filter || 'received';
     window._vendorBillsTab = 'bills';
-    window.renderAllVendorBillsPage();
+    window.cchPoRefreshFinancePage();
   };
 
   window.renderAllVendorBillsPage = async function() {

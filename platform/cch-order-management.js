@@ -1,11 +1,11 @@
 /**
- * Order Management — firm-wide PO operations dashboard (staging Phase 1).
- * Does not modify renderPODetail, project PO tabs, or vendor bill variance UI.
+ * Order Management — firm-wide PO hub: track orders, pay vendors, bill variances, QuickBooks.
+ * Vendor Bills / Bill variances nav fold in here on staging (cchOmPageEnabled).
  */
 (function() {
   'use strict';
 
-  var OM_BUILD = '20260602om6';
+  var OM_BUILD = '20260602om7';
 
   function esc(t) {
     if (typeof window.esc === 'function') return window.esc(t);
@@ -179,23 +179,73 @@
       '</div>';
   }
 
+  window.cchOmIsActive = function() {
+    var h = window.location.hash || '';
+    return h.indexOf('/ordermanagement') >= 0 || h.indexOf('/ordermgmt') >= 0;
+  };
+
+  function omDeferVarianceBadge() {
+    if (window._omVarBadgeLoading) return;
+    if (typeof window.cchPoCollectVarianceRows !== 'function') return;
+    window._omVarBadgeLoading = true;
+    window.cchPoCollectVarianceRows().then(function(rows) {
+      window._omVarBadgeLoading = false;
+      var n = rows.filter(function(r) { return r.readyToBill; }).length;
+      window._omVarianceReady = n;
+      var el = document.getElementById('cchOmVarBadge');
+      if (!el) return;
+      if (n > 0) {
+        el.textContent = '(' + n + ')';
+        el.style.display = '';
+      } else {
+        el.textContent = '';
+        el.style.display = 'none';
+      }
+    }).catch(function() {
+      window._omVarBadgeLoading = false;
+    });
+  }
+
   function tabBar(active) {
+    var varBadge = window._omVarianceReady > 0
+      ? ' <span id="cchOmVarBadge" style="font-size:10px;color:#B45309;font-weight:700;">(' + window._omVarianceReady + ')</span>'
+      : ' <span id="cchOmVarBadge" style="font-size:10px;color:#B45309;font-weight:700;display:none;"></span>';
     var tabs = [
       { id: 'open', label: 'Open POs', hash: '#/ordermanagement/open' },
       { id: 'noeta', label: 'Missing ETA', hash: '#/ordermanagement/noeta' },
       { id: 'noconfirm', label: 'Missing confirmations', hash: '#/ordermanagement/noconfirm' },
       { id: 'receiving', label: 'Receiving status', hash: '#/ordermanagement/receiving' },
+      { id: 'bills', label: 'Vendor bills', hash: '#/ordermanagement/bills' },
+      { id: 'variances', label: 'Bill variances', hash: '#/ordermanagement/variances', badge: true },
       { id: 'qb', label: 'QuickBooks', hash: '#/ordermanagement/qb' }
     ];
-    return '<div style="display:flex;gap:0;margin:20px 0 16px;border-bottom:2px solid rgba(196,164,100,0.15);">' +
+    return '<div style="display:flex;gap:0;margin:20px 0 16px;border-bottom:2px solid rgba(196,164,100,0.15);flex-wrap:wrap;">' +
       tabs.map(function(t) {
         var on = active === t.id;
+        var labelHtml = esc(t.label) + (t.badge ? varBadge : '');
         return '<button type="button" class="btn btn-sm" style="border:none;border-bottom:3px solid ' +
           (on ? '#C4A464' : 'transparent') + ';background:' + (on ? 'rgba(196,164,100,0.08)' : 'transparent') +
           ';color:' + (on ? '#C4A464' : 'var(--gray-500)') + ';font-weight:' + (on ? '700' : '500') +
-          ';padding:10px 16px;margin-bottom:-2px;" onclick="navigate(\'' + t.hash + '\')">' + esc(t.label) + '</button>';
+          ';padding:10px 14px;margin-bottom:-2px;white-space:nowrap;" onclick="navigate(\'' + t.hash + '\')">' +
+          labelHtml + '</button>';
       }).join('') +
       '</div>';
+  }
+
+  function omPageSubtitle(tab) {
+    if (tab === 'bills') {
+      return 'Pay vendors — open balances, awaiting bill, and per-invoice totals. Click a row to open the PO.';
+    }
+    if (tab === 'variances') {
+      return 'Bill the client for freight, tax, and fees above the locked PO total. Batch ready variances to a client invoice.';
+    }
+    if (tab === 'qb') {
+      return 'QuickBooks sync — push vendor bills and track QB status.';
+    }
+    if (tab === 'receiving') {
+      return 'Selection receiving vs PO fulfillment — linked clip order status.';
+    }
+    return 'Studio PO operations — status, aging, and ETA gaps. Click a row to open the PO. Houzz legacy imports excluded.';
   }
 
   window.cchOmSortBy = function(field) {
@@ -1233,6 +1283,8 @@
     if (hash.indexOf('/noeta') >= 0) tab = 'noeta';
     else if (hash.indexOf('/noconfirm') >= 0) tab = 'noconfirm';
     else if (hash.indexOf('/receiving') >= 0) tab = 'receiving';
+    else if (hash.indexOf('/variances') >= 0 && hash.indexOf('/ordermanagement') >= 0) tab = 'variances';
+    else if (hash.indexOf('/bills') >= 0 && hash.indexOf('/ordermanagement') >= 0) tab = 'bills';
     else if (hash.indexOf('/qb') >= 0) tab = 'qb';
     if (tab === 'receiving' && window._omLastTab !== 'receiving') {
       window._omSortField = 'outstanding';
@@ -1243,6 +1295,8 @@
       window._omSortDir = 'desc';
     }
     if (tab === 'qb' && !window._omQbFilter) window._omQbFilter = 'attention';
+    if (tab === 'bills') window._vendorBillsTab = 'bills';
+    if (tab === 'variances') window._vendorBillsTab = 'variances';
     window._omLastTab = tab;
     window._omTab = tab;
 
@@ -1250,7 +1304,11 @@
       ? 'Loading receiving status across projects…'
       : tab === 'qb'
         ? 'Loading QuickBooks status…'
-        : 'Loading order management…';
+        : tab === 'bills'
+          ? 'Loading vendor bills…'
+          : tab === 'variances'
+            ? 'Loading bill variances…'
+            : 'Loading order management…';
     T.innerHTML = '<div style="padding:40px;color:var(--gray-500);">' + loadingMsg + '</div>';
     if (typeof window.setBreadcrumb === 'function') window.setBreadcrumb([{ label: 'Order Management' }]);
     if (typeof window.setTopbarActions === 'function') {
@@ -1263,11 +1321,12 @@
 
     var pos = [];
     var projList = [];
+    var projNames = {};
     try {
       if (typeof window.cchPoLoadAllPosForVendorBills === 'function') {
         var loaded = await window.cchPoLoadAllPosForVendorBills();
         pos = loaded.pos || [];
-        var projNames = loaded.projNames || {};
+        projNames = loaded.projNames || {};
         projList = Object.keys(projNames).map(function(id) {
           return { id: id, name: projNames[id] };
         }).sort(function(a, b) {
@@ -1331,28 +1390,55 @@
       panel = receivingStatusReport(allOpen, clipsByProject, projList, recvVendors);
     } else if (tab === 'qb') {
       panel = qbStatusReport(studioPos, projList);
+    } else if (tab === 'bills') {
+      var vbPreset = window._vendorBillsPreset || '';
+      if (vbPreset === 'variances') vbPreset = '';
+      if (typeof window.cchPoBuildVendorBillsPanelHtml === 'function') {
+        panel = window.cchPoBuildVendorBillsPanelHtml(pos, projNames, vbPreset);
+        window._vendorBillsPreset = '';
+      } else {
+        panel = '<div class="card" style="padding:24px;color:#B45309;">Vendor bills module not loaded.</div>';
+      }
+    } else if (tab === 'variances') {
+      if (typeof window.cchPoBuildFirmVariancePanelHtml === 'function') {
+        panel = await window.cchPoBuildFirmVariancePanelHtml();
+        window._omVarianceReady = (window.__cchVarBatchRows || []).filter(function(r) { return r.readyToBill; }).length;
+      } else {
+        panel = '<div class="card" style="padding:24px;color:#B45309;">Bill variances module not loaded.</div>';
+      }
     }
+
+    var showFulfillmentKpis = tab === 'open' || tab === 'noeta' || tab === 'noconfirm' || tab === 'receiving';
+    var kpiBlock = showFulfillmentKpis
+      ? '<div style="display:flex;gap:0;margin-bottom:20px;border-radius:0;overflow:hidden;border:1px solid rgba(196,164,100,0.15);flex-wrap:wrap;">' +
+        kpiCard('Open POs', String(allOpen.length), 'Studio docs only', '#C4A464') +
+        kpiCard('Missing confirmation', String(noConfirm.length), 'Sent — no vendor ack', '#E16A5B') +
+        kpiCard('Lines without ETA', String(missingEtaLines), 'On open POs', '#C4A464') +
+        kpiCard('Open PO value', '$' + openValue.toLocaleString('en-US', { minimumFractionDigits: 2 }), 'Merchandise total', '#1B3352') +
+        '</div>'
+      : '';
 
     T.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:4px;">' +
       '<div><h1 class="page-title" style="margin:0;">Order Management</h1>' +
-      '<p style="font-size:13px;color:var(--gray-500);margin:8px 0 0;max-width:640px;">Studio PO operations — status, aging, and ETA gaps. ' +
-      'Click a row to open the existing PO page. Houzz legacy imports are excluded' +
-      (houzzExcluded > 0 ? ' (' + houzzExcluded + ' hidden)' : '') + '.</p></div></div>' +
-      '<div style="display:flex;gap:0;margin-bottom:20px;border-radius:0;overflow:hidden;border:1px solid rgba(196,164,100,0.15);flex-wrap:wrap;">' +
-      kpiCard('Open POs', String(allOpen.length), 'Studio docs only', '#C4A464') +
-      kpiCard('Missing confirmation', String(noConfirm.length), 'Sent — no vendor ack', '#E16A5B') +
-      kpiCard('Lines without ETA', String(missingEtaLines), 'On open POs', '#C4A464') +
-      kpiCard('Open PO value', '$' + openValue.toLocaleString('en-US', { minimumFractionDigits: 2 }), 'Merchandise total', '#1B3352') +
-      '</div>' +
+      '<p style="font-size:13px;color:var(--gray-500);margin:8px 0 0;max-width:720px;">' + esc(omPageSubtitle(tab)) +
+      (showFulfillmentKpis && houzzExcluded > 0 ? ' (' + houzzExcluded + ' Houzz POs hidden on track tabs.)' : '') +
+      '</p></div></div>' +
+      kpiBlock +
       tabBar(tab) +
       panel;
+
+    if (tab !== 'variances') omDeferVarianceBadge();
   };
 
   document.addEventListener('DOMContentLoaded', function() {
     if (window.cchOmPageEnabled()) {
       var nav = document.getElementById('navOrderManagement');
       if (nav) nav.style.display = '';
+      var vbNav = document.getElementById('navVendorBills');
+      var varNav = document.getElementById('navBillVariances');
+      if (vbNav) vbNav.style.display = 'none';
+      if (varNav) varNav.style.display = 'none';
     }
   });
 
