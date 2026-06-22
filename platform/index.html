@@ -23978,6 +23978,8 @@ async function renderBoardsTab(T, proj) {
       // Houzz credit / adjustment lines store negative amount with cost=0 — must subtract, not drop.
       if (sell < 0) {
         lineAmt = sell;
+      } else if (cost < 0) {
+        lineAmt = Math.round(cost * qty * (1 + mkup / 100) * 100) / 100;
       } else if (designNoMk && cost > 0) {
         lineAmt = Math.round(cost * qty * 100) / 100;
       } else if (designNoMk || (isSvc && cost <= 0 && rate > 0)) {
@@ -28573,8 +28575,14 @@ async function renderBoardsTab(T, proj) {
       return html;
     }
 
-    async function _loadShipToContacts() {
-      if (_shipToReceivers != null && _shipToWorkrooms != null) return;
+    function _invalidateShipToContactsCache() {
+      _shipToReceivers = null;
+      _shipToWorkrooms = null;
+    }
+    window._invalidateShipToContactsCache = _invalidateShipToContactsCache;
+
+    async function _loadShipToContacts(forceReload) {
+      if (!forceReload && _shipToReceivers != null && _shipToWorkrooms != null) return;
       _shipToReceivers = [];
       _shipToWorkrooms = [];
       var wrSeen = {};
@@ -28594,6 +28602,20 @@ async function renderBoardsTab(T, proj) {
         if (rcSeen[k]) return;
         rcSeen[k] = true;
         _shipToReceivers.push({ name: name, addr: addr || name });
+      }
+      function vendorAddr(v, name) {
+        return _shipToContactAddrLine(name, v.address || v.addr || v.vnAddress || v.mailingAddress, v.phone || v.contactPhone);
+      }
+      function isWorkroomVendor(v) {
+        var cat = String(v.category || '').trim();
+        var typ = String(v.type || v.vendorType || '').trim().toLowerCase();
+        return cat === 'Workroom' || v.isWorkroom === true || typ === 'workroom' || typ.indexOf('upholster') >= 0;
+      }
+      function isReceiverVendor(v) {
+        var cat = String(v.category || '').trim();
+        var typ = String(v.type || v.vendorType || '').trim().toLowerCase();
+        return cat === 'Delivery / Receiver' || cat === 'Freight / Receiver' ||
+          v.type === 'receiver' || v.isReceiver === true || typ.indexOf('receiver') >= 0 || typ.indexOf('freight') >= 0;
       }
       try {
         var snap = await db.collection('team').get();
@@ -28619,13 +28641,32 @@ async function renderBoardsTab(T, proj) {
         var vs = await db.collection('vendors').get();
         vs.forEach(function(d) {
           var v = d.data() || {};
-          if (v.type !== 'receiver' && !v.isReceiver) return;
-          var name = String(v.name || v.company || '').trim();
+          var name = String(v.name || v.company || v.vendor || '').trim();
           if (!name) return;
-          var addr = _shipToContactAddrLine(name, v.address || v.mailingAddress, v.phone || v.contactPhone);
-          pushReceiver(name, addr);
+          var addr = vendorAddr(v, name);
+          if (isWorkroomVendor(v)) pushWorkroom(name, addr);
+          if (isReceiverVendor(v)) pushReceiver(name, addr);
         });
-      } catch (e) { console.warn('Could not load vendor receivers for ship-to:', e); }
+      } catch (e) { console.warn('Could not load vendors for ship-to:', e); }
+      if (!_shipToWorkrooms.length && !_shipToReceivers.length) {
+        console.warn('[ship-to] No workrooms or receivers loaded — add under Vendors → Workrooms / Delivery Receivers, or Team & Contacts.');
+      }
+    }
+
+    function docEditRefreshShipToDropdowns() {
+      if (!_docEdit || _docEdit.type !== 'po') return;
+      var sel = document.getElementById('docEditPOShipTo');
+      var cur = sel ? sel.value : (_docEdit.docData.shipTo || '');
+      var html = _piShipToOptions(cur);
+      if (sel) {
+        sel.innerHTML = html;
+        if (cur) sel.value = _normalizePoShipToSelection(cur, window._docEditProjData || {});
+      }
+      document.querySelectorAll('#docEditItemsArea select[data-field="shipTo"]').forEach(function(el) {
+        var prev = el.value;
+        el.innerHTML = _piShipToOptions(prev);
+        if (prev) el.value = prev;
+      });
     }
 
     // Pre-load on page init (non-blocking)
@@ -28708,16 +28749,16 @@ async function renderBoardsTab(T, proj) {
           opts.push({ group: 'Receiver', label: r.name, addr: r.addr });
         });
       } else {
-        opts.push({ group: 'Receiver', label: 'Receiver (none saved — add in Team & Contacts or mark a vendor as receiver)', addr: 'Receiver' });
+        opts.push({ group: 'Receiver', label: '(none yet — add under Vendors → Delivery / Receivers)', addr: 'Receiver' });
       }
 
-      // Workrooms from team contacts
+      // Workrooms from company list (vendors, team, workrooms collection)
       if (_shipToWorkrooms && _shipToWorkrooms.length > 0) {
         _shipToWorkrooms.forEach(function(w) {
           opts.push({ group: 'Workroom', label: w.name, addr: w.addr });
         });
       } else {
-        opts.push({ group: 'Workroom', label: 'Workroom (none saved — add in Team & Contacts or Workrooms)', addr: 'Workroom' });
+        opts.push({ group: 'Workroom', label: '(none yet — add under Vendors → Workrooms)', addr: 'Workroom' });
       }
 
       opts.push({ group: 'Other', label: 'Vendor Direct to Client', addr: 'Vendor Direct to Client' });
@@ -31377,7 +31418,12 @@ async function renderBoardsTab(T, proj) {
     async function showEditProjectModal(projectId) {
       const doc = await db.collection('boards').doc(projectId).get();
       const p = doc.exists ? doc.data() : {};
-      if (typeof _loadShipToContacts === 'function') await _loadShipToContacts();
+      if (typeof _loadShipToContacts === 'function') {
+        if (!_shipToWorkrooms || !_shipToReceivers || (!_shipToWorkrooms.length && !_shipToReceivers.length)) {
+          _invalidateShipToContactsCache();
+        }
+        await _loadShipToContacts(true);
+      }
 
       // Build client list from BOTH existing projects AND clients collection
       let clientNames = [];
@@ -31520,20 +31566,22 @@ async function renderBoardsTab(T, proj) {
               <div class="form-group"><label class="form-label">Project fee / contract ($)</label><input class="form-input" id="epFee" type="number" step="0.01" value="${escAttr(p.fee || p.projectFee || '')}" placeholder="0.00"></div>
 
               <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--gold);margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid rgba(15,26,46,0.1);">Ship-to default</div>
-              <div class="form-group"><label class="form-label">Preferred ship-to</label>
-                <select class="form-select" id="epShipToMode">
+              <div class="form-group"><label class="form-label">Preferred ship-to (new POs)</label>
+                <select class="form-select" id="epShipToMode" onchange="epShipToModeChanged()">
                   <option value="project_site" ${shipMode==='project_site'?'selected':''}>Default — Client project (job site)</option>
                   <option value="client_billing" ${shipMode==='client_billing'?'selected':''}>Client main address</option>
                   <option value="cch_studio" ${shipMode==='cch_studio'?'selected':''}>CCH — Studio</option>
                   <option value="cch_vanessa" ${shipMode==='cch_vanessa'?'selected':''}>CCH — Vanessa</option>
-                  <option value="workroom" ${shipMode==='workroom'?'selected':''}>Workroom</option>
-                  <option value="receiver" ${shipMode==='receiver'?'selected':''}>Receiver</option>
+                  <option value="workroom" ${shipMode==='workroom'?'selected':''}>Workroom (default for new POs)</option>
+                  <option value="receiver" ${shipMode==='receiver'?'selected':''}>Receiver (default for new POs)</option>
                 </select>
-                <div style="font-size:11px;color:var(--gray-500);margin-top:6px;line-height:1.4;">When mode is Workroom or Receiver, pick from your company list below — same list used on PO ship-to.</div>
+                <div style="font-size:11px;color:var(--gray-500);margin-top:6px;line-height:1.4;">Projects often use <strong>several workrooms</strong> — pick the real destination on each <strong>PO</strong> (header Ship to + per-line Ship to). This section only sets the default when a new PO is created.</div>
               </div>
-              <div class="form-group"><label class="form-label">Workroom</label><select class="form-select" id="epWorkroomName">${_shipToContactPicklistOptions(_shipToWorkrooms, p.shipToWorkroomName || '', '— Select workroom —')}</select></div>
-              <div class="form-group"><label class="form-label">Workroom URL / notes</label><input class="form-input" id="epWorkroomUrl" value="${escAttr(p.shipToWorkroomUrl || '')}" placeholder="https://… or internal ref (optional)"></div>
-              <div class="form-group"><label class="form-label">Receiver</label><select class="form-select" id="epReceiverName">${_shipToContactPicklistOptions(_shipToReceivers, p.shipToReceiverName || '', '— Select receiver —')}</select></div>
+              <div id="epShipToWorkroomBlock" class="form-group"><label class="form-label">Default workroom</label><select class="form-select" id="epWorkroomName">${_shipToContactPicklistOptions(_shipToWorkrooms, p.shipToWorkroomName || '', '— Select workroom —')}</select>
+                <div style="font-size:11px;color:var(--gray-500);margin-top:4px;">Company list from <strong>Vendors → Workrooms</strong> and Team &amp; Contacts.</div></div>
+              <div id="epShipToWorkroomUrlBlock" class="form-group"><label class="form-label">Workroom URL / notes</label><input class="form-input" id="epWorkroomUrl" value="${escAttr(p.shipToWorkroomUrl || '')}" placeholder="https://… or internal ref (optional)"></div>
+              <div id="epShipToReceiverBlock" class="form-group"><label class="form-label">Default receiver</label><select class="form-select" id="epReceiverName">${_shipToContactPicklistOptions(_shipToReceivers, p.shipToReceiverName || '', '— Select receiver —')}</select>
+                <div style="font-size:11px;color:var(--gray-500);margin-top:4px;">Company list from <strong>Vendors → Delivery / Receivers</strong> and Team &amp; Contacts.</div></div>
               <div class="form-row">
                 <div class="form-group"><label class="form-label">CCH Studio ship address (optional)</label><input class="form-input" id="epShipCchStudio" value="${escAttr(p.shipAddressCchStudio || '')}" placeholder="Override when mode = CCH Studio"></div>
                 <div class="form-group"><label class="form-label">CCH Vanessa ship address (optional)</label><input class="form-input" id="epShipVanessa" value="${escAttr(p.shipAddressCchVanessa || '')}" placeholder="Override when mode = CCH Vanessa"></div>
@@ -31567,7 +31615,22 @@ async function renderBoardsTab(T, proj) {
       if ((p.clientName || '') && !(p.clientEmail || '').trim()) {
         setTimeout(function() { epAutofillClient(p.clientName); }, 100);
       }
+      if (typeof epShipToModeChanged === 'function') epShipToModeChanged();
     }
+
+    function epShipToModeChanged() {
+      var modeEl = document.getElementById('epShipToMode');
+      var mode = modeEl ? String(modeEl.value || '').trim() : '';
+      var wr = document.getElementById('epShipToWorkroomBlock');
+      var wrUrl = document.getElementById('epShipToWorkroomUrlBlock');
+      var rc = document.getElementById('epShipToReceiverBlock');
+      var showWr = mode === 'workroom';
+      var showRc = mode === 'receiver';
+      if (wr) wr.style.display = showWr ? '' : 'none';
+      if (wrUrl) wrUrl.style.display = showWr ? '' : 'none';
+      if (rc) rc.style.display = showRc ? '' : 'none';
+    }
+    window.epShipToModeChanged = epShipToModeChanged;
 
     function epShowClientDropdown() {
       epFilterClientDropdown(document.getElementById('epClient').value);
@@ -32534,7 +32597,7 @@ async function renderBoardsTab(T, proj) {
         if (isInvoice && isServiceLine && cost <= 0) {
           costCell = '<input type="number" step="0.01" min="0" class="doc-edit-num-field doc-edit-num-field--money" value="' + (rateVal > 0 ? rateVal.toFixed(2) : '') + '" data-idx="' + idx + '" data-field="rate" onchange="docEditRateChange(this)" title="Billable rate (design / service line)">';
         } else {
-          costCell = '<input type="text" inputmode="decimal" class="doc-edit-num-input doc-edit-num-field doc-edit-num-field--money" value="' + (cost ? cost.toFixed(2) : '') + '" data-idx="' + idx + '" data-field="cost" onchange="docEditNumChange(this)" title="Trade cost per unit">';
+          costCell = '<input type="text" inputmode="decimal" class="doc-edit-num-input doc-edit-num-field doc-edit-num-field--money" value="' + (cost || cost === 0 ? cost.toFixed(2) : '') + '" data-idx="' + idx + '" data-field="cost" onchange="docEditNumChange(this)" title="Trade cost per unit (negative = credit / adjustment)">';
         }
 
         var tagCell = '<td style="text-align:center;vertical-align:middle;"><input type="text" value="' + escAttr(_lineTagTxt) + '" data-idx="' + idx + '" data-field="lineTag" onchange="docEditFieldChange(this)" placeholder="—" maxlength="32" title="Optional label: L39, A, B, trim…" style="width:44px;text-align:center;font-size:11px;font-weight:700;padding:4px 3px;border:1px solid rgba(15,26,46,0.12);"></td>';
@@ -32787,14 +32850,14 @@ async function renderBoardsTab(T, proj) {
             item.amount = Math.round(ship * 100) / 100;
           }
           if (calcs[0]) calcs[0].value = item.amount.toFixed(2);
-        } else if (cost > 0) {
+        } else if (cost !== 0) {
           const total = (cost * qty * (1 + mkup / 100)) + ship;
           const mkupDollar = cost * qty * (mkup / 100);
           item.amount = total;
           if (calcs[0]) calcs[0].value = mkupDollar.toFixed(2);
           if (calcs[1]) calcs[1].value = total.toFixed(2);
         } else {
-          // Cost was cleared: prevent stale amount from keeping old subtotal.
+          // Cost cleared to zero: prevent stale amount from keeping old subtotal.
           // Keep service-rate behavior (rate-driven amount) intact.
           if (!(isInv && isSvc && rate > 0)) item.amount = 0;
           const sell = parseFloat(item.amount) || 0;
@@ -32805,12 +32868,13 @@ async function renderBoardsTab(T, proj) {
         if (unitEl) {
           var unitSell = isPO
             ? (qty > 0 ? ((cost * qty) + ship) / qty : cost)
-            : ((cost > 0) ? (cost * (1 + mkup / 100)) : ((parseFloat(item.amount) || 0) / (qty || 1)));
+            : ((cost !== 0) ? (cost * (1 + mkup / 100)) : ((parseFloat(item.amount) || 0) / (qty || 1)));
           if (isInv && isSvc && cost <= 0 && rate > 0) unitSell = rate;
           unitEl.value = unitSell.toFixed(2);
         }
       }
       if (field === 'cost' && _docEdit.type === 'invoice') {
+        docEditRecalcTotals();
         docEditRenderItems();
         docEditAutoSave();
         return;
@@ -32885,7 +32949,7 @@ async function renderBoardsTab(T, proj) {
           var cp2 = parseMoney(item.clientPrice);
           if (cp2 > 0 && qty) amt = Math.round(cp2 * qty * 100) / 100;
         }
-        var lt = cost > 0 ? (cost * qty) + ship : amt + ship;
+        var lt = cost !== 0 ? (cost * qty) + ship : amt + ship;
         if (!_expBreakdown[et]) _expBreakdown[et] = 0;
         _expBreakdown[et] += lt;
       });
@@ -36515,7 +36579,12 @@ async function renderBoardsTab(T, proj) {
       if (!vendors.length) { await cchAlert('Nothing to create.', 'Generate POs'); return; }
       closeModal();
       try {
-        if (typeof _loadShipToContacts === 'function') await _loadShipToContacts();
+        if (typeof _loadShipToContacts === 'function') {
+          if (!_shipToWorkrooms || !_shipToReceivers || (!_shipToWorkrooms.length && !_shipToReceivers.length)) {
+            _invalidateShipToContactsCache();
+          }
+          await _loadShipToContacts(true);
+        }
         if (!window._docEditProjData || window._docEditProjData.id !== st.projectId) {
           try {
             var _poGenBoard = await db.collection('boards').doc(st.projectId).get();
@@ -37933,7 +38002,10 @@ async function renderBoardsTab(T, proj) {
         }
       }
       if (type === 'po') {
-        await _loadShipToContacts();
+        if (!_shipToWorkrooms || !_shipToReceivers || (!_shipToWorkrooms.length && !_shipToReceivers.length)) {
+          _invalidateShipToContactsCache();
+        }
+        await _loadShipToContacts(true);
         items.forEach(function(it) {
           var q = parseFloat(it.qty) || 1;
           var c = parseFloat(it.cost) || 0;
@@ -38083,7 +38155,7 @@ async function renderBoardsTab(T, proj) {
             </div>
             <div>
               <div style="font-size:12px;text-transform:uppercase;letter-spacing:2px;color:#0F1A2E;font-weight:700;margin-bottom:10px;">Ship to</div>
-              <p style="font-size:11px;color:var(--gray-500);margin:0 0 10px;line-height:1.45;">Delivery destination for this PO. Options include CCH, client, receivers, and workrooms from <strong>Team & Contacts</strong>.</p>
+              <p style="font-size:11px;color:var(--gray-500);margin:0 0 10px;line-height:1.45;">Delivery destination for this PO. Workrooms and receivers come from <strong>Vendors → Workrooms</strong> and <strong>Delivery / Receivers</strong> (plus Team &amp; Contacts). Use per-line <strong>Ship to</strong> when lines go to different places.</p>
               <select class="form-input" id="docEditPOShipTo" onchange="docEditPOVendorShipChange()" style="font-size:14px;padding:10px 12px;">${_piShipToOptions(docData.shipTo || docData.deliverTo || '')}</select>
               <label style="font-size:11px;color:#0F1A2E;font-weight:600;display:block;margin-top:12px;margin-bottom:4px;">Vendor-facing ship-to address</label>
               <textarea class="form-textarea" id="docEditPOShipToAddress" rows="3" placeholder="Full delivery address as it should appear on the PO to the vendor" onchange="docEditPOVendorShipChange()" style="font-size:13px;line-height:1.5;">${esc((function() {
@@ -60151,7 +60223,7 @@ async function renderBoardsTab(T, proj) {
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('project','pos')">Project${sortArrow('project','pos')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('date','pos')">Date${sortArrow('date','pos')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('status','pos')">Status${sortArrow('status','pos')}</th>
-                  <th style="${thStyle}">Bill status</th>
+                  <th style="${thStyle}text-align:center;">Bills</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('workroom','pos')">Workroom${sortArrow('workroom','pos')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('receiver','pos')">Receiver${sortArrow('receiver','pos')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('eta','pos')">ETA${sortArrow('eta','pos')}</th>
@@ -60179,7 +60251,7 @@ async function renderBoardsTab(T, proj) {
                     <td style="${tdStyle}color:var(--gray-500);">${esc(po.projectName)}</td>
                     <td style="${tdStyle}color:var(--gray-400);font-size:12px;">${formatDate(po.issueDate || po.orderDate || po.poDate || po.date || po.createdAt)}</td>
                     <td style="${tdStyle}" onclick="event.stopPropagation()">${typeof cchPoFulfillmentStatusBadgeHtml==='function'?cchPoFulfillmentStatusBadgeHtml(po,{projectId:po.projectId,poId:po.id,clickable:true}):statusBadge(po.status)}</td>
-                    <td style="${tdStyle}font-size:11px;white-space:nowrap;" onclick="event.stopPropagation()">${typeof cchPoListBillWorkflowHtml==='function'?cchPoListBillWorkflowHtml(po):'—'}</td>
+                    <td style="${tdStyle}text-align:center;white-space:nowrap;" onclick="event.stopPropagation()">${typeof window.cchOmBillsCellHtml==='function'?window.cchOmBillsCellHtml(po):(typeof cchPoListBillWorkflowHtml==='function'?cchPoListBillWorkflowHtml(po):'—')}</td>
                     <td style="${tdStyle}font-size:12px;">${workroom ? '<span style="font-size:11px;padding:3px 8px;border-radius:0;background:#F3E5F5;color:#7B1FA2;font-weight:500;">'+esc(workroom)+'</span>' : '—'}</td>
                     <td style="${tdStyle}font-size:12px;">${receiver ? '<span style="font-size:11px;padding:3px 8px;border-radius:0;background:#E3F2FD;color:#1565C0;font-weight:500;">'+esc(receiver)+'</span>' : '—'}</td>
                     <td style="${tdStyle}color:var(--gray-500);font-size:12px;">${esc(po.eta||'—')}</td>
