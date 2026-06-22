@@ -396,24 +396,28 @@
     });
   }
 
+  function omFilterSummary(totalCount, filteredCount) {
+    var dedupeNote = (window._omDedupeHidden > 0)
+      ? ' · ' + window._omDedupeHidden + ' duplicate PO doc' + (window._omDedupeHidden !== 1 ? 's' : '') +
+        ' hidden (same # per project)'
+      : '';
+    return '<p id="cchOmFilterSummary" style="color:var(--gray-400);margin:0 0 8px;font-size:12px;">' +
+      (filteredCount === totalCount
+        ? esc(String(totalCount) + ' open Studio PO' + (totalCount !== 1 ? 's' : ''))
+        : 'Showing ' + filteredCount + ' of ' + totalCount + ' open Studio POs') +
+      dedupeNote + ' · Houzz legacy imports excluded</p>';
+  }
+
   function filterToolbar(projList, vendors, statuses, totalCount, filteredCount) {
     var fp = window._omFilterProject || '';
     var fv = window._omFilterVendor || '';
     var fs = window._omFilterStatus || '';
     var fa = window._omFilterAging || '';
     var kw = window._omFilterKeyword || '';
-    var dedupeNote = (window._omDedupeHidden > 0)
-      ? ' · ' + window._omDedupeHidden + ' duplicate PO doc' + (window._omDedupeHidden !== 1 ? 's' : '') +
-        ' hidden (same # per project)'
-      : '';
-    return '<p style="color:var(--gray-400);margin:0 0 8px;font-size:12px;">' +
-      (filteredCount === totalCount
-        ? esc(String(totalCount) + ' open Studio PO' + (totalCount !== 1 ? 's' : ''))
-        : 'Showing ' + filteredCount + ' of ' + totalCount + ' open Studio POs') +
-      dedupeNote + ' · Houzz legacy imports excluded</p>' +
-      '<div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">' +
-      '<input type="search" placeholder="Search PO #, vendor, project, ship to…" class="form-input" ' +
-      'value="' + escAttr(kw) + '" oninput="window._omFilterKeyword=this.value;window.cchOmDebounceRender()" ' +
+    return omFilterSummary(totalCount, filteredCount) +
+      '<div id="cchOmFilterBar" style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">' +
+      '<input type="text" id="cchOmSearchInput" autocomplete="off" placeholder="Search PO #, vendor, project, ship to…" class="form-input" ' +
+      'value="' + escAttr(kw) + '" onkeydown="event.stopPropagation();" oninput="window._omFilterKeyword=this.value;window.cchOmDebounceRender()" ' +
       'style="flex:1;min-width:220px;">' +
       '<select class="form-input" style="width:180px;" onchange="window._omFilterProject=this.value;window.renderOrderManagementPage()">' +
       '<option value="">All projects</option>' +
@@ -439,6 +443,7 @@
         return '<option value="' + b + '"' + (fa === b ? ' selected' : '') + '>' + esc(agingLabel(b)) + '</option>';
       }).join('') +
       '</select>' +
+      '<button type="button" class="btn btn-secondary btn-sm" onclick="window.cchOmExportFilteredCsv()" title="Download CSV of rows matching current filters">Export CSV</button>' +
       '</div>';
   }
 
@@ -507,7 +512,7 @@
         poTotal(po).toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
         '</tr>';
     }).join('');
-    return '<div class="card" style="overflow:hidden;overflow-x:auto;">' +
+    return '<div id="cchOmTableWrap" class="card" style="overflow:hidden;overflow-x:auto;">' +
       '<table style="width:100%;min-width:1240px;border-collapse:collapse;font-size:13px;">' +
       '<thead><tr style="border-bottom:2px solid var(--gray-200);">' +
       thSort('PO #', 'number') +
@@ -1356,8 +1361,53 @@
   window.cchOmDebounceRender = function() {
     if (window._omDebounceTimer) clearTimeout(window._omDebounceTimer);
     window._omDebounceTimer = setTimeout(function() {
+      window._omFilterOnlyRefresh = true;
       window.renderOrderManagementPage();
     }, 280);
+  };
+
+  window.cchOmExportFilteredCsv = function() {
+    var rows = window._omLastFilteredOpen || [];
+    if (!rows.length) {
+      if (typeof showToast === 'function') showToast('No rows match current filters.', 'warning');
+      return;
+    }
+    var header = ['PO #', 'Vendor', 'Project', 'Shipped To', 'Status', 'Confirm', 'Date', 'Age (days)', 'ETA', 'Lines w/o ETA', 'Total'];
+    var body = rows.map(function(po) {
+      var ship = typeof window.cchPoListShipToLabel === 'function' ? window.cchPoListShipToLabel(po) : cchOmPoShipToDisplay(po);
+      var age = poAgeDays(po);
+      var missEta = window.cchOmMissingEtaLineCount(po);
+      return [
+        po.number || po.id,
+        po._displayVendor || po.vendor || '',
+        po.projectName || po.projectId || '',
+        ship === '—' ? '' : ship,
+        po.status || '',
+        po.vendorConfirmDate || po.confirmDate || '',
+        fmtDate(poIssueDate(po)),
+        age != null ? String(age) : '',
+        poEtaDisplay(po),
+        missEta > 0 ? String(missEta) : '',
+        poTotal(po).toFixed(2)
+      ];
+    });
+    if (typeof cchDownloadCsv === 'function') {
+      cchDownloadCsv('order-management-open-pos-' + new Date().toISOString().slice(0, 10) + '.csv', [header].concat(body));
+    } else {
+      var csv = [header].concat(body).map(function(r) {
+        return r.map(function(c) {
+          var s = String(c == null ? '' : c);
+          return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+        }).join(',');
+      }).join('\r\n');
+      var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'order-management-open-pos-' + new Date().toISOString().slice(0, 10) + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function() { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+    }
   };
 
   window.renderOrderManagementPage = async function() {
@@ -1496,12 +1546,7 @@
     var statuses = Object.keys(statusSet).sort();
 
     var filteredOpen = applyFilters(allOpen);
-    var recvVendors = [];
-    allOpen.forEach(function(po) {
-      var v = String(po._displayVendor || po.vendor || '').trim();
-      if (v && recvVendors.indexOf(v) < 0) recvVendors.push(v);
-    });
-    recvVendors.sort();
+    window._omLastFilteredOpen = filteredOpen.slice();
 
     var panel = '';
     if (tab === 'open') {
@@ -1511,6 +1556,12 @@
     } else if (tab === 'noconfirm') {
       panel = missingConfirmReport(noConfirm);
     } else if (tab === 'receiving') {
+      var recvVendors = [];
+      allOpen.forEach(function(po) {
+        var v = String(po._displayVendor || po.vendor || '').trim();
+        if (v && recvVendors.indexOf(v) < 0) recvVendors.push(v);
+      });
+      recvVendors.sort();
       var recvProjectIds = [];
       allOpen.forEach(function(po) {
         if (po.projectId && recvProjectIds.indexOf(po.projectId) < 0) recvProjectIds.push(po.projectId);
@@ -1554,6 +1605,20 @@
       : '<div id="cchOmKpis" style="display:none;"></div>';
 
     if (useCache) {
+      var focusSaved = typeof window.cchCaptureListSearchFocus === 'function'
+        ? window.cchCaptureListSearchFocus('cchOmSearchInput')
+        : null;
+      if (window._omFilterOnlyRefresh && tab === 'open') {
+        window._omFilterOnlyRefresh = false;
+        var sumEl = document.getElementById('cchOmFilterSummary');
+        if (sumEl) sumEl.outerHTML = omFilterSummary(allOpen.length, filteredOpen.length);
+        var tableWrap = document.getElementById('cchOmTableWrap');
+        if (tableWrap) tableWrap.outerHTML = openPosTable(filteredOpen);
+        if (typeof window.cchRestoreListSearchFocus === 'function') window.cchRestoreListSearchFocus(focusSaved);
+        if (tab !== 'variances') omDeferVarianceBadge();
+        return;
+      }
+      window._omFilterOnlyRefresh = false;
       var kpiEl = document.getElementById('cchOmKpis');
       var tabEl = document.getElementById('cchOmTabBar');
       var panelEl = document.getElementById('cchOmPanel');
@@ -1568,6 +1633,7 @@
       }
       if (tabEl) tabEl.outerHTML = tabBar(tab);
       if (panelEl) panelEl.innerHTML = panel;
+      if (typeof window.cchRestoreListSearchFocus === 'function') window.cchRestoreListSearchFocus(focusSaved);
       if (tab !== 'variances') omDeferVarianceBadge();
       return;
     }

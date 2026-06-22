@@ -4966,6 +4966,78 @@
     }
 
     // ==================== SORT/FILTER HELPERS ====================
+    /** Save active list-search input so full-page re-render does not drop focus (spacebar typing). */
+    window.cchCaptureListSearchFocus = function(inputId) {
+      var el = document.getElementById(inputId);
+      if (!el || document.activeElement !== el) return null;
+      return { id: inputId, start: el.selectionStart, end: el.selectionEnd, value: el.value };
+    };
+    window.cchRestoreListSearchFocus = function(saved) {
+      if (!saved || !saved.id) return;
+      requestAnimationFrame(function() {
+        var el = document.getElementById(saved.id);
+        if (!el) return;
+        if (saved.value != null && el.value !== saved.value) el.value = saved.value;
+        el.focus({ preventScroll: true });
+        try {
+          if (saved.start != null && saved.end != null) el.setSelectionRange(saved.start, saved.end);
+        } catch (_sel) {}
+      });
+    };
+
+    function cchDownloadCsv(filename, rows) {
+      rows = rows || [];
+      if (!rows.length) {
+        if (typeof showToast === 'function') showToast('Nothing to export.', 'warning');
+        return;
+      }
+      var csv = rows.map(function(r) {
+        return r.map(function(cell) {
+          var s = String(cell == null ? '' : cell);
+          if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+          return s;
+        }).join(',');
+      }).join('\r\n');
+      var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function() { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+    }
+    window.cchDownloadCsv = cchDownloadCsv;
+
+    window.exportAllPosCsv = function() {
+      var rows = window._allPosFilteredExport || [];
+      if (!rows.length) {
+        if (typeof showToast === 'function') showToast('No POs match current filters.', 'warning');
+        return;
+      }
+      var header = ['PO #', 'Vendor', 'Project', 'Date', 'Status', 'Shipped To', 'ETA', 'Total', 'Bill', 'Paid', 'Balance'];
+      var body = rows.map(function(po) {
+        var ship = typeof window.cchPoListShipToLabel === 'function' ? window.cchPoListShipToLabel(po) : (po.shipTo || po.receiver || po.workroom || '');
+        var bill = typeof window.cchPoListBillTotalForRow === 'function' ? window.cchPoListBillTotalForRow(po) : null;
+        var paid = typeof window.cchPoListPaidForRow === 'function' ? window.cchPoListPaidForRow(po) : 0;
+        var bal = typeof window.cchPoListBalanceForRow === 'function' ? window.cchPoListBalanceForRow(po) : 0;
+        var total = typeof window.cchPoListPoTotal === 'function' ? window.cchPoListPoTotal(po) : (parseFloat(po.total) || 0);
+        return [
+          po.number || po.num || po.id,
+          po._displayVendor || po.vendor || '',
+          po.projectName || po.projectId || '',
+          formatDate(po.issueDate || po.orderDate || po.poDate || po.date || po.createdAt),
+          po.status || '',
+          ship,
+          po.eta || '',
+          total.toFixed(2),
+          bill != null ? bill.toFixed(2) : '',
+          paid ? paid.toFixed(2) : '',
+          bal ? bal.toFixed(2) : ''
+        ];
+      });
+      cchDownloadCsv('purchase-orders-' + new Date().toISOString().slice(0, 10) + '.csv', [header].concat(body));
+    };
+
     function finListSearchRow(pageType, keywordVal) {
       const isInv = pageType === 'invoices';
       const pfx = isInv ? 'invoices' : 'pos';
@@ -4981,9 +5053,10 @@
         '<div class="fin-search-wrap">' +
         '<span style="font-size:16px;opacity:0.45;" aria-hidden="true">🔍</span>' +
         '<input type="text" id="finSearch-' + pageType + '" autocomplete="off" placeholder="' + ph + '" value="' + v + '" ' +
-        'oninput="' + pfx + 'Keyword=this.value;clearTimeout(' + pfx + 'Debounce);' + pfx + 'Debounce=setTimeout(function(){' + resetPage + 'render' + renderFn + '();},250)">' +
+        'onkeydown="event.stopPropagation();" oninput="' + pfx + 'Keyword=this.value;clearTimeout(' + pfx + 'Debounce);' + pfx + 'Debounce=setTimeout(function(){' + resetPage + 'render' + renderFn + '();},250)">' +
         '</div>' +
         (keywordVal ? '<button type="button" class="fin-search-clear" onclick="' + pfx + 'Keyword=\'\';document.getElementById(\'finSearch-' + pageType + '\').value=\'\';' + resetPage + 'render' + renderFn + '()">Clear</button>' : '') +
+        (pageType === 'pos' ? '<button type="button" class="btn btn-secondary btn-sm" onclick="exportAllPosCsv()" title="Download CSV of POs matching current filters">Export CSV</button>' : '') +
         '</div>';
     }
 
@@ -24774,7 +24847,7 @@ async function renderBoardsTab(T, proj) {
           <label for="projPoSearchInp">Search purchase orders</label>
           <div class="fin-search-wrap"><span style="font-size:16px;opacity:0.45;">🔍</span>
             <input type="text" id="projPoSearchInp" autocomplete="off" placeholder="PO #, vendor, tags, line items…" value="${esc(window._projPoListKw || '')}"
-              oninput="window._projPoListKw=this.value; clearTimeout(window._projPoSearchDebounce); window._projPoSearchDebounce=setTimeout(function(){ renderProjectDetail(); }, 200)">
+              onkeydown="event.stopPropagation();" oninput="window._projPoListKw=this.value; clearTimeout(window._projPoSearchDebounce); window._projPoSearchDebounce=setTimeout(function(){ renderProjectDetail(); }, 200)">
           </div>
           ${String(window._projPoListKw || '').trim() ? `<button type="button" class="fin-search-clear" onclick="window._projPoListKw='';var el=document.getElementById('projPoSearchInp');if(el)el.value='';renderProjectDetail();">Clear</button>` : ''}
         </div>
@@ -60133,6 +60206,7 @@ async function renderBoardsTab(T, proj) {
           inv._balance = invoiceListRowBalance(inv);
         });
         const filtered = applySortFilter(periodFiltered, 'invoices');
+        const _finInvFocus = typeof window.cchCaptureListSearchFocus === 'function' ? window.cchCaptureListSearchFocus('finSearch-invoices') : null;
         const totalBilled = _num2(filtered.reduce(function(s, i) { return s + invoiceListRowTotal(i); }, 0));
         const totalCollected = _num2(filtered.reduce(function(s, i) { return s + invoiceListRowCollected(i); }, 0));
         const totalOutstanding = _num2(totalBilled - totalCollected);
@@ -60244,6 +60318,7 @@ async function renderBoardsTab(T, proj) {
           </div>
           ${paginationBar(filtered.length, invoicesPage, 'invoices')}`}
         `;
+        if (typeof window.cchRestoreListSearchFocus === 'function') window.cchRestoreListSearchFocus(_finInvFocus);
       } catch(e) {
         T.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">Error: ' + esc(e.message) + '</div></div>';
       }
@@ -60304,6 +60379,8 @@ async function renderBoardsTab(T, proj) {
           });
         }
         const filtered = applySortFilter(periodFiltered, 'pos');
+        window._allPosFilteredExport = filtered.slice();
+        const _finSearchFocus = typeof window.cchCaptureListSearchFocus === 'function' ? window.cchCaptureListSearchFocus('finSearch-pos') : null;
         const openPOs = filtered.filter(p => {
           const st = (p.status || '').toLowerCase();
           const paySt = (p.paymentStatus || '').toLowerCase();
@@ -60440,6 +60517,7 @@ async function renderBoardsTab(T, proj) {
           </div>
           ${paginationBar(filtered.length, posPage, 'pos')}`}
         `;
+        if (typeof window.cchRestoreListSearchFocus === 'function') window.cchRestoreListSearchFocus(_finSearchFocus);
       } catch(e) {
         T.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">Error: ' + esc(e.message) + '</div></div>';
       }
