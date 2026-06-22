@@ -209,6 +209,42 @@
       sentLine + billLine + '</div>';
   };
 
+  /** Compact QB sync dot for list columns (green = in QB, red = needs push / out of sync). */
+  window.cchPoQbDotCellHtml = function(po) {
+    po = po || {};
+    var bill = po.bill || {};
+    var qbBillId = String(bill.qbBillId || '').trim();
+    var legQb = typeof window.getQbId === 'function' ? String(window.getQbId(po) || '').trim() : '';
+    var blRef = typeof window.cchPoQbBillDocNumberFromPo === 'function' ? window.cchPoQbBillDocNumberFromPo(po) : '';
+    function dot(color, tip, label) {
+      return '<span style="display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%;" title="' + escAttr(tip) + '">' +
+        '<span style="width:10px;height:10px;border-radius:50%;background:' + color + ';display:inline-block;flex-shrink:0;box-shadow:0 0 0 1px rgba(15,26,46,0.08);"></span>' +
+        (label ? '<span style="font-size:10px;color:#5C6B80;font-weight:600;white-space:nowrap;">' + esc(label) + '</span>' : '') +
+        '</span>';
+    }
+    if (qbBillId) {
+      var linkedTip = bill.qbLinkedExisting ? ' · linked existing QB bill' : '';
+      return dot('#5FA56B', 'Synced to QuickBooks · ' + (blRef || qbBillId) + linkedTip, 'QB');
+    }
+    if (legQb && !window.cchPoQbBillOnlyMode()) {
+      return dot('#5FA56B', 'PO in QuickBooks (legacy) · ' + legQb, 'QB');
+    }
+    if (bill.received || qbBillId) {
+      if (cchPoBillNeedsQbSync(bill)) {
+        return dot('#DC2626', 'Bill updated in Studio — re-push to QuickBooks' + (blRef ? ' · ' + blRef : ''), 'Sync');
+      }
+      if (window.cchPoQbBillPushAllowed && !window.cchPoQbBillPushAllowed()) {
+        return dot('#CA8A04', 'Bill received — QB push on production only' + (blRef ? ' · ' + blRef : ''), '—');
+      }
+      return dot('#DC2626', 'Bill ready — push to QuickBooks' + (blRef ? ' · ' + blRef : ''), 'Push');
+    }
+    var sentInfo = window.cchPoWasSentToVendor ? window.cchPoWasSentToVendor(po) : { sent: false };
+    if (sentInfo.sent) {
+      return dot('#D1D5DB', 'PO sent — awaiting vendor bill before QB', '—');
+    }
+    return '<span style="color:var(--gray-400);font-size:12px;" title="No vendor bill yet">—</span>';
+  };
+
   var PO_LIFECYCLE_STEPS = ['draft', 'sent', 'bill_received', 'paid', 'cleared'];
   var VARIANCE_REASONS = [
     { id: 'shipping', label: 'Shipping', defaultRes: 'billable_to_client' },

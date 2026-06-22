@@ -492,7 +492,8 @@
         escAttr(shipToTxt) + '">' + esc(shipToTxt) + '</td>' +
         '<td style="' + td + '" onclick="event.stopPropagation()">' + statusHtml + '</td>' +
         '<td style="' + td + '" onclick="event.stopPropagation()">' + omConfirmCellHtml(po) + '</td>' +
-        '<td style="' + td + '" onclick="event.stopPropagation()">' + omBillsCellHtml(po) + '</td>' +
+        '<td style="' + td + 'text-align:center;" onclick="event.stopPropagation()">' + omBillsCellHtml(po) + '</td>' +
+        '<td style="' + td + 'text-align:center;" onclick="event.stopPropagation()">' + omQbDotCellHtml(po) + '</td>' +
         '<td style="' + td + 'font-size:12px;color:var(--gray-500);white-space:nowrap;">' + esc(fmtDate(poIssueDate(po))) + '</td>' +
         '<td style="' + td + 'font-size:12px;color:' + ageColor + ';font-weight:600;">' + esc(ageTxt) + '</td>' +
         '<td style="' + td + '" onclick="event.stopPropagation()">' + omEtaCellHtml(po) + '</td>' +
@@ -503,7 +504,7 @@
         '</tr>';
     }).join('');
     return '<div class="card" style="overflow:hidden;overflow-x:auto;">' +
-      '<table style="width:100%;min-width:1180px;border-collapse:collapse;font-size:13px;">' +
+      '<table style="width:100%;min-width:1240px;border-collapse:collapse;font-size:13px;">' +
       '<thead><tr style="border-bottom:2px solid var(--gray-200);">' +
       thSort('PO #', 'number') +
       thSort('Vendor', 'vendor') +
@@ -512,6 +513,7 @@
       thSort('Status', 'status') +
       thSort('Confirm', 'confirm') +
       thSort('Bills', 'bills', 'text-align:center;') +
+      '<th style="padding:10px 12px;text-align:center;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;white-space:nowrap;" title="QuickBooks — green synced, red needs push">QB</th>' +
       thSort('Date', 'date') +
       thSort('Age', 'age') +
       thSort('ETA', 'eta') +
@@ -852,6 +854,14 @@
       '<div class="action-dropdown" style="display:none;min-width:200px;max-width:280px;text-align:left;">' +
       menuItems + '</div></div>';
   }
+  window.cchOmBillsCellHtml = omBillsCellHtml;
+
+  function omQbDotCellHtml(po) {
+    if (typeof window.cchPoQbDotCellHtml === 'function') {
+      return window.cchPoQbDotCellHtml(po);
+    }
+    return '<span style="color:var(--gray-400);font-size:12px;">—</span>';
+  }
 
   function poNumbersMatch(a, b) {
     a = String(a || '').trim().replace(/\s+/g, '');
@@ -1094,7 +1104,8 @@
         '<td style="' + td + 'color:var(--gray-500);">' + esc(po.projectName || po.projectId) + '</td>' +
         '<td style="' + td + '" onclick="event.stopPropagation()">' + statusHtml + '</td>' +
         '<td style="' + td + '" onclick="event.stopPropagation()">' + omConfirmCellHtml(po) + '</td>' +
-        '<td style="' + td + '" onclick="event.stopPropagation()">' + omBillsCellHtml(po) + '</td>' +
+        '<td style="' + td + 'text-align:center;" onclick="event.stopPropagation()">' + omBillsCellHtml(po) + '</td>' +
+        '<td style="' + td + 'text-align:center;" onclick="event.stopPropagation()">' + omQbDotCellHtml(po) + '</td>' +
         '<td style="' + td + 'font-size:12px;line-height:1.5;">' + clipSummary + '</td>' +
         '<td style="' + td + 'text-align:center;font-size:12px;">' + esc(String(r.poLines || '—')) + '</td>' +
         '<td style="' + td + 'text-align:center;font-size:12px;">' + unlinked + '</td>' +
@@ -1113,6 +1124,7 @@
       thSort('PO status', 'status') +
       thSort('Confirm', 'confirm') +
       thSort('Bills', 'bills', 'text-align:center;') +
+      '<th style="padding:10px 12px;text-align:center;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;white-space:nowrap;" title="QuickBooks — green synced, red needs push">QB</th>' +
       '<th style="padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Linked selections</th>' +
       thSort('PO lines', 'poLines', 'text-align:center;') +
       thSort('Unlinked', 'outstanding', 'text-align:center;') +
