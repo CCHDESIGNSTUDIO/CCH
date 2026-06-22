@@ -209,40 +209,43 @@
       sentLine + billLine + '</div>';
   };
 
-  /** Compact QB sync dot for list columns (green = in QB, red = needs push / out of sync). */
+  /**
+   * Compact QB status dot for list columns. Three states only:
+   *   GREEN   = pushed through to QuickBooks (bill present in QB)
+   *   RED     = last push to QuickBooks failed
+   *   NOTHING = nothing pushed yet (never attempted, awaiting bill, or ready to push)
+   */
   window.cchPoQbDotCellHtml = function(po) {
     po = po || {};
     var bill = po.bill || {};
     var qbBillId = String(bill.qbBillId || '').trim();
     var legQb = typeof window.getQbId === 'function' ? String(window.getQbId(po) || '').trim() : '';
     var blRef = typeof window.cchPoQbBillDocNumberFromPo === 'function' ? window.cchPoQbBillDocNumberFromPo(po) : '';
+    var pushErr = String(bill.qbPushError || '').trim();
     function dot(color, tip, label) {
       return '<span style="display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%;" title="' + escAttr(tip) + '">' +
         '<span style="width:10px;height:10px;border-radius:50%;background:' + color + ';display:inline-block;flex-shrink:0;box-shadow:0 0 0 1px rgba(15,26,46,0.08);"></span>' +
         (label ? '<span style="font-size:10px;color:#5C6B80;font-weight:600;white-space:nowrap;">' + esc(label) + '</span>' : '') +
         '</span>';
     }
+    var none = '<span style="color:var(--gray-400);font-size:12px;" title="Not pushed to QuickBooks">—</span>';
+    // GREEN — successfully pushed / present in QuickBooks
     if (qbBillId) {
+      var stale = (typeof cchPoBillNeedsQbSync === 'function') && cchPoBillNeedsQbSync(bill);
       var linkedTip = bill.qbLinkedExisting ? ' · linked existing QB bill' : '';
-      return dot('#5FA56B', 'Synced to QuickBooks · ' + (blRef || qbBillId) + linkedTip, 'QB');
+      return dot('#5FA56B',
+        (stale ? 'In QuickBooks (edited in Studio — re-push to update) · ' : 'Pushed to QuickBooks · ') + (blRef || qbBillId) + linkedTip,
+        'QB');
     }
     if (legQb && !window.cchPoQbBillOnlyMode()) {
-      return dot('#5FA56B', 'PO in QuickBooks (legacy) · ' + legQb, 'QB');
+      return dot('#5FA56B', 'In QuickBooks (legacy) · ' + legQb, 'QB');
     }
-    if (bill.received || qbBillId) {
-      if (cchPoBillNeedsQbSync(bill)) {
-        return dot('#DC2626', 'Bill updated in Studio — re-push to QuickBooks' + (blRef ? ' · ' + blRef : ''), 'Sync');
-      }
-      if (window.cchPoQbBillPushAllowed && !window.cchPoQbBillPushAllowed()) {
-        return dot('#CA8A04', 'Bill received — QB push on production only' + (blRef ? ' · ' + blRef : ''), '—');
-      }
-      return dot('#DC2626', 'Bill ready — push to QuickBooks' + (blRef ? ' · ' + blRef : ''), 'Push');
+    // RED — a push was attempted and failed
+    if (pushErr) {
+      return dot('#DC2626', 'QuickBooks push failed: ' + pushErr + (blRef ? ' · ' + blRef : ''), 'Failed');
     }
-    var sentInfo = window.cchPoWasSentToVendor ? window.cchPoWasSentToVendor(po) : { sent: false };
-    if (sentInfo.sent) {
-      return dot('#D1D5DB', 'PO sent — awaiting vendor bill before QB', '—');
-    }
-    return '<span style="color:var(--gray-400);font-size:12px;" title="No vendor bill yet">—</span>';
+    // NOTHING — not pushed yet (never attempted, awaiting bill, ready to push, or staging-blocked)
+    return none;
   };
 
   var PO_LIFECYCLE_STEPS = ['draft', 'sent', 'bill_received', 'paid', 'cleared'];
@@ -4207,22 +4210,49 @@
       var rd = result && result.data;
       if (rd && rd.success) {
         var msg = rd.message || (rd.updated ? 'QuickBooks Bill updated' : 'Bill pushed to QuickBooks');
+        await cchPoStampQbPushOutcome(projectId, poId, null);
         if (!opts.skipConfirm && typeof window.showToast === 'function') window.showToast(msg, 'success');
         if (btn) { btn.innerHTML = '✅ Bill in QB'; }
         if (!opts.skipConfirm && typeof window.navigate === 'function') window.navigate(window.location.hash);
         return { ok: true, message: msg, qbBillId: rd.qbBillId };
       }
+      var failMsg = (rd && rd.message) || 'QuickBooks did not confirm the bill push.';
+      await cchPoStampQbPushOutcome(projectId, poId, failMsg);
       if (typeof window.cchAlert === 'function') {
-        await window.cchAlert((rd && rd.message) || 'QuickBooks did not confirm the bill push.', 'QuickBooks');
+        await window.cchAlert(failMsg, 'QuickBooks');
       }
       if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+      if (!opts.skipConfirm && typeof window.navigate === 'function') window.navigate(window.location.hash);
       return { ok: false };
     } catch (e) {
-      if (typeof window.cchAlert === 'function') await window.cchAlert((e && e.message) || String(e), 'Push bill to QuickBooks');
+      var errMsg = (e && e.message) || String(e);
+      await cchPoStampQbPushOutcome(projectId, poId, errMsg);
+      if (typeof window.cchAlert === 'function') await window.cchAlert(errMsg, 'Push bill to QuickBooks');
       if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+      if (!opts.skipConfirm && typeof window.navigate === 'function') window.navigate(window.location.hash);
       return { ok: false, error: e };
     }
   };
+
+  /** Record the outcome of a QB bill push on the PO so list dots can show green (ok) / red (failed). */
+  async function cchPoStampQbPushOutcome(projectId, poId, errorMsg) {
+    try {
+      var ref = firebase.firestore().collection('boards').doc(projectId).collection('purchaseOrders').doc(poId);
+      if (errorMsg) {
+        await ref.update({
+          'bill.qbPushError': String(errorMsg).slice(0, 300),
+          'bill.qbPushErrorAt': new Date().toISOString()
+        });
+      } else {
+        await ref.update({
+          'bill.qbPushError': firebase.firestore.FieldValue.delete(),
+          'bill.qbPushErrorAt': firebase.firestore.FieldValue.delete()
+        });
+      }
+    } catch (_eStamp) {
+      console.warn('[cchPoStampQbPushOutcome] could not record QB push outcome', _eStamp);
+    }
+  }
 
   window.cchPoSaveRecordedPayment = async function(projectId, poId) {
     var amt = parseFloat(document.getElementById('cchPoPayAmt').value) || 0;
