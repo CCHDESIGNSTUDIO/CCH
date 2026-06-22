@@ -937,6 +937,58 @@
     return poTotal;
   };
 
+  /** Short single-line ship-to label for PO lists (client, workroom, receiver, job site, etc.). */
+  window.cchPoListShipToLabel = function(po) {
+    po = po || {};
+    var raw = String(po.shipTo || po.deliverTo || '').trim();
+    if (!raw) {
+      var items = po.items || [];
+      var seen = {};
+      var fromLines = [];
+      items.forEach(function(it) {
+        var s = String((it && (it.shipTo || it.deliverTo)) || '').trim();
+        if (s && !seen[s]) {
+          seen[s] = true;
+          fromLines.push(s);
+        }
+      });
+      if (fromLines.length === 1) raw = fromLines[0];
+      else if (fromLines.length > 1) return fromLines.map(function(s) { return window.cchPoListShipToLabel({ shipTo: s }); }).join(' · ');
+    }
+    if (!raw) raw = String(po.workroom || po.receiver || po.location || '').trim();
+    if (!raw) {
+      var st = String(po.status || '').toLowerCase();
+      var loc = String(po.location || '').trim();
+      if ((st === 'at workroom' || st === 'at receiver') && loc) raw = loc;
+    }
+    if (!raw) return '';
+
+    function shortLabel(s) {
+      s = String(s || '').trim();
+      if (!s) return '';
+      var line = s.split('\n')[0].trim();
+      if (line.indexOf('·') >= 0 || line.indexOf('\u00b7') >= 0) line = line.split(/[·\u00b7]/)[0].trim();
+      return line;
+    }
+
+    var label = shortLabel(raw);
+    var low = label.toLowerCase().replace(/\s+/g, ' ').trim();
+    if (low === 'client' || low === 'client home' || low === 'billing' || /^client\s*\(?use billing/.test(low)) {
+      var cn = String(po.clientName || '').trim();
+      if (cn) return cn;
+      if (po.projectName && String(po.projectName).indexOf(' - ') >= 0) {
+        return String(po.projectName).split(' - ')[0].trim();
+      }
+      return 'Client';
+    }
+    if (low.indexOf('job site') >= 0 || low === 'jobsite' || low === 'client job site') return 'Job site';
+    if (low === 'cch' || low === 'cch office' || low === 'cch design studio' || low === 'cch design') return 'CCH Design Studio';
+    if (low === 'vh' || low === 'vh warehouse' || low === 'vessel home') return 'VH Warehouse';
+    if (/^workroom:/i.test(label)) return label.replace(/^workroom:\s*/i, '');
+    if (/^receiver:/i.test(label)) return label.replace(/^receiver:\s*/i, '');
+    return label;
+  };
+
   /** Bill, paid, balance, variance cells for All POs / project PO lists. */
   window.cchPoListAllPosFinancialCellsHtml = function(po, tdStyle) {
     tdStyle = tdStyle || 'padding:12px 14px;font-size:14px;';

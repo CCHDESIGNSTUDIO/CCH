@@ -4973,7 +4973,7 @@
       const resetPage = pfx + 'Page=1;';
       const ph = isInv
         ? 'Search invoice #, project, client, memo, tag, amount, status…'
-        : 'Search PO #, vendor, project, workroom, receiver, memo, status…';
+        : 'Search PO #, vendor, project, shipped to, memo, status…';
       const lab = isInv ? 'Search invoices' : 'Search purchase orders';
       const v = esc(keywordVal || '');
       return '<div class="fin-list-search-row" role="search">' +
@@ -5101,7 +5101,11 @@
           return d * ((window.cchPoListVarianceForRow(a) || 0) - (window.cchPoListVarianceForRow(b) || 0));
         }
         if (f === 'published') return d * ((a.published?1:0)-(b.published?1:0));
-        if (f === 'shipTo') return d * (a.shipTo||a.deliverTo||a.receiver||'').localeCompare(b.shipTo||b.deliverTo||b.receiver||'');
+        if (f === 'shipTo') {
+          var sa = typeof window.cchPoListShipToLabel === 'function' ? window.cchPoListShipToLabel(a) : (a.shipTo || a.deliverTo || a.receiver || a.workroom || '');
+          var sb = typeof window.cchPoListShipToLabel === 'function' ? window.cchPoListShipToLabel(b) : (b.shipTo || b.deliverTo || b.receiver || b.workroom || '');
+          return d * String(sa).localeCompare(String(sb), undefined, { sensitivity: 'base' });
+        }
         if (f === 'qb') return d * ((getQbDisplayId(a)?1:0)-(getQbDisplayId(b)?1:0));
         if (f === 'client') return d * (a.client||a.clientName||'').localeCompare(b.client||b.clientName||'');
         if (f === 'tag') {
@@ -5186,7 +5190,8 @@
           if (pageType === 'invoices' && Array.isArray(i.items)) {
             itemBlob = i.items.slice(0, 80).map(function(it) { return [it.title, it.description, it.vendor, it.memo].filter(Boolean).join(' '); }).join(' ');
           }
-          const searchable = [i.id, i.name, i.number, i.num, i.invoiceNum, i.vendor, i.projectName, i.projectId, i.clientName, i.shortDescription, i.documentTags, i.memo, i.workroom, i.receiver, i.eta, i.paymentStatus, i.qbDocId, i.qbStatus, tagLine, i.status, String(i.total), String(i.amount), abLine, itemBlob].filter(Boolean).join(' ').toLowerCase();
+          var shipToSearch = typeof window.cchPoListShipToLabel === 'function' ? window.cchPoListShipToLabel(i) : [i.shipTo, i.deliverTo, i.workroom, i.receiver].filter(Boolean).join(' ');
+          const searchable = [i.id, i.name, i.number, i.num, i.invoiceNum, i.vendor, i.projectName, i.projectId, i.clientName, i.shortDescription, i.documentTags, i.memo, shipToSearch, i.eta, i.paymentStatus, i.qbDocId, i.qbStatus, tagLine, i.status, String(i.total), String(i.amount), abLine, itemBlob].filter(Boolean).join(' ').toLowerCase();
           if (!tokens.length) return true;
           for (var ti = 0; ti < tokens.length; ti++) {
             if (searchable.indexOf(tokens[ti]) < 0) return false;
@@ -5242,8 +5247,11 @@
         }
         if (sortBy === 'qb') { const aq = a.qbDocId||''; const bq = b.qbDocId||''; return dir * (aq?1:0) - (bq?1:0); }
         if (sortBy === 'eta') return dir * (a.eta||'').localeCompare(b.eta||'');
-        if (sortBy === 'workroom') return dir * (a.workroom||'').localeCompare(b.workroom||'');
-        if (sortBy === 'receiver') return dir * (a.receiver||'').localeCompare(b.receiver||'');
+        if (sortBy === 'shipTo' || sortBy === 'workroom' || sortBy === 'receiver') {
+          var la = typeof window.cchPoListShipToLabel === 'function' ? window.cchPoListShipToLabel(a) : (a.shipTo || a.workroom || a.receiver || '');
+          var lb = typeof window.cchPoListShipToLabel === 'function' ? window.cchPoListShipToLabel(b) : (b.shipTo || b.workroom || b.receiver || '');
+          return dir * String(la).localeCompare(String(lb), undefined, { sensitivity: 'base' });
+        }
         if (sortBy === 'tag') {
           var tga = (typeof proposalDocumentTagText === 'function' ? proposalDocumentTagText(a) : '') || '';
           var tgb = (typeof proposalDocumentTagText === 'function' ? proposalDocumentTagText(b) : '') || '';
@@ -24802,7 +24810,7 @@ async function renderBoardsTab(T, proj) {
                 <th class="col-amount" style="cursor:pointer;" onclick="projTabSortBy('paidAmount')">Paid${projSortArrow('paidAmount')}</th>
                 <th class="col-amount" style="cursor:pointer;" onclick="projTabSortBy('balance')">Balance${projSortArrow('balance')}</th>
                 <th class="col-amount" style="cursor:pointer;" onclick="projTabSortBy('variance')">Variance${projSortArrow('variance')}</th>
-                <th style="cursor:pointer;" onclick="projTabSortBy('shipTo')">Ship To${projSortArrow('shipTo')}</th>
+                <th style="cursor:pointer;" onclick="projTabSortBy('shipTo')">Shipped To${projSortArrow('shipTo')}</th>
                 <th>QB</th>
                 <th>Linked Docs</th>
                 <th></th>
@@ -24816,6 +24824,7 @@ async function renderBoardsTab(T, proj) {
                   const poNum = esc(po.number || po.num || po.id.slice(0,8));
                   const poTagRaw = (typeof documentTagDisplayText === 'function' ? documentTagDisplayText(po) : (typeof proposalDocumentTagText === 'function' ? proposalDocumentTagText(po) : '')) || '';
                   const _poEligibleMerge = !getQbId(po) && String(po.id||'').indexOf('clip-po-') !== 0 && String(po.status||'').toLowerCase() !== 'merged';
+                  const _poShipToLabel = (typeof window.cchPoListShipToLabel === 'function' ? window.cchPoListShipToLabel(po) : (po.shipTo || po.deliverTo || po.receiver || po.workroom || '')) || '—';
                   return `
                   <tr style="cursor:pointer;" onclick="togglePOItems(this,'${po.id}')">
                     <td onclick="event.stopPropagation()" style="text-align:center;width:34px;">${_poEligibleMerge
@@ -24832,7 +24841,7 @@ async function renderBoardsTab(T, proj) {
                     <td class="col-date">${formatDate(po.issueDate || po.orderDate || po.poDate || po.date || po.createdAt)}</td>
                     <td class="col-amount">${formatMoney(typeof cchPoListPoTotal==='function'?cchPoListPoTotal(po):(po.total||0))}</td>
                     ${typeof cchPoListAllPosFinancialCellsHtml==='function'?cchPoListAllPosFinancialCellsHtml(po, 'padding:10px 14px;font-size:13px;'):'<td class="col-amount">—</td><td class="col-amount">—</td><td class="col-amount">—</td><td class="col-amount">—</td>'}
-                    <td class="col-date" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;" title="${escAttr(po.shipTo || po.deliverTo || po.receiver || '')}">${esc(po.shipTo || po.deliverTo || po.receiver || '—')}</td>
+                    <td class="col-date" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escAttr(_poShipToLabel)}">${esc(_poShipToLabel)}</td>
                     <td style="text-align:center;" onclick="event.stopPropagation()">${typeof cchPoQbDotCellHtml==='function'?cchPoQbDotCellHtml(po):(typeof cchPoQbListCellHtml==='function'?cchPoQbListCellHtml(po):qbCellBadge(getQbId(po), po.qbStatus, po))}</td>
                     <td class="col-links" onclick="event.stopPropagation()">
                       ${_poProposalId ? '<a onclick="navigate(\'#/project/'+proj.id+'/proposal/'+_poProposalId+'\')" style="color:var(--teal);cursor:pointer;margin-right:4px;" title="Linked Proposal">📋</a>' : ''}
@@ -60333,8 +60342,7 @@ async function renderBoardsTab(T, proj) {
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('date','pos')">Date${sortArrow('date','pos')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('status','pos')">Status${sortArrow('status','pos')}</th>
                   <th style="${thStyle}text-align:center;">Bills</th>
-                  <th style="${thStyle}cursor:pointer;" onclick="sortByField('workroom','pos')">Workroom${sortArrow('workroom','pos')}</th>
-                  <th style="${thStyle}cursor:pointer;" onclick="sortByField('receiver','pos')">Receiver${sortArrow('receiver','pos')}</th>
+                  <th style="${thStyle}cursor:pointer;" onclick="sortByField('shipTo','pos')">Shipped To${sortArrow('shipTo','pos')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('eta','pos')">ETA${sortArrow('eta','pos')}</th>
                   <th style="${thStyle}text-align:right;cursor:pointer;" onclick="sortByField('amount','pos')">Total${sortArrow('amount','pos')}</th>
                   <th style="${thStyle}text-align:right;cursor:pointer;" onclick="sortByField('billTotal','pos')">Bill${sortArrow('billTotal','pos')}</th>
@@ -60347,9 +60355,7 @@ async function renderBoardsTab(T, proj) {
               </thead>
               <tbody>
                 ${filtered.slice((posPage-1)*PAGE_SIZE, posPage*PAGE_SIZE).map(po => {
-                  const loc = po.location || po.shipTo || '';
-                  const workroom = po.workroom || (po.status === 'At Workroom' ? loc : '') || '';
-                  const receiver = po.receiver || (po.status === 'At Receiver' ? loc : '') || '';
+                  const shipToLabel = typeof window.cchPoListShipToLabel === 'function' ? window.cchPoListShipToLabel(po) : (po.shipTo || po.workroom || po.receiver || '');
                   return `
                   <tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="navigate('#/project/${po.projectId}/po/${po.id}')">
                     <td style="${tdStyle}font-weight:600;font-family:monospace;color:var(--gold);">
@@ -60361,8 +60367,7 @@ async function renderBoardsTab(T, proj) {
                     <td style="${tdStyle}color:var(--gray-400);font-size:12px;">${formatDate(po.issueDate || po.orderDate || po.poDate || po.date || po.createdAt)}</td>
                     <td style="${tdStyle}" onclick="event.stopPropagation()">${typeof cchPoFulfillmentStatusBadgeHtml==='function'?cchPoFulfillmentStatusBadgeHtml(po,{projectId:po.projectId,poId:po.id,clickable:true}):statusBadge(po.status)}</td>
                     <td style="${tdStyle}text-align:center;white-space:nowrap;" onclick="event.stopPropagation()">${typeof window.cchOmBillsCellHtml==='function'?window.cchOmBillsCellHtml(po):(typeof cchPoListBillWorkflowHtml==='function'?cchPoListBillWorkflowHtml(po):'—')}</td>
-                    <td style="${tdStyle}font-size:12px;">${workroom ? '<span style="font-size:11px;padding:3px 8px;border-radius:0;background:#F3E5F5;color:#7B1FA2;font-weight:500;">'+esc(workroom)+'</span>' : '—'}</td>
-                    <td style="${tdStyle}font-size:12px;">${receiver ? '<span style="font-size:11px;padding:3px 8px;border-radius:0;background:#E3F2FD;color:#1565C0;font-weight:500;">'+esc(receiver)+'</span>' : '—'}</td>
+                    <td style="${tdStyle}font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escAttr(shipToLabel)}">${shipToLabel ? esc(shipToLabel) : '—'}</td>
                     <td style="${tdStyle}color:var(--gray-500);font-size:12px;">${esc(po.eta||'—')}</td>
                     <td style="${tdStyle}text-align:right;font-weight:600;font-family:monospace;">$${((typeof cchPoListPoTotal==='function'?cchPoListPoTotal(po):(parseFloat(po.total)||0))).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
                     ${typeof cchPoListAllPosFinancialCellsHtml==='function'?cchPoListAllPosFinancialCellsHtml(po, tdStyle):'<td style="'+tdStyle+'">—</td><td style="'+tdStyle+'">—</td><td style="'+tdStyle+'">—</td><td style="'+tdStyle+'">—</td>'}

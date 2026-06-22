@@ -228,6 +228,10 @@
   }
 
   function cchOmPoShipToDisplay(po) {
+    if (typeof window.cchPoListShipToLabel === 'function') {
+      var lbl = window.cchPoListShipToLabel(po);
+      return lbl ? lbl : '—';
+    }
     var raw = cchOmPoShipToRaw(po);
     if (!raw) return '—';
     if (typeof window.resolvePOShipToDisplayText === 'function') {
@@ -509,7 +513,7 @@
       thSort('PO #', 'number') +
       thSort('Vendor', 'vendor') +
       thSort('Project', 'project') +
-      thSort('Ship to', 'shipTo') +
+      thSort('Shipped To', 'shipTo') +
       thSort('Status', 'status') +
       thSort('Confirm', 'confirm') +
       thSort('Bills', 'bills', 'text-align:center;') +
