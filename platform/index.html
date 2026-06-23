@@ -3853,6 +3853,7 @@
         'shipped':'badge-ordered', 'delivered':'badge-received',
         'sent to vendor':'badge-sent', 'sent':'badge-sent',
         'waiting for confirmation':'badge-waiting', 'waiting':'badge-waiting',
+        'confirmed':'badge-approved',
         'at receiver':'badge-atreceiver', 'at workroom':'badge-atworkroom',
         'cancelled':'badge-draft', 'on hold':'badge-atworkroom', 'closed':'badge-draft',
         'void':'badge-void'
@@ -4011,6 +4012,7 @@
       if (!Number.isNaN(clipFb) && clipFb > 0.001) return clipFb;
       return 0;
     }
+    window.poResolvedPaidAmount = poResolvedPaidAmount;
 
     /** One PO # per project tab / profit bar — prefer real Firestore PO over clip-po synthetic. */
     function dedupePurchaseOrdersForProjectList(pos) {
@@ -5244,7 +5246,14 @@
 
       let filtered = [...items];
       if (filterProject) filtered = filtered.filter(i => i.projectId === filterProject);
-      if (filterStatus) filtered = filtered.filter(i => (i.status||'Draft') === filterStatus);
+      if (filterStatus) {
+        filtered = filtered.filter(function(i) {
+          if (pageType === 'pos' && typeof window.cchPoProcurementStatusLabel === 'function') {
+            return window.cchPoProcurementStatusLabel(i) === filterStatus;
+          }
+          return (i.status || 'Draft') === filterStatus;
+        });
+      }
       if (filterVendor) filtered = filtered.filter(i => (i.vendor||'') === filterVendor);
         if (keyword) {
         const kw = keyword.toLowerCase().trim();
@@ -5292,7 +5301,12 @@
           return dir * ((parseFloat(a.total)||0) - (parseFloat(b.total)||0));
         }
         if (sortBy === 'project') return dir * (a.projectName||'').localeCompare(b.projectName||'');
-        if (sortBy === 'status') return dir * (a.status||'').localeCompare(b.status||'');
+        if (sortBy === 'status') {
+          if (pageType === 'pos' && typeof window.cchPoProcurementStatusLabel === 'function') {
+            return dir * window.cchPoProcurementStatusLabel(a).localeCompare(window.cchPoProcurementStatusLabel(b));
+          }
+          return dir * (a.status||'').localeCompare(b.status||'');
+        }
         if (sortBy === 'vendor') return dir * (a.vendor||'').localeCompare(b.vendor||'');
         if (sortBy === 'published') return dir * ((a.published?1:0) - (b.published?1:0));
         if (sortBy === 'datePaid') return cchCompareFinDocDates(a.datePaid || a.paidAt, b.datePaid || b.paidAt, dir);
@@ -24937,7 +24951,7 @@ async function renderBoardsTab(T, proj) {
                     </td>
                     <td class="col-doc-tags" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${poTagRaw ? escAttr(poTagRaw) : escAttr('No tag yet. Open Edit PO → Summary or Document Tags.')}">${poTagRaw ? esc(poTagRaw) : '<span class="doc-tag-empty" title="' + escAttr('No tag yet. Use ⋮ → Edit PO, then Summary or Document Tags.') + '">—</span>'}</td>
                     <td class="po-vendor-col" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;" title="${escAttr(po.vendor && String(po.vendor).trim() !== String(po._displayVendor || '').trim() ? ('Stored vendor: ' + po.vendor) : '')}">${esc(po._displayVendor || '—')}</td>
-                    <td class="col-status" onclick="event.stopPropagation()">${typeof cchPoFulfillmentStatusBadgeHtml==='function'?cchPoFulfillmentStatusBadgeHtml(po,{projectId:proj.id,poId:po.id,clickable:true}):('<span class="badge badge-'+(po.status||'draft').toLowerCase()+'">'+esc(po.status||'Draft')+'</span>')}</td>
+                    <td class="col-status" onclick="event.stopPropagation()">${typeof cchPoProcurementStatusBadgeHtml==='function'?cchPoProcurementStatusBadgeHtml(po,{projectId:proj.id,poId:po.id,clickable:true}):(typeof cchPoFulfillmentStatusBadgeHtml==='function'?cchPoFulfillmentStatusBadgeHtml(po,{projectId:proj.id,poId:po.id,clickable:true}):('<span class="badge badge-'+(po.status||'draft').toLowerCase()+'">'+esc(po.status||'Draft')+'</span>'))}</td>
                     <td style="font-size:11px;white-space:nowrap;" onclick="event.stopPropagation()">${typeof cchPoListBillWorkflowHtml==='function'?cchPoListBillWorkflowHtml(po):'—'}</td>
                     <td class="col-date">${formatDate(po.issueDate || po.orderDate || po.poDate || po.date || po.createdAt)}</td>
                     <td class="col-amount">${formatMoney(typeof cchPoListPoTotal==='function'?cchPoListPoTotal(po):(po.total||0))}</td>
@@ -36051,6 +36065,9 @@ async function renderBoardsTab(T, proj) {
             memo: el.value,
             notes: el.value,
             updatedAt: new Date().toISOString()
+          }).then(function() {
+            if (typeof invalidateSearchCache === 'function') invalidateSearchCache();
+            _cacheTime = 0;
           }).catch(function(e) {
             if (typeof showToast === 'function') showToast('Could not save memo: ' + (e.message || e), 'error');
           });
@@ -60485,7 +60502,7 @@ async function renderBoardsTab(T, proj) {
         await loadFinancialData();
         const all = _cachedPOs;
         const projList = _cachedProjList;
-        const statuses = [...new Set(all.map(p => p.status || 'Draft'))].sort();
+        const statuses = [...new Set(all.map(p => (typeof window.cchPoProcurementStatusLabel === 'function' ? window.cchPoProcurementStatusLabel(p) : (p.status || 'Draft'))))].sort();
         const vendors = poVendorNamesForToolbar(all);
         let periodFiltered = _finPeriodFilter(all, 'pos', 'date');
         if (window._posListPreset === 'pending' || window._posListPreset === 'needs-action') {
@@ -60598,7 +60615,7 @@ async function renderBoardsTab(T, proj) {
                     <td style="${tdStyle}font-weight:500;" title="${escAttr(po.vendor && String(po.vendor).trim() !== String(po._displayVendor || '').trim() ? ('Stored vendor: ' + po.vendor) : '')}">${esc(po._displayVendor || po.vendor || '—')}</td>
                     <td style="${tdStyle}color:var(--gray-500);">${esc(po.projectName)}</td>
                     <td style="${tdStyle}color:var(--gray-400);font-size:12px;">${formatDate(po.issueDate || po.orderDate || po.poDate || po.date || po.createdAt)}</td>
-                    <td style="${tdStyle}" onclick="event.stopPropagation()">${typeof cchPoFulfillmentStatusBadgeHtml==='function'?cchPoFulfillmentStatusBadgeHtml(po,{projectId:po.projectId,poId:po.id,clickable:true}):statusBadge(po.status)}</td>
+                    <td style="${tdStyle}" onclick="event.stopPropagation()">${typeof cchPoProcurementStatusBadgeHtml==='function'?cchPoProcurementStatusBadgeHtml(po,{projectId:po.projectId,poId:po.id,clickable:true}):(typeof cchPoFulfillmentStatusBadgeHtml==='function'?cchPoFulfillmentStatusBadgeHtml(po,{projectId:po.projectId,poId:po.id,clickable:true}):statusBadge(po.status))}</td>
                     <td style="${tdStyle}text-align:center;" onclick="event.stopPropagation()">${typeof window.cchFinLinkedDocsCellHtml === 'function' ? window.cchFinLinkedDocsCellHtml(po.projectId, 'po', po.id, 'purchaseOrders', po) : '—'}</td>
                     <td style="${tdStyle}text-align:center;white-space:nowrap;" onclick="event.stopPropagation()">${typeof window.cchOmBillsCellHtml==='function'?window.cchOmBillsCellHtml(po):(typeof cchPoListBillWorkflowHtml==='function'?cchPoListBillWorkflowHtml(po):'—')}</td>
                     <td style="${tdStyle}font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escAttr(shipToLabel)}">${shipToLabel ? esc(shipToLabel) : '—'}</td>
@@ -72461,10 +72478,10 @@ ${pages}
   <script src="cch-design-board.js?v=20260608db29"></script>
   <script src="cch-client-board.js?v=1774994684878"></script>
   <script src="cch-line-icons.js?v=20260620a"></script>
-  <script src="cch-proposals-invoices-fix.js?v=20260602ldd2"></script>
+  <script src="cch-proposals-invoices-fix.js?v=20260623posmk2"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
-  <script src="cch-po-bill-variance.js?v=20260622venctc"></script>
-  <script src="cch-order-management.js?v=20260622om12"></script>
+  <script src="cch-po-bill-variance.js?v=20260623poc2"></script>
+  <script src="cch-order-management.js?v=20260623om18"></script>
   <script src="cch-ffe-procurement.js?v=20260602"></script>
 </body>
 </html>

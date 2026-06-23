@@ -543,13 +543,25 @@
     return String(doc.status || '').trim();
   };
 
+  function cchPoFulfillmentStatusCanonicalId(current) {
+    var cur = String(current || '').trim();
+    if (!cur) return '';
+    for (var i = 0; i < CCH_PO_FULFILLMENT_STATUSES.length; i++) {
+      if (CCH_PO_FULFILLMENT_STATUSES[i].id.toLowerCase() === cur.toLowerCase()) {
+        return CCH_PO_FULFILLMENT_STATUSES[i].id;
+      }
+    }
+    return cur;
+  }
+
   window.cchPoFulfillmentStatusOptionsHtml = function(current) {
     current = String(current || '').trim();
+    var canonical = cchPoFulfillmentStatusCanonicalId(current);
     var html = '<option value="">— Not set —</option>';
     html += CCH_PO_FULFILLMENT_STATUSES.map(function(st) {
-      return '<option value="' + escAttr(st.id) + '"' + (current === st.id ? ' selected' : '') + '>' + esc(st.label) + '</option>';
+      return '<option value="' + escAttr(st.id) + '"' + (canonical === st.id ? ' selected' : '') + '>' + esc(st.label) + '</option>';
     }).join('');
-    if (current && current !== 'Draft' && !cchPoFulfillmentStatusDef(current)) {
+    if (current && !cchPoFulfillmentStatusDef(canonical)) {
       html += '<option value="' + escAttr(current) + '" selected>' + esc(current) + '</option>';
     }
     return html;
@@ -2454,13 +2466,75 @@
     return html;
   }
 
-  /** PO procurement only — not per-line order tracking (that is per vendor invoice group). */
+  /** PO procurement lane (Step 1) — separate from bill status and shipping/receiving. */
   var CCH_PO_PROCUREMENT_STATUSES = [
-    { id: '', label: '— Not set —' },
+    { id: 'Draft', label: 'Draft' },
     { id: 'Sent to Vendor', label: 'Sent to vendor' },
     { id: 'Waiting for Confirmation', label: 'Waiting for confirmation' },
-    { id: 'Confirmed', label: 'Confirmed / ordered with vendor' }
+    { id: 'Confirmed', label: 'Confirmed' }
   ];
+
+  /** Canonical procurement lane: draft | waiting | confirmed */
+  window.cchPoProcurementLaneId = function(doc) {
+    doc = doc || {};
+    var proc = String(doc.procurementStatus || '').trim();
+    if (proc === 'Confirmed') return 'confirmed';
+    if (proc === 'Waiting for Confirmation' || proc === 'Sent to Vendor') return 'waiting';
+    if (doc.poSentAt || doc.poLocked || String(doc.poStatus || '').trim().toLowerCase() === 'sent') return 'waiting';
+    return 'draft';
+  };
+
+  window.cchPoProcurementStatusLabel = function(doc) {
+    doc = doc || {};
+    var lane = window.cchPoProcurementLaneId(doc);
+    if (lane === 'confirmed') return 'Confirmed';
+    if (lane === 'waiting') {
+      var proc = String(doc.procurementStatus || '').trim();
+      if (proc === 'Sent to Vendor') return 'Sent to vendor';
+      return 'Waiting for confirmation';
+    }
+    return 'Draft';
+  };
+
+  /** All POs / project PO list — PO / order lane badge (not shipping fulfillment). */
+  window.cchPoProcurementStatusBadgeHtml = function(doc, opts) {
+    opts = opts || {};
+    doc = doc || {};
+    var lane = window.cchPoProcurementLaneId(doc);
+    var label = window.cchPoProcurementStatusLabel(doc);
+    var inner = typeof window.statusBadge === 'function'
+      ? window.statusBadge(label)
+      : ('<span class="badge badge-draft">' + esc(label) + '</span>');
+    if (!opts.clickable || !opts.projectId || !opts.poId) return inner;
+    if (lane === 'waiting') {
+      return '<span role="button" tabindex="0" title="Mark as confirmed — order conf # + vendor PDF" style="cursor:pointer;display:inline-block;" ' +
+        'onclick="event.stopPropagation();cchPoOpenMarkConfirmedModal(\'' + escJs(opts.projectId) + '\',\'' + escJs(opts.poId) + '\')">' +
+        inner + '</span>';
+    }
+    if (lane === 'confirmed') {
+      return '<span role="button" tabindex="0" title="View PO — confirmed with vendor" style="cursor:pointer;display:inline-block;" ' +
+        'onclick="event.stopPropagation();navigate(\'#/project/' + escJs(opts.projectId) + '/po/' + escJs(opts.poId) + '\')">' +
+        inner + '</span>';
+    }
+    return inner;
+  };
+
+  function cchPoProcurementStatusOptionsHtml(current, opts) {
+    opts = opts || {};
+    current = String(current || '').trim();
+    var lane = opts.lane || '';
+    var html = '';
+    CCH_PO_PROCUREMENT_STATUSES.forEach(function(st) {
+      if (opts.excludeConfirmed && st.id === 'Confirmed') return;
+      if (opts.sentOnly && st.id === 'Draft') return;
+      if (opts.waitingOnly && st.id !== 'Waiting for Confirmation' && st.id !== 'Sent to Vendor') return;
+      html += '<option value="' + escAttr(st.id) + '"' + (current === st.id ? ' selected' : '') + '>' + esc(st.label) + '</option>';
+    });
+    if (current && !CCH_PO_PROCUREMENT_STATUSES.some(function(s) { return s.id === current; })) {
+      html += '<option value="' + escAttr(current) + '" selected>' + esc(current) + '</option>';
+    }
+    return html;
+  }
 
   /**
    * Per vendor-invoice order status (not delivery-only).
@@ -3339,46 +3413,319 @@
   window.cchPoProcurementStatus = function(doc) {
     doc = doc || {};
     if (doc.procurementStatus) return String(doc.procurementStatus).trim();
-    if (doc.poLocked || doc.poSentAt) return 'Sent to Vendor';
+    if (doc.poLocked || doc.poSentAt) return 'Waiting for Confirmation';
+    return 'Draft';
+  };
+
+  /** Vendor order confirmation / sales order # — PO header or confirmation vendor-invoice row. */
+  window.cchPoOrderConfNumber = function(doc, poItems) {
+    doc = doc || {};
+    var direct = String(doc.orderConfNumber || doc.orderConfirmation || doc.orderConfNo || '').trim();
+    if (direct) return direct;
+    var groups = typeof window.cchPoVendorInvoiceGroups === 'function'
+      ? window.cchPoVendorInvoiceGroups(doc, poItems || doc.items || [])
+      : (doc.vendorInvoiceGroups || []);
+    for (var i = 0; i < groups.length; i++) {
+      var g = groups[i] || {};
+      if (String(g.documentType || '').trim() === 'confirmation') {
+        var n = String(g.salesOrderNumber || g.orderConfNumber || g.vendorInvoiceNumber || '').trim();
+        if (n) return n;
+      }
+    }
+    for (var j = 0; j < groups.length; j++) {
+      var n2 = String(groups[j].salesOrderNumber || groups[j].orderConfNumber || '').trim();
+      if (n2) return n2;
+    }
     return '';
   };
 
-  window.cchPoProcurementStatusEditorHtml = function(projectId, poId, doc, opts) {
+  window.cchPoOrderConfEditorHtml = function(projectId, poId, doc, opts) {
     opts = opts || {};
     doc = doc || {};
-    var cur = window.cchPoProcurementStatus(doc);
-    var uid = opts.uid || ('cchPoProc_' + String(poId || '').replace(/[^\w]/g, '').slice(0, 12));
-    var html = '<option value="">— Not set —</option>';
-    CCH_PO_PROCUREMENT_STATUSES.forEach(function(st) {
-      if (!st.id) return;
-      html += '<option value="' + escAttr(st.id) + '"' + (cur === st.id ? ' selected' : '') + '>' + esc(st.label) + '</option>';
-    });
-    if (cur && !CCH_PO_PROCUREMENT_STATUSES.some(function(s) { return s.id === cur; })) {
-      html += '<option value="' + escAttr(cur) + '" selected>' + esc(cur) + '</option>';
-    }
-    return '<div class="cch-po-procure-status" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">' +
-      '<label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#5C6B80;white-space:nowrap;">' + esc(opts.label || 'PO status') + '</label>' +
-      '<select id="' + uid + '_sel" class="form-input" style="max-width:260px;font-size:12px;padding:6px 10px;color:#1B3352;background:#fff;">' +
-        html +
-      '</select>' +
+    var val = window.cchPoOrderConfNumber(doc);
+    var uid = opts.uid || ('cchPoOrdConf_' + String(poId || '').replace(/[^\w]/g, '').slice(0, 12));
+    return '<div class="cch-po-order-conf" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px;">' +
+      '<label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#5C6B80;white-space:nowrap;">' +
+      esc(opts.label || 'Order conf #') + '</label>' +
+      '<input type="text" id="' + uid + '_inp" class="form-input" style="max-width:220px;font-size:12px;padding:6px 10px;" ' +
+      'value="' + escAttr(val) + '" placeholder="SO415912 · sales order #">' +
       (opts.showSaveButton !== false
-        ? '<button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;" onclick="cchPoSaveProcurementStatus(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\',\'' + uid + '\')">Update</button>'
+        ? '<button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;" onclick="cchPoSaveOrderConfNumber(\'' +
+          escJs(projectId) + '\',\'' + escJs(poId) + '\',\'' + uid + '\')">Save</button>'
         : '') +
       '</div>';
+  };
+
+  window.cchPoSaveOrderConfNumber = async function(projectId, poId, uidOrValue) {
+    var val = '';
+    if (typeof uidOrValue === 'string' && document.getElementById(uidOrValue + '_inp')) {
+      val = String(document.getElementById(uidOrValue + '_inp').value || '').trim();
+    } else {
+      val = String(uidOrValue || '').trim();
+    }
+    var ref = firebase.firestore().collection('boards').doc(projectId).collection('purchaseOrders').doc(poId);
+    var snap = await ref.get();
+    if (!snap.exists) return;
+    var doc = snap.data() || {};
+    var items = doc.items || [];
+    var groups = typeof window.cchPoVendorInvoiceGroupsUser === 'function'
+      ? window.cchPoVendorInvoiceGroupsUser(doc).map(function(g) { return Object.assign({}, g); })
+      : (Array.isArray(doc.vendorInvoiceGroups) ? doc.vendorInvoiceGroups.map(function(g) { return Object.assign({}, g); }) : []);
+    var lineIds = [];
+    for (var i = 0; i < items.length; i++) {
+      if (typeof window.isProposalGroupHeaderItem === 'function' && window.isProposalGroupHeaderItem(items[i])) continue;
+      if (typeof window.cchPoLineIsBillOnlyExpense === 'function' && window.cchPoLineIsBillOnlyExpense(items[i])) continue;
+      var lid = typeof window.cchPoResolveLineId === 'function' ? window.cchPoResolveLineId(items[i], i) : ('line_' + i);
+      if (lid) lineIds.push(lid);
+    }
+    if (val) {
+      var confIdx = -1;
+      for (var gi = 0; gi < groups.length; gi++) {
+        if (String(groups[gi].documentType || '').trim() === 'confirmation') { confIdx = gi; break; }
+      }
+      var confGroup = confIdx >= 0 ? groups[confIdx] : {
+        id: 'vig_conf_' + Date.now(),
+        vendorInvoiceDate: '',
+        poLineIds: lineIds.slice(),
+        status: 'Confirmed',
+        label: 'Order confirmation'
+      };
+      confGroup.documentType = 'confirmation';
+      confGroup.salesOrderNumber = val;
+      confGroup.orderConfNumber = val;
+      confGroup.vendorInvoiceNumber = String(confGroup.vendorInvoiceNumber || val).trim() || val;
+      if (!(confGroup.poLineIds || []).length) confGroup.poLineIds = lineIds.slice();
+      if (confIdx >= 0) groups[confIdx] = confGroup;
+      else groups.unshift(confGroup);
+    }
+    var patch = {
+      orderConfNumber: val || null,
+      orderConfirmation: val || null,
+      vendorInvoiceGroups: groups.length ? groups : null,
+      updatedAt: new Date().toISOString()
+    };
+    await cchPoUpdatePoDoc(ref, patch);
+    if (typeof window.showToast === 'function') window.showToast(val ? ('Order conf #: ' + val) : 'Order conf # cleared', 'success');
+    await window.cchPoAfterFulfillmentStatusSaved(projectId, poId);
+  };
+
+  window.cchPoProcurementStatusOptionsHtml = cchPoProcurementStatusOptionsHtml;
+
+  window.cchPoProcurementLanePanelHtml = function(projectId, poId, docData) {
+    docData = docData || {};
+    var lane = window.cchPoProcurementLaneId(docData);
+    var steps = [
+      { id: 'draft', label: 'Draft' },
+      { id: 'waiting', label: 'Waiting for confirmation' },
+      { id: 'confirmed', label: 'Confirmed' }
+    ];
+    var idx = lane === 'confirmed' ? 2 : (lane === 'waiting' ? 1 : 0);
+    var chips = steps.map(function(st, i) {
+      var done = i < idx;
+      var active = i === idx;
+      return '<span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:3px;' +
+        (done ? 'background:rgba(46,125,50,0.12);color:#1B5E20;border:1px solid rgba(46,125,50,0.2);' :
+          active ? 'background:#1B3352;color:#EDE8E0;border:1px solid #1B3352;' :
+          'background:#fff;color:#5C6B80;border:1px solid rgba(15,26,46,0.14);') + '">' +
+        (done ? '✓ ' : '') + esc(st.label) + '</span>' +
+        (i < steps.length - 1 ? '<span style="color:var(--gray-300);font-size:10px;">→</span>' : '');
+    }).join('');
+
+    var sentNote = '';
+    if (lane !== 'draft' && docData.poSentAt) {
+      var sentStr = typeof window.formatDate === 'function' ? window.formatDate(docData.poSentAt) : String(docData.poSentAt).slice(0, 10);
+      sentNote = '<span style="font-size:11px;color:#5C6B80;margin-left:8px;">Sent ' + esc(sentStr) + '</span>';
+    }
+
+    var actions = '';
+    if (lane === 'draft') {
+      actions = '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:12px;">' +
+        '<button type="button" class="btn btn-primary btn-sm" style="background:#1B3352;" onclick="cchPoSendToVendor(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\')">Send PO</button>' +
+        '<span style="font-size:11px;color:#5C6B80;line-height:1.45;max-width:520px;">Send the purchase order to the vendor. When they acknowledge, use <strong>Mark as confirmed</strong> with the order conf # and their confirmation PDF.</span>' +
+        '</div>';
+    } else if (lane === 'waiting') {
+      var cur = window.cchPoProcurementStatus(docData);
+      var uid = 'cchPoProcLane_' + String(poId || '').replace(/[^\w]/g, '').slice(0, 10);
+      actions = '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:12px;">' +
+        '<button type="button" class="btn btn-primary btn-sm" style="background:#0277BD;" onclick="cchPoOpenMarkConfirmedModal(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\')">Mark as confirmed</button>' +
+        '<select id="' + uid + '_sel" class="form-input" style="max-width:220px;font-size:12px;padding:6px 10px;" data-prev-status="' + escAttr(cur) + '" onfocus="this.setAttribute(\'data-prev-status\',this.value)" onchange="cchPoSaveProcurementStatus(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\',\'' + uid + '\')">' +
+          cchPoProcurementStatusOptionsHtml(cur, { waitingOnly: true, excludeConfirmed: true }) +
+        '</select>' +
+        '<span style="font-size:11px;color:#5C6B80;line-height:1.45;">Vendor ack not received yet — attach their sales order / confirmation when it arrives.</span>' +
+        '</div>';
+    } else {
+      var confNum = window.cchPoOrderConfNumber(docData);
+      var atts = Array.isArray(docData.confirmationAttachments) ? docData.confirmationAttachments : [];
+      var attHtml = atts.length
+        ? atts.map(function(a) {
+            return '<a href="' + escAttr(a.url || '#') + '" target="_blank" rel="noopener" style="font-size:12px;color:#00796B;font-weight:600;margin-right:10px;">📎 ' + esc(a.name || 'Confirmation') + '</a>';
+          }).join('')
+        : '<span style="font-size:11px;color:#B45309;font-weight:600;">No confirmation file attached</span>';
+      actions = '<div style="margin-top:12px;padding:10px 12px;background:rgba(2,119,189,0.06);border:1px solid rgba(2,119,189,0.18);border-radius:4px;">' +
+        '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;">' +
+          '<span style="font-size:12px;color:#1B3352;"><strong>Order conf #</strong> ' + (confNum ? esc(confNum) : '—') + '</span>' +
+          '<button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;" onclick="cchPoOpenMarkConfirmedModal(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\',true)">Edit confirmation</button>' +
+        '</div>' +
+        '<div style="margin-top:8px;">' + attHtml + '</div>' +
+        '</div>';
+    }
+
+    return '<div class="cch-po-procurement-lane" style="margin-bottom:12px;padding:12px 14px;background:var(--gray-50);border:1px solid rgba(15,26,46,0.08);border-radius:4px;">' +
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#5C6B80;margin-bottom:8px;">PO / Order status</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">' + chips + sentNote + '</div>' +
+      actions +
+      '</div>';
+  };
+
+  window.cchPoOpenMarkConfirmedModal = async function(projectId, poId, isEdit) {
+    var snap = await firebase.firestore().collection('boards').doc(projectId).collection('purchaseOrders').doc(poId).get();
+    var doc = snap.data() || {};
+    var existingNum = window.cchPoOrderConfNumber(doc);
+    var existingDate = '';
+    var groups = doc.vendorInvoiceGroups || [];
+    for (var i = 0; i < groups.length; i++) {
+      if (String(groups[i].documentType || '').trim() === 'confirmation' && groups[i].confirmedDate) {
+        existingDate = String(groups[i].confirmedDate).slice(0, 10);
+        break;
+      }
+    }
+    var title = isEdit ? 'Edit order confirmation' : 'Mark as confirmed';
+    var html = '<div id="cchMarkConfirmedModal" style="position:fixed;inset:0;background:rgba(15,26,46,0.45);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)this.remove()">' +
+      '<div style="background:#fff;max-width:480px;width:100%;padding:24px;border-radius:4px;box-shadow:0 16px 48px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">' +
+      '<h3 style="margin:0 0 8px;font-size:18px;">' + esc(title) + '</h3>' +
+      '<p style="font-size:12px;color:#5C6B80;margin:0 0 16px;line-height:1.5;">Vendor acknowledged the PO. Enter their <strong>order confirmation / sales order #</strong> and attach their confirmation PDF or screenshot.</p>' +
+      '<div style="margin-bottom:12px;"><label class="form-label">Order conf # <span style="color:#B45309;">*</span></label>' +
+        '<input type="text" id="cchMarkConfNum" class="form-input" value="' + escAttr(existingNum) + '" placeholder="SO415912"></div>' +
+      '<div style="margin-bottom:12px;"><label class="form-label">Confirmed date</label>' +
+        '<input type="date" id="cchMarkConfDate" class="form-input" value="' + escAttr(existingDate) + '"></div>' +
+      '<div style="margin-bottom:16px;"><label class="form-label">Attach confirmation (PDF or image)</label>' +
+        '<input type="file" id="cchMarkConfFile" class="form-input" accept=".pdf,image/*" style="font-size:12px;padding:6px;"></div>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById(\'cchMarkConfirmedModal\').remove()">Cancel</button>' +
+        '<button type="button" class="btn btn-primary btn-sm" style="background:#0277BD;" onclick="cchPoSubmitMarkConfirmed(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\')">Save &amp; mark confirmed</button>' +
+      '</div></div></div>';
+    document.body.insertAdjacentHTML('beforeend', html);
+  };
+
+  window.cchPoSubmitMarkConfirmed = async function(projectId, poId) {
+    var numEl = document.getElementById('cchMarkConfNum');
+    var dateEl = document.getElementById('cchMarkConfDate');
+    var fileEl = document.getElementById('cchMarkConfFile');
+    var confNum = String(numEl && numEl.value || '').trim();
+    if (!confNum) {
+      if (typeof window.cchAlert === 'function') await window.cchAlert('Order conf # is required.', 'Mark as confirmed');
+      return;
+    }
+    var confirmedDate = String(dateEl && dateEl.value || '').trim();
+    var file = fileEl && fileEl.files && fileEl.files[0];
+    if (file && file.size > 15 * 1024 * 1024) {
+      if (typeof window.cchAlert === 'function') await window.cchAlert('File must be under 15MB.', 'Attachment');
+      return;
+    }
+    try {
+      var ref = firebase.firestore().collection('boards').doc(projectId).collection('purchaseOrders').doc(poId);
+      var snap = await ref.get();
+      if (!snap.exists) return;
+      var doc = snap.data() || {};
+      var items = doc.items || [];
+      var confirmationAttachments = Array.isArray(doc.confirmationAttachments) ? doc.confirmationAttachments.slice() : [];
+      if (file) {
+        var path = 'attachments/' + projectId + '/purchaseOrders/' + poId + '/confirmation/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        var storageRef = firebase.storage().ref(path);
+        var up = await storageRef.put(file);
+        var url = await up.ref.getDownloadURL();
+        confirmationAttachments.push({
+          name: file.name,
+          url: url,
+          type: file.type || '',
+          size: file.size || 0,
+          uploadedAt: new Date().toISOString()
+        });
+      }
+      var groups = typeof window.cchPoVendorInvoiceGroupsUser === 'function'
+        ? window.cchPoVendorInvoiceGroupsUser(doc).map(function(g) { return Object.assign({}, g); })
+        : (Array.isArray(doc.vendorInvoiceGroups) ? doc.vendorInvoiceGroups.map(function(g) { return Object.assign({}, g); }) : []);
+      var lineIds = [];
+      for (var i = 0; i < items.length; i++) {
+        if (typeof window.isProposalGroupHeaderItem === 'function' && window.isProposalGroupHeaderItem(items[i])) continue;
+        if (typeof window.cchPoLineIsBillOnlyExpense === 'function' && window.cchPoLineIsBillOnlyExpense(items[i])) continue;
+        var lid = typeof window.cchPoResolveLineId === 'function' ? window.cchPoResolveLineId(items[i], i) : ('line_' + i);
+        if (lid) lineIds.push(lid);
+      }
+      var confIdx = -1;
+      for (var gi = 0; gi < groups.length; gi++) {
+        if (String(groups[gi].documentType || '').trim() === 'confirmation') { confIdx = gi; break; }
+      }
+      var lastAtt = confirmationAttachments.length ? confirmationAttachments[confirmationAttachments.length - 1] : null;
+      var confGroup = confIdx >= 0 ? groups[confIdx] : {
+        id: 'vig_conf_' + Date.now(),
+        vendorInvoiceDate: '',
+        poLineIds: lineIds.slice(),
+        status: 'Confirmed',
+        label: 'Order confirmation'
+      };
+      confGroup.documentType = 'confirmation';
+      confGroup.salesOrderNumber = confNum;
+      confGroup.orderConfNumber = confNum;
+      confGroup.vendorInvoiceNumber = confNum;
+      confGroup.confirmedDate = confirmedDate;
+      if (lastAtt) {
+        confGroup.attachmentName = lastAtt.name;
+        confGroup.attachmentUrl = lastAtt.url;
+      }
+      if (!(confGroup.poLineIds || []).length) confGroup.poLineIds = lineIds.slice();
+      if (confIdx >= 0) groups[confIdx] = confGroup;
+      else groups.unshift(confGroup);
+      var patch = {
+        procurementStatus: 'Confirmed',
+        procurementConfirmedAt: new Date().toISOString(),
+        orderConfNumber: confNum,
+        orderConfirmation: confNum,
+        confirmationAttachments: confirmationAttachments.length ? confirmationAttachments : null,
+        vendorInvoiceGroups: groups.length ? groups : null,
+        updatedAt: new Date().toISOString()
+      };
+      await cchPoUpdatePoDoc(ref, patch);
+      var modal = document.getElementById('cchMarkConfirmedModal');
+      if (modal) modal.remove();
+      if (typeof window.showToast === 'function') window.showToast('PO marked confirmed · ' + confNum, 'success');
+      if (typeof window.logDocActivity === 'function') {
+        await window.logDocActivity(projectId, 'purchaseOrders', poId, 'po_confirmed', 'Vendor confirmation recorded — ' + confNum);
+      }
+      if (typeof window.invalidateSearchCache === 'function') window.invalidateSearchCache();
+      if (typeof window._cacheTime !== 'undefined') window._cacheTime = 0;
+      await window.cchPoAfterFulfillmentStatusSaved(projectId, poId);
+      if (typeof window.navigate === 'function') window.navigate(window.location.hash);
+    } catch (e) {
+      if (typeof window.cchAlert === 'function') await window.cchAlert(e.message || e, 'Mark as confirmed');
+    }
   };
 
   window.cchPoSaveProcurementStatus = async function(projectId, poId, uid) {
     var sel = document.getElementById(uid + '_sel');
     if (!sel) return;
     var status = String(sel.value || '').trim();
+    var prev = sel.getAttribute('data-prev-status') || window.cchPoProcurementStatus({});
+    if (status === 'Confirmed') {
+      sel.value = prev;
+      return window.cchPoOpenMarkConfirmedModal(projectId, poId);
+    }
+    if (!status || status === 'Draft') {
+      sel.value = prev;
+      if (typeof window.cchAlert === 'function') await window.cchAlert('Use the PO editor while still in Draft. After send, status is Waiting for confirmation.', 'PO status');
+      return;
+    }
     try {
       await firebase.firestore().collection('boards').doc(projectId).collection('purchaseOrders').doc(poId).update({
-        procurementStatus: status || null,
+        procurementStatus: status,
         updatedAt: new Date().toISOString()
       });
-      if (typeof window.showToast === 'function') window.showToast(status ? ('PO status: ' + status) : 'PO status cleared', 'success');
+      sel.setAttribute('data-prev-status', status);
+      if (typeof window.showToast === 'function') window.showToast('PO status: ' + status, 'success');
       await window.cchPoAfterFulfillmentStatusSaved(projectId, poId);
+      if (typeof window.navigate === 'function') window.navigate(window.location.hash);
     } catch (e) {
+      sel.value = prev;
       if (typeof window.cchAlert === 'function') await window.cchAlert(e.message || e, 'PO status');
     }
   };
@@ -3536,7 +3883,7 @@
       '<p style="font-size:12px;color:#5C6B80;margin:0 0 14px;line-height:1.5;">Match vendor paperwork: <strong>Order confirmation / sales order</strong> when they acknowledge the PO (est. freight, optional start-ship date, back-order lines). <strong>Ship invoice</strong> when they ship and charge your CC — one row per partial shipment with actual freight and tracking.</p>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">' +
         '<div style="grid-column:1/-1;"><label class="form-label">Document type</label><select id="cchVigDocumentType" class="form-input">' + docTypeOpts + '</select></div>' +
-        '<div><label class="form-label">Sales order # <span style="font-weight:400;color:#9CA3AF;">(confirmation)</span></label><input type="text" id="cchVigSalesOrderNum" class="form-input" value="' + escAttr(existing ? existing.salesOrderNumber : '') + '" placeholder="SO415912"></div>' +
+        '<div><label class="form-label">Order conf # <span style="font-weight:400;color:#9CA3AF;">(sales order)</span></label><input type="text" id="cchVigSalesOrderNum" class="form-input" value="' + escAttr(existing ? existing.salesOrderNumber : '') + '" placeholder="SO415912"></div>' +
         '<div><label class="form-label">Vendor invoice / ref #</label><input type="text" id="cchVigInvNum" class="form-input" value="' + escAttr(existing ? existing.vendorInvoiceNumber : '') + '" placeholder="CS337523 or SO415912" oninput="cchPoUpdateVigBillPreview()"></div>' +
         '<div><label class="form-label">Document date</label><input type="date" id="cchVigInvDate" class="form-input" value="' + escAttr(existing ? existing.vendorInvoiceDate : '') + '" onchange="cchPoUpdateVigBillPreview()"></div>' +
         '<div><label class="form-label">Est. freight $ <span style="font-weight:400;color:#9CA3AF;">(on confirmation)</span></label><input type="number" step="0.01" min="0" id="cchVigEstFreight" class="form-input" value="' + escAttr(existing && existing.estimatedFreight !== '' && existing.estimatedFreight != null ? existing.estimatedFreight : '') + '" placeholder="127.20"></div>' +
@@ -3613,7 +3960,7 @@
       if (cb.value) poLineIds.push(cb.value);
     });
     if (!invNum && !salesOrderNumber) {
-      if (typeof window.cchAlert === 'function') await window.cchAlert('Enter a vendor invoice # or sales order #.', 'Vendor invoice');
+      if (typeof window.cchAlert === 'function') await window.cchAlert('Enter a vendor invoice # or order conf #.', 'Vendor invoice');
       return;
     }
     if (!invNum && salesOrderNumber) invNum = salesOrderNumber;
@@ -3668,6 +4015,10 @@
     groups = groups.filter(function(g) { return (g.poLineIds || []).length > 0 || g.id === payload.id; });
     groups = groups.filter(function(g) { return !cchPoVendorInvoiceGroupIsPlaceholder(g); });
     var patch = { vendorInvoiceGroups: groups.length ? groups : null, updatedAt: new Date().toISOString() };
+    if (documentType === 'confirmation' && salesOrderNumber) {
+      patch.orderConfNumber = salesOrderNumber;
+      patch.orderConfirmation = salesOrderNumber;
+    }
     if (doc.bill && doc.bill.received) {
       var chargeRows = cchPoReadVigChargeRowsFromDom();
       var merged = cchPoMergeVigChargesIntoBill(doc.bill, doc, oldInvNum, invNum, invDate, poLineIds, chargeRows);
@@ -3717,40 +4068,10 @@
   };
 
   window.cchPoBillVarianceMainBlocksHtml = function(projectId, poId, docData, poItems) {
-    var st = window.cchPoLifecycleStatus(docData);
     var bill = docData.bill;
     var variance = docData.variance;
-    var poAtSend = (bill && bill.poTotalAtSend != null) ? bill.poTotalAtSend : (docData.poTotalAtSend != null ? docData.poTotalAtSend : window.cchPoDocTotal(docData));
-
     var hasBill = bill && bill.received;
-    var steps = ['draft', 'sent', 'bill_received', 'paid', 'cleared'];
-    var stepIdx = { draft: 0, sent: 1, bill_received: 2, paid: 3, cleared: 4, closed: 4, voided: -1 };
-    var cur = stepIdx[st] != null ? stepIdx[st] : 1;
-
-    var pipe = '<div style="margin-bottom:12px;padding:10px 14px;background:var(--gray-50);border:1px solid rgba(15,26,46,0.08);border-radius:4px;">' +
-      '<div class="cch-po-pipeline" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:' + (hasBill ? '0' : '10px') + ';">';
-    steps.forEach(function(label, i) {
-      var names = ['Draft', 'Sent', 'Billed', 'Paid', 'Cleared'];
-      var done = i < cur;
-      var active = i === cur;
-      pipe += '<span style="font-size:11px;font-weight:600;padding:4px 9px;border-radius:3px;' +
-        (done ? 'background:rgba(46,125,50,0.12);color:#1B5E20;border:1px solid rgba(46,125,50,0.2);' : active ? 'background:#1B3352;color:#EDE8E0;border:1px solid #1B3352;' : 'background:#fff;color:#5C6B80;border:1px solid rgba(15,26,46,0.14);') + '">' +
-        (done ? '✓ ' : '') + names[i] + '</span>';
-      if (i < steps.length - 1) pipe += '<span style="color:var(--gray-300);font-size:10px;">→</span>';
-    });
-    pipe += '</div>';
-    if (!hasBill) {
-      pipe += '<div style="padding-top:10px;border-top:1px solid rgba(15,26,46,0.06);">' +
-        window.cchPoProcurementStatusEditorHtml(projectId, poId, docData, { label: 'PO status' }) +
-        (st === 'draft'
-          ? '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px;">' +
-              '<button type="button" class="btn btn-primary btn-sm" style="background:#1B3352;" onclick="cchPoSendToVendor(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\')">Send PO</button>' +
-              '<span style="font-size:11px;color:#5C6B80;line-height:1.4;">Send the purchase order to the vendor. Their invoice comes back separately — use <strong>Receive vendor bill</strong> below.</span>' +
-            '</div>'
-          : '') +
-        '</div>';
-    }
-    pipe += '</div>';
+    var poLane = window.cchPoProcurementLanePanelHtml(projectId, poId, docData);
 
     var vendorInvPanel = window.cchPoVendorInvoiceGroupsPanelHtml(projectId, poId, docData, poItems);
 
@@ -3778,8 +4099,8 @@
     }
 
     return hasBill
-      ? (pipe + billDoc + vendorInvPanel + billAttachments + varCard)
-      : (pipe + billDoc + varCard);
+      ? (poLane + billDoc + vendorInvPanel + billAttachments + varCard)
+      : (poLane + billDoc + varCard);
   };
 
   window.cchPoVarianceResolveFormHtml = function(projectId, poId, docData) {
@@ -3821,14 +4142,12 @@
       var patch = {
         poStatus: 'sent',
         poLocked: true,
-        procurementStatus: 'Sent to Vendor',
+        procurementStatus: 'Waiting for Confirmation',
         poSentAt: new Date().toISOString(),
         poSentBy: window.cchPoEmailPrefix(),
         poTotalAtSend: total,
         updatedAt: new Date().toISOString()
       };
-      var curSt = String(d.status || '').trim();
-      if (!curSt || curSt.toLowerCase() === 'draft') patch.status = 'Sent to Vendor';
       await cchPoUpdatePoDoc(ref, patch);
       var poLabel = poNum(d);
       if (typeof window.logDocActivity === 'function') {

@@ -202,10 +202,17 @@
     var memoVal = String(docData.memo || docData.notes || '');
     if (opts.editable) {
       var _pid = opts.projectId ? String(opts.projectId).replace(/'/g, "\\'") : '';
-      var _prid = opts.proposalId ? String(opts.proposalId).replace(/'/g, "\\'") : '';
-      var _blurFlush = (_pid && _prid)
-        ? ('onblur="if(typeof flushProposalDocMetaSave===\'function\')flushProposalDocMetaSave(\'' + _pid + '\',\'' + _prid + '\').catch(function(){});"')
-        : 'onblur="if(typeof flushProposalDocMetaSave===\'function\')flushProposalDocMetaSave().catch(function(){});"';
+      var _docId = opts.docId || opts.proposalId || opts.poId || '';
+      _docId = _docId ? String(_docId).replace(/'/g, "\\'") : '';
+      var _collection = opts.collection || (opts.proposalId ? 'proposals' : 'purchaseOrders');
+      var _blurFlush = '';
+      if (_pid && _docId) {
+        if (_collection === 'proposals' || opts.proposalId) {
+          _blurFlush = 'onblur="if(typeof flushProposalDocMetaSave===\'function\')flushProposalDocMetaSave(\'' + _pid + '\',\'' + _docId + '\').catch(function(){});"';
+        } else if (typeof window.flushDocMetaSave === 'function') {
+          _blurFlush = 'onblur="flushDocMetaSave(\'' + _pid + '\',\'' + _docId + '\',\'' + _collection + '\').catch(function(){});"';
+        }
+      }
       return '<div class="cch-doc-tags-memo-block" style="background:#FFFFFF;padding:18px 24px;margin-bottom:20px;border:1px solid rgba(196,164,100,0.08);">' +
         '<div style="margin-bottom:14px;">' +
           '<div style="font-size:12px;font-weight:700;margin-bottom:6px;color:var(--gold);letter-spacing:0.3px;">Summary (lists &amp; email subject)</div>' +
@@ -252,6 +259,35 @@
       row('Memo', memo) +
       (opts.hint ? '<p style="font-size:11px;color:#5C6B80;margin:0;line-height:1.45;">' + opts.hint + '</p>' : '') +
       '</div>';
+  };
+
+  /** Save Summary / Document Tags / Memo from docEdit* fields (PO view, etc.). */
+  window.flushDocMetaSave = async function(projectId, docId, collection) {
+    if (!projectId || !docId || !collection) return { saved: false, reason: 'missing-args' };
+    var summaryEl = document.getElementById('docEditShortDescription');
+    var tagsEl = document.getElementById('docEditTags');
+    var memoEl = document.getElementById('docEditMemo');
+    if (!summaryEl && !tagsEl && !memoEl) return { saved: false, reason: 'no-fields' };
+    var shortDescription = summaryEl ? String(summaryEl.value || '').trim() : '';
+    var documentTags = tagsEl ? String(tagsEl.value || '').trim() : '';
+    if (!shortDescription && documentTags) shortDescription = documentTags;
+    if (!documentTags && shortDescription) documentTags = shortDescription;
+    var memo = memoEl ? String(memoEl.value || '') : '';
+    var patch = {
+      shortDescription: shortDescription,
+      documentTags: documentTags,
+      tags: documentTags,
+      memo: memo,
+      notes: memo,
+      updatedAt: new Date().toISOString()
+    };
+    await db.collection('boards').doc(projectId).collection(collection).doc(docId).update(patch);
+    if (window._docEdit && window._docEdit.docId === docId && window._docEdit.projectId === projectId) {
+      Object.assign(window._docEdit.docData, patch);
+    }
+    if (typeof window.invalidateSearchCache === 'function') window.invalidateSearchCache();
+    if (typeof window._cacheTime !== 'undefined') window._cacheTime = 0;
+    return { saved: true };
   };
 
   // Flush proposal Summary/Tags/Memo when leaving edit route without Done editing
@@ -3207,9 +3243,17 @@
     var _connBtn = typeof window.cchConnectedDocsTitleBtn === 'function'
       ? window.cchConnectedDocsTitleBtn(projectId, type, docId, docNum) : '';
     var _tagsMemoBlock = typeof window.cchDocTagsMemoBlockHTML === 'function'
-      ? window.cchDocTagsMemoBlockHTML(docData, type === 'invoice'
-        ? { compact: true, hint: 'Edit in <strong>Edit line items</strong>.' }
-        : { hint: '' })
+      ? window.cchDocTagsMemoBlockHTML(docData, type === 'po'
+        ? {
+            editable: true,
+            projectId: projectId,
+            docId: docId,
+            collection: 'purchaseOrders',
+            hint: '<strong>Summary</strong> and <strong>Document Tags</strong> show on PO lists. <strong>Memo</strong> is internal only. Saves automatically as you type.'
+          }
+        : type === 'invoice'
+          ? { compact: true, hint: 'Edit in <strong>Edit line items</strong>.' }
+          : { hint: '' })
       : '';
 
     var invoiceDetailsHTML = '';
@@ -4083,7 +4127,7 @@
     if (type === 'invoice') {
       _premiumColgroup = '<colgroup><col class="pc-item"><col class="pc-qty"><col class="pc-money"><col class="pc-money"><col class="pc-tax"><col class="pc-money"></colgroup>';
     } else if (type === 'po') {
-      _premiumColgroup = '<colgroup><col class="pc-item"><col class="pc-vendor"><col class="pc-qty"><col class="pc-money"><col class="pc-money"><col class="pc-money"></colgroup>';
+      _premiumColgroup = '<colgroup><col class="pc-item"><col class="pc-sidemark"><col class="pc-qty"><col class="pc-money"><col class="pc-money"><col class="pc-money"></colgroup>';
     } else {
       _premiumColgroup = '<colgroup><col class="pc-item"><col class="pc-qty"><col class="pc-money"><col class="pc-money"><col class="pc-tax"><col class="pc-money"></colgroup>';
     }
@@ -4141,7 +4185,22 @@
       return html;
     }
 
-    function _premiumAppendLineRow(it) {
+    /** Vendor PO PDF sidemark — room + line tag (fixture / label). */
+    function _poVendorSidemarkText(it, groupLabel) {
+      it = it || {};
+      var room = String(it.room || it.category || '').trim();
+      if (!room && groupLabel && docGroupMode === 'room') {
+        room = String(groupLabel || '').trim();
+      }
+      var tag = (typeof window.cchLineTagText === 'function') ? String(window.cchLineTagText(it) || '').trim() : '';
+      if (!tag) tag = String(it.lineTag || it.lineTagCode || it.fixtureTag || '').trim();
+      var parts = [];
+      if (room) parts.push(room);
+      if (tag) parts.push(tag);
+      return parts.join(' · ');
+    }
+
+    function _premiumAppendLineRow(it, groupLabel) {
       var qty = parseFloat(it.qty) || 1;
       var amt = parseFloat(it.amount) || 0;
       var cost = parseFloat(it.cost) || 0;
@@ -4264,7 +4323,10 @@
           '</div>' +
         '</div>';
       itemsHtml += '<tr><td class="line-item-main">' + itemInner + '</td>' +
-        (type === 'po' ? '<td class="vendor-cell">' + esc((typeof window.cchPoLineDisplayVendor === 'function') ? window.cchPoLineDisplayVendor(it, docData) : (it.vendor || '')) + '</td>' : '') +
+        (type === 'po' ? '<td class="sidemark-cell">' + (function() {
+          var sm = _poVendorSidemarkText(it, groupLabel);
+          return sm ? esc(sm) : '<span style="color:#C4C4C4;">—</span>';
+        })() + '</td>' : '') +
         '<td style="text-align:center;">' + qty + '</td>' +
         '<td class="r">' + formatMoney(unitPrice) + '</td>' +
         '<td class="r ship">' + (ship > 0 ? formatMoney(ship) : '') + '</td>' +
@@ -4276,7 +4338,7 @@
     if (_hasProposalSectionGroups) {
       itemsHtml += '<div class="room-section"><div class="room-header"><span>Items</span><span></span></div>' +
         '<table class="cch-premium-items-table">' + _premiumColgroup + '<thead><tr><th>' + _thItemLabel + '</th>' +
-        (type === 'po' ? '<th>Vendor</th>' : '') +
+        (type === 'po' ? '<th>Sidemark</th>' : '') +
         '<th style="text-align:center;">Qty</th>' +
         '<th class="r">Price</th>' +
         '<th class="r">Shipping</th>' +
@@ -4296,7 +4358,7 @@
         var catTotal = catItems.reduce(function(s,i) { return s + (parseFloat(i.amount)||0); }, 0);
         itemsHtml += '<div class="room-section"><div class="room-header"><span>' + esc(cat) + '</span><span>' + (type === 'po' ? '' : formatMoney(catTotal)) + '</span></div>' +
           '<table class="cch-premium-items-table">' + _premiumColgroup + '<thead><tr><th>' + _thItemLabel + '</th>' +
-          (type === 'po' ? '<th>Vendor</th>' : '') +
+          (type === 'po' ? '<th>Sidemark</th>' : '') +
           '<th style="text-align:center;">Qty</th>' +
           '<th class="r">Price</th>' +
           '<th class="r">Shipping</th>' +
@@ -4304,7 +4366,7 @@
           '<th class="r">Total</th></tr></thead><tbody>';
 
         catItems.forEach(function(it) {
-          _premiumAppendLineRow(it);
+          _premiumAppendLineRow(it, cat);
         });
         itemsHtml += '</tbody></table></div>';
       });
@@ -4420,6 +4482,13 @@
       infoSectionHtml = '<div class="info-section info-section-po">' +
         (vendorBlockHtml ? '<div class="info-block"><div class="info-label">Bill to (vendor)</div><div class="info-value">' + vendorBlockHtml + '</div></div>' : '') +
         '<div class="info-block info-block-ship-to"><div class="info-label">Ship To</div><div class="info-value">' + shipToHtml + '</div></div>' +
+        (function() {
+          var _poDocTag = (typeof window.documentTagDisplayText === 'function')
+            ? String(window.documentTagDisplayText(docData) || '').trim()
+            : String(docData.documentTags || docData.shortDescription || docData.tags || '').trim();
+          if (!_poDocTag) return '';
+          return '<div class="info-block"><div class="info-label">Document Tags</div><div class="info-value" style="font-size:12px;font-weight:600;">' + esc(_poDocTag) + '</div></div>';
+        })() +
       '</div>';
     } else {
       infoSectionHtml = '<div class="info-section info-section-invoice">' +
@@ -4497,9 +4566,10 @@
       '.room-header span:first-child { font-size:11px; text-transform:uppercase; letter-spacing:2px; color:#C4A464; font-weight:700; }' +
       '.room-header span:last-child { font-size:12px; color:#5C6B80; font-weight:600; font-family:"DM Sans"; }' +
       'table.cch-premium-items-table { width:100%; border-collapse:collapse; table-layout:fixed; }' +
-      'col.pc-item { width:54%; }' +
+      'col.pc-item { width:44%; }' +
       'col.pc-qty { width:8%; }' +
       'col.pc-vendor { width:11%; }' +
+      'col.pc-sidemark { width:12%; }' +
       'col.pc-money { width:9%; }' +
       'col.pc-tax { width:6%; }' +
       'th, td { min-width:0; }' +
@@ -4517,6 +4587,7 @@
       'td.total-cell { font-weight:600; }' +
       'td.ship { color:#5C6B80; }' +
       'td.vendor-cell { color:#5C6B80; font-size:12px; }' +
+      'td.sidemark-cell { color:#1B3352; font-size:11px; font-weight:600; line-height:1.4; vertical-align:top; word-wrap:break-word; overflow-wrap:break-word; }' +
       'td.img-cell img { width:118px; height:118px; object-fit:contain; border-radius:0; background:#fff; }' +
       'td strong { font-size:13px; display:block; }' +
       '.item-desc { font-size:11px; color:#5C6B80; margin-top:2px; }' +
