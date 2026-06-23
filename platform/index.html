@@ -60001,6 +60001,7 @@ async function renderBoardsTab(T, proj) {
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('number','proposals')">Item${sortArrow('number','proposals')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('project','proposals')">Document Tags${sortArrow('project','proposals')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('status','proposals')">Status${sortArrow('status','proposals')}</th>
+                  <th style="${thStyle}text-align:center;">Connected</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('published','proposals')">Published${sortArrow('published','proposals')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('createdAt','proposals')">Created${sortArrow('createdAt','proposals')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('date','proposals')">Due Date${sortArrow('date','proposals')}</th>
@@ -60025,6 +60026,7 @@ async function renderBoardsTab(T, proj) {
                     </td>
                     <td style="${tdStyle}color:var(--gray-500);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.documentTags || p.projectName || '')}</td>
                     <td style="${tdStyle}">${statusBadge(p.status)}</td>
+                    <td style="${tdStyle}text-align:center;" onclick="event.stopPropagation()">${typeof window.cchFinLinkedDocsCellHtml === 'function' ? window.cchFinLinkedDocsCellHtml(p.projectId, 'proposal', p.id, 'proposals', p) : '—'}</td>
                     <td style="${tdStyle}">${p.published ? '<span class="pub-yes">Yes</span>' : '<span class="pub-no">—</span>'}</td>
                     <td style="${tdStyle}color:var(--gray-400);font-size:12px;">${formatDate(p.createdAt)}</td>
                     <td style="${tdStyle}color:var(--gray-400);font-size:12px;">${formatDate(p.dueDate || p.date)}</td>
@@ -60364,6 +60366,7 @@ async function renderBoardsTab(T, proj) {
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('number','invoices')">Invoice #${sortArrow('number','invoices')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('project','invoices')">Project${sortArrow('project','invoices')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('status','invoices')">Status${sortArrow('status','invoices')}</th>
+                  <th style="${thStyle}text-align:center;">Connected</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('published','invoices')">Published${sortArrow('published','invoices')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('createdAt','invoices')">Created${sortArrow('createdAt','invoices')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('date','invoices')">Date Sent${sortArrow('date','invoices')}</th>
@@ -60391,6 +60394,7 @@ async function renderBoardsTab(T, proj) {
                     </td>
                     <td style="${tdStyle}color:var(--gray-500);">${esc(inv.projectName)}</td>
                     <td style="${tdStyle}">${statusBadge(inv.status)}</td>
+                    <td style="${tdStyle}text-align:center;" onclick="event.stopPropagation()">${typeof window.cchFinLinkedDocsCellHtml === 'function' ? window.cchFinLinkedDocsCellHtml(inv.projectId, 'invoice', inv.id, 'invoices', inv) : '—'}</td>
                     <td style="${tdStyle}">${inv.published ? '<span class="pub-yes">Yes</span>' : '<span class="pub-no">—</span>'}</td>
                     <td style="${tdStyle}color:var(--gray-400);font-size:12px;">${formatDate(inv.createdAt)}</td>
                     <td style="${tdStyle}color:var(--gray-400);font-size:12px;">${formatDate(inv.dateSent || inv.date)}</td>
@@ -60569,6 +60573,7 @@ async function renderBoardsTab(T, proj) {
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('project','pos')">Project${sortArrow('project','pos')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('date','pos')">Date${sortArrow('date','pos')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('status','pos')">Status${sortArrow('status','pos')}</th>
+                  <th style="${thStyle}text-align:center;">Connected</th>
                   <th style="${thStyle}text-align:center;">Bills</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('shipTo','pos')">Shipped To${sortArrow('shipTo','pos')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('eta','pos')">ETA${sortArrow('eta','pos')}</th>
@@ -60594,6 +60599,7 @@ async function renderBoardsTab(T, proj) {
                     <td style="${tdStyle}color:var(--gray-500);">${esc(po.projectName)}</td>
                     <td style="${tdStyle}color:var(--gray-400);font-size:12px;">${formatDate(po.issueDate || po.orderDate || po.poDate || po.date || po.createdAt)}</td>
                     <td style="${tdStyle}" onclick="event.stopPropagation()">${typeof cchPoFulfillmentStatusBadgeHtml==='function'?cchPoFulfillmentStatusBadgeHtml(po,{projectId:po.projectId,poId:po.id,clickable:true}):statusBadge(po.status)}</td>
+                    <td style="${tdStyle}text-align:center;" onclick="event.stopPropagation()">${typeof window.cchFinLinkedDocsCellHtml === 'function' ? window.cchFinLinkedDocsCellHtml(po.projectId, 'po', po.id, 'purchaseOrders', po) : '—'}</td>
                     <td style="${tdStyle}text-align:center;white-space:nowrap;" onclick="event.stopPropagation()">${typeof window.cchOmBillsCellHtml==='function'?window.cchOmBillsCellHtml(po):(typeof cchPoListBillWorkflowHtml==='function'?cchPoListBillWorkflowHtml(po):'—')}</td>
                     <td style="${tdStyle}font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escAttr(shipToLabel)}">${shipToLabel ? esc(shipToLabel) : '—'}</td>
                     <td style="${tdStyle}color:var(--gray-500);font-size:12px;">${esc(po.eta||'—')}</td>
@@ -72451,11 +72457,11 @@ ${pages}
 
   </script>
   <script src="cch-invoice-tax-rules.js?v=20260520prod"></script>
-  <script src="cch-functions.js?v=20260602ldd"></script>
+  <script src="cch-functions.js?v=20260602ldd2"></script>
   <script src="cch-design-board.js?v=20260608db29"></script>
   <script src="cch-client-board.js?v=1774994684878"></script>
   <script src="cch-line-icons.js?v=20260620a"></script>
-  <script src="cch-proposals-invoices-fix.js?v=20260602ldd"></script>
+  <script src="cch-proposals-invoices-fix.js?v=20260602ldd2"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
   <script src="cch-po-bill-variance.js?v=20260622venctc"></script>
   <script src="cch-order-management.js?v=20260622om12"></script>

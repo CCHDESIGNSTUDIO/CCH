@@ -336,7 +336,93 @@ function _cchLinkedDocVendor(type, data) {
   return String(data.vendor || data._displayVendor || '').trim();
 }
 
-/** Sync linked-doc resolver for finance list rows (explicit links only — no fuzzy item overlap). */
+function _cchRefNorm(type, numStr) {
+  var s = String(numStr || '').trim();
+  if (!s) return '';
+  if (type === 'po' && typeof normPoNumberForKey === 'function') return normPoNumberForKey(s);
+  if (type === 'invoice' && typeof normalizeInvoiceNumberKey === 'function') return normalizeInvoiceNumberKey(s);
+  var m = s.toUpperCase().match(/(PO|IN|PR|INV)[\s-]?(\d+)/i);
+  if (m) {
+    var pfx = m[1].toUpperCase();
+    if (pfx === 'INV') pfx = 'IN';
+    return pfx + '-' + m[2];
+  }
+  return s.toUpperCase().replace(/\s+/g, '');
+}
+
+function _cchFindDocByRef(type, ref, lists) {
+  lists = lists || {};
+  var rk = _cchRefNorm(type, ref);
+  if (!rk) return null;
+  var arr = type === 'proposal' ? (lists.proposals || []) : type === 'invoice' ? (lists.invoices || []) : (lists.pos || []);
+  for (var i = 0; i < arr.length; i++) {
+    var d = arr[i];
+    if (_cchRefNorm(type, _cchLinkedDocNum(type, d)) === rk) return d;
+  }
+  return null;
+}
+
+function _cchParseConnectedDocsField(s, lists, push) {
+  String(s || '').split(/[,;\n]+/).forEach(function(part) {
+    var t = String(part || '').trim();
+    if (!t) return;
+    var mPo = t.match(/(PO)[\s-]?(\d+)/i);
+    if (mPo) {
+      var po = _cchFindDocByRef('po', mPo[0], lists);
+      if (po) push('po', po.id, po);
+    }
+    var mInv = t.match(/(IN|INV)[\s-]?(\d+)/i);
+    if (mInv) {
+      var iv = _cchFindDocByRef('invoice', mInv[0], lists);
+      if (iv) push('invoice', iv.id, iv);
+    }
+    var mPr = t.match(/(PR)[\s-]?(\d+)/i);
+    if (mPr) {
+      var pr = _cchFindDocByRef('proposal', mPr[0], lists);
+      if (pr) push('proposal', pr.id, pr);
+    }
+  });
+}
+
+function _cchInferLinkedDocsOverlap(docType, docId, docData, lists, push) {
+  var itms = (docData.items || []).map(function(i) {
+    return String(i.title || i.name || '').toLowerCase().trim();
+  }).filter(Boolean);
+  if (!itms.length && docType !== 'po') return;
+  var v = String(docData.vendor || '').toLowerCase().trim();
+
+  if (docType === 'invoice' || docType === 'proposal') {
+    (lists.proposals || []).forEach(function(pr) {
+      if (docType === 'proposal' && pr.id === docId) return;
+      var pi = (pr.items || []).map(function(i) { return String(i.title || i.name || '').toLowerCase().trim(); }).filter(Boolean);
+      if (itms.length && pi.length) {
+        var m = itms.filter(function(t) { return pi.some(function(p) { return p.includes(t) || t.includes(p); }); }).length;
+        if (m >= Math.min(itms.length, pi.length) * 0.3) push('proposal', pr.id, pr);
+      }
+    });
+  }
+  if (docType === 'invoice' || docType === 'po') {
+    (lists.pos || []).forEach(function(po) {
+      if (docType === 'po' && po.id === docId) return;
+      var pv = String(po.vendor || po._displayVendor || '').toLowerCase().trim();
+      if (docType === 'invoice' && v && pv && pv === v) { push('po', po.id, po); return; }
+      var pi = (po.items || []).map(function(i) { return String(i.title || i.name || '').toLowerCase().trim(); }).filter(Boolean);
+      if (!itms.length || !pi.length) return;
+      var m = itms.filter(function(t) { return pi.some(function(p) { return p.includes(t) || t.includes(p); }); }).length;
+      if (m >= Math.min(itms.length, pi.length) * 0.3) push('po', po.id, po);
+    });
+  }
+  if (docType === 'proposal' || docType === 'po') {
+    (lists.invoices || []).forEach(function(iv) {
+      var ii = (iv.items || []).map(function(i) { return String(i.title || i.name || '').toLowerCase().trim(); }).filter(Boolean);
+      if (!itms.length || !ii.length) return;
+      var m = itms.filter(function(t) { return ii.some(function(p) { return p.includes(t) || t.includes(p); }); }).length;
+      if (m >= Math.min(itms.length, ii.length) * 0.3) push('invoice', iv.id, iv);
+    });
+  }
+}
+
+/** Sync linked-doc resolver for finance list rows. */
 window.cchCollectLinkedProjectDocsSync = function(docType, docId, docData, lists) {
   lists = lists || {};
   docData = docData || {};
@@ -408,6 +494,45 @@ window.cchCollectLinkedProjectDocsSync = function(docType, docId, docData, lists
     if (docType === 'proposal' && sid(docData.linkedPOId) === poId) push('po', poId, po);
     if (docType === 'invoice' && sid(docData.linkedPOId) === poId) push('po', poId, po);
   });
+
+  // Reverse explicit links + num-only refs
+  if (docType === 'invoice') {
+    proposals.forEach(function(pr) {
+      if (sid(pr.linkedInvoiceId) === docId) push('proposal', pr.id, pr);
+    });
+    if (sid(docData.linkedPONum) && !sid(docData.linkedPOId)) {
+      var poByNum = _cchFindDocByRef('po', docData.linkedPONum, lists);
+      if (poByNum) push('po', poByNum.id, poByNum);
+    }
+    if (sid(docData.linkedProposalNum) && !propId) {
+      var prByNum = _cchFindDocByRef('proposal', docData.linkedProposalNum, lists);
+      if (prByNum) push('proposal', prByNum.id, prByNum);
+    }
+  }
+  if (docType === 'proposal') {
+    invoices.forEach(function(iv) {
+      if (sid(iv.linkedProposalId) === docId || sid(iv.fromProposal) === docId) push('invoice', iv.id, iv);
+    });
+    if (sid(docData.linkedInvoiceNum) && !invId) {
+      var ivByNum = _cchFindDocByRef('invoice', docData.linkedInvoiceNum, lists);
+      if (ivByNum) push('invoice', ivByNum.id, ivByNum);
+    }
+    if (sid(docData.linkedPONum) && !sid(docData.linkedPOId)) {
+      var poByNum2 = _cchFindDocByRef('po', docData.linkedPONum, lists);
+      if (poByNum2) push('po', poByNum2.id, poByNum2);
+    }
+  }
+  if (docType === 'po') {
+    proposals.forEach(function(pr) {
+      if (sid(pr.linkedPOId) === docId) push('proposal', pr.id, pr);
+    });
+    invoices.forEach(function(iv) {
+      if (sid(iv.linkedPOId) === docId) push('invoice', iv.id, iv);
+    });
+  }
+
+  _cchParseConnectedDocsField(docData.connectedDocs, lists, push);
+  _cchInferLinkedDocsOverlap(docType, docId, docData, lists, push);
 
   return out;
 };

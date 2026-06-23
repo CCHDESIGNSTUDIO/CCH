@@ -112,18 +112,33 @@
   };
 
   /** Finance list Linked Docs column — dropdown trigger (doc # + vendor in menu). */
+  window.cchFinLinkedDocsListsForProject = function(projectId) {
+    var pid = String(projectId || '');
+    function byPid(arr) {
+      return (arr || []).filter(function(d) { return String(d.projectId || '') === pid; });
+    }
+    return {
+      proposals: byPid(window._cachedProposals),
+      invoices: byPid(window._cachedInvoices),
+      pos: byPid(window._cachedPOs)
+    };
+  };
+
   window.cchFinLinkedDocsCellHtml = function(projectId, docType, docId, collection, docData, lists) {
+    if (!lists || (!lists.proposals && !lists.invoices && !lists.pos)) {
+      lists = window.cchFinLinkedDocsListsForProject(projectId);
+    }
     var links = (typeof window.cchCollectLinkedProjectDocsSync === 'function')
       ? window.cchCollectLinkedProjectDocsSync(docType, docId, docData || {}, lists || {}) : [];
     if (!links.length) {
-      return '<a onclick="linkDocModal(\'' + cchEscJsStr(projectId) + '\',\'' + collection + '\',\'' + cchEscJsStr(docId) + '\')" style="color:var(--gray-400);cursor:pointer;font-size:11px;white-space:nowrap;" title="Link documents">🔗 Link</a>';
+      return '<a onclick="event.stopPropagation();linkDocModal(\'' + cchEscJsStr(projectId) + '\',\'' + collection + '\',\'' + cchEscJsStr(docId) + '\')" style="color:var(--gray-500);cursor:pointer;font-size:11px;white-space:nowrap;text-decoration:underline;" title="Link documents">Link</a>';
     }
     var jsType = docType === 'po' ? 'po' : (docType === 'invoice' ? 'invoice' : 'proposal');
-    var btnLabel = links.length === 1 ? links[0].label : (links.length + ' docs');
+    var btnLabel = links.length === 1 ? links[0].label : (links.length + ' linked');
     var tip = links.map(function(d) {
       return d.label + (d.vendor ? ' · ' + d.vendor : '');
     }).join('\n');
-    return '<button type="button" class="btn btn-secondary btn-sm cch-fin-linked-docs-btn" style="font-size:11px;padding:3px 8px;white-space:nowrap;max-width:128px;overflow:hidden;text-overflow:ellipsis;" ' +
+    return '<button type="button" class="btn btn-secondary btn-sm cch-fin-linked-docs-btn" style="font-size:11px;padding:3px 8px;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis;" ' +
       'onclick="event.stopPropagation();showConnectedDocs(\'' + cchEscJsStr(projectId) + '\',\'' + jsType + '\',\'' + cchEscJsStr(docId) + '\',\'\',this)" ' +
       'title="' + esc(tip) + '">▾ ' + esc(btnLabel) + '</button>';
   };
