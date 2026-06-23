@@ -3129,8 +3129,7 @@
           '</div>' +
           (type === 'po' ? '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;">' : '') +
           _docViewTableHeadHtml + _docViewLineRowsHtml(catItems) + '</tbody></table>' +
-          (type === 'po' ? '</div>' : '') +
-          '</div>';
+          (type === 'po' ? '</div>' : '') + '</div>';
       });
     }
 
@@ -3412,7 +3411,14 @@
       var _poDateStr = _poDateRaw && typeof formatDate === 'function' ? formatDate(_poDateRaw) : '';
       var _poVendor = String(docData.vendor || '').trim();
       var _poVendorAddr = String(docData.vendorAddress || '').trim();
-      var _poShipTo = String(docData.shipTo || docData.deliverTo || '').trim();
+      var _poShipToRaw = String(docData.shipTo || docData.deliverTo || '').trim();
+      var _poShipTo = _poShipToRaw;
+      if (_poShipToRaw && typeof window.resolvePOShipToDisplayText === 'function') {
+        try {
+          var _poShipResolved = window.resolvePOShipToDisplayText(_poShipToRaw, projData, docData);
+          if (_poShipResolved && String(_poShipResolved).trim()) _poShipTo = String(_poShipResolved).trim();
+        } catch (_ePoViewShip) {}
+      }
       var poDetailsHTML = '';
       if (_poVendor || _poVendorAddr || _poShipTo) {
         poDetailsHTML =
@@ -3426,7 +3432,7 @@
               '</div>' +
               '<div>' +
                 '<div style="font-size:9px;text-transform:uppercase;letter-spacing:0.06em;color:#9CA3AF;margin-bottom:6px;">Ship to</div>' +
-                (_poShipTo ? '<div style="white-space:pre-wrap;">' + esc(_poShipTo) + '</div>' : '<span style="color:var(--gray-400);">—</span>') +
+                (_poShipTo ? '<div style="white-space:pre-wrap;">' + esc(_poShipTo).replace(/\n/g, '<br>') + '</div>' : '<span style="color:var(--gray-400);">—</span>') +
               '</div>' +
             '</div>' +
             (_poDateStr ? '<div style="margin-top:12px;font-size:12px;color:#5C6B80;"><span style="font-size:9px;text-transform:uppercase;letter-spacing:0.06em;color:#9CA3AF;">PO date</span> <strong style="color:#1B3352;">' + esc(_poDateStr) + '</strong></div>' : '') +
@@ -3959,7 +3965,7 @@
       else if (_stk.length > 1) shipToRaw = _stk.join(' · ');
     }
 
-    var shipToDisplay = shipToRaw;
+    var shipToDisplay = String(docData.shipToAddress || '').trim() || shipToRaw;
     if (type === 'po' && typeof window.resolvePOShipToDisplayText === 'function') {
       try {
         var projForShip = Object.assign({}, proj);
@@ -3973,6 +3979,13 @@
         var _shipResolved = window.resolvePOShipToDisplayText(shipToRaw, projForShip, docData);
         if (_shipResolved && String(_shipResolved).trim()) shipToDisplay = String(_shipResolved).trim();
       } catch (_eShipRes) {}
+    }
+
+    var vendorAddrPremium = String(docData.vendorAddress || '').trim();
+    if (type === 'po' && !vendorAddrPremium && docData.vendor && typeof window.cchPoVendorAddressResolved === 'function') {
+      try {
+        vendorAddrPremium = await window.cchPoVendorAddressResolved(docData);
+      } catch (_eVenPrem) {}
     }
 
     var docNum = docData.invoiceNum || docData.number || docData.proposalNum || docData.name || docId.slice(0,8);
@@ -4171,17 +4184,39 @@
       if (descBody && lineLabel && descBody.toLowerCase().indexOf(String(lineLabel).toLowerCase()) === 0) {
         descBody = descBody.slice(lineLabel.length).replace(/^\s*\([^)]*\)\s*/, '').replace(/^\s*[\u2014—\-]\s*/, '').trim();
       }
+      // PO vendor print: SKU / Finish / Dimensions block (reuse on-screen helper) + per-line ship-to.
+      var poSpecsUnder = (type === 'po' && typeof window.cchPoLineSpecsBlockHtml === 'function')
+        ? window.cchPoLineSpecsBlockHtml(it, { includeDescription: false })
+        : '';
+      var poShipToUnder = '';
+      if (type === 'po') {
+        var _lineShip = String(it.shipTo || it.deliverTo || '').trim();
+        if (_lineShip) {
+          var _lineShipDisp = _lineShip;
+          if (typeof window.resolvePOShipToDisplayText === 'function') {
+            try {
+              var _r = window.resolvePOShipToDisplayText(_lineShip, proj, docData);
+              if (_r && String(_r).trim()) _lineShipDisp = String(_r).trim();
+            } catch (_eLs) {}
+          }
+          poShipToUnder = '<div class="cch-po-line-shipto" style="margin-top:6px;font-size:11px;color:#1B7A6B;line-height:1.45;">' +
+            '<span style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Ship to</span> ' +
+            esc(String(_lineShipDisp).replace(/\n/g, ' · ')) + '</div>';
+        }
+      }
       var itemInner =
         '<div class="cch-premium-item-grid' + (imgBlock ? '' : ' cch-premium-item-grid--no-thumb') + '">' +
           imgBlock +
           '<div class="cch-premium-item-text">' +
             '<strong>' + esc(lineLabel) + '</strong>' +
+            poSpecsUnder +
             '<div class="prop-line-detail-stack">' +
             (descBody ? '<div style="margin-top:6px;"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Description</div><div class="item-desc item-desc-multiline">' + esc(descBody) + '</div></div>' : '') +
             periodHtml +
             notesUnder +
             '</div>' +
             workroomUnder +
+            poShipToUnder +
             (it.vendor && type !== 'po' && type !== 'invoice' ? '<div class="item-vendor">' + esc(it.vendor) + '</div>' : '') +
           '</div>' +
         '</div>';
@@ -4285,6 +4320,16 @@
     var shipToHtml = shipToDisplay
       ? esc(shipToDisplay).replace(/\n/g, '<br>')
       : '<span style="color:#5C6B80;font-size:12px;">Set <strong>Project Address</strong> (job site) in Edit Project, or choose ship-to on lines.</span>';
+    if (type === 'po') {
+      var _poShipSet = {};
+      items.forEach(function(it) {
+        var s = String(it.shipTo || it.deliverTo || '').trim();
+        if (s) _poShipSet[s] = true;
+      });
+      if (Object.keys(_poShipSet).length > 1) {
+        shipToHtml += '<div style="margin-top:6px;font-size:11px;color:#B45309;font-weight:600;">Multiple ship-to locations — see each line item below.</div>';
+      }
+    }
     var projectAddressPdf = typeof window.cchProjectAddressFromData === 'function'
       ? window.cchProjectAddressFromData(proj, docData)
       : String(proj.projectAddress || proj.address || docData.projectAddress || '').trim();
@@ -4314,8 +4359,16 @@
 
     var infoSectionHtml = '';
     if (type === 'po') {
+      var vendorBlockHtml = '';
+      if (docData.vendor) {
+        vendorBlockHtml = '<strong>' + esc(docData.vendor) + '</strong>';
+        if (vendorAddrPremium) {
+          vendorBlockHtml += '<div style="margin-top:6px;color:#5C6B80;font-size:12px;line-height:1.55;">' +
+            esc(vendorAddrPremium).replace(/\n/g, '<br>') + '</div>';
+        }
+      }
       infoSectionHtml = '<div class="info-section info-section-po">' +
-        (docData.vendor ? '<div class="info-block"><div class="info-label">Vendor</div><div class="info-value"><strong>' + esc(docData.vendor) + '</strong></div></div>' : '') +
+        (vendorBlockHtml ? '<div class="info-block"><div class="info-label">Bill to (vendor)</div><div class="info-value">' + vendorBlockHtml + '</div></div>' : '') +
         '<div class="info-block info-block-ship-to"><div class="info-label">Ship To</div><div class="info-value">' + shipToHtml + '</div></div>' +
       '</div>';
     } else {

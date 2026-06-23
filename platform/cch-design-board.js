@@ -275,6 +275,14 @@
     return t || 'Untitled Board';
   }
 
+  /** Room or board title for print footnotes / cost summary. */
+  function _dbBoardLabel(d) {
+    d = d || {};
+    var room = String(d.room || '').trim();
+    if (room) return room;
+    return _dbBoardDisplayName(d);
+  }
+
   // ---- Save state for undo ----
   var _autoSaveTimer = null;
   function autoSave() {
@@ -720,8 +728,10 @@
       '.db-el-product{box-sizing:border-box;pointer-events:auto;cursor:move;}' +
       '.db-el-media{position:relative;box-sizing:border-box;background:#fff;border:1px solid rgba(15,26,46,0.06);border-radius:2px;overflow:hidden;padding:0;pointer-events:none;}' +
       '.db-el-media img{width:100%;height:100%;object-fit:cover;object-position:center;display:block;pointer-events:none;}' +
-      '.db-el-caption{margin-top:3px;font-size:11px;font-weight:600;color:#333;text-align:center;pointer-events:none;line-height:1.25;}' +
-      '.db-el-desc{margin-top:2px;font-size:10px;color:#666;text-align:center;pointer-events:none;line-height:1.35;white-space:pre-wrap;}' +
+      '.db-el-caption{margin-top:5px;font-size:14px;font-weight:600;color:#1B3352;text-align:center;pointer-events:none;line-height:1.3;}' +
+      '.db-el-desc{margin-top:3px;font-size:12px;color:#4B5563;text-align:center;pointer-events:none;line-height:1.4;white-space:pre-wrap;}' +
+      '.db-el-price{margin-top:3px;font-size:14px;font-weight:700;color:#0A1F3D;text-align:center;pointer-events:none;line-height:1.25;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}' +
+      '.db-el-annotation{margin-top:4px;font-size:12px;color:#6B7280;text-align:center;font-style:italic;pointer-events:none;white-space:pre-line;line-height:1.35;}' +
       '.db-resize{position:absolute;width:12px;height:12px;background:var(--gold);border:2px solid #fff;border-radius:2px;z-index:20;box-shadow:0 1px 3px rgba(0,0,0,0.2);pointer-events:auto;}' +
       '.db-source-tab{flex:1;padding:8px 4px;font-size:10px;font-weight:600;border:none;background:transparent;color:#6b7280;cursor:pointer;border-bottom:2px solid transparent;}' +
       '.db-source-tab:hover{color:#1B3352;}' +
@@ -1233,7 +1243,6 @@
     var selClass = sel ? ' db-el-selected' : '';
 
     if (el.type === 'product' || el.type === 'image') {
-      var showPrice = dbEditor.showPricing && !dbEditor.clientView && el.showPrice !== false;
       var imgSrc = dbResolveProductImgSrc(el);
       var hasImg = !!(el.imageUrl || el.img);
       var ew = el.w || 180;
@@ -1246,8 +1255,8 @@
       return '<div class="db-el db-el-product' + selClass + '" data-id="' + el.id + '" style="position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;width:' + ew + 'px;z-index:' + (sel ? 100 : 10) + ';" onpointerdown="elMouseDown(event,\'' + el.id + '\')" ondblclick="event.stopPropagation();void dbOpenProductDetail(\'' + el.id + '\')" oncontextmenu="return dbProductContextMenu(event,\'' + el.id + '\')">' +
         '<div class="db-el-media" style="width:' + ew + 'px;height:' + eh + 'px;">' + mediaInner + (sel ? resizeHandles() : '') + '</div>' +
         dbProductCaptionHtml(el) +
-        (showPrice && el.sellPrice ? '<div style="font-size:10px;color:var(--green);font-weight:600;text-align:center;pointer-events:none;">' + fmt$(el.sellPrice) + '</div>' : '') +
-        (el.annotation ? '<div style="font-size:10px;color:#666;text-align:center;font-style:italic;margin-top:2px;pointer-events:none;white-space:pre-line;">' + esc(el.annotation) + '</div>' : '') +
+        dbProductPriceHtml(el) +
+        (el.annotation ? '<div class="db-el-annotation">' + esc(el.annotation) + '</div>' : '') +
       '</div>';
     }
     if (el.type === 'text') {
@@ -1346,13 +1355,9 @@
     var media = node.querySelector('.db-el-media');
     if (!media) return false;
     while (media.nextSibling) node.removeChild(media.nextSibling);
-    var showPrice = dbEditor.showPricing && !dbEditor.clientView && el.showPrice !== false;
-    var tail = dbProductCaptionHtml(el);
-    if (showPrice && el.sellPrice) {
-      tail += '<div style="font-size:10px;color:var(--green);font-weight:600;text-align:center;pointer-events:none;">' + fmt$(el.sellPrice) + '</div>';
-    }
+    var tail = dbProductCaptionHtml(el) + dbProductPriceHtml(el);
     if (el.annotation) {
-      tail += '<div style="font-size:10px;color:#666;text-align:center;font-style:italic;margin-top:2px;pointer-events:none;white-space:pre-line;">' + esc(el.annotation) + '</div>';
+      tail += '<div class="db-el-annotation">' + esc(el.annotation) + '</div>';
     }
     if (tail) media.insertAdjacentHTML('afterend', tail);
     return true;
@@ -1416,6 +1421,13 @@
     if (!clip || !clip.data) return '';
     var cd = clip.data;
     return String(cd.description || cd.shortDescription || cd.desc || '').trim();
+  }
+
+  function dbProductPriceHtml(el) {
+    if (!el) return '';
+    var showPrice = dbEditor.showPricing && !dbEditor.clientView && el.showPrice !== false;
+    if (!showPrice || !el.sellPrice) return '';
+    return '<div class="db-el-price">' + fmt$(el.sellPrice) + '</div>';
   }
 
   function dbProductCaptionHtml(el) {
@@ -2877,7 +2889,7 @@
         '<button class="btn btn-secondary btn-sm" style="margin-left:6px;" onclick="dbCostSummaryMakeProductFromImages()">+ Make a product</button></div>';
     }
 
-    var boardName = (dbEditor.boardData && (dbEditor.boardData.title || dbEditor.boardData.name)) || 'Design Board';
+    var boardName = _dbBoardLabel(dbEditor.boardData);
     var overlay = document.createElement('div');
     overlay.id = 'dbCostSummaryOverlay';
     overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(15,26,46,0.45);display:flex;align-items:center;justify-content:center;padding:24px;';
@@ -2885,8 +2897,8 @@
     overlay.innerHTML =
       '<div style="background:#fff;border-radius:10px;max-width:640px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);" onclick="event.stopPropagation()">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #eee;">' +
-          '<div><div style="font-weight:700;font-size:16px;color:#1B3352;">Cost Summary</div>' +
-            '<div style="font-size:11px;color:#999;">' + esc(boardName) + ' · ' + products.length + ' product' + (products.length === 1 ? '' : 's') + ' · ' + (clientMode ? 'Client view — sell price only' : 'Internal view — cost + markup') + '</div></div>' +
+          '<div><div style="font-weight:700;font-size:18px;color:#1B3352;line-height:1.25;">' + esc(boardName) + '</div>' +
+            '<div style="font-size:11px;color:#888;margin-top:4px;letter-spacing:0.04em;text-transform:uppercase;">Cost Summary · ' + products.length + ' product' + (products.length === 1 ? '' : 's') + ' · ' + (clientMode ? 'Client view — sell price only' : 'Internal view — cost + markup') + '</div></div>' +
           '<div style="display:flex;gap:10px;align-items:center;">' +
             '<div style="display:inline-flex;border:1px solid #d0d5dd;border-radius:6px;overflow:hidden;font-size:12px;font-weight:700;line-height:1;">' +
               '<button title="Internal: shows trade cost, markup and sell" onclick="if(window._dbCostSummaryClient){dbToggleCostSummaryView();}" style="padding:7px 14px;border:none;cursor:pointer;' + (!clientMode ? 'background:#0A1F3D;color:#fff;' : 'background:#fff;color:#0A1F3D;') + '">Internal</button>' +
@@ -2958,10 +2970,10 @@
     var totals = clientMode
       ? '<tr style="font-weight:700;border-top:2px solid #000;">' + imgTotalTd + '<td>Total</td><td style="text-align:right;">' + fmt$(totalSell) + '</td></tr>'
       : '<tr style="font-weight:700;border-top:2px solid #000;">' + imgTotalTd + '<td>Total</td><td style="text-align:right;">' + fmt$(totalCost) + '</td><td></td><td style="text-align:right;">' + fmt$(totalSell) + '</td></tr>';
-    var title = esc((dbEditor.boardData && (dbEditor.boardData.title || dbEditor.boardData.name)) || 'Design Board');
+    var roomLabel = esc(_dbBoardLabel(dbEditor.boardData));
     var w = window.open('', '_blank');
     if (!w) { if (typeof cchAlert === 'function') cchAlert('Allow pop-ups to print the summary.', 'Cost Summary'); return; }
-    w.document.write('<html><head><title>Cost Summary — ' + title + '</title><style>body{font-family:Georgia,serif;padding:40px;color:#1B3352;}h1{font-size:20px;margin:0;}table{width:100%;border-collapse:collapse;font-size:13px;margin-top:18px;}th,td{padding:8px 10px;border-bottom:1px solid #eee;vertical-align:middle;}th{font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#999;}td.ts-img{width:56px;padding:6px 10px;}td.ts-img img{width:48px;height:48px;object-fit:cover;border-radius:3px;display:block;}td.ts-img .ts-img-ph{width:48px;height:48px;border-radius:3px;background:#f0f0f0;}@media print{img{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head><body><h1>Cost Summary</h1><div style="color:#888;font-size:12px;margin-top:4px;">' + title + '</div><table><thead>' + head + '</thead><tbody>' + body + totals + '</tbody></table></body></html>');
+    w.document.write('<html><head><title>' + roomLabel + ' — Cost Summary</title><style>@page{margin:0.75in;}body{font-family:Georgia,serif;padding:40px;color:#1B3352;}h1{font-size:22px;font-weight:700;margin:0;line-height:1.25;} .db-cs-sub{color:#888;font-size:11px;margin-top:6px;letter-spacing:0.05em;text-transform:uppercase;}table{width:100%;border-collapse:collapse;font-size:13px;margin-top:18px;}th,td{padding:8px 10px;border-bottom:1px solid #eee;vertical-align:middle;}th{font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#999;}td.ts-img{width:56px;padding:6px 10px;}td.ts-img img{width:48px;height:48px;object-fit:cover;border-radius:3px;display:block;}td.ts-img .ts-img-ph{width:48px;height:48px;border-radius:3px;background:#f0f0f0;}@media print{img{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head><body><h1>' + roomLabel + '</h1><div class="db-cs-sub">Cost Summary</div><table><thead>' + head + '</thead><tbody>' + body + totals + '</tbody></table></body></html>');
     w.document.close();
     w.focus();
     w.onafterprint = function() { try { w.close(); } catch (e) {} };
@@ -2997,6 +3009,10 @@
           '<button class="btn btn-secondary" style="justify-content:flex-start;" onclick="' + rm + 'dbPrintBoard();">🖼 Print board</button>' +
           '<button class="btn btn-secondary" style="justify-content:flex-start;" onclick="' + rm + 'showBoardCostSummary();">💲 Cost summary (print from there)</button>' +
           '<button class="btn btn-secondary" style="justify-content:flex-start;" onclick="' + rm + 'exportBoardPNG();">⬇ Download board image (PNG)</button>' +
+          '<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#4B5563;cursor:pointer;margin-top:4px;">' +
+            '<input type="checkbox" id="dbPrintIncludeName"' + (window._dbPrintIncludeBoardName ? ' checked' : '') + ' onchange="window._dbPrintIncludeBoardName=!!this.checked">' +
+            ' Include board / room name as footnote on print</label>' +
+          '<div style="font-size:11px;color:#999;line-height:1.4;">Use <strong>Heading</strong> or <strong>Text</strong> on the board for titles. The footnote is optional — off by default.</div>' +
           '<div style="font-size:11px;color:#999;line-height:1.4;">PNG download can fail when the board has images from sites that block copying. Use <strong>Print board</strong> for a reliable copy.</div>' +
         '</div>' +
         '<div style="padding:10px 18px;border-top:1px solid #eee;text-align:right;"><button class="btn btn-secondary btn-sm" onclick="' + rm + '">Close</button></div>' +
@@ -3011,26 +3027,35 @@
     if (typeof dbUpdateSelectionDom === 'function') dbUpdateSelectionDom();
     var cw = parseFloat(canvas.style.width) || canvas.offsetWidth || 1920;
     var ch = parseFloat(canvas.style.height) || canvas.offsetHeight || 1080;
-    var scale = Math.min(1, 1000 / cw);
     var w = window.open('', '_blank');
     if (!w) { if (typeof cchAlert === 'function') cchAlert('Allow pop-ups to print the board.', 'Print'); return; }
     var styles = '';
     document.querySelectorAll('style, link[rel="stylesheet"]').forEach(function(n) { styles += n.outerHTML; });
-    var title = esc((dbEditor.boardData && (dbEditor.boardData.title || dbEditor.boardData.name)) || 'Design Board');
+    var boardLabel = esc(_dbBoardLabel(dbEditor.boardData));
+    var includeName = !!window._dbPrintIncludeBoardName;
     var clone = canvas.cloneNode(true);
     clone.querySelectorAll('.db-resize').forEach(function(n) { n.remove(); });
+    var hint = clone.querySelector('#dbCanvasDropHint');
+    if (hint) hint.remove();
     clone.style.boxShadow = 'none';
-    var html = '<html><head><title>' + title + '</title>' + styles +
-      '<style>@page{size:landscape;margin:8mm;}html,body{margin:0;padding:0;background:#fff;}' +
-      '#dbPrintWrap{width:' + (cw * scale) + 'px;height:' + (ch * scale) + 'px;overflow:hidden;margin:0 auto;}' +
-      '#dbPrintInner{transform:scale(' + scale + ');transform-origin:top left;width:' + cw + 'px;height:' + ch + 'px;}' +
-      '@media print{img{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head>' +
-      '<body><div id="dbPrintWrap"><div id="dbPrintInner">' + clone.outerHTML + '</div></div></body></html>';
+    var footnote = includeName
+      ? '<div class="db-print-footnote">' + boardLabel + '</div>'
+      : '';
+    var html = '<html><head><title>' + boardLabel + ' — Design Board</title>' + styles +
+      '<style>@page{margin:10mm;}html,body{margin:0;padding:0;background:#fff;}' +
+      '.db-print-sheet{padding:4mm 6mm 6mm;box-sizing:border-box;}' +
+      '#dbPrintWrap{width:100%;max-width:' + cw + 'px;margin:0 auto;overflow:hidden;}' +
+      '#dbPrintInner{transform-origin:top center;width:' + cw + 'px;margin:0 auto;}' +
+      '.db-print-footnote{margin:10px auto 0;max-width:' + cw + 'px;text-align:center;font-family:Georgia,serif;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#9CA3AF;}' +
+      '.db-el-caption{font-size:14px !important;}.db-el-desc{font-size:12px !important;}.db-el-price{font-size:14px !important;}' +
+      '@media print{img{-webkit-print-color-adjust:exact;print-color-adjust:exact;} .db-print-sheet{padding:0;}}' +
+      '</style></head><body><div class="db-print-sheet"><div id="dbPrintWrap"><div id="dbPrintInner">' + clone.outerHTML + '</div></div>' + footnote + '</div>' +
+      '<script>(function(){var cw=' + cw + ',ch=' + ch + ';function fit(){var iw=Math.max(320,(window.innerWidth||960)-24);var ih=Math.max(320,(window.innerHeight||720)-40);var s=Math.min(1,iw/cw,ih/ch);var inner=document.getElementById("dbPrintInner");var wrap=document.getElementById("dbPrintWrap");if(inner){inner.style.transform="scale("+s+")";inner.style.height=(ch*s)+"px";}if(wrap){wrap.style.height=(ch*s)+"px";}}fit();window.onresize=fit;})();<\/script></body></html>';
     w.document.write(html);
     w.document.close();
     w.focus();
     w.onafterprint = function() { try { w.close(); } catch (e) {} };
-    setTimeout(function() { try { w.print(); } catch (e) {} }, 700);
+    setTimeout(function() { try { w.print(); } catch (e) {} }, 800);
   };
 
   // ==================== CSS for editor ============================
@@ -3223,6 +3248,6 @@
     };
   }
 
-  console.info('[CCH Design Board] build 20260608db28 — client-view fit + preview scroll');
+  console.info('[CCH Design Board] build 20260608db29 — client-view fit + print/cost-summary polish');
 
 })();
