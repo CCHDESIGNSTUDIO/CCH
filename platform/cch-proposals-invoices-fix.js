@@ -3086,7 +3086,7 @@
             (item.shipTo && type !== 'invoice' ? '<div style="font-size:11px;color:var(--teal);margin-top:2px;">📍 ' + esc(item.shipTo) + '</div>' : '') +
             typeBadgeHtml +
           '</td>' +
-          '<td style="padding:10px 8px;font-size:13px;color:var(--gray-500);">' + esc(item.vendor || '') + '</td>' +
+          '<td style="padding:10px 8px;font-size:13px;color:var(--gray-500);">' + esc((type === 'po' && typeof window.cchPoLineDisplayVendor === 'function') ? window.cchPoLineDisplayVendor(item, docData) : (item.vendor || '')) + '</td>' +
           (_showPoVendorInvCols ? '<td style="padding:10px 8px;vertical-align:middle;">' + (_poVigCells ? _poVigCells.invHtml : '—') + '</td>' +
           '<td style="padding:10px 8px;vertical-align:middle;">' + (_poVigCells ? _poVigCells.statusHtml : '—') + '</td>' +
           (_showPoLineEtaCol ? '<td style="padding:10px 8px;vertical-align:middle;">' + (_poVigCells ? _poVigCells.etaHtml : '—') + '</td>' : '') +
@@ -3125,9 +3125,12 @@
         itemsHTML += '<div class="' + (type === 'invoice' ? 'cch-inv-line-group' : '') + '" style="margin-bottom:' + (type === 'invoice' ? '14' : '28') + 'px;">' +
           '<div style="font-size:' + (type === 'invoice' ? '13' : '14') + 'px;font-weight:600;margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid var(--gold);display:flex;justify-content:space-between;">' +
             '<span>' + esc(cat) + '</span>' +
-            '<span style="font-size:13px;color:var(--gray-500);">' + formatMoney(catTotal) + '</span>' +
+            (type === 'po' ? '' : '<span style="font-size:13px;color:var(--gray-500);">' + formatMoney(catTotal) + '</span>') +
           '</div>' +
-          _docViewTableHeadHtml + _docViewLineRowsHtml(catItems) + '</tbody></table></div>';
+          (type === 'po' ? '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;">' : '') +
+          _docViewTableHeadHtml + _docViewLineRowsHtml(catItems) + '</tbody></table>' +
+          (type === 'po' ? '</div>' : '') +
+          '</div>';
       });
     }
 
@@ -3409,14 +3412,7 @@
       var _poDateStr = _poDateRaw && typeof formatDate === 'function' ? formatDate(_poDateRaw) : '';
       var _poVendor = String(docData.vendor || '').trim();
       var _poVendorAddr = String(docData.vendorAddress || '').trim();
-      var _poShipToRaw = String(docData.shipTo || docData.deliverTo || '').trim();
-      var _poShipTo = _poShipToRaw;
-      if (_poShipToRaw && typeof window.resolvePOShipToDisplayText === 'function') {
-        try {
-          var _poShipResolved = window.resolvePOShipToDisplayText(_poShipToRaw, projData, docData);
-          if (_poShipResolved && String(_poShipResolved).trim()) _poShipTo = String(_poShipResolved).trim();
-        } catch (_ePoViewShip) {}
-      }
+      var _poShipTo = String(docData.shipTo || docData.deliverTo || '').trim();
       var poDetailsHTML = '';
       if (_poVendor || _poVendorAddr || _poShipTo) {
         poDetailsHTML =
@@ -3430,7 +3426,7 @@
               '</div>' +
               '<div>' +
                 '<div style="font-size:9px;text-transform:uppercase;letter-spacing:0.06em;color:#9CA3AF;margin-bottom:6px;">Ship to</div>' +
-                (_poShipTo ? '<div style="white-space:pre-wrap;">' + esc(_poShipTo).replace(/\n/g, '<br>') + '</div>' : '<span style="color:var(--gray-400);">—</span>') +
+                (_poShipTo ? '<div style="white-space:pre-wrap;">' + esc(_poShipTo) + '</div>' : '<span style="color:var(--gray-400);">—</span>') +
               '</div>' +
             '</div>' +
             (_poDateStr ? '<div style="margin-top:12px;font-size:12px;color:#5C6B80;"><span style="font-size:9px;text-transform:uppercase;letter-spacing:0.06em;color:#9CA3AF;">PO date</span> <strong style="color:#1B3352;">' + esc(_poDateStr) + '</strong></div>' : '') +
@@ -3963,7 +3959,7 @@
       else if (_stk.length > 1) shipToRaw = _stk.join(' · ');
     }
 
-    var shipToDisplay = String(docData.shipToAddress || '').trim() || shipToRaw;
+    var shipToDisplay = shipToRaw;
     if (type === 'po' && typeof window.resolvePOShipToDisplayText === 'function') {
       try {
         var projForShip = Object.assign({}, proj);
@@ -3977,13 +3973,6 @@
         var _shipResolved = window.resolvePOShipToDisplayText(shipToRaw, projForShip, docData);
         if (_shipResolved && String(_shipResolved).trim()) shipToDisplay = String(_shipResolved).trim();
       } catch (_eShipRes) {}
-    }
-
-    var vendorAddrPremium = String(docData.vendorAddress || '').trim();
-    if (type === 'po' && !vendorAddrPremium && docData.vendor && typeof window.cchPoVendorAddressResolved === 'function') {
-      try {
-        vendorAddrPremium = await window.cchPoVendorAddressResolved(docData);
-      } catch (_eVenPrem) {}
     }
 
     var docNum = docData.invoiceNum || docData.number || docData.proposalNum || docData.name || docId.slice(0,8);
@@ -4182,44 +4171,22 @@
       if (descBody && lineLabel && descBody.toLowerCase().indexOf(String(lineLabel).toLowerCase()) === 0) {
         descBody = descBody.slice(lineLabel.length).replace(/^\s*\([^)]*\)\s*/, '').replace(/^\s*[\u2014—\-]\s*/, '').trim();
       }
-      // PO vendor print: SKU / Finish / Dimensions block (reuse on-screen helper) + per-line ship-to.
-      var poSpecsUnder = (type === 'po' && typeof window.cchPoLineSpecsBlockHtml === 'function')
-        ? window.cchPoLineSpecsBlockHtml(it, { includeDescription: false })
-        : '';
-      var poShipToUnder = '';
-      if (type === 'po') {
-        var _lineShip = String(it.shipTo || it.deliverTo || '').trim();
-        if (_lineShip) {
-          var _lineShipDisp = _lineShip;
-          if (typeof window.resolvePOShipToDisplayText === 'function') {
-            try {
-              var _r = window.resolvePOShipToDisplayText(_lineShip, proj, docData);
-              if (_r && String(_r).trim()) _lineShipDisp = String(_r).trim();
-            } catch (_eLs) {}
-          }
-          poShipToUnder = '<div class="cch-po-line-shipto" style="margin-top:6px;font-size:11px;color:#1B7A6B;line-height:1.45;">' +
-            '<span style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Ship to</span> ' +
-            esc(String(_lineShipDisp).replace(/\n/g, ' · ')) + '</div>';
-        }
-      }
       var itemInner =
         '<div class="cch-premium-item-grid' + (imgBlock ? '' : ' cch-premium-item-grid--no-thumb') + '">' +
           imgBlock +
           '<div class="cch-premium-item-text">' +
             '<strong>' + esc(lineLabel) + '</strong>' +
-            poSpecsUnder +
             '<div class="prop-line-detail-stack">' +
             (descBody ? '<div style="margin-top:6px;"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Description</div><div class="item-desc item-desc-multiline">' + esc(descBody) + '</div></div>' : '') +
             periodHtml +
             notesUnder +
             '</div>' +
             workroomUnder +
-            poShipToUnder +
             (it.vendor && type !== 'po' && type !== 'invoice' ? '<div class="item-vendor">' + esc(it.vendor) + '</div>' : '') +
           '</div>' +
         '</div>';
       itemsHtml += '<tr><td class="line-item-main">' + itemInner + '</td>' +
-        (type === 'po' ? '<td class="vendor-cell">' + esc(it.vendor||'') + '</td>' : '') +
+        (type === 'po' ? '<td class="vendor-cell">' + esc((typeof window.cchPoLineDisplayVendor === 'function') ? window.cchPoLineDisplayVendor(it, docData) : (it.vendor || '')) + '</td>' : '') +
         '<td style="text-align:center;">' + qty + '</td>' +
         '<td class="r">' + formatMoney(unitPrice) + '</td>' +
         '<td class="r ship">' + (ship > 0 ? formatMoney(ship) : '') + '</td>' +
@@ -4249,7 +4216,7 @@
       _premiumGroupKeys.forEach(function(cat) {
         var catItems = grouped[cat];
         var catTotal = catItems.reduce(function(s,i) { return s + (parseFloat(i.amount)||0); }, 0);
-        itemsHtml += '<div class="room-section"><div class="room-header"><span>' + esc(cat) + '</span><span>' + formatMoney(catTotal) + '</span></div>' +
+        itemsHtml += '<div class="room-section"><div class="room-header"><span>' + esc(cat) + '</span><span>' + (type === 'po' ? '' : formatMoney(catTotal)) + '</span></div>' +
           '<table class="cch-premium-items-table">' + _premiumColgroup + '<thead><tr><th>' + _thItemLabel + '</th>' +
           (type === 'po' ? '<th>Vendor</th>' : '') +
           '<th style="text-align:center;">Qty</th>' +
@@ -4318,16 +4285,6 @@
     var shipToHtml = shipToDisplay
       ? esc(shipToDisplay).replace(/\n/g, '<br>')
       : '<span style="color:#5C6B80;font-size:12px;">Set <strong>Project Address</strong> (job site) in Edit Project, or choose ship-to on lines.</span>';
-    if (type === 'po') {
-      var _poShipSet = {};
-      items.forEach(function(it) {
-        var s = String(it.shipTo || it.deliverTo || '').trim();
-        if (s) _poShipSet[s] = true;
-      });
-      if (Object.keys(_poShipSet).length > 1) {
-        shipToHtml += '<div style="margin-top:6px;font-size:11px;color:#B45309;font-weight:600;">Multiple ship-to locations — see each line item below.</div>';
-      }
-    }
     var projectAddressPdf = typeof window.cchProjectAddressFromData === 'function'
       ? window.cchProjectAddressFromData(proj, docData)
       : String(proj.projectAddress || proj.address || docData.projectAddress || '').trim();
@@ -4357,16 +4314,8 @@
 
     var infoSectionHtml = '';
     if (type === 'po') {
-      var vendorBlockHtml = '';
-      if (docData.vendor) {
-        vendorBlockHtml = '<strong>' + esc(docData.vendor) + '</strong>';
-        if (vendorAddrPremium) {
-          vendorBlockHtml += '<div style="margin-top:6px;color:#5C6B80;font-size:12px;line-height:1.55;">' +
-            esc(vendorAddrPremium).replace(/\n/g, '<br>') + '</div>';
-        }
-      }
       infoSectionHtml = '<div class="info-section info-section-po">' +
-        (vendorBlockHtml ? '<div class="info-block"><div class="info-label">Bill to (vendor)</div><div class="info-value">' + vendorBlockHtml + '</div></div>' : '') +
+        (docData.vendor ? '<div class="info-block"><div class="info-label">Vendor</div><div class="info-value"><strong>' + esc(docData.vendor) + '</strong></div></div>' : '') +
         '<div class="info-block info-block-ship-to"><div class="info-label">Ship To</div><div class="info-value">' + shipToHtml + '</div></div>' +
       '</div>';
     } else {

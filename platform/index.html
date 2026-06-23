@@ -12071,6 +12071,53 @@
     }
     window.cchMergeLineItemWithClipImages = cchMergeLineItemWithClipImages;
 
+    /** First https product/vendor page on a line, clip, or library row (clipper fields). */
+    function cchLineProductSourceUrl(item) {
+      item = item || {};
+      var list = [item.productUrl, item.pageUrl, item.sourceUrl, item.clippedFromUrl, item.vendorUrl, item.link, item.houzzUrl, item.canonicalUrl, item.url];
+      for (var i = 0; i < list.length; i++) {
+        var u = String(list[i] || '').trim();
+        if (!u || !/^https?:\/\//i.test(u)) continue;
+        var low = u.toLowerCase();
+        if (low.indexOf('javascript:') === 0 || low.indexOf('data:') === 0) continue;
+        return u;
+      }
+      return '';
+    }
+    window.cchLineProductSourceUrl = cchLineProductSourceUrl;
+
+    /** Fill-empty-only: copy clipper URL, SKU, finish, size, description from clip or library onto a doc line. */
+    function cchFillLineItemFromClipMetadata(line, clip, lib) {
+      line = Object.assign({}, line || {});
+      clip = clip || {};
+      lib = lib || {};
+      var url = cchLineProductSourceUrl(line);
+      if (!url) url = cchLineProductSourceUrl(clip);
+      if (!url) url = cchLineProductSourceUrl(lib);
+      if (url && !cchLineProductSourceUrl(line)) {
+        line.productUrl = url;
+        if (!String(line.pageUrl || '').trim()) line.pageUrl = url;
+      }
+      if (!String(line.sku || '').trim()) {
+        var sk = String(clip.sku || clip.model || clip.itemCode || lib.sku || lib.model || lib.productCode || '').trim();
+        if (sk) line.sku = sk;
+      }
+      if (!String(line.finish || '').trim()) {
+        var fn = String(clip.finish || clip.color || clip.finishColor || lib.finish || lib.color || '').trim();
+        if (fn) line.finish = fn;
+      }
+      if (!String(line.dimensions || '').trim()) {
+        var dm = String(clip.dimensions || clip.size || lib.dimensions || '').trim();
+        if (dm) line.dimensions = dm;
+      }
+      if (!String(line.description || '').trim()) {
+        var desc = String(clip.description || clip.clientDescription || lib.description || lib.clientDescription || '').trim();
+        if (desc) line.description = desc;
+      }
+      return line;
+    }
+    window.cchFillLineItemFromClipMetadata = cchFillLineItemFromClipMetadata;
+
     /** Thumbnail for Add-item sidebar — matches room boards (images[] + objects, hero index, imageUrl). */
     function getDocSidebarItemThumbnailUrl(item) {
       item = item || {};
@@ -29209,8 +29256,12 @@ async function renderBoardsTab(T, proj) {
           try {
             var _clipSnapEditor = await db.collection('boards').doc(projectId).collection('clips').doc(_clipIdForEditor).get();
             if (_clipSnapEditor.exists) {
+              var _clipDataEditor = Object.assign({ id: _clipSnapEditor.id }, _clipSnapEditor.data() || {});
               var _clipBeforeN = (cchProposalLineImagesFromSource(item).images || []).length;
-              item = cchMergeLineItemWithClipImages(item, Object.assign({ id: _clipSnapEditor.id }, _clipSnapEditor.data() || {}));
+              item = cchMergeLineItemWithClipImages(item, _clipDataEditor);
+              if (typeof cchFillLineItemFromClipMetadata === 'function') {
+                item = cchFillLineItemFromClipMetadata(item, _clipDataEditor);
+              }
               var _clipAfterN = (cchProposalLineImagesFromSource(item).images || []).length;
               if (_clipAfterN > _clipBeforeN) {
                 try { showToast('Loaded ' + _clipAfterN + ' images from your Room Board clip', 3500); } catch (_tClip) {}
@@ -29227,6 +29278,9 @@ async function renderBoardsTab(T, proj) {
         window._piLibraryResolve = (typeof resolveLineItemFromLibrary === 'function')
           ? await resolveLineItemFromLibrary(item, idx, { ensureBulkCache: true, buildClipCtx: false })
           : null;
+        if (window._piLibraryResolve && window._piLibraryResolve.lib && typeof cchFillLineItemFromClipMetadata === 'function') {
+          item = cchFillLineItemFromClipMetadata(item, {}, window._piLibraryResolve.lib);
+        }
         window._piLibraryApplied = false;
         window._piImageManual = lineItemImageIsProtected(item);
         var _rmLine = String(item.room || '').trim();
@@ -29284,6 +29338,10 @@ async function renderBoardsTab(T, proj) {
             '<button type="button" style="display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;color:#0F1A2E;" onclick="cchCloseDocMoreDd();piAddImageUrl()">🔗 Add image URL</button>' +
             '</div></div>';
         }
+        var _piSourceUrl = (typeof cchLineProductSourceUrl === 'function') ? cchLineProductSourceUrl(item) : '';
+        var _piOpenPageBtn = _piSourceUrl
+          ? '<a id="piOpenProductPage" href="' + escAttr(_piSourceUrl) + '" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="flex-shrink:0;white-space:nowrap;">Open page ↗</a>'
+          : '<span id="piOpenProductPage" class="btn btn-secondary btn-sm" style="flex-shrink:0;opacity:0.45;pointer-events:none;">Open page ↗</span>';
         var _piDeleteOnclick = collection === 'proposals'
           ? 'removeProposalItem(\'' + escAttr(projectId) + '\',\'' + escAttr(docId) + '\',' + idx + ',{lineEditor:true})'
           : 'docEditRemoveItemFromModal(' + idx + ')';
@@ -29342,10 +29400,19 @@ async function renderBoardsTab(T, proj) {
                       <div class="form-group"><label class="form-label">Room</label><select class="form-input" id="piRoom">${_piRoomOptions(item.room || '', boardRooms)}</select></div>
                       <div class="form-group"><label class="form-label">Ship To</label><select class="form-input" id="piShipTo">${_piShipToOptions(item.shipTo || '')}</select></div>
                     </div>
+                    <div class="form-group" style="margin-bottom:4px;">
+                      <label class="form-label">Product page</label>
+                      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        <input class="form-input" id="piProductUrl" value="${escAttr(_piSourceUrl)}" placeholder="https://vendor.com/product…" style="flex:1;min-width:200px;font-size:12px;" oninput="piProductUrlChanged()">
+                        ${_piOpenPageBtn}
+                      </div>
+                      <div style="font-size:10px;color:var(--gray-500);margin-top:4px;line-height:1.35;">Clipper / vendor link — open to check finish, size, and specs while editing this line.</div>
+                    </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                       <div class="form-group"><label class="form-label">SKU / Model</label><input class="form-input" id="piSku" value="${escAttr(item.sku || item.model || item.itemCode || '')}" placeholder="Vendor SKU or model #"></div>
                       <div class="form-group"><label class="form-label">Finish / Color</label><input class="form-input" id="piFinish" value="${escAttr(item.finish || item.color || item.finishColor || '')}" placeholder="e.g. Matte Black"></div>
                     </div>
+                    <div class="form-group"><label class="form-label">Size / Dimensions</label><input class="form-input" id="piDimensions" value="${escAttr(item.dimensions || item.size || item.dimension || '')}" placeholder='e.g. 12" H × 8" W'></div>
                     <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea clip-detail-textarea-scroll" id="piDesc" rows="3" placeholder="Product description/specs shown on the proposal.">${esc(item.description || '')}</textarea></div>
                     <div class="form-group"><label class="form-label">Tag <span style="font-weight:400;color:var(--gray-500);">(optional)</span></label><input class="form-input" id="piLineTag" value="${escAttr(_piTagVal)}" placeholder="L39, A, B, trim…" maxlength="32" style="max-width:140px;font-weight:600;" title="Fixture code, fabric/trim letter, or custom builder label"></div>
                     <div class="form-group"><label class="form-label">Notes shown under description</label><textarea class="form-textarea clip-detail-textarea-scroll" id="piLineNotes" rows="3" placeholder="Application / install notes, e.g. Banding on leading edge of panel — material application">${esc(_piNotesBody)}</textarea>
@@ -29644,6 +29711,35 @@ async function renderBoardsTab(T, proj) {
       document.getElementById('piClientPrice').textContent = formatMoney(clientPrice);
     }
 
+    window.piProductUrlChanged = function() {
+      var inp = document.getElementById('piProductUrl');
+      var btn = document.getElementById('piOpenProductPage');
+      if (!inp || !btn) return;
+      var u = String(inp.value || '').trim();
+      if (u && /^https?:\/\//i.test(u)) {
+        if (btn.tagName === 'A') {
+          btn.href = u;
+        } else {
+          var a = document.createElement('a');
+          a.id = 'piOpenProductPage';
+          a.className = 'btn btn-secondary btn-sm';
+          a.style.cssText = 'flex-shrink:0;white-space:nowrap;';
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          a.href = u;
+          a.textContent = 'Open page ↗';
+          btn.replaceWith(a);
+        }
+      } else if (btn.tagName === 'A') {
+        var span = document.createElement('span');
+        span.id = 'piOpenProductPage';
+        span.className = 'btn btn-secondary btn-sm';
+        span.style.cssText = 'flex-shrink:0;opacity:0.45;pointer-events:none;';
+        span.textContent = 'Open page ↗';
+        btn.replaceWith(span);
+      }
+    };
+
     /** True when this line was copied to an invoice (explicit marker or legacy Invoiced + approved). */
     function proposalLineIsInvoiced(item, propData) {
       item = item || {};
@@ -29758,6 +29854,24 @@ async function renderBoardsTab(T, proj) {
       if (_piFinishEl) {
         var _piFinishVal = String(_piFinishEl.value || '').trim();
         if (_piFinishVal) items[idx].finish = _piFinishVal; else delete items[idx].finish;
+      }
+      var _piDimEl = document.getElementById('piDimensions');
+      if (_piDimEl) {
+        var _piDimVal = String(_piDimEl.value || '').trim();
+        if (_piDimVal) items[idx].dimensions = _piDimVal; else delete items[idx].dimensions;
+      }
+      var _piUrlEl = document.getElementById('piProductUrl');
+      if (_piUrlEl) {
+        var _piUrlVal = String(_piUrlEl.value || '').trim();
+        if (_piUrlVal) {
+          items[idx].productUrl = _piUrlVal;
+          items[idx].pageUrl = _piUrlVal;
+        } else {
+          delete items[idx].productUrl;
+          delete items[idx].pageUrl;
+          delete items[idx].sourceUrl;
+          delete items[idx].clippedFromUrl;
+        }
       }
       var tagVal = String((document.getElementById('piLineTag') && document.getElementById('piLineTag').value) || '').trim();
       if (tagVal) items[idx].lineTag = tagVal;
@@ -30980,7 +31094,7 @@ async function renderBoardsTab(T, proj) {
         itemsHtml += '<div style="margin-bottom:24px;">' +
           '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #eee;padding:6px 0 4px;margin-bottom:8px;">' +
           '<div style="font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:#999;font-weight:600;">' + esc(cat) + '</div>' +
-          '<div style="font-size:12px;font-weight:600;color:#999;">' + formatMoney(catTotal) + '</div></div>' +
+          (isPO ? '' : '<div style="font-size:12px;font-weight:600;color:#999;">' + formatMoney(catTotal) + '</div>') + '</div>' +
           '<table><thead><tr>' + (showImgColLegacy ? '<th style="width:110px;"></th>' : '') + '<th>Item</th>';
         if (isPO) {
           itemsHtml += '<th>Vendor</th><th>Room</th><th style="text-align:center;">Qty</th><th class="right">Cost</th><th class="right">Shipping</th><th class="right">Total</th>';
@@ -36787,6 +36901,8 @@ async function renderBoardsTab(T, proj) {
               room: item.room || item.category || '', qty: item.qty || 1,
               lineTag: _poLineTag || null,
               sku: item.sku || '', finish: item.finish || '', dimensions: item.dimensions || '',
+              productUrl: (typeof cchLineProductSourceUrl === 'function' ? cchLineProductSourceUrl(item) : String(item.productUrl || item.pageUrl || '').trim()) || null,
+              pageUrl: (typeof cchLineProductSourceUrl === 'function' ? cchLineProductSourceUrl(item) : String(item.pageUrl || item.productUrl || '').trim()) || null,
               cost: parseFloat(item.cost || item.totalCost || 0),
               unitCost: parseFloat(item.cost || item.totalCost || 0) / (parseFloat(item.qty) || 1),
               clientPrice: parseFloat(item.amount || item.totalSelling || item.clientPrice || 0),

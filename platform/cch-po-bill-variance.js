@@ -209,45 +209,6 @@
       sentLine + billLine + '</div>';
   };
 
-  /**
-   * Compact QB status dot for list columns. Three states only:
-   *   GREEN   = pushed through to QuickBooks (bill present in QB)
-   *   RED     = last push to QuickBooks failed
-   *   NOTHING = nothing pushed yet (never attempted, awaiting bill, or ready to push)
-   */
-  window.cchPoQbDotCellHtml = function(po) {
-    po = po || {};
-    var bill = po.bill || {};
-    var qbBillId = String(bill.qbBillId || '').trim();
-    var legQb = typeof window.getQbId === 'function' ? String(window.getQbId(po) || '').trim() : '';
-    var blRef = typeof window.cchPoQbBillDocNumberFromPo === 'function' ? window.cchPoQbBillDocNumberFromPo(po) : '';
-    var pushErr = String(bill.qbPushError || '').trim();
-    function dot(color, tip, label) {
-      return '<span style="display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%;" title="' + escAttr(tip) + '">' +
-        '<span style="width:10px;height:10px;border-radius:50%;background:' + color + ';display:inline-block;flex-shrink:0;box-shadow:0 0 0 1px rgba(15,26,46,0.08);"></span>' +
-        (label ? '<span style="font-size:10px;color:#5C6B80;font-weight:600;white-space:nowrap;">' + esc(label) + '</span>' : '') +
-        '</span>';
-    }
-    var none = '<span style="color:var(--gray-400);font-size:12px;" title="Not pushed to QuickBooks">—</span>';
-    // GREEN — successfully pushed / present in QuickBooks
-    if (qbBillId) {
-      var stale = (typeof cchPoBillNeedsQbSync === 'function') && cchPoBillNeedsQbSync(bill);
-      var linkedTip = bill.qbLinkedExisting ? ' · linked existing QB bill' : '';
-      return dot('#5FA56B',
-        (stale ? 'In QuickBooks (edited in Studio — re-push to update) · ' : 'Pushed to QuickBooks · ') + (blRef || qbBillId) + linkedTip,
-        'QB');
-    }
-    if (legQb && !window.cchPoQbBillOnlyMode()) {
-      return dot('#5FA56B', 'In QuickBooks (legacy) · ' + legQb, 'QB');
-    }
-    // RED — a push was attempted and failed
-    if (pushErr) {
-      return dot('#DC2626', 'QuickBooks push failed: ' + pushErr + (blRef ? ' · ' + blRef : ''), 'Failed');
-    }
-    // NOTHING — not pushed yet (never attempted, awaiting bill, ready to push, or staging-blocked)
-    return none;
-  };
-
   var PO_LIFECYCLE_STEPS = ['draft', 'sent', 'bill_received', 'paid', 'cleared'];
   var VARIANCE_REASONS = [
     { id: 'shipping', label: 'Shipping', defaultRes: 'billable_to_client' },
@@ -303,60 +264,6 @@
     return out;
   }
 
-  /** Normalize PO # for per-project dedup (matches project PO tab). */
-  function cchPoNormPoNumberKey(s) {
-    return String(s || '').trim().replace(/^#/, '').toUpperCase();
-  }
-
-  function cchPoPoDedupeScore(po) {
-    var s = 0;
-    if (String(po.id || '').indexOf('clip-po-') !== 0) s += 1e6;
-    if (typeof window.getQbId === 'function' && window.getQbId(po)) s += 1e5;
-    if (po.bill && po.bill.received) s += 5e4;
-    if (po.poLocked || po.poSentAt || po.sentAt) s += 2e4;
-    s += (po.items || []).length * 100;
-    var paid = typeof window.cchPoPaidTotal === 'function' ? window.cchPoPaidTotal(po) : 0;
-    s += paid * 10;
-    var ts = new Date(po.updatedAt || po.poSentAt || po.createdAt || 0).getTime();
-    if (!isNaN(ts)) s += ts / 1e6;
-    return s;
-  }
-
-  /** One row per PO # per project — hides duplicate Firestore docs (imports / clip-po stubs). */
-  window.cchPoDedupePosByProjectNumber = function(allPos) {
-    if (!allPos || !allPos.length) return { pos: allPos || [], hidden: 0 };
-    var byPid = {};
-    allPos.forEach(function(po) {
-      var pid = po.projectId || '__none';
-      if (!byPid[pid]) byPid[pid] = [];
-      byPid[pid].push(po);
-    });
-    var out = [];
-    var hidden = 0;
-    Object.keys(byPid).forEach(function(pid) {
-      var buckets = {};
-      byPid[pid].forEach(function(po) {
-        var k = cchPoNormPoNumberKey(po.number || po.num || po.poNum || '');
-        if (!k) k = '__id:' + (po.id || '');
-        if (!buckets[k]) buckets[k] = [];
-        buckets[k].push(po);
-      });
-      Object.keys(buckets).forEach(function(k) {
-        var arr = buckets[k];
-        if (arr.length === 1) {
-          out.push(arr[0]);
-          return;
-        }
-        hidden += arr.length - 1;
-        arr.sort(function(a, b) { return cchPoPoDedupeScore(b) - cchPoPoDedupeScore(a); });
-        var keep = arr[0];
-        keep._omDedupeSiblings = arr.length - 1;
-        out.push(keep);
-      });
-    });
-    return { pos: out, hidden: hidden };
-  };
-
   /** Firm-wide PO load — same Firestore path as bill variances (not limited to loadFinancialData cache). */
   window.cchPoLoadAllPosForVendorBills = async function() {
     var boards = await cchPoBoardList();
@@ -381,8 +288,7 @@
     }));
     var pos = [];
     chunks.forEach(function(part) { pos = pos.concat(part); });
-    var deduped = window.cchPoDedupePosByProjectNumber(pos);
-    return { pos: deduped.pos, projNames: projNames, dedupeHidden: deduped.hidden };
+    return { pos: pos, projNames: projNames };
   };
 
   window.cchPoDocTotal = function(doc) {
@@ -446,6 +352,30 @@
   /** Single PO display/save total — trade merchandise from lines, not client markup. */
   window.cchPoDisplayTotal = function(doc) {
     return window.cchPoMerchandiseTotal(doc);
+  };
+
+  /** PO line vendor — fall back to PO header when line field empty (legacy/sent POs). */
+  window.cchPoLineDisplayVendor = function(item, doc) {
+    var v = String(item && item.vendor || '').trim();
+    if (v) return v;
+    v = String(doc && doc.vendor || '').trim();
+    if (v) return v;
+    v = String(item && item.manufacturer || '').trim();
+    return v;
+  };
+
+  /** Fill-empty-only: copy PO header vendor onto lines missing vendor. Returns true if any line changed. */
+  window.cchPoHydrateLineVendorsFromDoc = function(items, doc) {
+    if (!items || !items.length || !doc) return false;
+    var poV = String(doc.vendor || '').trim();
+    if (!poV) return false;
+    var changed = false;
+    items.forEach(function(it) {
+      if (!it || String(it.vendor || '').trim()) return;
+      it.vendor = poV;
+      changed = true;
+    });
+    return changed;
   };
 
   /** PO list / variance baseline — merchandise only (no vendor tax or freight lines). */
@@ -578,10 +508,8 @@
     if (typeof window.invalidateSearchCache === 'function') window.invalidateSearchCache();
     if (typeof window._cacheTime !== 'undefined') window._cacheTime = 0;
     var h = window.location.hash || '';
-    if ((h.indexOf('/vendorbills') >= 0 || h.indexOf('/ordermanagement') >= 0) &&
-        typeof window.cchPoRefreshFinancePage === 'function') {
-      if (h.indexOf('/ordermanagement') >= 0 && window._omInlineSaveActive) return;
-      window.cchPoRefreshFinancePage();
+    if (h.indexOf('/vendorbills') >= 0 && typeof window.renderAllVendorBillsPage === 'function') {
+      window.renderAllVendorBillsPage();
       return;
     }
     if (h.indexOf('/po/' + poId) >= 0 && typeof window.renderDocViewPage === 'function') {
@@ -935,118 +863,6 @@
       return Math.max(0, Math.round((poTotal - paid) * 100) / 100);
     }
     return poTotal;
-  };
-
-  /** Short single-line ship-to label for PO lists (client, workroom, receiver, job site, etc.). */
-  window.cchPoListShipToLabel = function(po) {
-    po = po || {};
-    var raw = String(po.shipTo || po.deliverTo || '').trim();
-    if (!raw) {
-      var items = po.items || [];
-      var seen = {};
-      var fromLines = [];
-      items.forEach(function(it) {
-        var s = String((it && (it.shipTo || it.deliverTo)) || '').trim();
-        if (s && !seen[s]) {
-          seen[s] = true;
-          fromLines.push(s);
-        }
-      });
-      if (fromLines.length === 1) raw = fromLines[0];
-      else if (fromLines.length > 1) return fromLines.map(function(s) { return window.cchPoListShipToLabel({ shipTo: s }); }).join(' · ');
-    }
-    if (!raw) raw = String(po.workroom || po.receiver || po.location || '').trim();
-    if (!raw) {
-      var st = String(po.status || '').toLowerCase();
-      var loc = String(po.location || '').trim();
-      if ((st === 'at workroom' || st === 'at receiver') && loc) raw = loc;
-    }
-    if (!raw) return '';
-
-    function shortLabel(s) {
-      s = String(s || '').trim();
-      if (!s) return '';
-      var line = s.split('\n')[0].trim();
-      if (line.indexOf('·') >= 0 || line.indexOf('\u00b7') >= 0) line = line.split(/[·\u00b7]/)[0].trim();
-      return line;
-    }
-
-    var label = shortLabel(raw);
-    var low = label.toLowerCase().replace(/\s+/g, ' ').trim();
-    if (low === 'client' || low === 'client home' || low === 'billing' || /^client\s*\(?use billing/.test(low)) {
-      var cn = String(po.clientName || '').trim();
-      if (cn) return cn;
-      if (po.projectName && String(po.projectName).indexOf(' - ') >= 0) {
-        return String(po.projectName).split(' - ')[0].trim();
-      }
-      return 'Client';
-    }
-    if (low.indexOf('job site') >= 0 || low === 'jobsite' || low === 'client job site') return 'Job site';
-    if (low === 'cch' || low === 'cch office' || low === 'cch design studio' || low === 'cch design') return 'CCH Design Studio';
-    if (low === 'vh' || low === 'vh warehouse' || low === 'vessel home') return 'VH Warehouse';
-    if (/^workroom:/i.test(label)) return label.replace(/^workroom:\s*/i, '');
-    if (/^receiver:/i.test(label)) return label.replace(/^receiver:\s*/i, '');
-    return label;
-  };
-
-  /** Multiline remit-to / vendor address from a vendors catalog record. */
-  window.cchVendorCatalogAddressText = function(v) {
-    if (!v) return '';
-    if (typeof window.cchComposeAddressMultiline === 'function' &&
-        typeof window.cchAddressPartsFromRecord === 'function' &&
-        typeof window.cchCoerceStructuredAddressParts === 'function') {
-      var composed = window.cchComposeAddressMultiline(
-        window.cchCoerceStructuredAddressParts(window.cchAddressPartsFromRecord(v))
-      );
-      if (composed) return composed;
-    }
-    return String(v.address || v.vendorAddress || '').trim();
-  };
-
-  /** Find vendor by display name (cache, then Firestore). */
-  window.cchLookupVendorRecordByName = async function(name) {
-    name = String(name || '').trim();
-    if (!name) return null;
-    var low = name.toLowerCase();
-    try {
-      if (typeof vendorsCache !== 'undefined' && vendorsCache && vendorsCache.length) {
-        var hit = vendorsCache.find(function(v) {
-          return v && String(v.name || '').trim().toLowerCase() === low;
-        });
-        if (hit) return hit;
-      }
-    } catch (_cacheErr) { /* ignore */ }
-    try {
-      var snap = await db.collection('vendors').where('name', '==', name).limit(1).get();
-      if (!snap.empty) {
-        var d0 = snap.docs[0];
-        return Object.assign({ id: d0.id }, d0.data());
-      }
-      var all = await db.collection('vendors').get();
-      var found = null;
-      all.forEach(function(d) {
-        if (found) return;
-        var v = d.data() || {};
-        if (String(v.name || '').trim().toLowerCase() === low) {
-          found = Object.assign({ id: d.id }, v);
-        }
-      });
-      return found;
-    } catch (e) {
-      console.warn('[cchLookupVendorRecordByName]', e);
-      return null;
-    }
-  };
-
-  /** PO vendor address: saved on doc, else vendors catalog. */
-  window.cchPoVendorAddressResolved = async function(docData) {
-    docData = docData || {};
-    var stored = String(docData.vendorAddress || '').trim();
-    if (stored) return stored;
-    var vend = String(docData.vendor || '').trim();
-    if (!vend) return '';
-    var rec = await window.cchLookupVendorRecordByName(vend);
-    return window.cchVendorCatalogAddressText(rec);
   };
 
   /** Bill, paid, balance, variance cells for All POs / project PO lists. */
@@ -3194,15 +3010,11 @@
   window.cchPoVendorInvoicePayStatusBadgeHtml = function(paid, due) {
     paid = parseFloat(paid) || 0;
     due = parseFloat(due) || 0;
-    var omUi = typeof window.cchOmIsActive === 'function' && window.cchOmIsActive();
     if (due <= 0.02 && paid > 0.01) {
       return '<span class="badge" style="font-size:10px;font-weight:700;padding:3px 10px;background:rgba(46,125,50,0.14);color:#1B5E20;border:1px solid rgba(46,125,50,0.25);white-space:nowrap;">Paid</span>';
     }
     if (due > 0.02) {
-      var dueBg = omUi ? 'rgba(15,26,46,0.08)' : 'rgba(180,83,9,0.12)';
-      var dueColor = omUi ? '#0F1A2E' : '#92400E';
-      var dueBorder = omUi ? 'rgba(15,26,46,0.18)' : 'rgba(180,83,9,0.22)';
-      return '<span class="badge" style="font-size:10px;font-weight:700;padding:3px 10px;background:' + dueBg + ';color:' + dueColor + ';border:1px solid ' + dueBorder + ';white-space:nowrap;">Due ' + fmt(due) + '</span>';
+      return '<span class="badge" style="font-size:10px;font-weight:700;padding:3px 10px;background:rgba(180,83,9,0.12);color:#92400E;border:1px solid rgba(180,83,9,0.22);white-space:nowrap;">Due ' + fmt(due) + '</span>';
     }
     return '<span style="font-size:11px;color:#9CA3AF;">Unpaid</span>';
   };
@@ -3672,7 +3484,7 @@
       if (pending) {
         varCard += window.cchPoVarianceResolveFormHtml(projectId, poId, docData);
         varCard += '<div style="margin-top:10px;font-size:11px;"><a href="#" onclick="event.preventDefault();navigate(\'#/project/' + escJs(projectId) + '/discrepancies\');return false;" style="color:var(--cyan);font-weight:600;">Open Bill variances for this project →</a> · ' +
-          '<a href="#" onclick="event.preventDefault();navigate(\'' + escJs(typeof window.cchPoFinanceRoute === 'function' ? window.cchPoFinanceRoute('variances') : '#/vendorbills/variances') + '\');return false;" style="color:var(--cyan);font-weight:600;">Firm-wide Bill variances →</a></div>';
+          '<a href="#" onclick="event.preventDefault();navigate(\'#/vendorbills/variances\');return false;" style="color:var(--cyan);font-weight:600;">Firm-wide Bill variances →</a></div>';
       } else {
         varCard += '<div style="font-size:12px;color:var(--gray-600);">Resolution: <strong>' + esc(variance.resolution) + '</strong></div>';
       }
@@ -4322,49 +4134,22 @@
       var rd = result && result.data;
       if (rd && rd.success) {
         var msg = rd.message || (rd.updated ? 'QuickBooks Bill updated' : 'Bill pushed to QuickBooks');
-        await cchPoStampQbPushOutcome(projectId, poId, null);
         if (!opts.skipConfirm && typeof window.showToast === 'function') window.showToast(msg, 'success');
         if (btn) { btn.innerHTML = '✅ Bill in QB'; }
         if (!opts.skipConfirm && typeof window.navigate === 'function') window.navigate(window.location.hash);
         return { ok: true, message: msg, qbBillId: rd.qbBillId };
       }
-      var failMsg = (rd && rd.message) || 'QuickBooks did not confirm the bill push.';
-      await cchPoStampQbPushOutcome(projectId, poId, failMsg);
       if (typeof window.cchAlert === 'function') {
-        await window.cchAlert(failMsg, 'QuickBooks');
+        await window.cchAlert((rd && rd.message) || 'QuickBooks did not confirm the bill push.', 'QuickBooks');
       }
       if (btn) { btn.innerHTML = orig; btn.disabled = false; }
-      if (!opts.skipConfirm && typeof window.navigate === 'function') window.navigate(window.location.hash);
       return { ok: false };
     } catch (e) {
-      var errMsg = (e && e.message) || String(e);
-      await cchPoStampQbPushOutcome(projectId, poId, errMsg);
-      if (typeof window.cchAlert === 'function') await window.cchAlert(errMsg, 'Push bill to QuickBooks');
+      if (typeof window.cchAlert === 'function') await window.cchAlert((e && e.message) || String(e), 'Push bill to QuickBooks');
       if (btn) { btn.innerHTML = orig; btn.disabled = false; }
-      if (!opts.skipConfirm && typeof window.navigate === 'function') window.navigate(window.location.hash);
       return { ok: false, error: e };
     }
   };
-
-  /** Record the outcome of a QB bill push on the PO so list dots can show green (ok) / red (failed). */
-  async function cchPoStampQbPushOutcome(projectId, poId, errorMsg) {
-    try {
-      var ref = firebase.firestore().collection('boards').doc(projectId).collection('purchaseOrders').doc(poId);
-      if (errorMsg) {
-        await ref.update({
-          'bill.qbPushError': String(errorMsg).slice(0, 300),
-          'bill.qbPushErrorAt': new Date().toISOString()
-        });
-      } else {
-        await ref.update({
-          'bill.qbPushError': firebase.firestore.FieldValue.delete(),
-          'bill.qbPushErrorAt': firebase.firestore.FieldValue.delete()
-        });
-      }
-    } catch (_eStamp) {
-      console.warn('[cchPoStampQbPushOutcome] could not record QB push outcome', _eStamp);
-    }
-  }
 
   window.cchPoSaveRecordedPayment = async function(projectId, poId) {
     var amt = parseFloat(document.getElementById('cchPoPayAmt').value) || 0;
@@ -4799,8 +4584,8 @@
     T.innerHTML = '<div class="page-header" style="display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px;">' +
       '<div><div class="page-title">Bill variances</div>' +
       '<div class="page-subtitle">This project · select multiple PO variances and add to one client invoice</div></div>' +
-      '<button type="button" class="btn btn-secondary btn-sm" onclick="navigate(\'' + escJs(typeof window.cchPoFinanceRoute === 'function' ? window.cchPoFinanceRoute('variances') : '#/vendorbills/variances') + '\')">Open firm-wide Bill variances</button></div>' +
-      '<p style="font-size:12px;color:#5C6B80;max-width:720px;margin:0 0 14px;line-height:1.5;">Freight, tax, and other charges above the locked PO total. Firm-wide list: Finance → <strong>Order Management → Bill variances</strong>.</p>' +
+      '<button type="button" class="btn btn-secondary btn-sm" onclick="navigate(\'#/vendorbills/variances\')">Open firm-wide Bill variances</button></div>' +
+      '<p style="font-size:12px;color:#5C6B80;max-width:720px;margin:0 0 14px;line-height:1.5;">Freight, tax, and other charges above the locked PO total. Firm-wide list: Finance → <strong>Vendor Bills → Bill variances</strong>.</p>' +
       '<div style="margin-bottom:14px;">' + chips + '</div>' + batchBar +
       '<table class="data-table"><thead><tr><th style="width:36px;"></th><th>PO</th><th>Vendor</th>' +
       '<th style="text-align:right;">PO total</th><th style="text-align:right;">Bill total</th><th style="text-align:right;">Variance</th>' +
@@ -4811,32 +4596,13 @@
   window.cchPoSetFirmVarianceFilter = function(f) {
     window._poDiscFilter = f;
     window._vendorBillsTab = 'variances';
-    window.cchPoRefreshFinancePage();
+    window.renderAllVendorBillsPage();
   };
 
   window.cchPoFirmVarianceProjectChanged = function(projectId) {
     window._poVarFirmProject = projectId || 'all';
     window._vendorBillsTab = 'variances';
-    window.cchPoRefreshFinancePage();
-  };
-
-  window.cchPoFinanceRoute = function(tab) {
-    if (typeof window.cchOmPageEnabled === 'function' && window.cchOmPageEnabled()) {
-      if (tab === 'variances') return '#/ordermanagement/variances';
-      return '#/ordermanagement/bills';
-    }
-    if (tab === 'variances') return '#/vendorbills/variances';
-    return '#/vendorbills';
-  };
-
-  window.cchPoRefreshFinancePage = function() {
-    if (typeof window.cchOmIsActive === 'function' && window.cchOmIsActive() &&
-        typeof window.cchOmSoftRefresh === 'function') {
-      return window.cchOmSoftRefresh();
-    }
-    if (typeof window.renderAllVendorBillsPage === 'function') {
-      return window.renderAllVendorBillsPage();
-    }
+    window.renderAllVendorBillsPage();
   };
 
   function cchPoVendorBillsTabBarHtml(activeTab, varianceReady) {
@@ -4883,16 +4649,13 @@
   window.cchPoSetVendorBillsTab = function(tab) {
     window._vendorBillsTab = tab === 'variances' ? 'variances' : 'bills';
     if (typeof window.navigate === 'function') {
-      window.navigate(window.cchPoFinanceRoute(window._vendorBillsTab === 'variances' ? 'variances' : 'bills'));
+      window.navigate(window._vendorBillsTab === 'variances' ? '#/vendorbills/variances' : '#/vendorbills');
     } else {
-      window.cchPoRefreshFinancePage();
+      window.renderAllVendorBillsPage();
     }
   };
 
   async function cchPoBuildFirmVariancePanelHtml() {
-    var omUi = typeof window.cchOmIsActive === 'function' && window.cchOmIsActive();
-    var readyAccent = omUi ? '#0F1A2E' : '#B45309';
-    var cardStyle = 'padding:14px 18px;min-width:160px;background:#fff;border:1px solid rgba(15,26,46,0.12);';
     var allRows = await window.cchPoCollectVarianceRows();
     window.__cchVarBatchRows = allRows.filter(function(r) { return r.readyToBill; });
     var filter = window._poDiscFilter || 'ready_to_bill';
@@ -4926,12 +4689,12 @@
         '</div>'
       : '';
 
-    return '<p style="font-size:13px;color:#5C6B80;max-width:760px;line-height:1.5;margin:0 0 10px;">PO vendor bill vs locked PO total — <strong>bill the client</strong> for freight, tax, and fees above the PO. To <strong>pay the vendor</strong>, use the <button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px;vertical-align:baseline;" onclick="cchPoSetVendorBillsTab(\'bills\')">Vendor bills</button> tab in Order Management.</p>' +
+    return '<p style="font-size:13px;color:var(--gray-500);max-width:760px;line-height:1.5;margin:0 0 10px;">PO vendor bill vs locked PO total — <strong>bill the client</strong> for freight, tax, and fees above the PO. To <strong>pay the vendor</strong>, use the <button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px;vertical-align:baseline;" onclick="cchPoSetVendorBillsTab(\'bills\')">Vendor bills</button> tab.</p>' +
       '<div style="display:flex;flex-wrap:wrap;gap:12px;margin:16px 0;">' +
-        '<div class="card" style="' + cardStyle + '"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Ready to bill</div>' +
-          '<div style="font-size:22px;font-weight:700;color:' + readyAccent + ';">' + readyRows.length + '</div></div>' +
-        '<div class="card" style="' + cardStyle + '"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Ready total</div>' +
-          '<div style="font-size:22px;font-weight:700;color:#0F1A2E;">' + fmt(readySum) + '</div></div>' +
+        '<div class="card" style="padding:14px 18px;min-width:160px;"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Ready to bill</div>' +
+          '<div style="font-size:22px;font-weight:700;color:#B45309;">' + readyRows.length + '</div></div>' +
+        '<div class="card" style="padding:14px 18px;min-width:160px;"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Ready total</div>' +
+          '<div style="font-size:22px;font-weight:700;color:#1B3352;">' + fmt(readySum) + '</div></div>' +
       '</div>' +
       '<div style="margin-bottom:14px;">' + chips + '</div>' + batchBar +
       '<table class="data-table"><thead><tr><th style="width:36px;"></th><th>Project</th><th>PO</th><th>Vendor</th>' +
@@ -4939,17 +4702,9 @@
       '<th>Reason</th><th>Status</th><th>Client invoice</th></tr></thead><tbody>' +
       cchPoBuildVarianceTableRowsHtml(rows, true) + '</tbody></table>';
   }
-  window.cchPoBuildFirmVariancePanelHtml = cchPoBuildFirmVariancePanelHtml;
 
   window.renderDiscrepancyReportPage = async function() {
     window._vendorBillsTab = 'variances';
-    if (typeof window.cchOmPageEnabled === 'function' && window.cchOmPageEnabled() &&
-        typeof window.renderOrderManagementPage === 'function') {
-      if (typeof history !== 'undefined' && history.replaceState) {
-        history.replaceState(null, '', '#/ordermanagement/variances');
-      }
-      return window.renderOrderManagementPage();
-    }
     return window.renderAllVendorBillsPage();
   };
 
@@ -5131,9 +4886,6 @@
   function cchPoBuildVendorBillsPanelHtml(pos, projNames, preset) {
     projNames = projNames || {};
     preset = preset || '';
-    var omUi = typeof window.cchOmIsActive === 'function' && window.cchOmIsActive();
-    var openAccent = omUi ? '#0F1A2E' : '#B45309';
-    var cardStyle = 'padding:14px 18px;min-width:140px;background:#fff;border:1px solid rgba(15,26,46,0.12);';
     if (preset === 'open' || preset === 'pending' || preset === 'paid' || preset === 'all') {
       window._vendorBillsFilter = preset === 'pending' ? 'awaiting_bill' : preset;
     }
@@ -5170,19 +4922,14 @@
 
     function chip(id, label, count) {
       var on = filter === id;
-      var chipBorder = on ? (omUi ? '#0F1A2E' : '#C4A464') : 'rgba(15,26,46,0.18)';
-      var chipBg = on ? (omUi ? 'rgba(15,26,46,0.08)' : 'rgba(196,164,100,0.22)') : '#fff';
-      var chipColor = on ? (omUi ? '#0F1A2E' : '#5C4A2A') : '#0F1A2E';
       return '<button type="button" onclick="cchPoSetVendorBillsFilter(\'' + escJs(id) + '\')" style="padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;border:1px solid ' +
-        chipBorder + ';background:' + chipBg + ';color:' + chipColor + ';">' +
+        (on ? '#C4A464' : 'rgba(15,26,46,0.18)') + ';background:' + (on ? 'rgba(196,164,100,0.22)' : '#fff') + ';color:' + (on ? '#5C4A2A' : '#0F1A2E') + ';">' +
         esc(label) + (count != null ? ' (' + count + ')' : '') + '</button>';
     }
 
     var presetBanner = '';
     if (window._vendorBillsFilter === 'open' && window.location.hash.indexOf('/open') >= 0) {
-      presetBanner = omUi
-        ? '<div style="font-size:12px;color:#0F1A2E;margin-bottom:12px;padding:10px 14px;border:1px solid rgba(15,26,46,0.15);background:#fff;">Showing open vendor bills (balance due). <a href="#" onclick="event.preventDefault();cchPoSetVendorBillsFilter(\'all\');return false;" style="color:#1B3352;font-weight:600;">Show all</a></div>'
-        : '<div style="font-size:12px;color:var(--gold);margin-bottom:12px;padding:10px 14px;border:1px solid rgba(196,164,100,0.35);background:rgba(196,164,100,0.06);">Showing open vendor bills (balance due). <a href="#" onclick="event.preventDefault();cchPoSetVendorBillsFilter(\'all\');return false;" style="color:var(--cyan);font-weight:600;">Show all</a></div>';
+      presetBanner = '<div style="font-size:12px;color:var(--gold);margin-bottom:12px;padding:10px 14px;border:1px solid rgba(196,164,100,0.35);background:rgba(196,164,100,0.06);">Showing open vendor bills (balance due). <a href="#" onclick="event.preventDefault();cchPoSetVendorBillsFilter(\'all\');return false;" style="color:var(--cyan);font-weight:600;">Show all</a></div>';
     }
 
     var tbody = rows.length ? rows.map(function(r) {
@@ -5208,14 +4955,14 @@
       return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;' + rowBg + '" onclick="navigate(\'' + escJs(poHash) + '\')">' +
         '<td style="padding:12px 14px;font-size:13px;">' + esc(r.projectName) + '</td>' +
         '<td style="padding:12px 14px;">' + billNumCell + '</td>' +
-        '<td style="padding:12px 14px;font-family:monospace;font-weight:600;color:' + (omUi ? '#0F1A2E' : 'var(--gold)') + ';">' + esc(r.poNumber || r.poId.slice(0, 8)) + '</td>' +
+        '<td style="padding:12px 14px;font-family:monospace;font-weight:600;color:var(--gold);">' + esc(r.poNumber || r.poId.slice(0, 8)) + '</td>' +
         '<td style="padding:12px 14px;font-size:13px;">' + esc(r.vendor || '—') + '</td>' +
         '<td style="padding:12px 14px;font-size:12px;font-weight:600;color:#0F1A2E;">' + invRefCell + '</td>' +
         '<td style="padding:12px 14px;font-size:12px;color:var(--gray-500);">' + esc(recvStr) + '</td>' +
         '<td style="padding:12px 14px;font-size:12px;font-weight:600;color:#1B3352;white-space:nowrap;">' + (etaStr !== '—' ? esc(etaStr) : '<span style="color:var(--gray-400);font-weight:400;">—</span>') + '</td>' +
         '<td style="padding:12px 14px;text-align:right;font-family:var(--font-mono);font-weight:600;">' + fmt(r.billTotal) + (r.hasBill ? '' : '<div style="font-size:10px;color:var(--gray-400);font-weight:400;">PO est.</div>') + '</td>' +
         '<td style="padding:12px 14px;text-align:right;font-family:var(--font-mono);color:' + (r.paid > 0.01 ? '#1B5E20' : 'var(--gray-400)') + ';">' + (r.hasBill ? fmt(r.paid) : '—') + '</td>' +
-        '<td style="padding:12px 14px;text-align:right;font-family:var(--font-mono);font-weight:700;color:' + (r.due > 0.02 ? openAccent : (r.hasBill ? '#1B5E20' : 'var(--gray-400)') ) + ';">' + (r.hasBill ? fmt(r.due) : '—') + '</td>' +
+        '<td style="padding:12px 14px;text-align:right;font-family:var(--font-mono);font-weight:700;color:' + (r.due > 0.02 ? '#B45309' : (r.hasBill ? '#1B5E20' : 'var(--gray-400)') ) + ';">' + (r.hasBill ? fmt(r.due) : '—') + '</td>' +
         '<td style="padding:12px 14px;font-size:11px;white-space:nowrap;">' + qbCell + '</td>' +
         '<td style="padding:12px 14px;text-align:center;">' + statusBadge + '</td>' +
         window.cchPoVendorBillRowActionsHtml(r) + '</tr>';
@@ -5224,26 +4971,26 @@
       : '<tr><td colspan="13" style="padding:40px;text-align:center;color:var(--gray-400);">No sent POs or received vendor bills yet. Send a PO to the vendor, then receive their invoice — those rows appear here.</td></tr>');
 
     var footerRow = recvInView.length
-      ? '<tr style="border-top:2px solid ' + (omUi ? '#0F1A2E' : 'var(--gold)') + ';background:#fff;font-weight:700;">' +
-          '<td colspan="7" style="padding:12px 14px;font-size:12px;text-align:right;color:#5C6B80;">Totals (' + recvInView.length + ' bill' + (recvInView.length !== 1 ? 's' : '') + ' in view)</td>' +
+      ? '<tr style="border-top:2px solid var(--gold);background:#FFFDF8;font-weight:700;">' +
+          '<td colspan="7" style="padding:12px 14px;font-size:12px;text-align:right;color:var(--gray-600);">Totals (' + recvInView.length + ' bill' + (recvInView.length !== 1 ? 's' : '') + ' in view)</td>' +
           '<td style="padding:12px 14px;text-align:right;font-family:var(--font-mono);color:#0F1A2E;">' + fmt(sumTotal) + '</td>' +
           '<td style="padding:12px 14px;text-align:right;font-family:var(--font-mono);color:#1B5E20;">' + fmt(sumPaid) + '</td>' +
-          '<td style="padding:12px 14px;text-align:right;font-family:var(--font-mono);color:' + (sumBalance > 0.02 ? openAccent : '#1B5E20') + ';">' + fmt(sumBalance) + '</td>' +
+          '<td style="padding:12px 14px;text-align:right;font-family:var(--font-mono);color:' + (sumBalance > 0.02 ? '#B45309' : '#1B5E20') + ';">' + fmt(sumBalance) + '</td>' +
           '<td colspan="3"></td></tr>'
       : '';
 
-    return '<p style="font-size:13px;color:#5C6B80;max-width:820px;line-height:1.55;margin:0 0 16px;">Each row is one <strong>vendor invoice</strong> on a Studio bill (<strong>Bill #</strong> BL-9017 = one QuickBooks Bill per PO). <strong>Vendor inv #</strong> is the vendor&apos;s paper invoice. Line items and PO detail live on the <strong>PO page</strong> — not here. Legacy Houzz POs synced to QB as PO stay on <strong>All POs</strong>.</p>' +
+    return '<p style="font-size:13px;color:var(--gray-500);max-width:820px;line-height:1.55;margin:0 0 16px;">Each row is one <strong>vendor invoice</strong> on a Studio bill (<strong>Bill #</strong> BL-9017 = one QuickBooks Bill per PO). <strong>Vendor inv #</strong> is the vendor&apos;s paper invoice. Line items and PO detail live on the <strong>PO page</strong> — not here. Legacy Houzz POs synced to QB as PO stay on <strong>All POs</strong>.</p>' +
       '<div style="display:flex;flex-wrap:wrap;gap:12px;margin:16px 0;">' +
-        '<div class="card" style="' + cardStyle + '"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Open bills</div>' +
-          '<div style="font-size:22px;font-weight:700;color:' + openAccent + ';">' + openRows.length + '</div></div>' +
-        '<div class="card" style="' + cardStyle + '"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Total</div>' +
+        '<div class="card" style="padding:14px 18px;min-width:140px;"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Open bills</div>' +
+          '<div style="font-size:22px;font-weight:700;color:#B45309;">' + openRows.length + '</div></div>' +
+        '<div class="card" style="padding:14px 18px;min-width:140px;"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Total</div>' +
           '<div style="font-size:22px;font-weight:700;color:#0F1A2E;font-family:var(--font-mono);">' + fmt(sumTotal) + '</div>' +
-          '<div style="font-size:10px;color:#5C6B80;margin-top:4px;">bills in this view</div></div>' +
-        '<div class="card" style="' + cardStyle + '"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Paid</div>' +
+          '<div style="font-size:10px;color:var(--gray-500);margin-top:4px;">bills in this view</div></div>' +
+        '<div class="card" style="padding:14px 18px;min-width:140px;"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Paid</div>' +
           '<div style="font-size:22px;font-weight:700;color:#1B5E20;font-family:var(--font-mono);">' + fmt(sumPaid) + '</div></div>' +
-        '<div class="card" style="' + cardStyle + '"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Balance</div>' +
-          '<div style="font-size:22px;font-weight:700;color:' + (sumBalance > 0.02 ? openAccent : '#1B5E20') + ';font-family:var(--font-mono);">' + fmt(sumBalance) + '</div>' +
-          '<div style="font-size:10px;color:#5C6B80;margin-top:4px;">' + awaiting.length + ' awaiting bill</div></div>' +
+        '<div class="card" style="padding:14px 18px;min-width:140px;"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Balance</div>' +
+          '<div style="font-size:22px;font-weight:700;color:' + (sumBalance > 0.02 ? '#B45309' : '#1B5E20') + ';font-family:var(--font-mono);">' + fmt(sumBalance) + '</div>' +
+          '<div style="font-size:10px;color:var(--gray-500);margin-top:4px;">' + awaiting.length + ' awaiting bill</div></div>' +
       '</div>' + presetBanner +
       '<div style="display:flex;flex-wrap:wrap;gap:0;margin-bottom:16px;border:1px solid rgba(10,31,61,0.14);width:fit-content;">' +
         chip('open', 'Open', openRows.length) +
@@ -5268,13 +5015,10 @@
         '<th style="text-align:center;padding:12px 14px;font-size:11px;text-transform:uppercase;color:var(--gray-400);">Actions</th>' +
       '</tr></thead><tbody>' + tbody + footerRow + '</tbody></table></div>';
   }
-  window.cchPoBuildVendorBillsPanelHtml = cchPoBuildVendorBillsPanelHtml;
 
   window.cchPoDashboardVarianceWidgetHtml = function(pendingCount, pendingSum) {
     if (!pendingCount) return '';
-    var varHash = typeof window.cchPoFinanceRoute === 'function'
-      ? window.cchPoFinanceRoute('variances') : '#/vendorbills/variances';
-    return '<div class="card" style="padding:14px 18px;margin-bottom:16px;border-left:4px solid #CA8A04;cursor:pointer;" onclick="navigate(\'' + escJs(varHash) + '\')">' +
+    return '<div class="card" style="padding:14px 18px;margin-bottom:16px;border-left:4px solid #CA8A04;cursor:pointer;" onclick="navigate(\'#/vendorbills/variances\')">' +
       '<div style="font-size:13px;font-weight:700;color:#92400E;">⚠ ' + pendingCount + ' bill variance' + (pendingCount > 1 ? 's' : '') + ' ready</div>' +
       '<div style="font-size:12px;color:var(--gray-600);">' + fmt(pendingSum) + ' to bill · <span style="color:var(--gold);font-weight:600;">Open Bill variances →</span></div></div>';
   };
@@ -5345,7 +5089,7 @@
   window.cchPoSetVendorBillsFilter = function(filter) {
     window._vendorBillsFilter = filter || 'received';
     window._vendorBillsTab = 'bills';
-    window.cchPoRefreshFinancePage();
+    window.renderAllVendorBillsPage();
   };
 
   window.renderAllVendorBillsPage = async function() {

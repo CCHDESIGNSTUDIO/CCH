@@ -161,7 +161,7 @@
     if (label) label.textContent = Math.round(z * 100) + '%';
   }
 
-  function dbFitCanvasToView() {
+  function dbFitCanvasToView(forceFitMode) {
     var wrap = document.getElementById('dbCanvasWrap');
     if (!wrap) return;
     var cw = dbEditor.boardData.canvasWidth || 1400;
@@ -170,9 +170,48 @@
     var zW = (wrap.clientWidth - pad) / cw;
     var zH = (wrap.clientHeight - pad) / ch;
     var z = Math.min(zW, zH, 1);
-    dbEditor.viewZoomMode = 'fit';
+    if (forceFitMode !== false) dbEditor.viewZoomMode = 'fit';
     dbEditor.canvasScale = Math.max(0.2, z);
     dbApplyViewZoom();
+  }
+
+  /** Size editor to visible viewport (staging banner + breadcrumbs + tabs eat space above content). */
+  function dbSyncEditorShellHeight() {
+    var root = document.getElementById('dbEditorRoot');
+    if (!root) return;
+    var top = root.getBoundingClientRect().top;
+    var h = Math.max(320, Math.floor(window.innerHeight - top - 6));
+    root.style.height = h + 'px';
+    root.style.maxHeight = h + 'px';
+  }
+
+  function dbApplyClientViewLayout() {
+    var cv = !!dbEditor.clientView;
+    var cp = document.getElementById('dbClipsPanel');
+    var pp = document.getElementById('dbPropsPanel');
+    var root = document.getElementById('dbEditorRoot');
+    if (cp) cp.style.display = cv ? 'none' : 'flex';
+    if (pp) pp.style.display = cv ? 'none' : 'block';
+    if (root) root.classList.toggle('db-editor-client-view', cv);
+    var cvBtn = document.querySelector('#dbToolbar button[onclick="toggleClientView()"]');
+    if (cvBtn) {
+      cvBtn.textContent = cv ? '👁 Client view: ON' : '👁 Client view';
+      cvBtn.style.background = cv ? '#0A1F3D' : '';
+      cvBtn.style.color = cv ? '#fff' : '';
+      cvBtn.style.borderColor = cv ? '#0A1F3D' : '';
+    }
+    dbRefreshAllPricingVisibility();
+    dbSyncEditorShellHeight();
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        if (cv) {
+          dbFitCanvasToView(true);
+        } else {
+          dbApplyViewZoom();
+          if (dbEditor.viewZoomMode === 'fit') dbFitCanvasToView(false);
+        }
+      });
+    });
   }
 
   window.dbSetViewZoom = function(z) {
@@ -192,7 +231,9 @@
       if (!document.getElementById('dbCanvas')) return;
       clearTimeout(_dbViewResizeTimer);
       _dbViewResizeTimer = setTimeout(function() {
-        if (dbEditor.viewZoomMode === 'fit') dbFitCanvasToView();
+        dbSyncEditorShellHeight();
+        if (dbEditor.clientView || dbEditor.viewZoomMode === 'fit') dbFitCanvasToView(!dbEditor.clientView);
+        else dbApplyViewZoom();
       }, 120);
     });
   }
@@ -232,14 +273,6 @@
     d = d || {};
     var t = String(d.title || d.name || '').trim();
     return t || 'Untitled Board';
-  }
-
-  /** Room or board title for print footnotes / cost summary. */
-  function _dbBoardLabel(d) {
-    d = d || {};
-    var room = String(d.room || '').trim();
-    if (room) return room;
-    return _dbBoardDisplayName(d);
   }
 
   // ---- Save state for undo ----
@@ -672,21 +705,23 @@
     var ch = bd.canvasHeight || 1000;
 
     C.innerHTML =
-      '<div id="dbEditorRoot" style="display:flex;flex-direction:column;height:calc(100vh - 112px);min-height:420px;">' +
+      '<div id="dbEditorRoot"' + (dbEditor.clientView ? ' class="db-editor-client-view"' : '') + ' style="display:flex;flex-direction:column;min-height:420px;overflow:hidden;">' +
       '<style>' +
       '#dbToolbar .db-tool-btn{font-family:DM Sans,system-ui,sans-serif!important;font-size:12px!important;font-weight:600!important;padding:8px 12px!important;border-radius:6px!important;cursor:pointer!important;letter-spacing:0.02em!important;border:1px solid rgba(27,51,82,0.32)!important;background:#fff!important;color:#0a1628!important;box-shadow:0 1px 2px rgba(27,51,82,0.08)!important;line-height:1.2!important;}' +
       '#dbToolbar .db-tool-btn:hover{border-color:#C4A464!important;color:#1B3352!important;background:#fffdf6!important;}' +
       '#dbToolbar .db-tool-btn--active{background:linear-gradient(180deg,#d4b76e,#c4a464)!important;color:#1a1204!important;border-color:#8a7030!important;box-shadow:inset 0 1px 0 rgba(255,255,255,0.35),0 1px 2px rgba(0,0,0,0.08)!important;}' +
       '#dbToolbar .db-toolbar-hint{font-size:11px!important;color:#2c3d5e!important;font-weight:500!important;max-width:240px!important;line-height:1.4!important;}' +
       '#dbToolbar .db-toolbar-hint strong{color:#0a1628!important;font-weight:700!important;}' +
+      '#dbEditorRoot.db-editor-client-view .db-toolbar-edit-only{display:none!important;}' +
+      '#dbEditorRoot.db-editor-client-view .db-el-product{pointer-events:none!important;cursor:default!important;}' +
+      '#dbEditorRoot.db-editor-client-view .db-resize{display:none!important;}' +
+      '#dbEditorRoot.db-editor-client-view #dbCanvasWrap,#dbEditorRoot.db-editor-client-view #dbCanvas,#dbEditorRoot.db-editor-client-view #dbCanvasStage{touch-action:pan-x pan-y!important;}' +
       '#dbCanvas,#dbCanvasStage{touch-action:none;}' +
       '.db-el-product{box-sizing:border-box;pointer-events:auto;cursor:move;}' +
       '.db-el-media{position:relative;box-sizing:border-box;background:#fff;border:1px solid rgba(15,26,46,0.06);border-radius:2px;overflow:hidden;padding:0;pointer-events:none;}' +
       '.db-el-media img{width:100%;height:100%;object-fit:cover;object-position:center;display:block;pointer-events:none;}' +
-      '.db-el-caption{margin-top:5px;font-size:14px;font-weight:600;color:#1B3352;text-align:center;pointer-events:none;line-height:1.3;}' +
-      '.db-el-desc{margin-top:3px;font-size:12px;color:#4B5563;text-align:center;pointer-events:none;line-height:1.4;white-space:pre-wrap;}' +
-      '.db-el-price{margin-top:3px;font-size:14px;font-weight:700;color:#0A1F3D;text-align:center;pointer-events:none;line-height:1.25;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}' +
-      '.db-el-annotation{margin-top:4px;font-size:12px;color:#6B7280;text-align:center;font-style:italic;pointer-events:none;white-space:pre-line;line-height:1.35;}' +
+      '.db-el-caption{margin-top:3px;font-size:11px;font-weight:600;color:#333;text-align:center;pointer-events:none;line-height:1.25;}' +
+      '.db-el-desc{margin-top:2px;font-size:10px;color:#666;text-align:center;pointer-events:none;line-height:1.35;white-space:pre-wrap;}' +
       '.db-resize{position:absolute;width:12px;height:12px;background:var(--gold);border:2px solid #fff;border-radius:2px;z-index:20;box-shadow:0 1px 3px rgba(0,0,0,0.2);pointer-events:auto;}' +
       '.db-source-tab{flex:1;padding:8px 4px;font-size:10px;font-weight:600;border:none;background:transparent;color:#6b7280;cursor:pointer;border-bottom:2px solid transparent;}' +
       '.db-source-tab:hover{color:#1B3352;}' +
@@ -696,16 +731,16 @@
       '<div id="dbToolbar" style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--gray-200);margin-bottom:0;flex-wrap:wrap;">' +
         '<button class="btn btn-secondary btn-sm" onclick="closeBoardEditor()" style="margin-right:8px;">← Back</button>' +
         '<span style="font-weight:700;font-size:15px;margin-right:16px;color:#1B3352;" id="dbTitle">' + esc(_dbBoardDisplayName(bd)) + '</span>' +
-        '<div style="display:flex;gap:6px;padding:6px;background:#eef2f7;border-radius:8px;flex-wrap:wrap;align-items:center;border:1px solid rgba(27,51,82,0.1);">' +
+        '<div class="db-toolbar-edit-only" style="display:flex;gap:6px;padding:6px;background:#eef2f7;border-radius:8px;flex-wrap:wrap;align-items:center;border:1px solid rgba(27,51,82,0.1);">' +
           toolBtn('select', '↖', 'Select') +
           toolBtn('text', 'T', 'Text') +
           toolBtn('heading', 'H', 'Heading') +
           toolBtn('arrow', '→', 'Arrow') +
           toolBtn('note', '📝', 'Note') +
         '</div>' +
-        '<span class="db-toolbar-hint">Choose <strong>Text</strong> or <strong>Heading</strong>, then click on the board to place.</span>' +
-        '<button class="btn btn-secondary btn-sm" onclick="void addImageFromComputer()">📁 From computer</button>' +
-        '<button class="btn btn-secondary btn-sm" onclick="void addImageToBoard()" title="Paste image URL">🔗 Image URL</button>' +
+        '<span class="db-toolbar-hint db-toolbar-edit-only">Choose <strong>Text</strong> or <strong>Heading</strong>, then click on the board to place.</span>' +
+        '<button class="btn btn-secondary btn-sm db-toolbar-edit-only" onclick="void addImageFromComputer()">📁 From computer</button>' +
+        '<button class="btn btn-secondary btn-sm db-toolbar-edit-only" onclick="void addImageToBoard()" title="Paste image URL">🔗 Image URL</button>' +
         '<div style="display:flex;align-items:center;gap:2px;padding:2px 6px;background:#eef2f7;border-radius:6px;border:1px solid rgba(27,51,82,0.1);">' +
           '<button type="button" class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:14px;line-height:1;" onclick="dbZoomOut()" title="Zoom out">−</button>' +
           '<span id="dbZoomLabel" style="font-size:11px;font-weight:600;min-width:38px;text-align:center;color:#1B3352;">100%</span>' +
@@ -713,16 +748,16 @@
           '<button type="button" class="btn btn-secondary btn-sm" style="padding:4px 8px;font-size:10px;margin-left:2px;" onclick="dbZoomFit()" title="Fit board to window (like Canva)">Fit</button>' +
         '</div>' +
         '<div style="flex:1;"></div>' +
-        '<label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" ' + (dbEditor.showPricing ? 'checked' : '') + ' onchange="toggleBoardPricing(this.checked)"> Show Pricing</label>' +
+        '<label class="db-toolbar-edit-only" style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" ' + (dbEditor.showPricing ? 'checked' : '') + ' onchange="toggleBoardPricing(this.checked)"> Show Pricing</label>' +
         '<button class="btn btn-secondary btn-sm" onclick="toggleClientView()" style="' + (dbEditor.clientView ? 'background:#0A1F3D;color:#fff;border-color:#0A1F3D;' : '') + '">' + (dbEditor.clientView ? '👁 Client view: ON' : '👁 Client view') + '</button>' +
         '<button class="btn btn-secondary btn-sm" onclick="openLuxuryClientView()">🖤 Share with Client</button>' +
-        '<button class="btn btn-secondary btn-sm" onclick="dbUndo()">↩ Undo</button>' +
-        '<button type="button" id="dbUnstickToolbarBtn" class="btn btn-secondary btn-sm" title="Unstick drag, remove ghost tiles, spread stacked items — does not delete your work" onclick="void dbRepairBoard()">🔧 Repair board</button>' +
-        '<span id="dbUnstickStatus" style="font-size:10px;color:var(--gray-500);min-width:72px;"></span>' +
-        '<button class="btn btn-secondary btn-sm" onclick="dbOpenPrintMenu()">🖨 Print / Export</button>' +
-        '<button class="btn btn-secondary btn-sm" onclick="showBoardCostSummary()">💲 Summary</button>' +
-        '<button class="btn btn-secondary btn-sm" onclick="createProposalFromBoard()">📋 → Proposal</button>' +
-        '<button class="btn btn-primary btn-sm" onclick="saveBoardToFirestore()">💾 Save</button>' +
+        '<button class="btn btn-secondary btn-sm db-toolbar-edit-only" onclick="dbUndo()">↩ Undo</button>' +
+        '<button type="button" id="dbUnstickToolbarBtn" class="btn btn-secondary btn-sm db-toolbar-edit-only" title="Unstick drag, remove ghost tiles, spread stacked items — does not delete your work" onclick="void dbRepairBoard()">🔧 Repair board</button>' +
+        '<span id="dbUnstickStatus" class="db-toolbar-edit-only" style="font-size:10px;color:var(--gray-500);min-width:72px;"></span>' +
+        '<button class="btn btn-secondary btn-sm db-toolbar-edit-only" onclick="dbOpenPrintMenu()">🖨 Print / Export</button>' +
+        '<button class="btn btn-secondary btn-sm db-toolbar-edit-only" onclick="showBoardCostSummary()">💲 Summary</button>' +
+        '<button class="btn btn-secondary btn-sm db-toolbar-edit-only" onclick="createProposalFromBoard()">📋 → Proposal</button>' +
+        '<button class="btn btn-primary btn-sm db-toolbar-edit-only" onclick="saveBoardToFirestore()">💾 Save</button>' +
       '</div>' +
 
       // Main layout: clips panel + canvas + props panel
@@ -790,9 +825,12 @@
     renderProps();
     dbUpdateCanvasDropHint();
     dbApplyViewZoom();
+    dbSyncEditorShellHeight();
+    dbApplyClientViewLayout();
     requestAnimationFrame(function() {
       requestAnimationFrame(function() {
-        if (dbEditor.viewZoomMode === 'fit') dbFitCanvasToView();
+        dbSyncEditorShellHeight();
+        if (!dbEditor.clientView && dbEditor.viewZoomMode === 'fit') dbFitCanvasToView(false);
       });
     });
     dbWireUnstickButtons();
@@ -1195,6 +1233,7 @@
     var selClass = sel ? ' db-el-selected' : '';
 
     if (el.type === 'product' || el.type === 'image') {
+      var showPrice = dbEditor.showPricing && !dbEditor.clientView && el.showPrice !== false;
       var imgSrc = dbResolveProductImgSrc(el);
       var hasImg = !!(el.imageUrl || el.img);
       var ew = el.w || 180;
@@ -1207,8 +1246,8 @@
       return '<div class="db-el db-el-product' + selClass + '" data-id="' + el.id + '" style="position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;width:' + ew + 'px;z-index:' + (sel ? 100 : 10) + ';" onpointerdown="elMouseDown(event,\'' + el.id + '\')" ondblclick="event.stopPropagation();void dbOpenProductDetail(\'' + el.id + '\')" oncontextmenu="return dbProductContextMenu(event,\'' + el.id + '\')">' +
         '<div class="db-el-media" style="width:' + ew + 'px;height:' + eh + 'px;">' + mediaInner + (sel ? resizeHandles() : '') + '</div>' +
         dbProductCaptionHtml(el) +
-        dbProductPriceHtml(el) +
-        (el.annotation ? '<div class="db-el-annotation">' + esc(el.annotation) + '</div>' : '') +
+        (showPrice && el.sellPrice ? '<div style="font-size:10px;color:var(--green);font-weight:600;text-align:center;pointer-events:none;">' + fmt$(el.sellPrice) + '</div>' : '') +
+        (el.annotation ? '<div style="font-size:10px;color:#666;text-align:center;font-style:italic;margin-top:2px;pointer-events:none;white-space:pre-line;">' + esc(el.annotation) + '</div>' : '') +
       '</div>';
     }
     if (el.type === 'text') {
@@ -1307,9 +1346,13 @@
     var media = node.querySelector('.db-el-media');
     if (!media) return false;
     while (media.nextSibling) node.removeChild(media.nextSibling);
-    var tail = dbProductCaptionHtml(el) + dbProductPriceHtml(el);
+    var showPrice = dbEditor.showPricing && !dbEditor.clientView && el.showPrice !== false;
+    var tail = dbProductCaptionHtml(el);
+    if (showPrice && el.sellPrice) {
+      tail += '<div style="font-size:10px;color:var(--green);font-weight:600;text-align:center;pointer-events:none;">' + fmt$(el.sellPrice) + '</div>';
+    }
     if (el.annotation) {
-      tail += '<div class="db-el-annotation">' + esc(el.annotation) + '</div>';
+      tail += '<div style="font-size:10px;color:#666;text-align:center;font-style:italic;margin-top:2px;pointer-events:none;white-space:pre-line;">' + esc(el.annotation) + '</div>';
     }
     if (tail) media.insertAdjacentHTML('afterend', tail);
     return true;
@@ -1373,13 +1416,6 @@
     if (!clip || !clip.data) return '';
     var cd = clip.data;
     return String(cd.description || cd.shortDescription || cd.desc || '').trim();
-  }
-
-  function dbProductPriceHtml(el) {
-    if (!el) return '';
-    var showPrice = dbEditor.showPricing && !dbEditor.clientView && el.showPrice !== false;
-    if (!showPrice || !el.sellPrice) return '';
-    return '<div class="db-el-price">' + fmt$(el.sellPrice) + '</div>';
   }
 
   function dbProductCaptionHtml(el) {
@@ -1955,6 +1991,7 @@
   }
 
   window.arrowHandleDown = function(e, id, end) {
+    if (dbEditor.clientView) return;
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
@@ -1993,6 +2030,7 @@
   };
 
   window.elMouseDown = function(e, id) {
+    if (dbEditor.clientView) return;
     if (e.button !== 0) return;
     e.stopPropagation();
     if (e.target.classList && e.target.classList.contains('db-resize')) return;
@@ -2089,6 +2127,7 @@
   };
 
   window.resizeMouseDown = function(e, dir) {
+    if (dbEditor.clientView) return;
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
@@ -2124,6 +2163,7 @@
   };
 
   window.canvasMouseDown = function(e) {
+    if (dbEditor.clientView) return;
     if (e.button != null && e.button !== 0) return;
     if (e.target && e.target.closest && e.target.closest('.db-el')) return;
     var canvas = document.getElementById('dbCanvas');
@@ -2422,19 +2462,19 @@
   };
 
   window.toggleClientView = function() {
-    dbEditor.clientView = !dbEditor.clientView;
-    var cp = document.getElementById('dbClipsPanel');
-    var pp = document.getElementById('dbPropsPanel');
-    if (cp) cp.style.display = dbEditor.clientView ? 'none' : 'flex';
-    if (pp) pp.style.display = dbEditor.clientView ? 'none' : 'block';
-    var cvBtn = document.querySelector('#dbToolbar button[onclick="toggleClientView()"]');
-    if (cvBtn) {
-      cvBtn.textContent = dbEditor.clientView ? '👁 Client view: ON' : '👁 Client view';
-      cvBtn.style.background = dbEditor.clientView ? '#0A1F3D' : '';
-      cvBtn.style.color = dbEditor.clientView ? '#fff' : '';
-      cvBtn.style.borderColor = dbEditor.clientView ? '#0A1F3D' : '';
+    var entering = !dbEditor.clientView;
+    if (entering) {
+      dbEditor._preClientViewScale = dbEditor.canvasScale;
+      dbEditor._preClientViewZoomMode = dbEditor.viewZoomMode;
+    } else {
+      if (dbEditor._preClientViewZoomMode) dbEditor.viewZoomMode = dbEditor._preClientViewZoomMode;
+      if (dbEditor._preClientViewScale != null) dbEditor.canvasScale = dbEditor._preClientViewScale;
     }
-    dbRefreshAllPricingVisibility();
+    dbEditor.clientView = entering;
+    dbCancelActiveDrag();
+    dbEditor.selectedId = null;
+    dbUpdateSelectionDom();
+    dbApplyClientViewLayout();
   };
 
   /** Persist imageUrl/images on product tiles from clips so client board does not depend on a second fetch. */
@@ -2837,7 +2877,7 @@
         '<button class="btn btn-secondary btn-sm" style="margin-left:6px;" onclick="dbCostSummaryMakeProductFromImages()">+ Make a product</button></div>';
     }
 
-    var boardName = _dbBoardLabel(dbEditor.boardData);
+    var boardName = (dbEditor.boardData && (dbEditor.boardData.title || dbEditor.boardData.name)) || 'Design Board';
     var overlay = document.createElement('div');
     overlay.id = 'dbCostSummaryOverlay';
     overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(15,26,46,0.45);display:flex;align-items:center;justify-content:center;padding:24px;';
@@ -2845,8 +2885,8 @@
     overlay.innerHTML =
       '<div style="background:#fff;border-radius:10px;max-width:640px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);" onclick="event.stopPropagation()">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #eee;">' +
-          '<div><div style="font-weight:700;font-size:18px;color:#1B3352;line-height:1.25;">' + esc(boardName) + '</div>' +
-            '<div style="font-size:11px;color:#888;margin-top:4px;letter-spacing:0.04em;text-transform:uppercase;">Cost Summary · ' + products.length + ' product' + (products.length === 1 ? '' : 's') + ' · ' + (clientMode ? 'Client view — sell price only' : 'Internal view — cost + markup') + '</div></div>' +
+          '<div><div style="font-weight:700;font-size:16px;color:#1B3352;">Cost Summary</div>' +
+            '<div style="font-size:11px;color:#999;">' + esc(boardName) + ' · ' + products.length + ' product' + (products.length === 1 ? '' : 's') + ' · ' + (clientMode ? 'Client view — sell price only' : 'Internal view — cost + markup') + '</div></div>' +
           '<div style="display:flex;gap:10px;align-items:center;">' +
             '<div style="display:inline-flex;border:1px solid #d0d5dd;border-radius:6px;overflow:hidden;font-size:12px;font-weight:700;line-height:1;">' +
               '<button title="Internal: shows trade cost, markup and sell" onclick="if(window._dbCostSummaryClient){dbToggleCostSummaryView();}" style="padding:7px 14px;border:none;cursor:pointer;' + (!clientMode ? 'background:#0A1F3D;color:#fff;' : 'background:#fff;color:#0A1F3D;') + '">Internal</button>' +
@@ -2918,10 +2958,10 @@
     var totals = clientMode
       ? '<tr style="font-weight:700;border-top:2px solid #000;">' + imgTotalTd + '<td>Total</td><td style="text-align:right;">' + fmt$(totalSell) + '</td></tr>'
       : '<tr style="font-weight:700;border-top:2px solid #000;">' + imgTotalTd + '<td>Total</td><td style="text-align:right;">' + fmt$(totalCost) + '</td><td></td><td style="text-align:right;">' + fmt$(totalSell) + '</td></tr>';
-    var roomLabel = esc(_dbBoardLabel(dbEditor.boardData));
+    var title = esc((dbEditor.boardData && (dbEditor.boardData.title || dbEditor.boardData.name)) || 'Design Board');
     var w = window.open('', '_blank');
     if (!w) { if (typeof cchAlert === 'function') cchAlert('Allow pop-ups to print the summary.', 'Cost Summary'); return; }
-    w.document.write('<html><head><title>' + roomLabel + ' — Cost Summary</title><style>@page{margin:0.75in;}body{font-family:Georgia,serif;padding:40px;color:#1B3352;}h1{font-size:22px;font-weight:700;margin:0;line-height:1.25;} .db-cs-sub{color:#888;font-size:11px;margin-top:6px;letter-spacing:0.05em;text-transform:uppercase;}table{width:100%;border-collapse:collapse;font-size:13px;margin-top:18px;}th,td{padding:8px 10px;border-bottom:1px solid #eee;vertical-align:middle;}th{font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#999;}td.ts-img{width:56px;padding:6px 10px;}td.ts-img img{width:48px;height:48px;object-fit:cover;border-radius:3px;display:block;}td.ts-img .ts-img-ph{width:48px;height:48px;border-radius:3px;background:#f0f0f0;}@media print{img{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head><body><h1>' + roomLabel + '</h1><div class="db-cs-sub">Cost Summary</div><table><thead>' + head + '</thead><tbody>' + body + totals + '</tbody></table></body></html>');
+    w.document.write('<html><head><title>Cost Summary — ' + title + '</title><style>body{font-family:Georgia,serif;padding:40px;color:#1B3352;}h1{font-size:20px;margin:0;}table{width:100%;border-collapse:collapse;font-size:13px;margin-top:18px;}th,td{padding:8px 10px;border-bottom:1px solid #eee;vertical-align:middle;}th{font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#999;}td.ts-img{width:56px;padding:6px 10px;}td.ts-img img{width:48px;height:48px;object-fit:cover;border-radius:3px;display:block;}td.ts-img .ts-img-ph{width:48px;height:48px;border-radius:3px;background:#f0f0f0;}@media print{img{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head><body><h1>Cost Summary</h1><div style="color:#888;font-size:12px;margin-top:4px;">' + title + '</div><table><thead>' + head + '</thead><tbody>' + body + totals + '</tbody></table></body></html>');
     w.document.close();
     w.focus();
     w.onafterprint = function() { try { w.close(); } catch (e) {} };
@@ -2957,10 +2997,6 @@
           '<button class="btn btn-secondary" style="justify-content:flex-start;" onclick="' + rm + 'dbPrintBoard();">🖼 Print board</button>' +
           '<button class="btn btn-secondary" style="justify-content:flex-start;" onclick="' + rm + 'showBoardCostSummary();">💲 Cost summary (print from there)</button>' +
           '<button class="btn btn-secondary" style="justify-content:flex-start;" onclick="' + rm + 'exportBoardPNG();">⬇ Download board image (PNG)</button>' +
-          '<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#4B5563;cursor:pointer;margin-top:4px;">' +
-            '<input type="checkbox" id="dbPrintIncludeName"' + (window._dbPrintIncludeBoardName ? ' checked' : '') + ' onchange="window._dbPrintIncludeBoardName=!!this.checked">' +
-            ' Include board / room name as footnote on print</label>' +
-          '<div style="font-size:11px;color:#999;line-height:1.4;">Use <strong>Heading</strong> or <strong>Text</strong> on the board for titles. The footnote is optional — off by default.</div>' +
           '<div style="font-size:11px;color:#999;line-height:1.4;">PNG download can fail when the board has images from sites that block copying. Use <strong>Print board</strong> for a reliable copy.</div>' +
         '</div>' +
         '<div style="padding:10px 18px;border-top:1px solid #eee;text-align:right;"><button class="btn btn-secondary btn-sm" onclick="' + rm + '">Close</button></div>' +
@@ -2975,35 +3011,26 @@
     if (typeof dbUpdateSelectionDom === 'function') dbUpdateSelectionDom();
     var cw = parseFloat(canvas.style.width) || canvas.offsetWidth || 1920;
     var ch = parseFloat(canvas.style.height) || canvas.offsetHeight || 1080;
+    var scale = Math.min(1, 1000 / cw);
     var w = window.open('', '_blank');
     if (!w) { if (typeof cchAlert === 'function') cchAlert('Allow pop-ups to print the board.', 'Print'); return; }
     var styles = '';
     document.querySelectorAll('style, link[rel="stylesheet"]').forEach(function(n) { styles += n.outerHTML; });
-    var boardLabel = esc(_dbBoardLabel(dbEditor.boardData));
-    var includeName = !!window._dbPrintIncludeBoardName;
+    var title = esc((dbEditor.boardData && (dbEditor.boardData.title || dbEditor.boardData.name)) || 'Design Board');
     var clone = canvas.cloneNode(true);
     clone.querySelectorAll('.db-resize').forEach(function(n) { n.remove(); });
-    var hint = clone.querySelector('#dbCanvasDropHint');
-    if (hint) hint.remove();
     clone.style.boxShadow = 'none';
-    var footnote = includeName
-      ? '<div class="db-print-footnote">' + boardLabel + '</div>'
-      : '';
-    var html = '<html><head><title>' + boardLabel + ' — Design Board</title>' + styles +
-      '<style>@page{margin:10mm;}html,body{margin:0;padding:0;background:#fff;}' +
-      '.db-print-sheet{padding:4mm 6mm 6mm;box-sizing:border-box;}' +
-      '#dbPrintWrap{width:100%;max-width:' + cw + 'px;margin:0 auto;overflow:hidden;}' +
-      '#dbPrintInner{transform-origin:top center;width:' + cw + 'px;margin:0 auto;}' +
-      '.db-print-footnote{margin:10px auto 0;max-width:' + cw + 'px;text-align:center;font-family:Georgia,serif;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#9CA3AF;}' +
-      '.db-el-caption{font-size:14px !important;}.db-el-desc{font-size:12px !important;}.db-el-price{font-size:14px !important;}' +
-      '@media print{img{-webkit-print-color-adjust:exact;print-color-adjust:exact;} .db-print-sheet{padding:0;}}' +
-      '</style></head><body><div class="db-print-sheet"><div id="dbPrintWrap"><div id="dbPrintInner">' + clone.outerHTML + '</div></div>' + footnote + '</div>' +
-      '<script>(function(){var cw=' + cw + ',ch=' + ch + ';function fit(){var iw=Math.max(320,(window.innerWidth||960)-24);var ih=Math.max(320,(window.innerHeight||720)-40);var s=Math.min(1,iw/cw,ih/ch);var inner=document.getElementById("dbPrintInner");var wrap=document.getElementById("dbPrintWrap");if(inner){inner.style.transform="scale("+s+")";inner.style.height=(ch*s)+"px";}if(wrap){wrap.style.height=(ch*s)+"px";}}fit();window.onresize=fit;})();<\/script></body></html>';
+    var html = '<html><head><title>' + title + '</title>' + styles +
+      '<style>@page{size:landscape;margin:8mm;}html,body{margin:0;padding:0;background:#fff;}' +
+      '#dbPrintWrap{width:' + (cw * scale) + 'px;height:' + (ch * scale) + 'px;overflow:hidden;margin:0 auto;}' +
+      '#dbPrintInner{transform:scale(' + scale + ');transform-origin:top left;width:' + cw + 'px;height:' + ch + 'px;}' +
+      '@media print{img{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head>' +
+      '<body><div id="dbPrintWrap"><div id="dbPrintInner">' + clone.outerHTML + '</div></div></body></html>';
     w.document.write(html);
     w.document.close();
     w.focus();
     w.onafterprint = function() { try { w.close(); } catch (e) {} };
-    setTimeout(function() { try { w.print(); } catch (e) {} }, 800);
+    setTimeout(function() { try { w.print(); } catch (e) {} }, 700);
   };
 
   // ==================== CSS for editor ============================
@@ -3196,6 +3223,6 @@
     };
   }
 
-  console.info('[CCH Design Board] build 20260608db27 — pointer-capture drag, model-driven position');
+  console.info('[CCH Design Board] build 20260608db28 — client-view fit + preview scroll');
 
 })();
