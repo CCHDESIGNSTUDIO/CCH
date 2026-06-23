@@ -2931,7 +2931,7 @@
     .data-table.fin-table .col-status { min-width: 80px; }
     .data-table.fin-table .col-amount { text-align: right; font-family: var(--font-mono); font-weight: 600; min-width: 90px; white-space: nowrap; }
     .data-table.fin-table .col-amount-light { text-align: right; font-family: var(--font-mono); min-width: 80px; color: var(--gray-500); }
-    .data-table.fin-table .col-links { font-size: 11px; min-width: 60px; }
+    .data-table.fin-table .col-links { font-size: 11px; min-width: 88px; }
     .data-table.fin-table .col-actions { white-space: nowrap; min-width: 100px; }
     .data-table.fin-table .col-count { text-align: center; min-width: 50px; }
     .data-table.fin-table .col-shared { min-width: 70px; }
@@ -23978,11 +23978,12 @@ async function renderBoardsTab(T, proj) {
       var proposalsDedupeHidden = _deduped.hiddenCount;
 
       // Auto-link proposals to invoices and POs (after dedupe so links target the canonical copy)
+      var invoicesForLink = [], posForLink = [];
       try {
         var invSnap = await db.collection('boards').doc(proj.id).collection('invoices').get();
-        var invoicesForLink = []; invSnap.forEach(function(d) { invoicesForLink.push({ id: d.id, ...d.data() }); });
+        invSnap.forEach(function(d) { invoicesForLink.push({ id: d.id, ...d.data() }); });
         var poSnap = await db.collection('boards').doc(proj.id).collection('purchaseOrders').get();
-        var posForLink = []; poSnap.forEach(function(d) { posForLink.push({ id: d.id, ...d.data() }); });
+        poSnap.forEach(function(d) { posForLink.push({ id: d.id, ...d.data() }); });
         proposals.forEach(function(pr) {
           if (!pr.linkedInvoiceId) {
             var found = invoicesForLink.find(function(inv) { return inv.linkedProposalId === pr.id; });
@@ -24063,9 +24064,7 @@ async function renderBoardsTab(T, proj) {
                     <td class="col-amount-light" style="color:${_pBal > 0 ? 'var(--gold)' : 'var(--green)'};">${_pBal > 0 ? formatMoney(_pBal) : '$0.00'}</td>
                     <td class="col-date">${p.sentDate ? formatDate(p.sentDate) : '<span style="color:var(--gray-300);">—</span>'}</td>
                     <td class="col-links" onclick="event.stopPropagation()">
-                      ${p.linkedInvoiceId ? '<a onclick="navigate(\'#/project/'+proj.id+'/invoice/'+p.linkedInvoiceId+'\')" style="color:var(--teal);cursor:pointer;margin-right:4px;" title="Linked Invoice">🧾</a>' : ''}
-                      ${p.linkedPOId ? '<a onclick="navigate(\'#/project/'+proj.id+'/po/'+p.linkedPOId+'\')" style="color:var(--teal);cursor:pointer;" title="Linked PO">📦</a>' : ''}
-                      ${!p.linkedInvoiceId && !p.linkedPOId ? '<a onclick="linkDocModal(\''+proj.id+'\',\'proposals\',\''+p.id+'\')" style="color:var(--gray-300);cursor:pointer;" title="Link to other docs">🔗</a>' : ''}
+                      ${typeof window.cchFinLinkedDocsCellHtml === 'function' ? window.cchFinLinkedDocsCellHtml(proj.id, 'proposal', p.id, 'proposals', p, { proposals: proposals, invoices: invoicesForLink, pos: posForLink }) : ''}
                     </td>
                     <td class="col-actions" onclick="event.stopPropagation()">
                       <div class="action-menu-wrap" style="display:flex;align-items:center;justify-content:center;gap:6px;">
@@ -24562,33 +24561,6 @@ async function renderBoardsTab(T, proj) {
         po.forEach(d => pos.push({ id: d.id, ...d.data() }));
       } catch(e) {}
 
-      // Auto-link by vendor + item overlap
-      invoices.forEach(inv => {
-        inv._linkedPrs = []; inv._linkedPos = [];
-        const v = (inv.vendor || '').toLowerCase().trim();
-        const itms = (inv.items || []).map(i => (i.title||i.name||'').toLowerCase().trim()).filter(Boolean);
-        proposals.forEach(pr => {
-          if (inv.linkedProposalId === pr.id || pr.linkedInvoiceId === inv.id) { inv._linkedPrs.push(pr); return; }
-          const pv = (pr.vendor || '').toLowerCase();
-          if (v && pv && pv.includes(v)) { inv._linkedPrs.push(pr); return; }
-          const pi = (pr.items || []).map(i => (i.title||i.name||'').toLowerCase().trim()).filter(Boolean);
-          if (itms.length && pi.length) {
-            const m = itms.filter(t => pi.some(p => p.includes(t) || t.includes(p))).length;
-            if (m >= Math.min(itms.length, pi.length) * 0.3) inv._linkedPrs.push(pr);
-          }
-        });
-        pos.forEach(po => {
-          if (inv.linkedPOId === po.id || po.linkedInvoiceId === inv.id) { inv._linkedPos.push(po); return; }
-          const pv = (po.vendor || '').toLowerCase().trim();
-          if (v && pv && pv === v) { inv._linkedPos.push(po); return; }
-          const pi = (po.items || []).map(i => (i.title||i.name||'').toLowerCase().trim()).filter(Boolean);
-          if (itms.length && pi.length) {
-            const m = itms.filter(t => pi.some(p => p.includes(t) || t.includes(p))).length;
-            if (m >= Math.min(itms.length, pi.length) * 0.3) inv._linkedPos.push(po);
-          }
-        });
-      });
-
       // Summary — same row total as All Invoices (lines + stored total)
       const totalInv = invoices.reduce((s,i) => s + invoiceListRowTotal(i), 0);
       let totalPdFromInvoices = 0;
@@ -24653,8 +24625,6 @@ async function renderBoardsTab(T, proj) {
                   const tp = invoiceListRowPayments(inv);
                   const it = invoiceListRowTotal(inv);
                   const bal = invoiceListRowBalance(inv);
-                  const lp = inv._linkedPrs || [];
-                  const lo = inv._linkedPos || [];
                   return '<tr style="cursor:pointer;" onclick="navigate(\'#/project/' + proj.id + '/invoice/' + inv.id + '\')">' +
                     '<td style="font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="#' + escAttr(String(invNum)) + '">' +
                       '<span style="color:var(--gold);font-family:var(--font-mono);">#' + esc(invNum) + '</span>' +
@@ -24674,9 +24644,7 @@ async function renderBoardsTab(T, proj) {
                     })() + '</td>' +
                     '<td onclick="event.stopPropagation()">' + qbCellBadge(getQbId(inv), inv.qbStatus, inv) + '</td>' +
                     '<td class="col-links" onclick="event.stopPropagation()">' +
-                      lp.map(function(p) { return '<a onclick="navigate(\'#/project/' + proj.id + '/proposal/' + p.id + '\')" style="color:var(--teal);cursor:pointer;margin-right:4px;" title="' + esc(p.proposalNum||p.name||'PR') + '">&#x1F4CB;</a>'; }).join('') +
-                      lo.map(function(p) { return '<a onclick="navigate(\'#/project/' + proj.id + '/po/' + p.id + '\')" style="color:var(--teal);cursor:pointer;margin-right:4px;" title="' + esc(p.number||p.num||'PO') + '">&#x1F4E6;</a>'; }).join('') +
-                      (lp.length === 0 && lo.length === 0 ? '<a onclick="linkDocModal(\'' + proj.id + '\',\'invoices\',\'' + inv.id + '\')" style="color:var(--gray-300);cursor:pointer;" title="Link docs">&#x1F517;</a>' : '') +
+                      (typeof window.cchFinLinkedDocsCellHtml === 'function' ? window.cchFinLinkedDocsCellHtml(proj.id, 'invoice', inv.id, 'invoices', inv, { proposals: proposals, invoices: invoices, pos: pos }) : '') +
                     '</td>' +
                     '<td class="col-actions" onclick="event.stopPropagation()">' +
                       '<div class="action-menu-wrap" style="display:flex;align-items:center;gap:4px;position:relative;">' +
@@ -24758,6 +24726,14 @@ async function renderBoardsTab(T, proj) {
         });
       } catch(e){}
 
+      var _poTabProposals = [], _poTabInvoices = [];
+      try {
+        const prSnap = await db.collection('boards').doc(proj.id).collection('proposals').get();
+        prSnap.forEach(d => _poTabProposals.push({ id: d.id, ...d.data() }));
+        const invSnapPo = await db.collection('boards').doc(proj.id).collection('invoices').get();
+        invSnapPo.forEach(d => _poTabInvoices.push({ id: d.id, ...d.data() }));
+      } catch(e) {}
+
       // Also build POs from clips that have poNum (Houzz — paid often lives on clips until merged to purchaseOrders)
       try {
         const clipSnap = await db.collection('boards').doc(proj.id).collection('clips').get();
@@ -24802,9 +24778,7 @@ async function renderBoardsTab(T, proj) {
 
       // Auto-link: match POs to invoices in this project by shared items/vendor
       try {
-        let invoices = [];
-        const invSnap = await db.collection('boards').doc(proj.id).collection('invoices').get();
-        invSnap.forEach(d => invoices.push({ id: d.id, ...d.data() }));
+        let invoices = _poTabInvoices.slice();
 
         for (const po of pos) {
           if (po.linkedInvoiceId) continue; // already linked
@@ -24971,11 +24945,8 @@ async function renderBoardsTab(T, proj) {
                     <td class="col-date" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escAttr(_poShipToLabel)}">${esc(_poShipToLabel)}</td>
                     <td style="text-align:center;" onclick="event.stopPropagation()">${typeof cchPoQbDotCellHtml==='function'?cchPoQbDotCellHtml(po):(typeof cchPoQbListCellHtml==='function'?cchPoQbListCellHtml(po):qbCellBadge(getQbId(po), po.qbStatus, po))}</td>
                     <td class="col-links" onclick="event.stopPropagation()">
-                      ${_poProposalId ? '<a onclick="navigate(\'#/project/'+proj.id+'/proposal/'+_poProposalId+'\')" style="color:var(--teal);cursor:pointer;margin-right:4px;" title="Linked Proposal">📋</a>' : ''}
-                      ${_poInvoiceId ? '<a onclick="navigate(\'#/project/'+proj.id+'/invoice/'+_poInvoiceId+'\')" style="color:var(--teal);cursor:pointer;margin-right:4px;" title="Linked Invoice">🧾</a>' : ''}
-                      ${_poConnectedRefs.length ? '<span style="color:var(--gray-500);font-size:11px;margin-right:4px;" title="' + escAttr(_poConnectedRefs.join(', ')) + '">📎 ' + _poConnectedRefs.length + '</span>' : ''}
-                      ${(po.attachments && po.attachments.length > 0) ? '<span style="cursor:pointer;color:var(--teal);" onclick="viewPOAttachments(\''+proj.id+'\',\''+po.id+'\')" title="'+po.attachments.length+' attachment(s)">📎 '+po.attachments.length+'</span>' : ''}
-                      ${!_poProposalId && !_poInvoiceId ? '<a onclick="linkDocModal(\''+proj.id+'\',\'purchaseOrders\',\''+po.id+'\')" style="color:var(--gray-300);cursor:pointer;" title="Link docs">🔗</a>' : ''}
+                      ${typeof window.cchFinLinkedDocsCellHtml === 'function' ? window.cchFinLinkedDocsCellHtml(proj.id, 'po', po.id, 'purchaseOrders', po, { proposals: _poTabProposals, invoices: _poTabInvoices, pos: pos }) : ''}
+                      ${(po.attachments && po.attachments.length > 0) ? '<span style="cursor:pointer;color:var(--teal);margin-left:6px;" onclick="viewPOAttachments(\''+proj.id+'\',\''+po.id+'\')" title="'+po.attachments.length+' attachment(s)">📎 '+po.attachments.length+'</span>' : ''}
                     </td>
                     <td class="col-actions" onclick="event.stopPropagation()">
                       <div class="action-menu-wrap" style="display:flex;align-items:center;gap:4px;position:relative;">
@@ -72480,11 +72451,11 @@ ${pages}
 
   </script>
   <script src="cch-invoice-tax-rules.js?v=20260520prod"></script>
-  <script src="cch-functions.js?v=202605283"></script>
+  <script src="cch-functions.js?v=20260602ldd"></script>
   <script src="cch-design-board.js?v=20260608db29"></script>
   <script src="cch-client-board.js?v=1774994684878"></script>
   <script src="cch-line-icons.js?v=20260620a"></script>
-  <script src="cch-proposals-invoices-fix.js?v=20260622venctc"></script>
+  <script src="cch-proposals-invoices-fix.js?v=20260602ldd"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
   <script src="cch-po-bill-variance.js?v=20260622venctc"></script>
   <script src="cch-order-management.js?v=20260622om12"></script>
