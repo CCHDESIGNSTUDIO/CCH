@@ -19831,7 +19831,7 @@ async function renderBoardsTab(T, proj) {
           ${window._ibShowStarredOnly && items.filter(it => _ibStarCountFromItem(it) > 0).length === 0 ? '<div style="padding:32px;text-align:center;color:var(--gray-400);font-size:13px;column-span:all;">No starred images in this section.</div>' : ''}
           ${items.filter((item) => !window._ibShowStarredOnly || _ibStarCountFromItem(item) > 0).map((item, i) => {
             const origIdx = items.indexOf(item);
-            const price = item.price || item.clientPrice || item.cost || '';
+            const price = item.price || item.clientPrice || '';
             const caption = item.caption || item.title || '';
             const starCount = _ibStarCountFromItem(item);
             const commentCount = _ibCommentCountFromItem(item);
@@ -23089,8 +23089,8 @@ async function renderBoardsTab(T, proj) {
                 <div class="ib-lb-vendor" contenteditable="true" onblur="ibLbSaveField('vendor',this.textContent.trim())" title="Click to edit vendor" style="${vendor ? '' : 'opacity:0.4;font-style:italic;'}">${vendor || 'Add vendor...'}</div>
                 <div class="ib-lb-price-wrap" style="margin-top:8px;display:flex;align-items:center;gap:6px;">
                   <span style="color:var(--gold);font-family:var(--font-mono);font-weight:700;font-size:18px;">$</span>
-                  <input id="ibLbPriceInput" type="number" step="0.01" min="0" value="${price ? escAttr(price) : ''}" placeholder="Add cost…"
-                    title="Click to add or edit the cost for this pin"
+                  <input id="ibLbPriceInput" type="number" step="0.01" min="0" value="${price ? escAttr(price) : ''}" placeholder="Client price…"
+                    title="Client price shown to the client (never the trade cost)"
                     onblur="ibLbSaveField('price',this.value)" onkeydown="if(event.key==='Enter')this.blur()"
                     style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);color:var(--gold);font-family:var(--font-mono);font-weight:700;font-size:16px;border-radius:4px;padding:5px 9px;width:130px;">
                 </div>
@@ -23274,6 +23274,13 @@ async function renderBoardsTab(T, proj) {
       if (typeof item === 'string') item = { imageUrl: item, stars: 0, comments: [] };
       item[field] = value.trim();
       if (field === 'caption') item.title = value.trim();
+      if (field === 'price') {
+        // Inspiration board displays the CLIENT price only — keep clientPrice in sync and flag it visible.
+        var _pNum = parseFloat(String(value).replace(/[^0-9.\-]/g, '')) || 0;
+        item.price = _pNum > 0 ? _pNum : '';
+        item.clientPrice = _pNum > 0 ? _pNum : '';
+        if (_pNum > 0) item.showPrice = true;
+      }
       images[s.index] = item;
       await db.collection('boards').doc(s.projectId).collection('ideabooks').doc(s.sectionId).update({ images: images });
     }
