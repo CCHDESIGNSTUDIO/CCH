@@ -3427,8 +3427,13 @@
             '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px;line-height:1.5;color:#0F1A2E;">' +
               '<div>' +
                 '<div style="font-size:9px;text-transform:uppercase;letter-spacing:0.06em;color:#9CA3AF;margin-bottom:6px;">Bill to (vendor)</div>' +
-                (_poVendor ? '<strong>' + esc(_poVendor) + '</strong>' : '<span style="color:var(--gray-400);">—</span>') +
-                (_poVendorAddr ? '<div style="margin-top:6px;color:#5C6B80;white-space:pre-wrap;">' + esc(_poVendorAddr) + '</div>' : '') +
+                ((_poVendor && typeof window.cchVendorContactBlockHtml === 'function')
+                  ? window.cchVendorContactBlockHtml(
+                      { name: _poVendor, address: _poVendorAddr, phone: String(docData.vendorPhone || '').trim(), email: String(docData.vendorEmail || '').trim() },
+                      { labelColor: '#5C6B80', addrColor: '#5C6B80', fontSize: '13px' }
+                    )
+                  : ((_poVendor ? '<strong>' + esc(_poVendor) + '</strong>' : '<span style="color:var(--gray-400);">—</span>') +
+                     (_poVendorAddr ? '<div style="margin-top:6px;color:#5C6B80;white-space:pre-wrap;">' + esc(_poVendorAddr) + '</div>' : ''))) +
               '</div>' +
               '<div>' +
                 '<div style="font-size:9px;text-transform:uppercase;letter-spacing:0.06em;color:#9CA3AF;margin-bottom:6px;">Ship to</div>' +
@@ -3987,6 +3992,12 @@
         vendorAddrPremium = await window.cchPoVendorAddressResolved(docData);
       } catch (_eVenPrem) {}
     }
+    var vendorContactPremium = null;
+    if (type === 'po' && docData.vendor && typeof window.cchPoVendorContactResolved === 'function') {
+      try {
+        vendorContactPremium = await window.cchPoVendorContactResolved(docData);
+      } catch (_eVenContactPrem) { vendorContactPremium = null; }
+    }
 
     var docNum = docData.invoiceNum || docData.number || docData.proposalNum || docData.name || docId.slice(0,8);
     var docDate = type === 'po'
@@ -4361,10 +4372,17 @@
     if (type === 'po') {
       var vendorBlockHtml = '';
       if (docData.vendor) {
-        vendorBlockHtml = '<strong>' + esc(docData.vendor) + '</strong>';
-        if (vendorAddrPremium) {
-          vendorBlockHtml += '<div style="margin-top:6px;color:#5C6B80;font-size:12px;line-height:1.55;">' +
-            esc(vendorAddrPremium).replace(/\n/g, '<br>') + '</div>';
+        if (vendorContactPremium && typeof window.cchVendorContactBlockHtml === 'function') {
+          vendorBlockHtml = window.cchVendorContactBlockHtml(
+            { name: docData.vendor, address: vendorContactPremium.address || vendorAddrPremium, phone: vendorContactPremium.phone, email: vendorContactPremium.email },
+            { labelColor: '#5C6B80', addrColor: '#5C6B80', fontSize: '12px' }
+          );
+        } else {
+          vendorBlockHtml = '<strong>' + esc(docData.vendor) + '</strong>';
+          if (vendorAddrPremium) {
+            vendorBlockHtml += '<div style="margin-top:6px;color:#5C6B80;font-size:12px;line-height:1.55;">' +
+              esc(vendorAddrPremium).replace(/\n/g, '<br>') + '</div>';
+          }
         }
       }
       infoSectionHtml = '<div class="info-section info-section-po">' +

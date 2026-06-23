@@ -31063,6 +31063,12 @@ async function renderBoardsTab(T, proj) {
           vendorAddrPreview = await window.cchPoVendorAddressResolved(docData);
         } catch (_eVaPrev) {}
       }
+      var vendorContactPreview = null;
+      if (type === 'po' && docData.vendor && typeof window.cchPoVendorContactResolved === 'function') {
+        try {
+          vendorContactPreview = await window.cchPoVendorContactResolved(docData);
+        } catch (_eVcPrev) { vendorContactPreview = null; }
+      }
       var shipToLegacyHtml = shipToLegacyRaw
         ? esc(shipToLegacyRaw).replace(/\n/g, '<br>')
         : '<span style="color:#bbb;font-size:12px;">Set ship-to on the PO or project address.</span>';
@@ -31200,8 +31206,14 @@ async function renderBoardsTab(T, proj) {
       }
 
       var vendorBlock = (type === 'po' && (docData.vendor || vendorAddrPreview)) ?
-        '<div class="info-block"><div class="info-label">Bill To</div><div class="info-value"><strong>' + esc(docData.vendor || 'Vendor') + '</strong>' +
-        (vendorAddrPreview ? '<br>' + esc(String(vendorAddrPreview)).replace(/\n/g, '<br>') : '') +
+        '<div class="info-block"><div class="info-label">Bill To</div><div class="info-value">' +
+        ((vendorContactPreview && docData.vendor && typeof window.cchVendorContactBlockHtml === 'function')
+          ? window.cchVendorContactBlockHtml(
+              { name: docData.vendor, address: vendorContactPreview.address || vendorAddrPreview, phone: vendorContactPreview.phone, email: vendorContactPreview.email },
+              { labelColor: '#5C6B80', addrColor: '#5C6B80', fontSize: '12px' }
+            )
+          : ('<strong>' + esc(docData.vendor || 'Vendor') + '</strong>' +
+             (vendorAddrPreview ? '<br>' + esc(String(vendorAddrPreview)).replace(/\n/g, '<br>') : ''))) +
         '</div></div>' : '';
       var projectBlockLegacy = '<div class="info-block"><div class="info-label">Project</div><div class="info-value"><strong>' + esc(proj.name||projectId) + '</strong>' +
         (projectAddressLegacy ? '<br><span style="color:#5C6B80;font-size:12px;">' + esc(projectAddressLegacy).replace(/\n/g, '<br>') + '</span>' : '') +
@@ -39341,6 +39353,15 @@ async function renderBoardsTab(T, proj) {
           var _poViewVa = await window.cchPoVendorAddressResolved(docData);
           if (_poViewVa) docData.vendorAddress = _poViewVa;
         } catch (_ePoViewVa) {}
+      }
+      if (docData.vendor && typeof window.cchPoVendorContactResolved === 'function') {
+        try {
+          var _poViewContact = await window.cchPoVendorContactResolved(docData);
+          if (_poViewContact) {
+            if (_poViewContact.phone && !String(docData.vendorPhone || '').trim()) docData.vendorPhone = _poViewContact.phone;
+            if (_poViewContact.email && !String(docData.vendorEmail || '').trim()) docData.vendorEmail = _poViewContact.email;
+          }
+        } catch (_ePoViewContact) {}
       }
       if (window._forceEditMode) {
         window._forceEditMode = false;
@@ -72463,9 +72484,9 @@ ${pages}
   <script src="cch-design-board.js?v=20260608db29"></script>
   <script src="cch-client-board.js?v=1774994684878"></script>
   <script src="cch-line-icons.js?v=20260620a"></script>
-  <script src="cch-proposals-invoices-fix.js?v=20260620icons"></script>
+  <script src="cch-proposals-invoices-fix.js?v=20260622venctc"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
-  <script src="cch-po-bill-variance.js?v=20260622qbdot"></script>
+  <script src="cch-po-bill-variance.js?v=20260622venctc"></script>
   <script src="cch-order-management.js?v=20260622om12"></script>
   <script src="cch-ffe-procurement.js?v=20260602"></script>
 </body>

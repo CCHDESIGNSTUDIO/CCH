@@ -1073,6 +1073,80 @@
     return window.cchVendorCatalogAddressText(rec);
   };
 
+  /**
+   * PO vendor contact: { name, address, phone, email }.
+   * Prefers values on the PO doc (vendor name, vendorAddress, vendor-specific
+   * vendorPhone/vendorEmail), then fills any missing field from the vendors
+   * catalog by vendor name. Vendor phone/email field names per grounding
+   * (index.html ~57894): phone = v.phone || v.contactPhone || v.tel;
+   * email = v.email || v.contactEmail. Never throws — returns a partial object.
+   * NOTE: docData.phone / docData.email are CLIENT contact on PO docs, so they
+   * are intentionally NOT read here.
+   */
+  window.cchPoVendorContactResolved = async function(docData) {
+    docData = docData || {};
+    var out = {
+      name: String(docData.vendor || '').trim(),
+      address: '',
+      phone: String(docData.vendorPhone || '').trim(),
+      email: String(docData.vendorEmail || '').trim()
+    };
+    try {
+      if (typeof window.cchPoVendorAddressResolved === 'function') {
+        out.address = String(await window.cchPoVendorAddressResolved(docData) || '').trim();
+      } else {
+        out.address = String(docData.vendorAddress || '').trim();
+      }
+    } catch (_eAddr) {
+      out.address = String(docData.vendorAddress || '').trim();
+    }
+    try {
+      if (out.name && (!out.phone || !out.email || !out.address) &&
+          typeof window.cchLookupVendorRecordByName === 'function') {
+        var rec = await window.cchLookupVendorRecordByName(out.name);
+        if (rec) {
+          if (!out.phone) out.phone = String(rec.phone || rec.contactPhone || rec.tel || '').trim();
+          if (!out.email) out.email = String(rec.email || rec.contactEmail || '').trim();
+          if (!out.address && typeof window.cchVendorCatalogAddressText === 'function') {
+            out.address = String(window.cchVendorCatalogAddressText(rec) || '').trim();
+          }
+        }
+      }
+    } catch (_eRec) { /* graceful: keep whatever we have */ }
+    return out;
+  };
+
+  /**
+   * SYNC vendor bill-to block HTML: bold name, multiline address, then Phone /
+   * Email lines ONLY when present (no empty labels). opts: { labelColor,
+   * addrColor, fontSize }. Values are escaped via the file's esc() helper.
+   */
+  window.cchVendorContactBlockHtml = function(contact, opts) {
+    contact = contact || {};
+    opts = opts || {};
+    var labelColor = opts.labelColor || '#5C6B80';
+    var addrColor = opts.addrColor || labelColor;
+    var fontSize = opts.fontSize || '12px';
+    var nameStr = String(contact.name || '').trim();
+    var addrStr = String(contact.address || '').trim();
+    var phoneStr = String(contact.phone || '').trim();
+    var emailStr = String(contact.email || '').trim();
+    var html = '';
+    if (nameStr) html += '<strong>' + esc(nameStr) + '</strong>';
+    if (addrStr) {
+      html += '<div style="margin-top:6px;color:' + addrColor + ';font-size:' + fontSize + ';line-height:1.55;white-space:pre-wrap;">' +
+        esc(addrStr).replace(/\n/g, '<br>') + '</div>';
+    }
+    if (phoneStr || emailStr) {
+      html += '<div style="margin-top:4px;color:' + labelColor + ';font-size:' + fontSize + ';line-height:1.55;">' +
+        (phoneStr ? 'Phone: ' + esc(phoneStr) : '') +
+        (phoneStr && emailStr ? '<br>' : '') +
+        (emailStr ? 'Email: ' + esc(emailStr) : '') +
+        '</div>';
+    }
+    return html;
+  };
+
   /** Bill, paid, balance, variance cells for All POs / project PO lists. */
   window.cchPoListAllPosFinancialCellsHtml = function(po, tdStyle) {
     tdStyle = tdStyle || 'padding:12px 14px;font-size:14px;';
