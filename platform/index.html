@@ -34138,6 +34138,21 @@ async function renderBoardsTab(T, proj) {
       return true;
     }
 
+    /**
+     * Per-unit sell for a doc line. Doc-line `amount` is the EXTENDED line total
+     * (cost*qty*markup+ship — see recalcProposalLineAmount), NOT per-unit. Board cards
+     * store a per-unit price, so divide the total back out by qty.
+     */
+    function _rbDocLineUnitSell(it, qty) {
+      qty = parseFloat(qty) || 1;
+      var amt = parseMoney(it && it.amount);
+      if (amt && qty) return amt / qty;
+      var cp = parseMoney(it && it.clientPrice);
+      if (cp) return cp;
+      var up = parseMoney(it && (it.unitPrice || it.sellPrice || it.unitSellingPrice));
+      if (up) return up;
+      return 0;
+    }
     async function cchResolveDocLinesIntoBoardCards(projectId, clips) {
       if (!projectId || !Array.isArray(clips)) return clips;
       var realPresence = {};   // baseKey|roomNorm -> true (a real clip already shows this product in this room)
@@ -34181,7 +34196,8 @@ async function renderBoardsTab(T, proj) {
               sku: it.sku || base.sku || '',
               imageUrl: String(base.imageUrl || base.image || it.imageUrl || it.image || '').trim(),
               cost: (it.cost != null ? it.cost : base.cost) || 0,
-              clientPrice: (it.amount != null ? it.amount : (it.clientPrice != null ? it.clientPrice : base.clientPrice)) || 0,
+              clientPrice: (_rbDocLineUnitSell(it, qty) || parseMoney(base.clientPrice) || 0),
+              totalSelling: (parseMoney(it.amount) || ((_rbDocLineUnitSell(it, qty) || parseMoney(base.clientPrice) || 0) * qty) || 0),
               qty: qty,
               libraryProductId: String((it.libraryProductId || it.linkedLibraryProductId || base.libraryProductId) || '').trim() || null,
               source: 'doc-resolve',
@@ -34239,9 +34255,12 @@ async function renderBoardsTab(T, proj) {
       var sell = parseMoney(clip.clientPrice) || parseFloat(clip.sellPrice) || parseFloat(clip.unitSellingPrice) || (parseMoney(clip.totalSelling) ? parseMoney(clip.totalSelling) / qty : 0) || parseFloat(clip.totalSell) || parseFloat(clip.price) || parseFloat(clip.retailPrice) || 0;
       var isValid = imgSrc && (imgSrc.startsWith('http') || imgSrc.startsWith('data:') || imgSrc.startsWith('//') || (imgSrc.charAt(0) === '/' && imgSrc.length > 1));
       var href = _rbResolvePrimaryDocHref(clip, projId);
-      var chip = '<span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#8a6d3b;background:rgba(201,169,110,0.16);padding:2px 6px;border-radius:3px;white-space:nowrap;" title="Billed to this room on a document \u2014 read-only here">From ' + esc(_rbDocResolveSourceLabel(clip)) + ' \u00b7 read-only</span>';
-      return '<div' + (href ? ' onclick="navigate(\'' + escAttr(href) + '\')"' : '') + ' class="rb-board-clip-card" style="background:white;border:1px solid var(--gray-200);border-radius:6px;overflow:hidden;' + (href ? 'cursor:pointer;' : '') + 'transition:box-shadow 0.2s,transform 0.15s;"' +
-        (href ? ' onmouseenter="this.style.boxShadow=\'0 4px 16px rgba(0,0,0,0.1)\';this.style.transform=\'translateY(-1px)\'" onmouseleave="this.style.boxShadow=\'none\';this.style.transform=\'none\'"' : '') + '>' +
+      var realId = String(clip._docResolveRealClipId || '').trim();
+      // Card click opens the item to edit (like a normal board card); the INV/PR/PO pills below open the doc.
+      var cardClick = realId ? ('showClipDetail(\'' + escAttr(projId) + '\',\'' + escAttr(realId) + '\')') : (href ? ('navigate(\'' + escAttr(href) + '\')') : '');
+      var chip = '<span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#8a6d3b;background:rgba(201,169,110,0.16);padding:2px 6px;border-radius:3px;white-space:nowrap;" title="Also billed to this room on ' + escAttr(_rbDocResolveSourceLabel(clip)) + '">From ' + esc(_rbDocResolveSourceLabel(clip)) + '</span>';
+      return '<div' + (cardClick ? ' onclick="' + cardClick + '"' : '') + ' class="rb-board-clip-card" style="background:white;border:1px solid var(--gray-200);border-radius:6px;overflow:hidden;' + (cardClick ? 'cursor:pointer;' : '') + 'transition:box-shadow 0.2s,transform 0.15s;"' +
+        (cardClick ? ' onmouseenter="this.style.boxShadow=\'0 4px 16px rgba(0,0,0,0.1)\';this.style.transform=\'translateY(-1px)\'" onmouseleave="this.style.boxShadow=\'none\';this.style.transform=\'none\'"' : '') + '>' +
         '<div style="position:relative;">' +
           '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:rgba(245,243,238,0.5);border-bottom:1px solid var(--gray-100);">' +
             chip +
@@ -34253,7 +34272,7 @@ async function renderBoardsTab(T, proj) {
           '<div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#0F1A2E;">' + esc(clip.title || 'Untitled') + '</div>' +
           (clip.vendor ? '<div style="font-size:11px;color:var(--gray-500);margin-top:2px;">By ' + esc(clip.vendor) + '</div>' : '') +
           (typeof cchProductIdentityBadgesHtml === 'function' ? cchProductIdentityBadgesHtml(clip, { showIds: true, hideUnlinked: true }) : '') +
-          (sell > 0 ? '<div style="font-size:14px;font-weight:700;color:var(--gold);font-family:var(--font-mono);margin-top:6px;">' + formatMoney(sell) + (qty > 1 ? ' <span style="font-size:11px;color:var(--gray-400);font-weight:400;">x' + qty + '</span>' : '') + '</div>' : '') +
+          (sell > 0 ? '<div style="font-size:14px;font-weight:700;color:var(--gold);font-family:var(--font-mono);margin-top:6px;">' + formatMoney(sell) + ' <span style="font-size:10px;color:var(--gray-400);font-weight:600;">/ea</span>' + (qty > 1 ? ' <span style="font-size:11px;color:var(--gray-400);font-weight:400;">\u00d7' + qty + ' \u00b7 ' + formatMoney(sell * qty) + '</span>' : '') + '</div>' : '') +
           clipLinkedDocPillsHtml(clip, projId) +
         '</div>' +
       '</div>';
@@ -34267,20 +34286,22 @@ async function renderBoardsTab(T, proj) {
       var markup = clip.markupPct || (cost > 0 && sell > 0 ? Math.round((sell - cost) / cost * 100) : 0);
       var total = sell * qty;
       var href = _rbResolvePrimaryDocHref(clip, projId);
-      var rowAttr = href ? (' onclick="navigate(\'' + escAttr(href) + '\')" style="cursor:pointer;"') : '';
+      var realId = String(clip._docResolveRealClipId || '').trim();
+      var rowClick = realId ? ('showClipDetail(\'' + escAttr(projId) + '\',\'' + escAttr(realId) + '\')') : (href ? ('navigate(\'' + escAttr(href) + '\')') : '');
+      var rowAttr = rowClick ? (' onclick="' + rowClick + '" style="cursor:pointer;"') : '';
       return '<tr' + rowAttr + '>' +
         '<td>' + imgTag + '</td>' +
-        '<td><strong>' + esc(clip.title || 'Untitled') + '</strong><br><span style="color:#8a6d3b;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">From ' + esc(_rbDocResolveSourceLabel(clip)) + ' \u00b7 read-only</span></td>' +
+        '<td><strong>' + esc(clip.title || 'Untitled') + '</strong><br><span style="color:#8a6d3b;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">From ' + esc(_rbDocResolveSourceLabel(clip)) + '</span></td>' +
         '<td style="font-size:12px;">' + esc(clip.vendor || '-') + '</td>' +
         '<td style="font-size:12px;">' + esc(clip.category || '-') + '</td>' +
         '<td style="font-size:12px;">' + esc(clip.room || '-') + '</td>' +
         '<td style="color:var(--gray-600);">' + (cost > 0 ? formatMoney(cost) : '-') + '</td>' +
-        '<td style="color:var(--green);font-weight:600;">' + (sell > 0 ? formatMoney(sell) : '-') + '</td>' +
+        '<td style="color:var(--green);font-weight:600;">' + (sell > 0 ? formatMoney(sell) + ' <span style="font-size:9px;color:var(--gray-400);font-weight:600;">/ea</span>' : '-') + '</td>' +
         '<td>' + (markup > 0 ? markup + '%' : '-') + '</td>' +
         '<td style="text-align:center;">' + qty + '</td>' +
         '<td style="font-weight:600;color:var(--green);">' + (total > 0 ? formatMoney(total) : '-') + '</td>' +
         '<td><span class="badge badge-draft">On doc</span></td>' +
-        '<td style="text-align:center;color:var(--gray-300);" title="Read-only \u2014 manage on the document">\u2014</td>' +
+        '<td style="text-align:center;color:var(--gray-300);" title="Click the row to edit; the INV/PO/PR pill opens the document">\u2014</td>' +
         '</tr>';
     }
 
@@ -55022,7 +55043,7 @@ async function renderBoardsTab(T, proj) {
             pointer-events: auto;
           }
           .pl-lib-modal-gallery {
-            width: min(420px, 42vw);
+            width: min(480px, 46vw);
             flex-shrink: 0;
             border-right: 1px solid var(--gray-200);
             padding: 16px;
@@ -55034,8 +55055,8 @@ async function renderBoardsTab(T, proj) {
           }
           .pl-lib-hero-img {
             width: 100%;
-            max-height: min(520px, 55vh);
-            min-height: 220px;
+            max-height: min(640px, 66vh);
+            min-height: 300px;
             aspect-ratio: 1;
             object-fit: contain;
             object-position: center;
@@ -55070,7 +55091,7 @@ async function renderBoardsTab(T, proj) {
               <!-- Left: hero + gallery (Product Library detail layout) -->
               <div class="pl-lib-modal-gallery">
                 <label class="form-label">Images</label>
-                <div id="prodImageZone" class="pl-lib-hero-zone" onclick="document.getElementById('prodImageFile').click()" ondragover="event.preventDefault();this.style.borderColor='var(--gold)'" ondragleave="this.style.borderColor='var(--gray-200)'" ondrop="handleImageDrop(event)" title="Click to replace hero image">
+                <div id="prodImageZone" class="pl-lib-hero-zone" onclick="(function(){var v=document.getElementById('prodImage');var u=(v&&v.value||'').trim();if(u&&typeof window._peOpenModalLightbox==='function'){window._peOpenModalLightbox(u);}else{var f=document.getElementById('prodImageFile');if(f)f.click();}})()" ondragover="event.preventDefault();this.style.borderColor='var(--gold)'" ondragleave="this.style.borderColor='var(--gray-200)'" ondrop="handleImageDrop(event)" title="Click to view larger \u2014 use Replace image to change">
                   ${p.imageUrl
                     ? '<img src="'+escAttr(p.imageUrl)+'" class="pl-lib-hero-img" id="prodImagePreview" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">'
                     : '<div class="pl-lib-hero-img" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--gray-400);cursor:pointer;"><div style="font-size:40px;">📷</div><div style="font-size:11px;">Click, paste URL, or drag</div></div>'}
@@ -56362,6 +56383,24 @@ async function renderBoardsTab(T, proj) {
       html += '</div>';
       return html;
     }
+    /** Internal item edit modal: open the shared full-screen lightbox (arrows / Esc / click-out) over the modal's photos. */
+    window._peOpenModalLightbox = function(startUrlOrIdx) {
+      var pre = window._lastProductModalPrefill || {};
+      var urls = [];
+      function add(u) { u = String(u || '').trim(); if (u && urls.indexOf(u) < 0) urls.push(u); }
+      var inp = document.getElementById('prodImage');
+      if (inp && inp.value) add(inp.value);
+      add(pre.imageUrl);
+      var imgs = (typeof _coerceGalleryUrlList === 'function') ? _coerceGalleryUrlList(pre) : (Array.isArray(pre.images) ? pre.images : []);
+      (imgs || []).forEach(function(x) { add(typeof x === 'string' ? x : (x && x.url)); });
+      urls = urls.filter(function(u) { return /^(https?:|data:|\/\/|\/)/.test(u); });
+      if (!urls.length) return;
+      var i = 0;
+      if (typeof startUrlOrIdx === 'string') { var k = urls.indexOf(String(startUrlOrIdx).trim()); i = k >= 0 ? k : 0; }
+      else { i = parseInt(startUrlOrIdx, 10) || 0; }
+      i = Math.max(0, Math.min(i, urls.length - 1));
+      if (typeof cpProposalLineLightboxOpen === 'function') cpProposalLineLightboxOpen(urls, i);
+    };
     function _peRefreshGalleryStrip(productId) {
       var strip = document.getElementById('peGalleryStrip');
       if (!strip) return;
