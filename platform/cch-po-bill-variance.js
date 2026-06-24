@@ -2838,6 +2838,17 @@
       '</div>';
   };
 
+  /** Project / All POs list — shipping / receiving badge. */
+  window.cchPoListShippingStatusHtml = function(po) {
+    po = po || {};
+    if (typeof window.cchPoShippingStatusBadgeHtml !== 'function') return '—';
+    return window.cchPoShippingStatusBadgeHtml(po, {
+      projectId: po.projectId,
+      poId: po.id,
+      clickable: true
+    });
+  };
+
   function cchPoProcurementStatusOptionsHtml(current, opts) {
     opts = opts || {};
     current = String(current || '').trim();

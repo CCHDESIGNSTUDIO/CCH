@@ -5017,19 +5017,24 @@
         if (typeof showToast === 'function') showToast('No POs match current filters.', 'warning');
         return;
       }
-      var header = ['PO #', 'Vendor', 'Project', 'Date', 'Status', 'Shipped To', 'ETA', 'Total', 'Bill', 'Paid', 'Balance'];
+      var header = ['PO #', 'Vendor', 'Project', 'Date', 'PO status', 'Bill status', 'Ship status', 'Shipped To', 'ETA', 'Total', 'Bill', 'Paid', 'Balance'];
       var body = rows.map(function(po) {
         var ship = typeof window.cchPoListShipToLabel === 'function' ? window.cchPoListShipToLabel(po) : (po.shipTo || po.receiver || po.workroom || '');
         var bill = typeof window.cchPoListBillTotalForRow === 'function' ? window.cchPoListBillTotalForRow(po) : null;
         var paid = typeof window.cchPoListPaidForRow === 'function' ? window.cchPoListPaidForRow(po) : 0;
         var bal = typeof window.cchPoListBalanceForRow === 'function' ? window.cchPoListBalanceForRow(po) : 0;
         var total = typeof window.cchPoListPoTotal === 'function' ? window.cchPoListPoTotal(po) : (parseFloat(po.total) || 0);
+        var poSt = typeof window.cchPoProcurementStatusLabel === 'function' ? window.cchPoProcurementStatusLabel(po) : (po.status || '');
+        var billSt = typeof window.cchPoBillStatusLabel === 'function' ? window.cchPoBillStatusLabel(po) : '';
+        var shipSt = typeof window.cchPoShippingStatusLabel === 'function' ? window.cchPoShippingStatusLabel(po, po.items || []) : '';
         return [
           po.number || po.num || po.id,
           po._displayVendor || po.vendor || '',
           po.projectName || po.projectId || '',
           formatDate(po.issueDate || po.orderDate || po.poDate || po.date || po.createdAt),
-          po.status || '',
+          poSt,
+          billSt,
+          shipSt,
           ship,
           po.eta || '',
           total.toFixed(2),
@@ -5307,6 +5312,9 @@
             return dir * window.cchPoProcurementStatusLabel(a).localeCompare(window.cchPoProcurementStatusLabel(b));
           }
           return dir * (a.status||'').localeCompare(b.status||'');
+        }
+        if (sortBy === 'shipStatus' && pageType === 'pos' && typeof window.cchPoShippingStatusLabel === 'function') {
+          return dir * window.cchPoShippingStatusLabel(a, a.items || []).localeCompare(window.cchPoShippingStatusLabel(b, b.items || []));
         }
         if (sortBy === 'vendor') return dir * (a.vendor||'').localeCompare(b.vendor||'');
         if (sortBy === 'published') return dir * ((a.published?1:0) - (b.published?1:0));
@@ -60781,9 +60789,10 @@ async function renderBoardsTab(T, proj) {
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('vendor','pos')">Vendor${sortArrow('vendor','pos')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('project','pos')">Project${sortArrow('project','pos')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('date','pos')">Date${sortArrow('date','pos')}</th>
-                  <th style="${thStyle}cursor:pointer;" onclick="sortByField('status','pos')">Status${sortArrow('status','pos')}</th>
+                  <th style="${thStyle}cursor:pointer;" onclick="sortByField('status','pos')">PO status${sortArrow('status','pos')}</th>
                   <th style="${thStyle}text-align:center;">Connected</th>
                   <th style="${thStyle}text-align:center;">Bills</th>
+                  <th style="${thStyle}text-align:center;cursor:pointer;" onclick="sortByField('shipStatus','pos')">Ship status${sortArrow('shipStatus','pos')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('shipTo','pos')">Shipped To${sortArrow('shipTo','pos')}</th>
                   <th style="${thStyle}cursor:pointer;" onclick="sortByField('eta','pos')">ETA${sortArrow('eta','pos')}</th>
                   <th style="${thStyle}text-align:right;cursor:pointer;" onclick="sortByField('amount','pos')">Total${sortArrow('amount','pos')}</th>
@@ -60810,6 +60819,7 @@ async function renderBoardsTab(T, proj) {
                     <td style="${tdStyle}" onclick="event.stopPropagation()">${typeof cchPoProcurementStatusBadgeHtml==='function'?cchPoProcurementStatusBadgeHtml(po,{projectId:po.projectId,poId:po.id,clickable:true}):(typeof cchPoFulfillmentStatusBadgeHtml==='function'?cchPoFulfillmentStatusBadgeHtml(po,{projectId:po.projectId,poId:po.id,clickable:true}):statusBadge(po.status))}</td>
                     <td style="${tdStyle}text-align:center;" onclick="event.stopPropagation()">${typeof window.cchFinLinkedDocsCellHtml === 'function' ? window.cchFinLinkedDocsCellHtml(po.projectId, 'po', po.id, 'purchaseOrders', po) : '—'}</td>
                     <td style="${tdStyle}text-align:center;white-space:nowrap;" onclick="event.stopPropagation()">${typeof window.cchOmBillsCellHtml==='function'?window.cchOmBillsCellHtml(po):(typeof cchPoListBillWorkflowHtml==='function'?cchPoListBillWorkflowHtml(po):'—')}</td>
+                    <td style="${tdStyle}text-align:center;white-space:nowrap;" onclick="event.stopPropagation()">${typeof cchPoListShippingStatusHtml==='function'?cchPoListShippingStatusHtml(po):'—'}</td>
                     <td style="${tdStyle}font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escAttr(shipToLabel)}">${shipToLabel ? esc(shipToLabel) : '—'}</td>
                     <td style="${tdStyle}color:var(--gray-500);font-size:12px;">${esc(po.eta||'—')}</td>
                     <td style="${tdStyle}text-align:right;font-weight:600;font-family:monospace;">$${((typeof cchPoListPoTotal==='function'?cchPoListPoTotal(po):(parseFloat(po.total)||0))).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
@@ -72672,7 +72682,7 @@ ${pages}
   <script src="cch-line-icons.js?v=20260620a"></script>
   <script src="cch-proposals-invoices-fix.js?v=20260623posmk4"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
-  <script src="cch-po-bill-variance.js?v=20260623poc5"></script>
+  <script src="cch-po-bill-variance.js?v=20260623poc6"></script>
   <script src="cch-order-management.js?v=20260623om21"></script>
   <script src="cch-ffe-procurement.js?v=20260602"></script>
 </body>
