@@ -130,6 +130,10 @@
     }
     var links = (typeof window.cchCollectLinkedProjectDocsSync === 'function')
       ? window.cchCollectLinkedProjectDocsSync(docType, docId, docData || {}, lists || {}) : [];
+    // PO rows: show only linked proposals & invoices, not other POs (per Cynthia).
+    if (docType === 'po' && Array.isArray(links)) {
+      links = links.filter(function(d) { return d && d.type !== 'po'; });
+    }
     if (!links.length) {
       return '<a onclick="event.stopPropagation();linkDocModal(\'' + cchEscJsStr(projectId) + '\',\'' + collection + '\',\'' + cchEscJsStr(docId) + '\')" style="color:var(--gray-500);cursor:pointer;font-size:11px;white-space:nowrap;text-decoration:underline;" title="Link documents">Link</a>';
     }
@@ -2999,7 +3003,7 @@
         '<thead><tr style="border-bottom:1px solid var(--gray-200);">' +
           '<th style="width:80px;padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;"></th>' +
           '<th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Item</th>' +
-          '<th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Vendor</th>' +
+          '<th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">' + (type === 'po' ? 'Room' : 'Vendor') + '</th>' +
           (_showPoVendorInvCols ? '<th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;min-width:88px;">Vendor inv #</th>' +
           '<th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;min-width:72px;">Order status</th>' +
           (_showPoLineEtaCol ? '<th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;min-width:100px;">Ship / ETA</th>' : '') +
@@ -3136,12 +3140,10 @@
         var _lineTitle = typeof window.invoiceLineDisplayTitle === 'function' ? window.invoiceLineDisplayTitle(item) : (item.title || 'Untitled');
         var _poRoomTagHtml = '';
         if (type === 'po') {
-          var _poRm = String(item.room || '').trim();
-          if (_poRm || lineTag) {
+          // Room now has its own dedicated column, so only show the Tag here to avoid duplicating room.
+          if (lineTag) {
             _poRoomTagHtml = '<div style="font-size:11px;color:#5C6B80;margin-top:4px;line-height:1.4;">' +
-              (_poRm ? '<span style="font-weight:600;">🏠 ' + esc(_poRm) + '</span>' : '') +
-              (_poRm && lineTag ? ' · ' : '') +
-              (lineTag ? '<span style="font-weight:700;color:#1B3352;">Tag ' + esc(lineTag) + '</span>' : '') +
+              '<span style="font-weight:700;color:#1B3352;">Tag ' + esc(lineTag) + '</span>' +
               '</div>';
           }
         }
@@ -3169,7 +3171,7 @@
             (item.shipTo && type !== 'invoice' ? '<div style="font-size:11px;color:var(--teal);margin-top:2px;">📍 ' + esc(item.shipTo) + '</div>' : '') +
             typeBadgeHtml +
           '</td>' +
-          '<td style="padding:10px 8px;font-size:13px;color:var(--gray-500);">' + esc((type === 'po' && typeof window.cchPoLineDisplayVendor === 'function') ? window.cchPoLineDisplayVendor(item, docData) : (item.vendor || '')) + '</td>' +
+          '<td style="padding:10px 8px;font-size:13px;color:var(--gray-500);">' + (type === 'po' ? esc(String(item.room || '').trim() || '—') : esc(item.vendor || '')) + '</td>' +
           (_showPoVendorInvCols ? '<td style="padding:10px 8px;vertical-align:middle;">' + (_poVigCells ? _poVigCells.invHtml : '—') + '</td>' +
           '<td style="padding:10px 8px;vertical-align:middle;">' + (_poVigCells ? _poVigCells.statusHtml : '—') + '</td>' +
           (_showPoLineEtaCol ? '<td style="padding:10px 8px;vertical-align:middle;">' + (_poVigCells ? _poVigCells.etaHtml : '—') + '</td>' : '') +

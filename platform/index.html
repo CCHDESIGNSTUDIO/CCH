@@ -24998,7 +24998,7 @@ async function renderBoardsTab(T, proj) {
                     <td class="col-doc-tags" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${poTagRaw ? escAttr(poTagRaw) : escAttr('No tag yet. Open Edit PO → Summary or Document Tags.')}">${poTagRaw ? esc(poTagRaw) : '<span class="doc-tag-empty" title="' + escAttr('No tag yet. Use ⋮ → Edit PO, then Summary or Document Tags.') + '">—</span>'}</td>
                     <td class="po-vendor-col" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;" title="${escAttr(po.vendor && String(po.vendor).trim() !== String(po._displayVendor || '').trim() ? ('Stored vendor: ' + po.vendor) : '')}">${esc(po._displayVendor || '—')}</td>
                     <td class="col-status" onclick="event.stopPropagation()">${typeof cchPoProcurementStatusBadgeHtml==='function'?cchPoProcurementStatusBadgeHtml(po,{projectId:proj.id,poId:po.id,clickable:true}):(typeof cchPoFulfillmentStatusBadgeHtml==='function'?cchPoFulfillmentStatusBadgeHtml(po,{projectId:proj.id,poId:po.id,clickable:true}):('<span class="badge badge-'+(po.status||'draft').toLowerCase()+'">'+esc(po.status||'Draft')+'</span>'))}</td>
-                    <td style="font-size:11px;white-space:nowrap;" onclick="event.stopPropagation()">${typeof cchPoListBillWorkflowHtml==='function'?cchPoListBillWorkflowHtml(po):'—'}</td>
+                    <td style="font-size:11px;white-space:nowrap;" onclick="event.stopPropagation()">${typeof cchPoBillStatusEditorCellHtml==='function'?cchPoBillStatusEditorCellHtml(po, proj.id):(typeof cchPoListBillWorkflowHtml==='function'?cchPoListBillWorkflowHtml(po):'—')}</td>
                     <td style="font-size:11px;white-space:nowrap;" onclick="event.stopPropagation()">${typeof cchPoShippingStatusBadgeHtml==='function'?cchPoShippingStatusBadgeHtml(po,{projectId:proj.id,poId:po.id,clickable:true}):'—'}</td>
                     <td class="col-date">${formatDate(po.issueDate || po.orderDate || po.poDate || po.date || po.createdAt)}</td>
                     <td class="col-amount">${formatMoney(typeof cchPoListPoTotal==='function'?cchPoListPoTotal(po):(po.total||0))}</td>
@@ -72932,9 +72932,9 @@ ${pages}
   <script src="cch-design-board.js?v=20260608db29"></script>
   <script src="cch-client-board.js?v=1774994684878"></script>
   <script src="cch-line-icons.js?v=20260620a"></script>
-  <script src="cch-proposals-invoices-fix.js?v=20260623posmk6"></script>
+  <script src="cch-proposals-invoices-fix.js?v=20260624posmk7"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
-  <script src="cch-po-bill-variance.js?v=20260624poc11"></script>
+  <script src="cch-po-bill-variance.js?v=20260624poc12"></script>
   <script src="cch-order-management.js?v=20260624om25"></script>
   <script src="cch-ffe-procurement.js?v=20260602"></script>
 </body>

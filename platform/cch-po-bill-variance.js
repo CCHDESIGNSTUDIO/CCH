@@ -192,6 +192,71 @@
   };
 
   /**
+   * Bill-status <option> list for the inline dropdown. Mirrors the bill-lane
+   * steps (Pending / Partial / Bill received / Closed); current lane is selected.
+   */
+  window.cchPoBillStatusOptionsHtml = function(currentLane) {
+    currentLane = String(currentLane || '').trim();
+    var steps = [
+      { id: 'pending', label: 'Pending' },
+      { id: 'partial', label: 'Partial' },
+      { id: 'received', label: 'Bill received' },
+      { id: 'closed', label: 'Closed' }
+    ];
+    return steps.map(function(st) {
+      return '<option value="' + st.id + '"' + (currentLane === st.id ? ' selected' : '') + '>' + esc(st.label) + '</option>';
+    }).join('');
+  };
+
+  /**
+   * Inline bill-status dropdown for the project PO tab (replaces the verbose
+   * paid/balance badge). The bill lane is DERIVED from the vendor-bill record,
+   * not a free-set field, so this select does not blind-write a lane. On change
+   * it routes to the existing Receive-vendor-bill flow (the safe writer) and
+   * reverts its visible value — the lane re-derives once the bill is saved.
+   * Paid / Balance numbers stay in their own BILL / PAID / BALANCE columns.
+   */
+  window.cchPoBillStatusEditorCellHtml = function(po, projectId) {
+    po = po || {};
+    var items = po.items || [];
+    var lane = typeof window.cchPoBillLaneId === 'function' ? window.cchPoBillLaneId(po, items) : 'na';
+    if (lane === 'na') {
+      return '<span style="font-size:11px;color:var(--gray-400);">—</span>';
+    }
+    var pid = escJs(projectId || po.projectId);
+    var poid = escJs(po.id);
+    var optsHtml = window.cchPoBillStatusOptionsHtml(lane);
+    return '<select class="form-input" style="font-size:11px;padding:4px 28px 4px 8px;min-width:130px;max-width:190px;" ' +
+      'data-prev-status="' + escAttr(lane) + '" onclick="event.stopPropagation()" ' +
+      'onfocus="this.setAttribute(\'data-prev-status\',this.value)" ' +
+      'onchange="window.cchPoBillStatusSelectChanged(\'' + pid + '\',\'' + poid + '\',this)" ' +
+      'title="Vendor bill status — choose Partial / Bill received to open the receive-bill flow">' + optsHtml + '</select>';
+  };
+
+  /**
+   * Dropdown change handler. Routes to the existing receive-bill modal rather
+   * than directly writing a derived lane (avoids inventing risky Firestore
+   * writes / accidental downgrades). The select reverts to its prior value;
+   * the lane updates from the saved bill record after the flow completes.
+   */
+  window.cchPoBillStatusSelectChanged = function(projectId, poId, el) {
+    if (!el) return;
+    var sel = String(el.value || '').trim();
+    var prev = el.getAttribute('data-prev-status') || '';
+    el.value = prev;
+    if (sel === prev) return;
+    if (sel === 'partial' || sel === 'received') {
+      if (typeof window.cchPoOpenReceiveBillModal === 'function') {
+        window.cchPoOpenReceiveBillModal(projectId, poId);
+        return;
+      }
+    }
+    if (typeof window.navigate === 'function') {
+      window.navigate('#/project/' + projectId + '/po/' + poId);
+    }
+  };
+
+  /**
    * Compact QB status dot for list columns. Three states only:
    *   GREEN   = pushed through to QuickBooks (bill present in QB)
    *   RED     = last push to QuickBooks failed
