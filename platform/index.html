@@ -58085,15 +58085,119 @@ async function renderBoardsTab(T, proj) {
 
     // ==================== DELIVERY / RECEIVERS PAGE ====================
     async function renderDeliveryReceivers() {
-      setBreadcrumb([{ label: 'Delivery / Receivers' }]);
-      setTopbarActions('');
+      setBreadcrumb([{ label: 'Receivers' }]);
+      setTopbarActions('<a class="btn btn-secondary btn-sm" style="margin-right:8px;" href="#/ordermanagement/receiving" onclick="event.preventDefault();navigate(\'#/ordermanagement/receiving\')">Order Management → Receiving</a>');
       const T = document.getElementById('contentArea');
-      T.innerHTML = `
-        <h1 class="page-title">Delivery & Receivers</h1>
-        <p style="color:var(--gray-400);margin-bottom:20px;">Track deliveries and receiving across all projects.</p>
-        <div class="empty-state"><div class="empty-icon">🚚</div>
-          <div class="empty-text">Delivery tracking coming soon.<br>Monitor shipments, receive items, and track damages.</div></div>
-      `;
+      T.innerHTML = '<h1 class="page-title">Receivers</h1>' +
+        '<p style="color:var(--gray-400);margin-bottom:20px;">Every receiver and the POs sent to them. Assign a receiver on the PO or in Order Management → Receiving.</p>' +
+        '<div style="padding:40px;color:var(--gray-400);">Loading receivers…</div>';
+
+      function rTotal(po) {
+        if (typeof window.cchPoListPoTotal === 'function') return window.cchPoListPoTotal(po);
+        if (typeof window.cchPoDocTotal === 'function') return window.cchPoDocTotal(po);
+        return parseFloat(po.total) || 0;
+      }
+      function rShipStatus(po) {
+        if (typeof window.cchPoShippingStatusLabel === 'function') return window.cchPoShippingStatusLabel(po, po.items || []);
+        return po.shippingStatus || po.status || '—';
+      }
+      function rEta(po) {
+        var e = po.eta || (po.bill && po.bill.etaDate) || '';
+        return e ? (typeof formatDate === 'function' ? formatDate(e) : String(e)) : '—';
+      }
+
+      try {
+        var loaded = typeof window.cchPoLoadAllPosForVendorBills === 'function'
+          ? await window.cchPoLoadAllPosForVendorBills()
+          : { pos: (window._cachedPOs || []), projNames: {} };
+        var pos = (loaded.pos || []).filter(function(p) {
+          return typeof window.cchOmIsStudioPo === 'function' ? window.cchOmIsStudioPo(p) : true;
+        });
+        var receivers = typeof window.cchPoLoadReceivers === 'function' ? await window.cchPoLoadReceivers() : [];
+        var contactByName = {};
+        receivers.forEach(function(r) { contactByName[r.name.toLowerCase()] = r; });
+
+        var groups = {};
+        pos.forEach(function(po) {
+          var name = String(po.receiver || '').trim();
+          var key = name || '__unassigned__';
+          if (!groups[key]) groups[key] = { name: name, pos: [] };
+          groups[key].pos.push(po);
+        });
+        // Ensure every known receiver shows even with zero POs
+        receivers.forEach(function(r) {
+          var key = r.name;
+          if (!groups[key]) groups[key] = { name: r.name, pos: [] };
+        });
+
+        var keys = Object.keys(groups).sort(function(a, b) {
+          if (a === '__unassigned__') return 1;
+          if (b === '__unassigned__') return -1;
+          return String(groups[a].name).localeCompare(String(groups[b].name));
+        });
+
+        var assignedPoCount = pos.filter(function(p) { return String(p.receiver || '').trim(); }).length;
+        var receiverCount = keys.filter(function(k) { return k !== '__unassigned__'; }).length;
+
+        var summary = '<div style="display:flex;gap:0;margin-bottom:20px;border:1px solid var(--gray-200);border-radius:6px;overflow:hidden;">' +
+          '<div style="flex:1;padding:16px 20px;border-right:1px solid var(--gray-200);"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);">Receivers</div><div style="font-size:22px;font-weight:700;">' + receiverCount + '</div></div>' +
+          '<div style="flex:1;padding:16px 20px;border-right:1px solid var(--gray-200);"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);">POs assigned</div><div style="font-size:22px;font-weight:700;">' + assignedPoCount + '</div></div>' +
+          '<div style="flex:1;padding:16px 20px;"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);">Unassigned POs</div><div style="font-size:22px;font-weight:700;color:' + ((groups.__unassigned__ && groups.__unassigned__.pos.length) ? '#B45309' : 'inherit') + ';">' + ((groups.__unassigned__ && groups.__unassigned__.pos.length) || 0) + '</div></div>' +
+          '</div>';
+
+        if (!keys.length) {
+          T.innerHTML = '<h1 class="page-title">Receivers</h1>' +
+            '<div class="empty-state"><div class="empty-icon">🚚</div><div class="empty-text">No receivers yet.<br>Add a Vendor with category "Delivery / Receiver", then assign it on a PO.</div></div>';
+          return;
+        }
+
+        var sections = keys.map(function(key) {
+          var g = groups[key];
+          var isUnassigned = key === '__unassigned__';
+          var title = isUnassigned ? 'Unassigned' : g.name;
+          var contact = contactByName[String(g.name || '').toLowerCase()];
+          var contactLine = contact && (contact.email || contact.phone)
+            ? '<span style="font-size:12px;color:var(--gray-500);font-weight:400;margin-left:10px;">' +
+                [contact.email, contact.phone].filter(Boolean).map(esc).join(' · ') + '</span>'
+            : '';
+          var rows = g.pos.length
+            ? g.pos.sort(function(a, b) { return String(a.number || a.id).localeCompare(String(b.number || b.id)); }).map(function(po) {
+                var td = 'padding:9px 12px;font-size:13px;border-bottom:1px solid var(--gray-100);';
+                return '<tr style="cursor:pointer;" onclick="navigate(\'#/project/' + escAttr(po.projectId) + '/po/' + escAttr(po.id) + '\')">' +
+                  '<td style="' + td + 'font-weight:600;font-family:monospace;color:var(--gold);">' + esc(po.number || po.id.substring(0, 8)) + '</td>' +
+                  '<td style="' + td + '">' + esc(po._displayVendor || po.vendor || '—') + '</td>' +
+                  '<td style="' + td + 'color:var(--gray-500);">' + esc(po.projectName || po.projectId) + '</td>' +
+                  '<td style="' + td + '">' + esc(rShipStatus(po)) + '</td>' +
+                  '<td style="' + td + 'color:var(--gray-500);">' + esc(rEta(po)) + '</td>' +
+                  '<td style="' + td + 'text-align:right;font-family:monospace;font-weight:600;">$' + rTotal(po).toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
+                  '</tr>';
+              }).join('')
+            : '<tr><td colspan="6" style="padding:12px;color:var(--gray-400);font-style:italic;font-size:12px;">No POs assigned to this receiver yet.</td></tr>';
+          return '<div class="card" style="margin-bottom:18px;overflow:hidden;">' +
+            '<div style="padding:12px 16px;background:' + (isUnassigned ? 'rgba(180,83,9,0.06)' : 'var(--gray-50)') + ';border-bottom:1px solid var(--gray-200);">' +
+              '<span style="font-size:15px;font-weight:700;color:' + (isUnassigned ? '#B45309' : 'var(--navy, #1B3352)') + ';">' + esc(title) + '</span>' +
+              '<span style="font-size:12px;color:var(--gray-500);margin-left:8px;">' + g.pos.length + ' PO' + (g.pos.length !== 1 ? 's' : '') + '</span>' +
+              contactLine +
+            '</div>' +
+            '<table style="width:100%;border-collapse:collapse;">' +
+              '<thead><tr style="border-bottom:2px solid var(--gray-200);">' +
+                '<th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);">PO #</th>' +
+                '<th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);">Vendor</th>' +
+                '<th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);">Project</th>' +
+                '<th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);">Ship status</th>' +
+                '<th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);">ETA</th>' +
+                '<th style="padding:8px 12px;text-align:right;font-size:10px;text-transform:uppercase;color:var(--gray-400);">Total</th>' +
+              '</tr></thead><tbody>' + rows + '</tbody></table>' +
+            '</div>';
+        }).join('');
+
+        T.innerHTML = '<h1 class="page-title">Receivers</h1>' +
+          '<p style="color:var(--gray-400);margin-bottom:20px;">Every receiver and the POs sent to them. Assign a receiver on the PO or in Order Management → Receiving. Houzz legacy imports excluded.</p>' +
+          summary + sections;
+      } catch (e) {
+        T.innerHTML = '<h1 class="page-title">Receivers</h1>' +
+          '<div class="card" style="padding:24px;color:#B45309;">Could not load receivers: ' + esc(e.message || e) + '</div>';
+      }
     }
 
     // ==================== VENDORS PAGE ====================
