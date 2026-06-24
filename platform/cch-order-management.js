@@ -1412,7 +1412,10 @@
         '<td style="' + td + 'font-size:12px;line-height:1.5;">' + clipSummary + '</td>' +
         '<td style="' + td + 'text-align:center;font-size:12px;">' + esc(String(r.poLines || '—')) + '</td>' +
         '<td style="' + td + 'text-align:center;font-size:12px;">' + unlinked + '</td>' +
-        '<td style="' + td + 'font-size:12px;color:var(--gray-500);">' + esc(r.location || '—') + '</td>' +
+        '<td style="' + td + 'font-size:12px;color:var(--gray-500);" onclick="event.stopPropagation()">' +
+        (typeof window.cchPoReceiverSelectHtml === 'function'
+          ? window.cchPoReceiverSelectHtml(po.projectId, po.id, po.receiver)
+          : esc(r.location || '—')) + '</td>' +
         '<td style="' + td + 'text-align:right;font-weight:600;font-family:monospace;">$' +
         poTotal(po).toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
         '</tr>';
@@ -1432,7 +1435,7 @@
       '<th style="padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Linked selections</th>' +
       thSort('PO lines', 'poLines', 'text-align:center;') +
       thSort('Unlinked', 'outstanding', 'text-align:center;') +
-      '<th style="padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Location</th>' +
+      '<th style="padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Receiver</th>' +
       thSort('Total', 'amount', 'text-align:right;') +
       '</tr></thead><tbody>' + body + '</tbody></table></div>';
   }

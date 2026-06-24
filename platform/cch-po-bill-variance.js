@@ -2899,14 +2899,121 @@
       '</div>';
   };
 
+  /* ---- Receiver assignment (a PO is uploaded/sent to a receiver; the link lives on po.receiver) ---- */
+  window._cchReceiversCache = window._cchReceiversCache || null;
+
+  /** Load receiver contacts once (Vendors type/category receiver/freight + Team role receiver), cached. */
+  window.cchPoLoadReceivers = async function(force) {
+    if (window._cchReceiversCache && !force) return window._cchReceiversCache;
+    var out = [];
+    var seen = {};
+    function add(name, data) {
+      name = String(name || '').trim();
+      if (!name || seen[name.toLowerCase()]) return;
+      seen[name.toLowerCase()] = true;
+      out.push({
+        name: name,
+        email: String((data && (data.email || data.contactEmail)) || '').trim(),
+        phone: String((data && (data.phone || data.contactPhone)) || '').trim()
+      });
+    }
+    try {
+      var vs = await firebase.firestore().collection('vendors').get();
+      vs.forEach(function(d) {
+        var v = d.data() || {};
+        var cat = String(v.category || '').trim();
+        var typ = String(v.type || v.vendorType || '').trim().toLowerCase();
+        if (cat === 'Delivery / Receiver' || cat === 'Freight / Receiver' ||
+            v.type === 'receiver' || v.isReceiver === true ||
+            typ.indexOf('receiver') >= 0 || typ.indexOf('freight') >= 0) {
+          add(v.name || v.company || v.vendor, v);
+        }
+      });
+    } catch (_e) {}
+    try {
+      var ts = await firebase.firestore().collection('team').get();
+      ts.forEach(function(d) {
+        var t = d.data() || {};
+        if (String(t.role || '').trim().toLowerCase() === 'receiver') add(t.name || t.company, t);
+      });
+    } catch (_e) {}
+    out.sort(function(a, b) { return a.name.localeCompare(b.name); });
+    window._cchReceiversCache = out;
+    return out;
+  };
+
+  /** <option> list for a receiver picker; always includes the current value even if not in the list. */
+  window.cchPoReceiverOptionsHtml = function(selected) {
+    selected = String(selected || '').trim();
+    if (window._cchReceiversCache == null) {
+      window._cchReceiversCache = [];
+      window.cchPoLoadReceivers(true).then(function() {
+        if (typeof window.cchOmIsActive === 'function' && window.cchOmIsActive() &&
+            typeof window.cchOmSoftRefresh === 'function') {
+          window.cchOmSoftRefresh();
+        }
+      });
+    }
+    var list = window._cchReceiversCache || [];
+    var html = '<option value="">— Receiver —</option>';
+    var found = false;
+    list.forEach(function(r) {
+      var sel = r.name === selected;
+      if (sel) found = true;
+      html += '<option value="' + escAttr(r.name) + '"' + (sel ? ' selected' : '') + '>' + esc(r.name) + '</option>';
+    });
+    if (selected && !found) html += '<option value="' + escAttr(selected) + '" selected>' + esc(selected) + '</option>';
+    return html;
+  };
+
+  /** Editable receiver <select> that saves to po.receiver. Safe in list rows (stops row click). */
+  window.cchPoReceiverSelectHtml = function(projectId, poId, selected) {
+    return '<select class="form-input cch-po-receiver-select" style="font-size:11px;padding:4px 8px;min-width:150px;" ' +
+      'onclick="event.stopPropagation()" ' +
+      'onchange="window.cchPoSaveReceiver(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\',this.value)">' +
+      window.cchPoReceiverOptionsHtml(selected) + '</select>';
+  };
+
+  window.cchPoSaveReceiver = async function(projectId, poId, value) {
+    value = String(value || '').trim();
+    try {
+      await firebase.firestore().collection('boards').doc(projectId)
+        .collection('purchaseOrders').doc(poId)
+        .update({ receiver: value, updatedAt: new Date().toISOString() });
+      if (window._omPosCache && Array.isArray(window._omPosCache.pos)) {
+        for (var i = 0; i < window._omPosCache.pos.length; i++) {
+          var p = window._omPosCache.pos[i];
+          if (p && p.projectId === projectId && p.id === poId) { p.receiver = value; break; }
+        }
+      }
+      if (typeof window.showToast === 'function') {
+        window.showToast(value ? ('Receiver: ' + value) : 'Receiver cleared', 'success');
+      }
+    } catch (e) {
+      if (typeof window.cchAlert === 'function') await window.cchAlert(e.message || e, 'Receiver');
+      else console.warn('cchPoSaveReceiver', e);
+    }
+  };
+
+  if (typeof firebase !== 'undefined' && firebase.firestore) {
+    try { window.cchPoLoadReceivers(); } catch (_e) {}
+  }
+
   window.cchPoShippingLanePanelHtml = function(projectId, poId, docData, poItems) {
     docData = docData || {};
     poItems = poItems || docData.items || [];
 
+    var receiverRowHtml = '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">' +
+      '<label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#5C6B80;white-space:nowrap;">Receiver</label>' +
+      window.cchPoReceiverSelectHtml(projectId, poId, docData.receiver) +
+      '<span style="font-size:10px;color:#9CA3AF;">Where this PO ships — used for Airtable + shipment notification</span>' +
+      '</div>';
+
     if (!window.cchPoShippingLaneActive(docData)) {
       return '<div class="cch-po-shipping-lane" style="margin-bottom:12px;padding:12px 14px;background:var(--gray-50);border:1px solid rgba(15,26,46,0.08);border-radius:4px;">' +
         '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#5C6B80;margin-bottom:6px;">Shipping / Receiving</div>' +
-        '<div style="font-size:12px;color:#9CA3AF;">— Applies after PO is confirmed with vendor</div></div>';
+        receiverRowHtml +
+        '<div style="font-size:12px;color:#9CA3AF;margin-top:8px;">— Status applies after PO is confirmed with vendor</div></div>';
     }
 
     var steps = [
@@ -2983,7 +3090,7 @@
       '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#5C6B80;margin-bottom:8px;">Shipping / Receiving</div>' +
       '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px;">' + chips +
       '<span style="font-size:11px;color:#5C6B80;margin-left:6px;">Current: <strong>' + esc(cur) + '</strong></span></div>' +
-      editor + trackingHtml + checkinHtml +
+      editor + receiverRowHtml + trackingHtml + checkinHtml +
       '</div>';
   };
 
