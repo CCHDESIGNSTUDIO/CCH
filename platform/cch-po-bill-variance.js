@@ -161,22 +161,25 @@
     return true;
   };
 
-  /** Project PO list — bill lane badge + paid/balance when bill is complete. */
+  /** Project PO list — bill lane badge + paid/balance when bill is received. */
   window.cchPoListBillWorkflowHtml = function(po) {
     po = po || {};
-    var lane = typeof window.cchPoBillLaneId === 'function' ? window.cchPoBillLaneId(po) : 'na';
+    var items = po.items || [];
+    var lane = typeof window.cchPoBillLaneId === 'function' ? window.cchPoBillLaneId(po, items) : 'na';
     if (lane === 'na') {
       return '<span style="font-size:11px;color:var(--gray-400);">—</span>';
     }
     var badge = typeof window.cchPoBillStatusBadgeHtml === 'function'
-      ? window.cchPoBillStatusBadgeHtml(po)
+      ? window.cchPoBillStatusBadgeHtml(po, { projectId: po.projectId, poId: po.id, poItems: items, clickable: true })
       : esc(String(lane));
     var money = '';
-    if (lane === 'complete') {
+    if (lane === 'received' || lane === 'closed') {
       var paid = typeof window.cchPoVendorBillPaidAmount === 'function' ? window.cchPoVendorBillPaidAmount(po) : 0;
       var due = typeof window.cchPoAmountDue === 'function' ? window.cchPoAmountDue(po) : 0;
-      money = '<div style="font-size:10px;color:#5C6B80;margin-top:3px;font-family:var(--font-mono);white-space:nowrap;">' +
-        fmt(paid) + ' paid · ' + fmt(due) + ' bal</div>';
+      if (lane === 'received' && due > 0.02) {
+        money = '<div style="font-size:10px;color:#5C6B80;margin-top:3px;font-family:var(--font-mono);white-space:nowrap;">' +
+          fmt(paid) + ' paid · ' + fmt(due) + ' bal</div>';
+      }
     } else if (lane === 'partial') {
       var bill = po.bill || {};
       if (bill.billTotal != null && Math.abs(parseFloat(bill.billTotal) || 0) > 0.01) {
@@ -636,6 +639,95 @@
   window.cchPoDisplayStatus = function(doc) {
     if (!doc) return '';
     return window.cchPoShippingStatus(doc);
+  };
+
+  window.cchPoSaveShippingStatusFromSelect = async function(projectId, poId, el) {
+    if (!el) return;
+    var status = String(el.value || '').trim();
+    var prev = el.getAttribute('data-prev-status') || '';
+    if (!status) {
+      el.value = prev;
+      return;
+    }
+    el.disabled = true;
+    try {
+      var extras = { location: '' };
+      if (status === 'At Receiver' || status === 'At Workroom') {
+        var label = status === 'At Receiver' ? 'receiver' : 'workroom';
+        var snap = await firebase.firestore().collection('boards').doc(projectId)
+          .collection('purchaseOrders').doc(poId).get();
+        var doc = snap.exists ? (snap.data() || {}) : {};
+        var existing = status === 'At Receiver'
+          ? String(doc.receiver || doc.location || '').trim()
+          : String(doc.workroom || doc.location || '').trim();
+        var loc = existing;
+        if (!loc && typeof window.cchPrompt === 'function') {
+          loc = await window.cchPrompt('Enter ' + label + ' name:', '', 'Receiving location');
+        }
+        if (!loc) {
+          el.value = prev;
+          return;
+        }
+        extras.location = String(loc).trim();
+      }
+      await window.cchPoSetFulfillmentStatus(projectId, poId, status, extras);
+      el.setAttribute('data-prev-status', status);
+    } catch (e) {
+      el.value = prev;
+      if (typeof window.cchAlert === 'function') await window.cchAlert(e.message || e, 'Shipping status');
+    } finally {
+      el.disabled = false;
+    }
+  };
+
+  /** One-tap receiver check-in (PO page + matches Airtable receiving statuses). */
+  window.cchPoQuickSetShippingStatus = async function(projectId, poId, status) {
+    status = String(status || '').trim();
+    if (!status) return;
+    var def = cchPoShippingStatusDef(status);
+    var extras = { location: '' };
+    try {
+      var snap = await firebase.firestore().collection('boards').doc(projectId)
+        .collection('purchaseOrders').doc(poId).get();
+      var doc = snap.exists ? (snap.data() || {}) : {};
+      if (def && def.needsLocation) {
+        var existing = def.needsLocation === 'receiver'
+          ? String(doc.receiver || doc.location || '').trim()
+          : String(doc.workroom || doc.location || '').trim();
+        if (existing) extras.location = existing;
+        else {
+          var label = def.needsLocation === 'receiver' ? 'receiver' : 'workroom';
+          var loc = typeof window.cchPrompt === 'function'
+            ? await window.cchPrompt('Enter ' + label + ' name:', '', 'Receiving location') : '';
+          if (!loc) return;
+          extras.location = String(loc).trim();
+        }
+      } else if (status === 'Delivered' || status === 'Received' || status === 'Installed') {
+        extras.location = String(doc.receiver || doc.workroom || doc.location || '').trim();
+      }
+      await window.cchPoSetFulfillmentStatus(projectId, poId, status, extras);
+    } catch (e) {
+      if (typeof window.cchAlert === 'function') await window.cchAlert(e.message || e, 'Shipping status');
+    }
+  };
+
+  /** Inline ship-status dropdown for lists (All POs, Order Management). */
+  window.cchPoShippingStatusEditorCellHtml = function(po) {
+    po = po || {};
+    if (typeof window.cchPoShippingLaneActive === 'function' && !window.cchPoShippingLaneActive(po)) {
+      return '<span style="font-size:11px;color:var(--gray-400);">—</span>';
+    }
+    var pid = escAttr(po.projectId);
+    var poid = escAttr(po.id);
+    var cur = typeof window.cchPoShippingStatus === 'function'
+      ? window.cchPoShippingStatus(po, po.items || []) : '';
+    var optsHtml = typeof window.cchPoFulfillmentStatusOptionsHtml === 'function'
+      ? window.cchPoFulfillmentStatusOptionsHtml(cur) : '';
+    return '<select class="form-input" style="font-size:11px;padding:4px 28px 4px 8px;min-width:148px;max-width:210px;" ' +
+      'data-prev-status="' + escAttr(cur) + '" onclick="event.stopPropagation()" ' +
+      'onfocus="this.setAttribute(\'data-prev-status\',this.value)" ' +
+      'onchange="window.cchPoSaveShippingStatusFromSelect(\'' + pid + '\',\'' + poid + '\',this)" ' +
+      'title="Shipping / receiving — syncs to FFE tracker">' + optsHtml + '</select>';
   };
 
   window.cchPoFulfillmentStatusOptionsHtml = function(current) {
@@ -2626,7 +2718,62 @@
     return inner;
   };
 
-  /** Bill lane: na (draft PO) | pending | partial | complete */
+  /** Bill lane: na | pending | partial | received | closed (paid + shipped). */
+  window.cchPoBillIsReceived = function(doc) {
+    doc = doc || {};
+    var bill = doc.bill || {};
+    if (bill.received || bill.qbBillId) return true;
+    var poSt = String(doc.poStatus || '').trim().toLowerCase();
+    return poSt === 'bill_received' || poSt === 'paid' || poSt === 'cleared';
+  };
+
+  window.cchPoBillIsPaidInFull = function(doc) {
+    doc = doc || {};
+    if (!window.cchPoBillIsReceived(doc)) return false;
+    var due = typeof window.cchPoAmountDue === 'function' ? window.cchPoAmountDue(doc) : 0;
+    var paid = typeof window.cchPoVendorBillPaidAmount === 'function' ? window.cchPoVendorBillPaidAmount(doc) : 0;
+    if (due <= 0.02 && paid > 0.01) return true;
+    var poSt = String(doc.poStatus || '').trim().toLowerCase();
+    return poSt === 'paid' || poSt === 'cleared';
+  };
+
+  /** Goods in hand / installed — not in-transit-only (Shipped alone does not close). */
+  window.cchPoIsReceivedForClose = function(doc, poItems) {
+    doc = doc || {};
+    var st = String(window.cchPoShippingStatus(doc, poItems) || '').trim();
+    var ok = ['Delivered', 'At Receiver', 'At Workroom', 'Received', 'Installed'];
+    return ok.indexOf(st) >= 0;
+  };
+  window.cchPoIsShippedForClose = window.cchPoIsReceivedForClose;
+
+  /** PO fully done: vendor bill received, paid in full, and goods received or installed. */
+  window.cchPoOrderClosed = function(doc, poItems) {
+    doc = doc || {};
+    return window.cchPoBillIsReceived(doc) &&
+      window.cchPoBillIsPaidInFull(doc) &&
+      window.cchPoIsShippedForClose(doc, poItems);
+  };
+
+  window.cchPoBillLaneId = function(doc, poItems) {
+    doc = doc || {};
+    if (window.cchPoOrderClosed(doc, poItems)) return 'closed';
+    if (window.cchPoBillIsReceived(doc)) return 'received';
+    if (window.cchPoProcurementLaneId(doc) === 'draft') return 'na';
+    if (window.cchPoBillHasPartialActivity(doc, poItems)) return 'partial';
+    return 'pending';
+  };
+
+  window.cchPoBillStatusLabel = function(doc, poItems) {
+    doc = doc || {};
+    var lane = window.cchPoBillLaneId(doc, poItems);
+    if (lane === 'na') return '—';
+    if (lane === 'pending') return 'Pending';
+    if (lane === 'partial') return 'Partial';
+    if (lane === 'received') return 'Bill received';
+    if (lane === 'closed') return 'Closed';
+    return '—';
+  };
+
   window.cchPoBillHasPartialActivity = function(doc, poItems) {
     doc = doc || {};
     poItems = poItems || doc.items || [];
@@ -2652,31 +2799,10 @@
     return false;
   };
 
-  window.cchPoBillLaneId = function(doc, poItems) {
-    doc = doc || {};
-    var bill = doc.bill || {};
-    if (bill.received || bill.qbBillId) return 'complete';
-    var poSt = String(doc.poStatus || '').trim().toLowerCase();
-    if (poSt === 'bill_received' || poSt === 'paid' || poSt === 'cleared') return 'complete';
-    if (window.cchPoProcurementLaneId(doc) === 'draft') return 'na';
-    if (window.cchPoBillHasPartialActivity(doc, poItems)) return 'partial';
-    return 'pending';
-  };
-
-  window.cchPoBillStatusLabel = function(doc, poItems) {
-    doc = doc || {};
-    var lane = window.cchPoBillLaneId(doc, poItems);
-    if (lane === 'na') return '—';
-    if (lane === 'pending') return 'Pending';
-    if (lane === 'partial') return 'Partial';
-    if (lane === 'complete') return 'Complete';
-    return '—';
-  };
-
   window.cchPoBillStatusBadgeHtml = function(doc, opts) {
     opts = opts || {};
     doc = doc || {};
-    var label = window.cchPoBillStatusLabel(doc, opts.poItems);
+    var label = window.cchPoBillStatusLabel(doc, opts.poItems || doc.items || []);
     if (label === '—') {
       return '<span style="font-size:11px;color:var(--gray-400);">—</span>';
     }
@@ -2703,14 +2829,15 @@
     var steps = [
       { id: 'pending', label: 'Pending' },
       { id: 'partial', label: 'Partial' },
-      { id: 'complete', label: 'Complete' }
+      { id: 'received', label: 'Bill received' },
+      { id: 'closed', label: 'Closed' }
     ];
-    var idx = lane === 'complete' ? 2 : (lane === 'partial' ? 1 : 0);
+    var idx = lane === 'closed' ? 3 : (lane === 'received' ? 2 : (lane === 'partial' ? 1 : 0));
     var chips = steps.map(function(st, i) {
-      var done = i < idx || (lane === 'complete' && i <= 2);
-      var active = i === idx && lane !== 'complete';
-      if (lane === 'complete') {
-        done = i <= 2;
+      var done = i < idx || (lane === 'closed' && i <= 3);
+      var active = i === idx && lane !== 'closed';
+      if (lane === 'closed') {
+        done = i <= 3;
         active = false;
       }
       return '<span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:3px;' +
@@ -2723,7 +2850,7 @@
 
     var paid = 0;
     var due = 0;
-    if (lane === 'complete') {
+    if (lane === 'received' || lane === 'closed') {
       paid = typeof window.cchPoVendorBillPaidAmount === 'function' ? window.cchPoVendorBillPaidAmount(docData) : 0;
       due = typeof window.cchPoAmountDue === 'function' ? window.cchPoAmountDue(docData) : 0;
     }
@@ -2731,10 +2858,10 @@
     var moneyHtml = '<div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:10px;font-size:12px;align-items:baseline;">' +
       '<span><span style="color:#5C6B80;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;display:block;margin-bottom:2px;">Paid</span>' +
       '<span style="font-family:var(--font-mono);font-weight:600;color:' + (paid > 0.01 ? '#1B5E20' : '#9CA3AF') + ';">' +
-      (lane === 'complete' ? fmt(paid) : '—') + '</span></span>' +
+      ((lane === 'received' || lane === 'closed') ? fmt(paid) : '—') + '</span></span>' +
       '<span><span style="color:#5C6B80;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;display:block;margin-bottom:2px;">Balance</span>' +
-      '<span style="font-family:var(--font-mono);font-weight:700;color:' + (due > 0.02 ? '#B45309' : (lane === 'complete' ? '#1B5E20' : '#9CA3AF')) + ';">' +
-      (lane === 'complete' ? fmt(due) : '—') + '</span></span></div>';
+      '<span style="font-family:var(--font-mono);font-weight:700;color:' + (due > 0.02 ? '#B45309' : ((lane === 'received' || lane === 'closed') ? '#1B5E20' : '#9CA3AF')) + ';">' +
+      ((lane === 'received' || lane === 'closed') ? fmt(due) : '—') + '</span></span></div>';
 
     var actions = '';
     if (lane === 'pending') {
@@ -2748,13 +2875,21 @@
         '<button type="button" class="btn btn-secondary btn-sm" onclick="cchPoOpenAddToBillModal(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\')">+ Add vendor invoice</button>' +
         '<span style="font-size:11px;color:#5C6B80;line-height:1.45;">Ship invoices or bill lines entered — finish with <strong>Receive vendor bill</strong> when the combined invoice is ready.</span>' +
         '</div>';
+    } else if (lane === 'closed') {
+      actions = '<div style="margin-top:10px;font-size:11px;color:#1B5E20;font-weight:600;">Closed — vendor bill paid in full and goods received or installed.</div>';
     } else {
       var recvStr = docData.bill && docData.bill.receivedAt && typeof window.formatDate === 'function'
         ? window.formatDate(docData.bill.receivedAt)
         : (docData.bill && docData.bill.receivedAt ? String(docData.bill.receivedAt).slice(0, 10) : '');
-      actions = '<div style="margin-top:10px;font-size:11px;color:#5C6B80;">' +
-        (recvStr ? 'Bill received ' + esc(recvStr) + ' · ' : '') +
-        'Use the vendor bill section below to edit, pay, or sync to QuickBooks.</div>';
+      var closeHints = [];
+      if (due > 0.02) closeHints.push('pay balance');
+      if (!window.cchPoIsReceivedForClose(docData, poItems)) closeHints.push('mark Received or Installed when goods are in');
+      actions = '<div style="margin-top:10px;font-size:11px;color:#5C6B80;line-height:1.45;">' +
+        (recvStr ? 'Bill received ' + esc(recvStr) + '. ' : 'Bill received. ') +
+        (closeHints.length
+          ? 'To <strong>Closed</strong>: ' + esc(closeHints.join(' and ')) + '.'
+          : 'Use the vendor bill section below to edit, pay, or sync to QuickBooks.') +
+        '</div>';
     }
 
     return '<div class="cch-po-bill-lane" style="margin-bottom:12px;padding:12px 14px;background:var(--gray-50);border:1px solid rgba(15,26,46,0.08);border-radius:4px;">' +
@@ -2830,16 +2965,33 @@
       trackingHtml += '<div style="margin-top:4px;font-size:11px;color:#1B3352;"><strong>Location</strong> ' + esc(loc) + '</div>';
     }
 
+    var checkinStatuses = ['At Receiver', 'At Workroom', 'Delivered', 'Received', 'Installed'];
+    var checkinHtml = '<div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(15,26,46,0.08);">' +
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#5C6B80;margin-bottom:8px;">Receiver check-in</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">' +
+      checkinStatuses.map(function(st) {
+        var active = cur === st;
+        return '<button type="button" class="btn btn-secondary btn-sm" style="font-size:10px;padding:4px 10px;' +
+          (active ? 'background:#1B3352;color:#EDE8E0;border-color:#1B3352;font-weight:700;' : '') + '" ' +
+          'onclick="cchPoQuickSetShippingStatus(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\',\'' + escJs(st) + '\')">' +
+          esc(st) + '</button>';
+      }).join('') +
+      '<span style="font-size:10px;color:#5C6B80;line-height:1.4;max-width:280px;">Updates Studio + linked FFE items. Receivers can also check in via <strong>Airtable</strong> (write-back planned).</span>' +
+      '</div></div>';
+
     return '<div class="cch-po-shipping-lane" style="margin-bottom:12px;padding:12px 14px;background:var(--gray-50);border:1px solid rgba(15,26,46,0.08);border-radius:4px;">' +
       '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#5C6B80;margin-bottom:8px;">Shipping / Receiving</div>' +
       '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px;">' + chips +
       '<span style="font-size:11px;color:#5C6B80;margin-left:6px;">Current: <strong>' + esc(cur) + '</strong></span></div>' +
-      editor + trackingHtml +
+      editor + trackingHtml + checkinHtml +
       '</div>';
   };
 
-  /** Project / All POs list — shipping / receiving badge. */
+  /** Project / All POs list — editable ship status when PO is confirmed. */
   window.cchPoListShippingStatusHtml = function(po) {
+    if (typeof window.cchPoShippingStatusEditorCellHtml === 'function') {
+      return window.cchPoShippingStatusEditorCellHtml(po);
+    }
     po = po || {};
     if (typeof window.cchPoShippingStatusBadgeHtml !== 'function') return '—';
     return window.cchPoShippingStatusBadgeHtml(po, {

@@ -3854,6 +3854,7 @@
         'sent to vendor':'badge-sent', 'sent':'badge-sent',
         'waiting for confirmation':'badge-waiting', 'waiting':'badge-waiting',
         'pending':'badge-waiting', 'complete':'badge-approved',
+        'bill received':'badge-invoiced', 'closed':'badge-paid',
         'confirmed':'badge-approved',
         'at receiver':'badge-atreceiver', 'at workroom':'badge-atworkroom',
         'cancelled':'badge-draft', 'on hold':'badge-atworkroom', 'closed':'badge-draft',
@@ -5025,7 +5026,7 @@
         var bal = typeof window.cchPoListBalanceForRow === 'function' ? window.cchPoListBalanceForRow(po) : 0;
         var total = typeof window.cchPoListPoTotal === 'function' ? window.cchPoListPoTotal(po) : (parseFloat(po.total) || 0);
         var poSt = typeof window.cchPoProcurementStatusLabel === 'function' ? window.cchPoProcurementStatusLabel(po) : (po.status || '');
-        var billSt = typeof window.cchPoBillStatusLabel === 'function' ? window.cchPoBillStatusLabel(po) : '';
+        var billSt = typeof window.cchPoBillStatusLabel === 'function' ? window.cchPoBillStatusLabel(po, po.items || []) : '';
         var shipSt = typeof window.cchPoShippingStatusLabel === 'function' ? window.cchPoShippingStatusLabel(po, po.items || []) : '';
         return [
           po.number || po.num || po.id,
@@ -72682,8 +72683,8 @@ ${pages}
   <script src="cch-line-icons.js?v=20260620a"></script>
   <script src="cch-proposals-invoices-fix.js?v=20260623posmk4"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
-  <script src="cch-po-bill-variance.js?v=20260623poc6"></script>
-  <script src="cch-order-management.js?v=20260623om21"></script>
+  <script src="cch-po-bill-variance.js?v=20260623poc9"></script>
+  <script src="cch-order-management.js?v=20260623om23"></script>
   <script src="cch-ffe-procurement.js?v=20260602"></script>
 </body>
 </html>

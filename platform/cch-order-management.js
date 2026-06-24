@@ -1034,40 +1034,24 @@
 
   window.cchOmSaveStatus = async function(projectId, poId, el) {
     if (!el) return;
-    var status = String(el.value || '').trim();
-    var prev = el.getAttribute('data-prev-status') || '';
-    if (!status) {
-      el.value = prev;
-      return;
-    }
     window._omInlineSaveActive = true;
-    el.disabled = true;
     try {
-      if (status === 'At Receiver' || status === 'At Workroom') {
-        var label = status === 'At Receiver' ? 'receiver' : 'workroom';
-        var loc = typeof window.cchPrompt === 'function'
-          ? await window.cchPrompt('Enter ' + label + ' name:', '', 'PO location') : '';
-        if (!loc) {
-          el.value = prev;
-          return;
-        }
-        if (typeof window.cchPoSetFulfillmentStatus === 'function') {
-          await window.cchPoSetFulfillmentStatus(projectId, poId, status, { location: String(loc).trim() });
-        }
-      } else if (typeof window.cchPoSetFulfillmentStatus === 'function') {
-        await window.cchPoSetFulfillmentStatus(projectId, poId, status, {});
-      } else if (typeof window.updatePOStatus === 'function') {
-        await window.updatePOStatus(projectId, poId, status);
+      if (typeof window.cchPoSaveShippingStatusFromSelect === 'function') {
+        await window.cchPoSaveShippingStatusFromSelect(projectId, poId, el);
       }
-      cchOmPatchCachedPo(projectId, poId, { status: status });
-      el.setAttribute('data-prev-status', status);
-    } catch (e) {
-      el.value = prev;
-      if (typeof window.showToast === 'function') window.showToast(e.message || 'Could not save status', 'error');
+      var status = String(el.value || '').trim();
+      var patch = { shippingStatus: status, status: status, updatedAt: new Date().toISOString() };
+      cchOmPatchCachedPo(projectId, poId, patch);
     } finally {
       window._omInlineSaveActive = false;
-      el.disabled = false;
     }
+  };
+
+  window.cchOmShippingStatusCellHtml = function(po) {
+    if (typeof window.cchPoShippingStatusEditorCellHtml === 'function') {
+      return window.cchPoShippingStatusEditorCellHtml(po);
+    }
+    return '—';
   };
 
   function omConfirmCellHtml(po) {
@@ -1120,7 +1104,7 @@
     var pid = escAttr(po.projectId);
     var poid = escAttr(po.id);
     var billBadge = typeof window.cchPoBillStatusBadgeHtml === 'function'
-      ? window.cchPoBillStatusBadgeHtml(po, { projectId: po.projectId, poId: po.id, clickable: true })
+      ? window.cchPoBillStatusBadgeHtml(po, { projectId: po.projectId, poId: po.id, poItems: po.items || [], clickable: true })
       : '';
     var actions = '';
     if (!info.count) {
@@ -1345,6 +1329,13 @@
       } else if (field === 'status') {
         va = String(poA.status || '').toLowerCase();
         vb = String(poB.status || '').toLowerCase();
+      } else if (field === 'shipStatus') {
+        va = typeof window.cchPoShippingStatusLabel === 'function'
+          ? String(window.cchPoShippingStatusLabel(poA, poA.items || []) || '').toLowerCase()
+          : String(poA.shippingStatus || poA.status || '').toLowerCase();
+        vb = typeof window.cchPoShippingStatusLabel === 'function'
+          ? String(window.cchPoShippingStatusLabel(poB, poB.items || []) || '').toLowerCase()
+          : String(poB.shippingStatus || poB.status || '').toLowerCase();
       } else if (field === 'received') {
         va = rA.received;
         vb = rB.received;
@@ -1397,7 +1388,9 @@
     var body = sorted.map(function(row) {
       var po = row.po;
       var r = row.recv;
-      var statusHtml = omStatusCellHtml(po);
+      var statusHtml = typeof window.cchOmShippingStatusCellHtml === 'function'
+        ? window.cchOmShippingStatusCellHtml(po)
+        : omStatusCellHtml(po);
       var clipSummary = r.linked
         ? recvCountPill('received', r.received, '#5FA56B') +
           recvCountPill('in transit', r.intransit, '#C4A464') +
@@ -1431,7 +1424,7 @@
       thSort('PO #', 'number') +
       thSort('Vendor', 'vendor') +
       thSort('Project', 'project') +
-      thSort('PO status', 'status') +
+      thSort('Ship status', 'shipStatus') +
       thSort('Order conf #', 'orderConf') +
       thSort('Conf date', 'confirm') +
       thSort('Bills', 'bills', 'text-align:center;') +
