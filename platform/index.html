@@ -24933,8 +24933,9 @@ async function renderBoardsTab(T, proj) {
                 <th style="cursor:pointer;min-width:100px;" onclick="projTabSortBy('number')">Item${projSortArrow('number')}</th>
                 <th style="cursor:pointer;max-width:220px;" onclick="projTabSortBy('tag')" title="Short label for this PO (Houzz-style). Not the project name. Set in Edit PO → Summary (lists &amp; email subject), Document Tags, or Memo (shown here if no tag).">Document tags${projSortArrow('tag')}</th>
                 <th class="po-vendor-col" style="cursor:pointer;" onclick="projTabSortBy('vendor')">Vendor${projSortArrow('vendor')}</th>
-                <th style="cursor:pointer;" onclick="projTabSortBy('status')">Status${projSortArrow('status')}</th>
+                <th style="cursor:pointer;" onclick="projTabSortBy('status')">PO status${projSortArrow('status')}</th>
                 <th>Bill status</th>
+                <th>Shipping</th>
                 <th style="cursor:pointer;" onclick="projTabSortBy('date')">Date${projSortArrow('date')}</th>
                 <th class="col-amount" style="cursor:pointer;" onclick="projTabSortBy('total')">Total${projSortArrow('total')}</th>
                 <th class="col-amount" style="cursor:pointer;" onclick="projTabSortBy('billTotal')">Bill${projSortArrow('billTotal')}</th>
@@ -24969,6 +24970,7 @@ async function renderBoardsTab(T, proj) {
                     <td class="po-vendor-col" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;" title="${escAttr(po.vendor && String(po.vendor).trim() !== String(po._displayVendor || '').trim() ? ('Stored vendor: ' + po.vendor) : '')}">${esc(po._displayVendor || '—')}</td>
                     <td class="col-status" onclick="event.stopPropagation()">${typeof cchPoProcurementStatusBadgeHtml==='function'?cchPoProcurementStatusBadgeHtml(po,{projectId:proj.id,poId:po.id,clickable:true}):(typeof cchPoFulfillmentStatusBadgeHtml==='function'?cchPoFulfillmentStatusBadgeHtml(po,{projectId:proj.id,poId:po.id,clickable:true}):('<span class="badge badge-'+(po.status||'draft').toLowerCase()+'">'+esc(po.status||'Draft')+'</span>'))}</td>
                     <td style="font-size:11px;white-space:nowrap;" onclick="event.stopPropagation()">${typeof cchPoListBillWorkflowHtml==='function'?cchPoListBillWorkflowHtml(po):'—'}</td>
+                    <td style="font-size:11px;white-space:nowrap;" onclick="event.stopPropagation()">${typeof cchPoShippingStatusBadgeHtml==='function'?cchPoShippingStatusBadgeHtml(po,{projectId:proj.id,poId:po.id,clickable:true}):'—'}</td>
                     <td class="col-date">${formatDate(po.issueDate || po.orderDate || po.poDate || po.date || po.createdAt)}</td>
                     <td class="col-amount">${formatMoney(typeof cchPoListPoTotal==='function'?cchPoListPoTotal(po):(po.total||0))}</td>
                     ${typeof cchPoListAllPosFinancialCellsHtml==='function'?cchPoListAllPosFinancialCellsHtml(po, 'padding:10px 14px;font-size:13px;'):'<td class="col-amount">—</td><td class="col-amount">—</td><td class="col-amount">—</td><td class="col-amount">—</td>'}
@@ -24995,7 +24997,7 @@ async function renderBoardsTab(T, proj) {
                     </td>
                   </tr>
                   <tr class="po-items-row" style="display:none;" id="po-items-${po.id}">
-                    <td colspan="13" style="padding:0 16px 16px 32px;background:var(--gray-50);">
+                    <td colspan="17" style="padding:0 16px 16px 32px;background:var(--gray-50);">
                       ${itemCount > 0 ? '<table style="width:100%;font-size:12px;border-collapse:collapse;"><thead><tr style="border-bottom:1px solid var(--gray-200);"><th style="text-align:left;padding:6px;width:40px;"></th><th style="text-align:left;padding:6px;">Item</th><th style="text-align:left;padding:6px;">Vendor</th><th style="text-align:left;padding:6px;">Room</th><th style="text-align:center;padding:6px;">Qty</th><th style="text-align:right;padding:6px;">Unit cost</th><th style="text-align:right;padding:6px;">Line total</th></tr></thead><tbody>' +
                         (po.items||[]).map(it => {
                           var c = parseFloat(String(it.cost||it.unitCost||0).replace(/[^0-9.-]/g,''))||0;
@@ -72668,10 +72670,10 @@ ${pages}
   <script src="cch-design-board.js?v=20260608db29"></script>
   <script src="cch-client-board.js?v=1774994684878"></script>
   <script src="cch-line-icons.js?v=20260620a"></script>
-  <script src="cch-proposals-invoices-fix.js?v=20260623posmk2"></script>
+  <script src="cch-proposals-invoices-fix.js?v=20260623posmk3"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
-  <script src="cch-po-bill-variance.js?v=20260623poc3"></script>
-  <script src="cch-order-management.js?v=20260623om19"></script>
+  <script src="cch-po-bill-variance.js?v=20260623poc4"></script>
+  <script src="cch-order-management.js?v=20260623om20"></script>
   <script src="cch-ffe-procurement.js?v=20260602"></script>
 </body>
 </html>

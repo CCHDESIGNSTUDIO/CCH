@@ -1186,9 +1186,14 @@
   function orderStatusBucket(st) {
     st = String(st || '').trim().toLowerCase();
     if (st === 'received' || st === 'installed') return 'received';
-    if (st === 'shipped' || st === 'at receiver' || st === 'at workroom' ||
+    if (st === 'shipped' || st === 'in transit' || st === 'at receiver' || st === 'at workroom' ||
         st === 'partially received' || st === 'delivered') return 'intransit';
     return 'outstanding';
+  }
+
+  function poShippingStatusForOm(po) {
+    if (typeof window.cchPoShippingStatus === 'function') return window.cchPoShippingStatus(po);
+    return String(po.status || '').trim();
   }
 
   function findLinkedClipsForPo(po, clipRows) {
@@ -1219,7 +1224,7 @@
     });
     var poLines = countPoMerchLines(po);
     var unlinkedLines = Math.max(0, poLines - linked.length);
-    var poBucket = orderStatusBucket(po.status);
+    var poBucket = orderStatusBucket(poShippingStatusForOm(po));
     var needsAttention = outstanding > 0 || intransit > 0 || unlinkedLines > 0 ||
       (linked.length === 0 && poLines > 0 && poBucket !== 'received');
     return {

@@ -3443,19 +3443,21 @@
             }).join('') + '</div>';
         }
       }
-      var _poShipStatus = typeof window.cchPoDisplayStatus === 'function' ? window.cchPoDisplayStatus(docData) : String(docData.status || '').trim();
-      var _poShipBadge = _poShipStatus
-        ? (typeof window.cchPoStatusBadgeHtml === 'function'
-          ? window.cchPoStatusBadgeHtml(_poShipStatus)
-          : (typeof window.statusBadge === 'function' ? window.statusBadge(_poShipStatus) : '<span class="badge badge-draft" style="font-size:10px;">' + esc(_poShipStatus) + '</span>'))
-        : '<span style="font-size:10px;color:#9CA3AF;">Shipping: —</span>';
+      var _poShipLabel = typeof window.cchPoShippingStatusLabel === 'function'
+        ? window.cchPoShippingStatusLabel(docData)
+        : (typeof window.cchPoDisplayStatus === 'function' ? window.cchPoDisplayStatus(docData) : String(docData.status || '').trim());
+      var _poShipBadge = _poShipLabel && _poShipLabel !== '—'
+        ? (typeof window.cchPoShippingStatusBadgeHtml === 'function'
+          ? window.cchPoShippingStatusBadgeHtml(docData)
+          : (typeof window.statusBadge === 'function' ? window.statusBadge(_poShipLabel) : '<span class="badge badge-draft" style="font-size:10px;">' + esc(_poShipLabel) + '</span>'))
+        : '<span style="font-size:10px;color:#9CA3AF;">—</span>';
       var _poHasVendorBill = !!(docData.bill && docData.bill.received);
       var _poBillTotal = _poHasVendorBill && typeof window.cchPoVendorBillTotal === 'function' ? window.cchPoVendorBillTotal(docData) : null;
       var poRailHTML =
         '<aside class="cch-doc-view-rail">' +
           '<div class="cch-doc-view-rail-card">' +
             '<div class="cch-doc-view-rail-title" style="margin:0 0 6px;">Totals</div>' +
-            '<div style="font-size:10px;color:#5C6B80;margin-bottom:8px;">Shipping ' + _poShipBadge + '</div>' +
+            '<div style="font-size:10px;color:#5C6B80;margin-bottom:8px;">Receiving ' + _poShipBadge + '</div>' +
             '<div class="cch-doc-view-rail-row"><span>Merchandise</span><strong>' + formatMoney(subtotal) + '</strong></div>' +
             (totalShipping > 0 ? '<div class="cch-doc-view-rail-row"><span>Shipping</span><strong>' + formatMoney(totalShipping) + '</strong></div>' : '') +
             '<div class="cch-doc-view-rail-row cch-doc-view-rail-grand"><span>PO total</span><strong>' + formatMoney(grandTotal) + '</strong></div>' +
