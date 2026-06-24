@@ -3444,7 +3444,7 @@
         }
       }
       var _poShipLabel = typeof window.cchPoShippingStatusLabel === 'function'
-        ? window.cchPoShippingStatusLabel(docData)
+        ? window.cchPoShippingStatusLabel(docData, items)
         : (typeof window.cchPoDisplayStatus === 'function' ? window.cchPoDisplayStatus(docData) : String(docData.status || '').trim());
       var _poShipBadge = _poShipLabel && _poShipLabel !== '—'
         ? (typeof window.cchPoShippingStatusBadgeHtml === 'function'

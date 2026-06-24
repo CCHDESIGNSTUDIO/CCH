@@ -557,30 +557,72 @@
     return !!(leg && !CCH_PO_PROCUREMENT_LEGACY_STATUS[leg]);
   };
 
-  /** Canonical shipping / receiving status (field: shippingStatus, legacy: status). */
-  window.cchPoShippingStatus = function(doc) {
+  function cchPoInferShippingStatusFromGroups(doc, poItems) {
+    doc = doc || {};
+    var groups = typeof window.cchPoVendorInvoiceGroupsDisplay === 'function'
+      ? window.cchPoVendorInvoiceGroupsDisplay(doc, poItems || doc.items || [])
+      : (Array.isArray(doc.vendorInvoiceGroups) ? doc.vendorInvoiceGroups : []);
+    var rank = {
+      'Cancelled': 0,
+      'On Hold': 1,
+      'Pending': 2,
+      'Back ordered': 3,
+      'Est. ship scheduled': 4,
+      'Ordered': 5,
+      'Shipped': 6,
+      'In transit': 7,
+      'Delivered': 8,
+      'At Receiver': 9,
+      'At Workroom': 9,
+      'Received': 10,
+      'Installed': 11
+    };
+    var best = '';
+    var bestR = -1;
+    for (var i = 0; i < groups.length; i++) {
+      var g = groups[i] || {};
+      if (String(g.documentType || '').trim() === 'confirmation') continue;
+      var st = cchPoShippingStatusCanonicalId(String(g.status || '').trim());
+      if (!cchPoShippingStatusDef(st)) continue;
+      var r = Object.prototype.hasOwnProperty.call(rank, st) ? rank[st] : 5;
+      if (r > bestR) {
+        bestR = r;
+        best = st;
+      }
+    }
+    return best;
+  }
+
+  /** Canonical shipping / receiving status (field: shippingStatus; legacy status only if valid ship value). */
+  window.cchPoShippingStatus = function(doc, poItems) {
     doc = doc || {};
     var explicit = String(doc.shippingStatus || '').trim();
-    if (explicit) return cchPoShippingStatusCanonicalId(explicit);
-    var leg = String(doc.status || '').trim();
-    if (leg && !CCH_PO_PROCUREMENT_LEGACY_STATUS[leg]) {
-      return cchPoShippingStatusCanonicalId(leg);
+    if (explicit) {
+      var explicitCanon = cchPoShippingStatusCanonicalId(explicit);
+      if (cchPoShippingStatusDef(explicitCanon)) return explicitCanon;
     }
+    var leg = String(doc.status || '').trim();
+    if (leg) {
+      var legCanon = cchPoShippingStatusCanonicalId(leg);
+      if (cchPoShippingStatusDef(legCanon)) return legCanon;
+    }
+    var inferred = cchPoInferShippingStatusFromGroups(doc, poItems);
+    if (inferred) return inferred;
     if (window.cchPoProcurementLaneId(doc) === 'confirmed') return 'Pending';
     return '';
   };
 
-  window.cchPoShippingStatusLabel = function(doc) {
+  window.cchPoShippingStatusLabel = function(doc, poItems) {
     doc = doc || {};
-    var st = window.cchPoShippingStatus(doc);
+    var st = window.cchPoShippingStatus(doc, poItems);
     if (st) return st;
     if (window.cchPoShippingLaneActive(doc)) return 'Pending';
     return '—';
   };
 
   /** Milestone index for shipping lane chips: 0 Pending · 1 Shipped · 2 Received */
-  window.cchPoShippingMilestoneIndex = function(doc) {
-    var st = String(window.cchPoShippingStatus(doc) || '').trim().toLowerCase();
+  window.cchPoShippingMilestoneIndex = function(doc, poItems) {
+    var st = String(window.cchPoShippingStatus(doc, poItems) || '').trim().toLowerCase();
     if (!st || st === 'pending' || st === 'back ordered' || st === 'est. ship scheduled' ||
         st === 'ordered' || st === 'on hold') return 0;
     if (st === 'shipped' || st === 'in transit' || st === 'delivered' ||
@@ -599,13 +641,11 @@
   window.cchPoFulfillmentStatusOptionsHtml = function(current) {
     current = String(current || '').trim();
     var canonical = cchPoShippingStatusCanonicalId(current);
+    if (!cchPoShippingStatusDef(canonical)) canonical = '';
     var html = '<option value="">— Not set —</option>';
     html += CCH_PO_SHIPPING_STATUSES.map(function(st) {
       return '<option value="' + escAttr(st.id) + '"' + (canonical === st.id ? ' selected' : '') + '>' + esc(st.label) + '</option>';
     }).join('');
-    if (current && !cchPoShippingStatusDef(canonical)) {
-      html += '<option value="' + escAttr(current) + '" selected>' + esc(current) + '</option>';
-    }
     return html;
   };
 
@@ -633,7 +673,7 @@
   window.cchPoFulfillmentStatusEditorHtml = function(projectId, poId, doc, opts) {
     opts = opts || {};
     doc = doc || {};
-    var cur = window.cchPoShippingStatus(doc);
+    var cur = window.cchPoShippingStatus(doc, doc.items || []);
     var loc = String(doc.receiver || doc.workroom || doc.location || '').trim();
     var def = cchPoShippingStatusDef(cur);
     var showLoc = def && def.needsLocation;
@@ -2739,7 +2779,7 @@
       { id: 'shipped', label: 'Shipped' },
       { id: 'received', label: 'Received' }
     ];
-    var idx = window.cchPoShippingMilestoneIndex(docData);
+    var idx = window.cchPoShippingMilestoneIndex(docData, poItems);
     var chips = steps.map(function(st, i) {
       var done = i < idx || (idx === 2 && i <= 2);
       var active = i === idx && idx < 2;
@@ -2755,7 +2795,7 @@
         (i < steps.length - 1 ? '<span style="color:var(--gray-300);font-size:10px;">→</span>' : '');
     }).join('');
 
-    var cur = window.cchPoShippingStatus(docData) || 'Pending';
+    var cur = window.cchPoShippingStatus(docData, poItems) || 'Pending';
     var uid = 'cchPoShipLane_' + String(poId || '').replace(/[^\w]/g, '').slice(0, 10);
     var editor = window.cchPoFulfillmentStatusEditorHtml(projectId, poId, docData, {
       uid: uid,
@@ -4796,15 +4836,12 @@
     }
     if (fullyPaid) {
       patch.poStatus = 'paid';
-      patch.status = 'Paid';
       patch.paymentStatus = 'paid';
     } else if (totalPaid > 0.02) {
       patch.poStatus = 'bill_received';
-      patch.status = 'Partial';
       patch.paymentStatus = 'partial';
     } else if (doc.bill && doc.bill.received) {
       patch.poStatus = 'bill_received';
-      patch.status = 'Billed';
       patch.paymentStatus = 'unpaid';
     }
     return patch;

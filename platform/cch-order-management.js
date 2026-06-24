@@ -1192,7 +1192,9 @@
   }
 
   function poShippingStatusForOm(po) {
-    if (typeof window.cchPoShippingStatus === 'function') return window.cchPoShippingStatus(po);
+    if (typeof window.cchPoShippingStatus === 'function') {
+      return window.cchPoShippingStatus(po, po.items || []);
+    }
     return String(po.status || '').trim();
   }
 
