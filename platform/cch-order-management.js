@@ -1259,7 +1259,7 @@
       (filteredCount === totalCount
         ? esc(String(totalCount) + ' PO' + (totalCount !== 1 ? 's' : '') + ' in receiving view')
         : 'Showing ' + filteredCount + ' of ' + totalCount + ' POs') +
-      ' · Linked room-board selections + PO status · click a row to open PO</p>' +
+      ' · Room-board clips linked by <code>poId</code> / PO # · detail &amp; link on PO page · click row to open</p>' +
       '<div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">' +
       '<input type="search" placeholder="Search PO #, vendor, project…" class="form-input" ' +
       'value="' + escAttr(kw) + '" oninput="window._omFilterKeyword=this.value;window.cchOmDebounceRender()" ' +
@@ -1395,10 +1395,27 @@
         ? recvCountPill('received', r.received, '#5FA56B') +
           recvCountPill('in transit', r.intransit, '#C4A464') +
           recvCountPill('outstanding', r.outstanding, OM_NAVY_MID)
-        : '<span style="font-size:11px;color:var(--gray-400);">No linked selections</span>';
-      var unlinked = r.unlinkedLines > 0
-        ? '<span style="font-size:11px;color:' + OM_NAVY_MID + ';font-weight:600;">+' + r.unlinkedLines + ' unlinked line' + (r.unlinkedLines !== 1 ? 's' : '') + '</span>'
-        : '—';
+        : '';
+      var selLinkHtml = '';
+      if (!r.linked && (r.poLines || 0) > 0) {
+        selLinkHtml = '<span style="font-size:11px;color:var(--gray-400);">No linked selections</span>';
+        if (r.unlinkedLines > 0) {
+          selLinkHtml += '<div style="font-size:10px;color:' + OM_NAVY_MID + ';margin-top:3px;font-weight:600;">' +
+            esc(String(r.unlinkedLines)) + ' of ' + esc(String(r.poLines)) + ' PO lines unlinked</div>';
+        }
+      } else if (r.linked) {
+        selLinkHtml = clipSummary || '<span style="font-size:11px;color:var(--gray-400);">Linked</span>';
+        if (r.unlinkedLines > 0) {
+          selLinkHtml += '<div style="font-size:10px;color:' + OM_NAVY_MID + ';margin-top:3px;font-weight:600;">+' +
+            esc(String(r.unlinkedLines)) + ' unlinked line' + (r.unlinkedLines !== 1 ? 's' : '') + '</div>';
+        }
+        if (r.poLines > r.linked) {
+          selLinkHtml += '<div style="font-size:10px;color:#9CA3AF;margin-top:2px;">' +
+            esc(String(r.linked)) + ' clip' + (r.linked !== 1 ? 's' : '') + ' · ' + esc(String(r.poLines)) + ' PO line' + (r.poLines !== 1 ? 's' : '') + '</div>';
+        }
+      } else {
+        selLinkHtml = '<span style="font-size:11px;color:var(--gray-400);">—</span>';
+      }
       return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="navigate(\'#/project/' +
         escAttr(po.projectId) + '/po/' + escAttr(po.id) + '\')">' +
         '<td style="' + td + 'font-weight:600;font-family:monospace;color:var(--gold);">' + esc(po.number || po.id.substring(0, 8)) + '</td>' +
@@ -1409,9 +1426,7 @@
         '<td style="' + td + '" onclick="event.stopPropagation()">' + omConfirmCellHtml(po) + '</td>' +
         '<td style="' + td + 'text-align:center;" onclick="event.stopPropagation()">' + omBillsCellHtml(po) + '</td>' +
         '<td style="' + td + 'text-align:center;" onclick="event.stopPropagation()">' + omQbDotCellHtml(po) + '</td>' +
-        '<td style="' + td + 'font-size:12px;line-height:1.5;">' + clipSummary + '</td>' +
-        '<td style="' + td + 'text-align:center;font-size:12px;">' + esc(String(r.poLines || '—')) + '</td>' +
-        '<td style="' + td + 'text-align:center;font-size:12px;">' + unlinked + '</td>' +
+        '<td style="' + td + 'font-size:12px;line-height:1.5;">' + selLinkHtml + '</td>' +
         '<td style="' + td + 'font-size:12px;color:var(--gray-500);" onclick="event.stopPropagation()">' +
         (typeof window.cchPoReceiverSelectHtml === 'function'
           ? window.cchPoReceiverSelectHtml(po.projectId, po.id, po.receiver)
@@ -1432,9 +1447,7 @@
       thSort('Conf date', 'confirm') +
       thSort('Bills', 'bills', 'text-align:center;') +
       '<th style="padding:10px 12px;text-align:center;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;white-space:nowrap;" title="QuickBooks — green synced, red needs push">QB</th>' +
-      '<th style="padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Linked selections</th>' +
-      thSort('PO lines', 'poLines', 'text-align:center;') +
-      thSort('Unlinked', 'outstanding', 'text-align:center;') +
+      '<th style="padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;" title="Room-board selections (clips) linked to this PO by poId or PO # — receiving status from clip orderStatus">Selections link</th>' +
       '<th style="padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Receiver</th>' +
       thSort('Total', 'amount', 'text-align:right;') +
       '</tr></thead><tbody>' + body + '</tbody></table></div>';

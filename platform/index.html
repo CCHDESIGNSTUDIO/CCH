@@ -7645,6 +7645,11 @@
       opts = opts || {};
       item = item || {};
       var parts = [];
+      var rm = String(item.room || '').trim();
+      if (rm) parts.push({ label: 'Room', value: rm });
+      var tag = (typeof cchLineTagText === 'function' ? cchLineTagText(item) : '') ||
+        String(item.lineTag || item.lineTagCode || item.fixtureTag || '').trim();
+      if (tag) parts.push({ label: 'Tag', value: tag });
       var sku = String(item.sku || item.model || item.itemCode || '').trim();
       if (sku) parts.push({ label: 'SKU', value: sku });
       var fin = String(item.finish || item.color || item.finishColor || '').trim();
@@ -10723,11 +10728,13 @@
     /** PO lines: one vendor-facing image only — never persist multi-image gallery on purchaseOrders. */
     function cchEnforcePoLineSingleImage(line) {
       line = line || {};
-      var u = String(line.imageUrl || line.image || '').trim();
-      if (!u && Array.isArray(line.images) && line.images.length) {
-        var raw = line.images[0];
+      var u = '';
+      if (Array.isArray(line.images) && line.images.length) {
+        var hi = Math.max(0, Math.min(parseInt(line.heroImageIndex, 10) || 0, line.images.length - 1));
+        var raw = line.images[hi] != null ? line.images[hi] : line.images[0];
         u = String(typeof raw === 'string' ? raw : (raw && (raw.url || raw.imageUrl || raw.src)) || '').trim();
       }
+      if (!u) u = String(line.imageUrl || line.image || '').trim();
       if (u) {
         line.imageUrl = u;
         line.image = u;
@@ -19091,6 +19098,16 @@
         '<div style="padding:10px 12px;">' +
           '<div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#0F1A2E;">' + esc(clip.title || 'Untitled') + '</div>' +
           (clip.vendor ? '<div style="font-size:11px;color:var(--gray-500);margin-top:2px;">By ' + esc(clip.vendor) + '</div>' : '') +
+          (function() {
+            var rm = String(clip.room || '').trim();
+            var tg = typeof cchLineTagText === 'function' ? String(cchLineTagText(clip) || '').trim() : String(clip.lineTag || '').trim();
+            if (!rm && !tg) return '';
+            return '<div style="font-size:10px;color:#5C6B80;margin-top:4px;line-height:1.35;">' +
+              (rm ? '<span style="font-weight:600;">🏠 ' + esc(rm) + '</span>' : '') +
+              (rm && tg ? ' · ' : '') +
+              (tg ? '<span style="font-weight:700;color:#1B3352;">Tag ' + esc(tg) + '</span>' : '') +
+              '</div>';
+          })() +
           (typeof cchProductIdentityBadgesHtml === 'function' ? cchProductIdentityBadgesHtml(clip, { showIds: true, hideUnlinked: true }) : '') +
           '<div style="display:flex;align-items:center;gap:8px;margin-top:6px;">' + clipApprovalBadgeHtml(clip) +
             '<select class="form-input" onclick="event.stopPropagation()" onchange="setClipApprovalStatus(\'' + escAttr(projId) + '\',\'' + escAttr(clip.id) + '\',this.value)" style="font-size:10px;padding:2px 4px;min-width:92px;">' +
@@ -29312,7 +29329,9 @@ async function renderBoardsTab(T, proj) {
         const qty = parseFloat(item.qty) || 1;
         const markupPct = parseFloat(item.markupPct) || 0;
         const shipping = parseFloat(item.shipping) || 0;
-        const clientPrice = parseFloat(item.amount) || (cost * qty * (1 + markupPct/100)) + shipping;
+        const unitSell = cost * (1 + markupPct / 100);
+        const lineSubtotal = parseFloat(item.amount);
+        const _lineSubtotalDisp = (!isNaN(lineSubtotal) && lineSubtotal > 0) ? lineSubtotal : (unitSell * qty) + shipping;
         const _imgNorm = _normalizeProposalItemImages(item);
         window._piImages = _imgNorm.list.slice();
         window._piHeroIdx = _imgNorm.heroIdx;
@@ -29350,13 +29369,13 @@ async function renderBoardsTab(T, proj) {
             '</div></div></div></div>';
         }
         var _piMoreLine = '';
-        if (collection === 'proposals' || collection === 'invoices') {
+        if (collection === 'proposals' || collection === 'invoices' || collection === 'purchaseOrders') {
           var _piColl = collection;
           _piMoreLine = '<div class="cch-doc-more-wrap" style="position:relative;display:inline-block;margin-left:4px;">' +
             '<button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation();var w=this.closest(\'.cch-doc-more-wrap\');var m=w&&w.querySelector(\'.cch-doc-more-dd\');if(m)m.style.display=m.style.display===\'block\'?\'none\':\'block\';">More ▾</button>' +
             '<div class="cch-doc-more-dd" onclick="event.stopPropagation()" style="display:none;position:absolute;right:0;bottom:100%;margin-bottom:6px;min-width:200px;background:#fff;border:1px solid rgba(15,26,46,0.12);border-radius:8px;box-shadow:0 8px 24px rgba(15,26,46,0.12);z-index:800;padding:4px 0;">' +
-            '<button type="button" style="display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;color:#0F1A2E;" onclick="cchCloseDocMoreDd();generateTearSheetsFromDoc(\'' + escAttr(projectId) + '\',\'' + _piColl + '\',\'' + escAttr(docId) + '\',\'' + escAttr(boardName) + '\')">📄 Tear sheet (this doc)</button>' +
-            '<button type="button" style="display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;color:#0F1A2E;" onclick="cchCloseDocMoreDd();document.getElementById(\'piFileInput\').click()">📷 Upload images</button>' +
+            (collection === 'purchaseOrders' ? '' : '<button type="button" style="display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;color:#0F1A2E;" onclick="cchCloseDocMoreDd();generateTearSheetsFromDoc(\'' + escAttr(projectId) + '\',\'' + _piColl + '\',\'' + escAttr(docId) + '\',\'' + escAttr(boardName) + '\')">📄 Tear sheet (this doc)</button>') +
+            '<button type="button" style="display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;color:#0F1A2E;" onclick="cchCloseDocMoreDd();document.getElementById(\'piFileInput\').click()">📷 ' + (collection === 'purchaseOrders' ? 'Upload / replace image' : 'Upload images') + '</button>' +
             '<button type="button" style="display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;color:#0F1A2E;" onclick="cchCloseDocMoreDd();piAddImageUrl()">🔗 Add image URL</button>' +
             '</div></div>';
         }
@@ -29367,6 +29386,20 @@ async function renderBoardsTab(T, proj) {
         var _piDeleteOnclick = collection === 'proposals'
           ? 'removeProposalItem(\'' + escAttr(projectId) + '\',\'' + escAttr(docId) + '\',' + idx + ',{lineEditor:true})'
           : 'docEditRemoveItemFromModal(' + idx + ')';
+        var _piIsPo = collection === 'purchaseOrders';
+        var _piUploadBtnLabel = _piIsPo ? '📷 Upload / replace image' : '📷 Upload images';
+        var _piUploadHint = _piIsPo
+          ? 'One vendor-facing photo per PO line. Upload or paste a URL, then Save.'
+          : 'Drag thumbnails to reorder. Click <strong>×</strong> to remove. <strong>Hero</strong> = cover on invoice &amp; tear sheets.';
+        var _piImageGridBlock = _piIsPo
+          ? '<div class="form-group" style="margin-bottom:10px;"><label class="form-label">Vendor PO image</label><div style="font-size:10px;color:var(--gray-500);margin-bottom:6px;">Shown on the PO preview and vendor PDF. A new upload replaces the current photo.</div><div id="piImageGrid" style="display:flex;gap:8px;flex-wrap:wrap;"></div></div>'
+          : '<div class="form-group" style="margin-bottom:10px;"><label class="form-label">Product images — list thumbnail</label><div style="font-size:10px;color:var(--gray-500);margin-bottom:6px;">Pick which photo appears as the small row image in the proposal table. Click <strong>×</strong> on a thumbnail to remove it.</div><div id="piImageGrid" style="display:flex;gap:8px;flex-wrap:wrap;"></div></div>';
+        var _piPricingGrid = _piIsPo
+          ? '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;"><div class="form-group"><label class="form-label">Qty</label><input class="form-input" id="piQty" type="number" step="1" min="1" value="' + qty + '" onchange="recalcLineItem()"></div><div class="form-group"><label class="form-label">Cost (Trade)</label><input class="form-input" id="piCost" type="number" step="0.01" value="' + cost + '" onchange="recalcLineItem()"></div><div class="form-group"><label class="form-label">Shipping</label><input class="form-input" id="piShipping" type="number" step="0.01" value="' + shipping + '" onchange="recalcLineItem()"></div></div>'
+          : '<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;"><div class="form-group"><label class="form-label">Qty</label><input class="form-input" id="piQty" type="number" step="1" min="1" value="' + qty + '" onchange="recalcLineItem()"></div><div class="form-group"><label class="form-label">Cost (Trade)</label><input class="form-input" id="piCost" type="number" step="0.01" value="' + cost + '" onchange="recalcLineItem()"></div><div class="form-group"><label class="form-label">Markup %</label><input class="form-input" id="piMarkup" type="number" step="0.1" value="' + markupPct + '" onchange="recalcLineItem()"></div><div class="form-group"><label class="form-label">Retail (ref.)</label><input class="form-input" id="piRetail" type="number" step="0.01" value="' + (parseFloat(item.retailPrice) || '') + '" placeholder="MSRP"></div><div class="form-group"><label class="form-label">Shipping</label><input class="form-input" id="piShipping" type="number" step="0.01" value="' + shipping + '" onchange="recalcLineItem()"></div></div>';
+        var _piSellRow = _piIsPo
+          ? '<div style="display:grid;grid-template-columns:1fr;gap:12px;"><div class="form-group"><label class="form-label">Line total (trade)</label><div id="piLineSubtotal" style="padding:10px 12px;background:var(--gray-50);border-radius:0;font-size:16px;font-weight:700;color:#0F1A2E;">' + formatMoney(_lineSubtotalDisp) + '</div><div style="font-size:10px;color:var(--gray-500);margin-top:4px;">Cost × qty + shipping</div></div></div>'
+          : '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"><div class="form-group"><label class="form-label">Client sell (ea.)</label><div id="piClientPrice" style="padding:10px 12px;background:var(--gray-50);border-radius:0;font-size:16px;font-weight:700;color:var(--gold);">' + formatMoney(unitSell) + '</div><div style="font-size:10px;color:var(--gray-500);margin-top:4px;">Trade cost + markup %</div></div><div class="form-group"><label class="form-label">Line subtotal</label><div id="piLineSubtotal" style="padding:10px 12px;background:var(--gray-50);border-radius:0;font-size:16px;font-weight:700;color:#0F1A2E;">' + formatMoney(_lineSubtotalDisp) + '</div><div style="font-size:10px;color:var(--gray-500);margin-top:4px;">Sell × qty + shipping</div></div></div>';
         document.getElementById('modalContainer').innerHTML = `
           <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
             <div class="modal clip-detail-modal" style="width:min(1180px,96vw);max-width:96vw;">
@@ -29382,41 +29415,29 @@ async function renderBoardsTab(T, proj) {
                         <div id="piHeroPlaceholder" style="padding:40px;color:var(--gray-400);text-align:center;${_piHeroSrc ? 'display:none;' : ''}">No image yet</div>
                       </div>
                       <div class="clip-detail-thumb-btns">
-                        <label class="btn btn-primary btn-sm" style="cursor:pointer;margin:0;text-align:center;color:#EDE8E0 !important;background:#0F1A2E !important;border:none;font-weight:600;">📷 Upload images
-                          <input type="file" accept="image/*" multiple style="display:none;" id="piFileInput" onchange="piUploadImages('${escAttr(projectId)}','${escAttr(collection)}','${escAttr(docId)}',${idx},this)">
+                        <label class="btn btn-primary btn-sm" style="cursor:pointer;margin:0;text-align:center;color:#EDE8E0 !important;background:#0F1A2E !important;border:none;font-weight:600;">${_piUploadBtnLabel}
+                          <input type="file" accept="image/*"${_piIsPo ? '' : ' multiple'} style="display:none;" id="piFileInput" onchange="piUploadImages('${escAttr(projectId)}','${escAttr(collection)}','${escAttr(docId)}',${idx},this)">
                         </label>
-                        <div style="font-size:10px;color:var(--gray-500);line-height:1.4;margin-top:6px;">Drag thumbnails to reorder. Click <strong>×</strong> to remove. <strong>Hero</strong> = cover on invoice &amp; tear sheets.</div>
+                        <div style="font-size:10px;color:var(--gray-500);line-height:1.4;margin-top:6px;">${_piUploadHint}</div>
                       </div>
                     </div>
                   </div>
                   <div class="clip-detail-fields-scroll">
                     ${_piLibSuggestHtml}
-                    <div class="form-group" style="margin-bottom:10px;">
-                      <label class="form-label">Product images — list thumbnail</label>
-                      <div style="font-size:10px;color:var(--gray-500);margin-bottom:6px;">Pick which photo appears as the small row image in the proposal table. Click <strong>×</strong> on a thumbnail to remove it.</div>
-                      <div id="piImageGrid" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
-                    </div>
+                    ${_piImageGridBlock}
                     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
-                      <input class="form-input" id="piImage" value="${escAttr(_piHeroSrc)}" placeholder="Paste image URL, Enter to add" style="font-size:12px;flex:1;min-width:160px;" onkeydown="if(event.key==='Enter'){event.preventDefault();piAddImageUrl();}">
-                      <button class="btn btn-sm btn-secondary" type="button" onclick="piAddImageUrl()">Add URL</button>
+                      <input class="form-input" id="piImage" value="${escAttr(_piHeroSrc)}" placeholder="${_piIsPo ? 'Paste image URL, Enter to replace' : 'Paste image URL, Enter to add'}" style="font-size:12px;flex:1;min-width:160px;" onkeydown="if(event.key==='Enter'){event.preventDefault();piAddImageUrl();}">
+                      <button class="btn btn-sm btn-secondary" type="button" onclick="piAddImageUrl()">${_piIsPo ? 'Replace URL' : 'Add URL'}</button>
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                       <div class="form-group"><label class="form-label">Item Name</label><input class="form-input" id="piTitle" value="${escAttr(item.title || '')}"></div>
                       <div class="form-group"><label class="form-label">Vendor</label><input class="form-input" id="piVendor" value="${escAttr(item.vendor || '')}"></div>
                     </div>
-                    <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;">
-                      <div class="form-group"><label class="form-label">Qty</label><input class="form-input" id="piQty" type="number" step="1" min="1" value="${qty}" onchange="recalcLineItem()"></div>
-                      <div class="form-group"><label class="form-label">Cost (Trade)</label><input class="form-input" id="piCost" type="number" step="0.01" value="${cost}" onchange="recalcLineItem()"></div>
-                      <div class="form-group"><label class="form-label">Markup %</label><input class="form-input" id="piMarkup" type="number" step="0.1" value="${markupPct}" onchange="recalcLineItem()"></div>
-                      <div class="form-group"><label class="form-label">Retail (ref.)</label><input class="form-input" id="piRetail" type="number" step="0.01" value="${parseFloat(item.retailPrice) || ''}" placeholder="MSRP"></div>
-                      <div class="form-group"><label class="form-label">Shipping</label><input class="form-input" id="piShipping" type="number" step="0.01" value="${shipping}" onchange="recalcLineItem()"></div>
-                    </div>
+                    ${_piPricingGrid}
+                    ${_piSellRow}
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                      <div class="form-group">
-                        <label class="form-label">Client Price (auto-calculated)</label>
-                        <div id="piClientPrice" style="padding:10px 12px;background:var(--gray-50);border-radius:0;font-size:16px;font-weight:700;color:var(--gold);">${formatMoney(clientPrice)}</div>
-                      </div>
                       <div class="form-group"><label class="form-label">Category</label><select class="form-input" id="piCat">${_piCategoryOptions(item.category || '', boardCats, boardRooms)}</select></div>
+                      <div class="form-group"></div>
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                       <div class="form-group"><label class="form-label">Room</label><select class="form-input" id="piRoom">${_piRoomOptions(item.room || '', boardRooms)}</select></div>
@@ -29557,8 +29578,15 @@ async function renderBoardsTab(T, proj) {
     function piAddImageUrl() {
       var url = (document.getElementById('piImage').value || '').trim();
       if (!url) return;
+      var _poImg = window._piLineCtx && window._piLineCtx.collection === 'purchaseOrders';
       if (!window._piImages) window._piImages = [];
-      window._piImages.push(url);
+      if (_poImg) {
+        window._piImages = [url];
+        window._piHeroIdx = 0;
+        window._piSelectionIdx = 0;
+      } else {
+        window._piImages.push(url);
+      }
       window._piImageManual = true;
       document.getElementById('piImage').value = '';
       _piRefreshImageGrid();
@@ -29692,7 +29720,9 @@ async function renderBoardsTab(T, proj) {
         inputEl = inputElMaybe;
       }
       if (!inputEl || !inputEl.files || inputEl.files.length === 0) return;
-      if (!window._piImages) window._piImages = [];
+      var _poUpload = collection === 'purchaseOrders';
+      if (_poUpload) window._piImages = [];
+      else if (!window._piImages) window._piImages = [];
       var pid = String(projectId || '').trim();
       var did = String(docId || '').trim() || 'draft';
       for (var fi = 0; fi < inputEl.files.length; fi++) {
@@ -29702,7 +29732,8 @@ async function renderBoardsTab(T, proj) {
           var ext = (f.name.split('.').pop() || 'jpeg').toLowerCase().replace(/[^a-z0-9]/gi, '') || 'jpeg';
           var path = docLineImageStoragePath(pid, collection, did, fi + '.' + ext, fi);
           var url = await uploadImageToStorage(f, path);
-          window._piImages.push(url);
+          if (_poUpload) window._piImages = [url];
+          else window._piImages.push(url);
           window._piImageManual = true;
         } catch (e) {
           console.warn('Line item Storage upload failed:', e);
@@ -29710,7 +29741,13 @@ async function renderBoardsTab(T, proj) {
           continue;
         }
       }
-      if (window._piImages && window._piImages.length) window._piImageManual = true;
+      if (window._piImages && window._piImages.length) {
+        window._piImageManual = true;
+        if (_poUpload) {
+          window._piHeroIdx = 0;
+          window._piSelectionIdx = 0;
+        }
+      }
       inputEl.value = '';
       _piRefreshImageGrid();
     }
@@ -29727,10 +29764,16 @@ async function renderBoardsTab(T, proj) {
     function recalcLineItem() {
       const qty = parseFloat(document.getElementById('piQty').value) || 1;
       const cost = parseFloat(document.getElementById('piCost').value) || 0;
-      const markupPct = parseFloat(document.getElementById('piMarkup').value) || 0;
       const shipping = parseFloat(document.getElementById('piShipping').value) || 0;
-      const clientPrice = (cost * qty * (1 + markupPct / 100)) + shipping;
-      document.getElementById('piClientPrice').textContent = formatMoney(clientPrice);
+      var _piCtx = window._piLineCtx || {};
+      var _isPoRecalc = _piCtx.collection === 'purchaseOrders';
+      const markupPct = _isPoRecalc ? 0 : (parseFloat(document.getElementById('piMarkup') && document.getElementById('piMarkup').value) || 0);
+      const unitSell = cost * (1 + markupPct / 100);
+      const lineSubtotal = _isPoRecalc ? ((cost * qty) + shipping) : (unitSell * qty + shipping);
+      var elUnit = document.getElementById('piClientPrice');
+      var elSub = document.getElementById('piLineSubtotal');
+      if (elUnit) elUnit.textContent = formatMoney(unitSell);
+      if (elSub) elSub.textContent = formatMoney(lineSubtotal);
     }
 
     window.piProductUrlChanged = function() {
@@ -29841,9 +29884,11 @@ async function renderBoardsTab(T, proj) {
         : JSON.parse(JSON.stringify(_propSnapData.items || []));
       const qty = parseFloat(document.getElementById('piQty').value) || 1;
       const cost = parseFloat(document.getElementById('piCost').value) || 0;
-      const markupPct = parseFloat(document.getElementById('piMarkup').value) || 0;
+      const _isPoSave = collection === 'purchaseOrders';
+      const markupPct = _isPoSave ? 0 : (parseFloat(document.getElementById('piMarkup') && document.getElementById('piMarkup').value) || 0);
       const shipping = parseFloat(document.getElementById('piShipping').value) || 0;
-      const clientPrice = (cost * qty * (1 + markupPct / 100)) + shipping;
+      const unitSell = cost * (1 + markupPct / 100);
+      const lineSubtotal = _isPoSave ? ((cost * qty) + shipping) : (unitSell * qty + shipping);
       var prevLine = items[idx] || {};
       var _savedImages = window._piImages || [];
       var _nImg = _savedImages.length;
@@ -29863,7 +29908,8 @@ async function renderBoardsTab(T, proj) {
         markupPct: markupPct,
         retailPrice: parseFloat(document.getElementById('piRetail').value) || 0,
         shipping: shipping,
-        amount: clientPrice,
+        amount: lineSubtotal,
+        clientPrice: unitSell,
         description: document.getElementById('piDesc').value.trim(),
         shipTo: document.getElementById('piShipTo').value.trim()
       };
@@ -29926,7 +29972,10 @@ async function renderBoardsTab(T, proj) {
         items[idx].images = _cleanImgs.slice();
         items[idx].heroImageIndex = _hi;
         items[idx].selectionImageIndex = (collection === 'invoices') ? _hi : _si;
-        if (window._piImageManual) items[idx]._imageManual = true;
+        if (window._piImageManual) {
+          items[idx]._imageManual = true;
+          if (collection === 'purchaseOrders') delete items[idx]._imageLocked;
+        }
         else if (window._piLibraryApplied) delete items[idx]._imageManual;
       } else if (!window._piImageManual && (prevLine.imageUrl || (Array.isArray(prevLine.images) && prevLine.images.length))) {
         /* Modal closed with empty _piImages (state loss) — do not wipe stored line images unless user edited. */
@@ -30369,10 +30418,20 @@ async function renderBoardsTab(T, proj) {
       imgs = _sanitizeLineImagesForSave(imgs);
       var si = imgs.length - 1;
       var hi = si;
+      if (_docEdit.type === 'po') {
+        imgs = imgs.length ? [imgs[imgs.length - 1]] : [];
+        si = 0;
+        hi = 0;
+        _docEdit.items[idx]._imageManual = true;
+        delete _docEdit.items[idx]._imageLocked;
+      }
       _docEdit.items[idx].images = imgs;
       _docEdit.items[idx].heroImageIndex = hi;
       _docEdit.items[idx].selectionImageIndex = (_docEdit.collection === 'invoices') ? hi : si;
       _docEdit.items[idx].imageUrl = imgs[(_docEdit.collection === 'invoices') ? hi : si] || imgs[0] || '';
+      if (_docEdit.type === 'po' && typeof cchEnforcePoLineSingleImage === 'function') {
+        _docEdit.items[idx] = cchEnforcePoLineSingleImage(_docEdit.items[idx]);
+      }
       docEditRenderItems();
       docEditAutoSave();
       showToast(added === 1 ? 'Image uploaded' : added + ' images uploaded');
@@ -30592,10 +30651,19 @@ async function renderBoardsTab(T, proj) {
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                 <div class="form-group">
-                  <label class="form-label">Client Price (auto-calculated)</label>
+                  <label class="form-label">Client sell (ea.)</label>
                   <div id="piClientPrice" style="padding:10px 12px;background:var(--gray-50);border-radius:0;font-size:16px;font-weight:700;color:var(--gold);">$0.00</div>
+                  <div style="font-size:10px;color:var(--gray-500);margin-top:4px;">Trade cost + markup %</div>
                 </div>
+                <div class="form-group">
+                  <label class="form-label">Line subtotal</label>
+                  <div id="piLineSubtotal" style="padding:10px 12px;background:var(--gray-50);border-radius:0;font-size:16px;font-weight:700;color:#0F1A2E;">$0.00</div>
+                  <div style="font-size:10px;color:var(--gray-500);margin-top:4px;">Sell × qty + shipping</div>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                 <div class="form-group"><label class="form-label">Category</label><select class="form-input" id="piCat">${_piCategoryOptions('', boardCats, boardRooms)}</select></div>
+                <div class="form-group"></div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                 <div class="form-group"><label class="form-label">Room</label><select class="form-input" id="piRoom">${_piRoomOptions('', boardRooms)}</select></div>
@@ -30642,7 +30710,8 @@ async function renderBoardsTab(T, proj) {
       const cost = parseFloat(document.getElementById('piCost').value) || 0;
       const markupPct = parseFloat(document.getElementById('piMarkup').value) || 0;
       const shipping = parseFloat(document.getElementById('piShipping').value) || 0;
-      const clientPrice = (cost * qty * (1 + markupPct / 100)) + shipping;
+      const unitSell = cost * (1 + markupPct / 100);
+      const lineSubtotal = unitSell * qty + shipping;
       var _addImages = window._piImages || [];
       var _an = _addImages.length;
       var _asi = _an ? Math.max(0, Math.min(parseInt(window._piSelectionIdx, 10) || 0, _an - 1)) : 0;
@@ -30659,7 +30728,8 @@ async function renderBoardsTab(T, proj) {
         cost: cost,
         markupPct: markupPct,
         shipping: shipping,
-        amount: clientPrice,
+        amount: lineSubtotal,
+        clientPrice: unitSell,
         imageUrl: _addImages[_asi] || _addImages[0] || '',
         images: _addImages,
         heroImageIndex: _ahi,
@@ -32719,6 +32789,13 @@ async function renderBoardsTab(T, proj) {
       editDocLineItem(_docEdit.projectId, _docEdit.collection, _docEdit.docId, idx);
     };
 
+    /** PO view: jump to Edit PO and open the line image editor for one row. */
+    window.cchPoOpenLineImageEditor = function(projectId, docId, idx) {
+      window._forceEditMode = true;
+      window._docEditOpenLineIdx = parseInt(idx, 10);
+      navigate('#/project/' + projectId + '/po/' + docId);
+    };
+
     async function docEditRefreshItemsFromFirestore() {
       if (!_docEdit || !_docEdit.projectId || !_docEdit.docId) return;
       try {
@@ -32933,8 +33010,8 @@ async function renderBoardsTab(T, proj) {
           '<td class="doc-edit-item-cell">' +
             '<div class="doc-edit-item-stack">' +
               '<div class="doc-edit-img-wrap">' + imgHtml +
-                (hideImgChrome ? '' : ('<input type="file" accept="image/*" multiple style="display:none;" onchange="uploadDocEditImage(' + idx + ', this)">' +
-                '<div class="doc-edit-img-hint" title="Edit images — multiple photos, cover image">Edit images</div>')) +
+                (hideImgChrome ? '' : ('<input type="file" accept="image/*"' + (isPO ? '' : ' multiple') + ' style="display:none;" onchange="uploadDocEditImage(' + idx + ', this)">' +
+                '<div class="doc-edit-img-hint" title="Edit images — ' + (isPO ? 'vendor PO photo' : 'multiple photos, cover image') + '">' + (isPO ? 'Edit image' : 'Edit images') + '</div>')) +
               '</div>' +
               '<div class="doc-edit-item-text">' +
                 '<input class="doc-edit-name" value="' + escAttr(item.title || item.name || '') + '" placeholder="Item name" data-idx="' + idx + '" data-field="title" onchange="docEditFieldChange(this)" style="margin-bottom:4px;">' +
@@ -33612,6 +33689,11 @@ async function renderBoardsTab(T, proj) {
             if (item.imageUrl) item.imageUrl = _sanitizePersistImageUrl(item.imageUrl) || '';
             if (item.images && item.images.length) item.images = _sanitizeLineImagesForSave(item.images);
             if (!item.imageUrl && item.images && item.images.length) item.imageUrl = item.images[0];
+          });
+        }
+        if (d.type === 'po' && typeof cchEnforcePoLineSingleImage === 'function') {
+          _safeItems.forEach(function(item, i) {
+            _safeItems[i] = cchEnforcePoLineSingleImage(item);
           });
         }
         d.items = _safeItems;
@@ -36249,6 +36331,10 @@ async function renderBoardsTab(T, proj) {
       _docEdit.items[idx].images = [];
       delete _docEdit.items[idx].heroImageIndex;
       delete _docEdit.items[idx].selectionImageIndex;
+      if (_docEdit.type === 'po') {
+        _docEdit.items[idx]._imageManual = true;
+        delete _docEdit.items[idx]._imageLocked;
+      }
       docEditRenderItems();
       docEditAutoSave();
       showToast('Image removed');
@@ -36258,6 +36344,17 @@ async function renderBoardsTab(T, proj) {
       if (url === null) return;
       var clean = (typeof _sanitizePersistImageUrl === 'function') ? _sanitizePersistImageUrl(url.trim()) : url.trim();
       if (!clean) { await cchAlert('That URL cannot be saved. Use a full https:// image link or upload a file.', 'Update Image'); return; }
+      if (_docEdit.type === 'po') {
+        _docEdit.items[idx].images = [clean];
+        _docEdit.items[idx].imageUrl = clean;
+        _docEdit.items[idx].heroImageIndex = 0;
+        _docEdit.items[idx].selectionImageIndex = 0;
+        _docEdit.items[idx]._imageManual = true;
+        delete _docEdit.items[idx]._imageLocked;
+        if (typeof cchEnforcePoLineSingleImage === 'function') {
+          _docEdit.items[idx] = cchEnforcePoLineSingleImage(_docEdit.items[idx]);
+        }
+      } else {
       var pack = (typeof cchProposalLineImagesFromSource === 'function')
         ? cchProposalLineImagesFromSource(_docEdit.items[idx])
         : { images: [] };
@@ -36267,6 +36364,7 @@ async function renderBoardsTab(T, proj) {
       _docEdit.items[idx].imageUrl = clean;
       _docEdit.items[idx].selectionImageIndex = imgs.indexOf(clean);
       if (_docEdit.items[idx].heroImageIndex == null) _docEdit.items[idx].heroImageIndex = _docEdit.items[idx].selectionImageIndex;
+      }
       docEditRenderItems();
       docEditAutoSave();
     }
@@ -38936,6 +39034,13 @@ async function renderBoardsTab(T, proj) {
             if (typeof openDocItemsSidebar === 'function') openDocItemsSidebar({ mode: 'docEdit' });
           } catch (e) { console.warn('[docEdit] open sidebar', e); }
         }, 350);
+      }
+      if (typeof window._docEditOpenLineIdx === 'number' && window._docEditOpenLineIdx >= 0) {
+        var _openLineIdx = window._docEditOpenLineIdx;
+        window._docEditOpenLineIdx = null;
+        setTimeout(function() {
+          if (typeof docEditOpenLineEditor === 'function') docEditOpenLineEditor(_openLineIdx);
+        }, 400);
       }
     }
 
@@ -72827,10 +72932,10 @@ ${pages}
   <script src="cch-design-board.js?v=20260608db29"></script>
   <script src="cch-client-board.js?v=1774994684878"></script>
   <script src="cch-line-icons.js?v=20260620a"></script>
-  <script src="cch-proposals-invoices-fix.js?v=20260623posmk4"></script>
+  <script src="cch-proposals-invoices-fix.js?v=20260623posmk6"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
   <script src="cch-po-bill-variance.js?v=20260623poc10"></script>
-  <script src="cch-order-management.js?v=20260623om24"></script>
+  <script src="cch-order-management.js?v=20260624om25"></script>
   <script src="cch-ffe-procurement.js?v=20260602"></script>
 </body>
 </html>

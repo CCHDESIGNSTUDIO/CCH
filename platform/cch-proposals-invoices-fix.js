@@ -2984,7 +2984,7 @@
       return -1;
     }
 
-    var _showLineTagCol = type === 'invoice' || type === 'proposal';
+    var _showLineTagCol = type === 'invoice' || type === 'proposal' || type === 'po';
     var _showPoVendorInvCols = type === 'po' && typeof window.cchPoVendorInvoiceGroupLineCellsHtml === 'function';
     var _showPoLinePayCol = _showPoVendorInvCols && !!(docData.bill && docData.bill.received);
     var _showPoLineEtaCol = _showPoVendorInvCols && typeof window.cchPoLineEtaHtml === 'function';
@@ -3095,6 +3095,9 @@
           }
         }
         var lineIdx = (type === 'invoice') ? cchDocItemLineIndex(items, item) : cchDocItemLineIndex(items, item);
+        if (type === 'po' && lineIdx >= 0 && typeof window.cchPoOpenLineImageEditor === 'function') {
+          imgTag = '<div role="button" tabindex="0" onclick="event.stopPropagation();cchPoOpenLineImageEditor(\'' + cchEscJsStr(projectId) + '\',\'' + cchEscJsStr(docId) + '\',' + lineIdx + ')" title="Click to edit PO line image" style="display:inline-block;cursor:pointer;line-height:0;border-radius:4px;">' + imgTag + '</div>';
+        }
         var _libSuggestHtml = '';
         if (lineIdx >= 0 && typeof window.cchLibrarySuggestHintHtml === 'function') {
           _libSuggestHtml = window.cchLibrarySuggestHintHtml(item, lineIdx);
@@ -3131,6 +3134,17 @@
           detailBlock = descHtmlInner + notesHtmlInner;
         }
         var _lineTitle = typeof window.invoiceLineDisplayTitle === 'function' ? window.invoiceLineDisplayTitle(item) : (item.title || 'Untitled');
+        var _poRoomTagHtml = '';
+        if (type === 'po') {
+          var _poRm = String(item.room || '').trim();
+          if (_poRm || lineTag) {
+            _poRoomTagHtml = '<div style="font-size:11px;color:#5C6B80;margin-top:4px;line-height:1.4;">' +
+              (_poRm ? '<span style="font-weight:600;">🏠 ' + esc(_poRm) + '</span>' : '') +
+              (_poRm && lineTag ? ' · ' : '') +
+              (lineTag ? '<span style="font-weight:700;color:#1B3352;">Tag ' + esc(lineTag) + '</span>' : '') +
+              '</div>';
+          }
+        }
         var typeBadgeHtml = '';
         if (type === 'invoice') {
           if (typeof invoiceLineIsDesignServicesNoMarkup === 'function' && invoiceLineIsDesignServicesNoMarkup(item)) {
@@ -3149,6 +3163,7 @@
         rows += '<tr style="border-bottom:1px solid var(--gray-100);">' +
           '<td style="padding:10px 8px;">' + imgTag + '</td>' +
           '<td style="padding:10px 8px;"><div style="font-size:14px;font-weight:600;">' + esc(_lineTitle) + '</div>' +
+            _poRoomTagHtml +
             _libSuggestHtml +
             detailBlock +
             (item.shipTo && type !== 'invoice' ? '<div style="font-size:11px;color:var(--teal);margin-top:2px;">📍 ' + esc(item.shipTo) + '</div>' : '') +
@@ -3519,7 +3534,7 @@
               '</div>' +
             '</div>' +
             (_poDateStr ? '<div style="margin-top:12px;font-size:12px;color:#5C6B80;"><span style="font-size:9px;text-transform:uppercase;letter-spacing:0.06em;color:#9CA3AF;">PO date</span> <strong style="color:#1B3352;">' + esc(_poDateStr) + '</strong></div>' : '') +
-            '<p style="font-size:11px;color:#5C6B80;margin:12px 0 0;line-height:1.45;">Edit vendor, ship-to, line items, and payments from <strong>Edit PO</strong>.</p>' +
+            '<p style="font-size:11px;color:#5C6B80;margin:12px 0 0;line-height:1.45;">Edit vendor, ship-to, line items, and images from <strong>Edit PO</strong>. Click a line photo to change it.</p>' +
           '</div>';
       }
 
@@ -3545,8 +3560,9 @@
               ((docData.bill && docData.bill.received)
                 ? '<div class="cch-doc-view-panel" style="margin-bottom:10px;padding:12px 14px;background:rgba(27,51,82,0.03);">' +
                     '<div class="cch-doc-view-panel-title" style="margin:0 0 6px;">Purchase order line items</div>' +
-                    '<p style="font-size:12px;color:#5C6B80;margin:0 0 10px;line-height:1.45;">Line items are locked after send. <strong>Order status</strong> and ship dates (confirmed · est. ship · actual ship · delivery ETA) come from <strong>Vendor invoices → Edit</strong>. Payment status shows once the bill is received.</p>' +
+                    '<p style="font-size:12px;color:#5C6B80;margin:0 0 10px;line-height:1.45;">Vendor invoice order status and ship dates are managed under <strong>Vendor invoices → Edit</strong>. Use <strong>Edit PO</strong> to change ship-to, vendor, line images, and per-line ship-to.</p>' +
                     (items.length === 0 ? '<div style="padding:12px;text-align:center;color:var(--gray-400);font-size:12px;">No items</div>' : itemsHTML) +
+                    '<p style="font-size:11px;color:#5C6B80;margin:10px 0 0;line-height:1.45;">Click a line photo to edit it, or use <strong>Edit PO</strong> → <strong>Edit image</strong> on any row.</p>' +
                   '</div>'
                 : '<div class="cch-doc-view-panel" style="margin-bottom:10px;">' +
                     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">' +
@@ -4276,7 +4292,7 @@
           periodHtml = '<div class="item-svc-period">Service date: ' + esc(p0) + '</div>';
         }
       }
-      var notesUnder = (type === 'invoice' || type === 'proposal') ? _invoicePreviewTagNotesHtml(it) : _lineNotesHtml(_rawNotes);
+      var notesUnder = (type === 'invoice' || type === 'proposal' || type === 'po') ? _invoicePreviewTagNotesHtml(it) : _lineNotesHtml(_rawNotes);
       var _poLineNote = (typeof cchLineAdditionalNotesText === 'function')
         ? cchLineAdditionalNotesText(it)
         : (String(it.additionalNotes || it.workroomNote || '').trim());
