@@ -19051,6 +19051,7 @@
     };
 
     function _renderRbBoardClipCard(projId, clip, idx, sectionKey, boardRoomSelectList) {
+      if (clip && clip._docResolveReadOnly) return _rbDocResolveCardHtml(projId, clip);
       var imgSrc = _clipBoardHeroUrl(clip);
       var _imgCount = (typeof cchProposalLineImagesFromSource === 'function' ? (cchProposalLineImagesFromSource(clip).images || []).length : 0);
       var _clipLbUrls = (typeof cpProposalLineImageList === 'function') ? cpProposalLineImageList(clip) : (imgSrc ? [imgSrc] : []);
@@ -19105,6 +19106,7 @@
           var focusItems = boardSortClipsInSection(groupedData[focusRm] || []);
           window._rbSectionClipOrders[focusRm] = focusItems.map(function(c) { return c.id; });
           var focusTotal = focusItems.reduce(function(s, c) {
+            if (c && c._docResolveReadOnly) return s;
             var q = parseFloat(c.qty || c.quantity) || 1;
             var p = parseMoney(c.clientPrice) || parseFloat(c.sellPrice) || parseMoney(c.totalSelling) || parseFloat(c.price) || 0;
             return s + (p * q);
@@ -19130,6 +19132,7 @@
         return '<div class="room-cards-grid">' + keys.map(function(rm) {
           var items = groupedData[rm] || [];
           var totalSell = items.reduce(function(s, c) {
+            if (c && c._docResolveReadOnly) return s;
             var q = parseFloat(c.qty || c.quantity) || 1;
             var p = parseMoney(c.clientPrice) || parseFloat(c.sellPrice) || parseMoney(c.totalSelling) || parseFloat(c.price) || 0;
             return s + (p * q);
@@ -19161,6 +19164,7 @@
         var items = boardSortClipsInSection(groupedData[rm] || []);
         window._rbSectionClipOrders[rm] = items.map(function(c) { return c.id; });
         var groupTotal = items.reduce(function(s, c) {
+          if (c && c._docResolveReadOnly) return s;
           var q = parseFloat(c.qty || c.quantity) || 1;
           var p = parseMoney(c.clientPrice) || parseFloat(c.sellPrice) || parseMoney(c.totalSelling) || parseFloat(c.price) || 0;
           return s + (p * q);
@@ -19230,6 +19234,16 @@ async function renderBoardsTab(T, proj) {
           await enrichClipsWithProjectDocLinks(proj.id, clips, { persistToClips: false });
         } catch (_enRich) {
           console.warn('[renderBoardsTab] enrichClipsWithProjectDocLinks', _enRich);
+        }
+      }
+
+      // RESOLVE-at-render: append read-only cards so a product billed into multiple rooms shows in
+      // every billed room (and POs get a board path). Read-only; no Firestore writes. (Jun 23)
+      if (typeof cchResolveDocLinesIntoBoardCards === 'function') {
+        try {
+          await cchResolveDocLinesIntoBoardCards(proj.id, clips);
+        } catch (_eDocResolve) {
+          console.warn('[renderBoardsTab] cchResolveDocLinesIntoBoardCards', _eDocResolve);
         }
       }
 
@@ -19348,8 +19362,8 @@ async function renderBoardsTab(T, proj) {
       const catCards = _buildCards(catNames, catGrouped);
 
       // Grand totals
-      const grandCost = clips.reduce((s,c) => s + ((parseMoney(c.cost)||0) * (parseFloat(c.qty)||1)), 0);
-      const grandSell = clips.reduce((s,c) => s + (parseMoney(c.totalSelling) || ((parseMoney(c.clientPrice)||0) * (parseFloat(c.qty)||1))), 0);
+      const grandCost = clips.reduce((s,c) => (c && c._docResolveReadOnly) ? s : s + ((parseMoney(c.cost)||0) * (parseFloat(c.qty)||1)), 0);
+      const grandSell = clips.reduce((s,c) => (c && c._docResolveReadOnly) ? s : s + (parseMoney(c.totalSelling) || ((parseMoney(c.clientPrice)||0) * (parseFloat(c.qty)||1))), 0);
 
       T.innerHTML = `
         <!-- TOP BAR: view toggles left, actions right -->
@@ -19425,7 +19439,7 @@ async function renderBoardsTab(T, proj) {
           const rmKey = rm.replace(/[^a-zA-Z0-9]/g,'');
           const isCollapsed = window._rbCollapsed && window._rbCollapsed[rm];
           const sectionItems = (window._boardViewMode === 'category' ? catGrouped : roomGrouped)[rm] || [];
-          const sectionTotal = sectionItems.reduce((s,c) => s + (parseMoney(c.totalSelling) || ((parseMoney(c.clientPrice)||0) * (parseFloat(c.qty)||1))), 0);
+          const sectionTotal = sectionItems.reduce((s,c) => (c && c._docResolveReadOnly) ? s : s + (parseMoney(c.totalSelling) || ((parseMoney(c.clientPrice)||0) * (parseFloat(c.qty)||1))), 0);
           return `
           <div style="margin-bottom:8px;" id="room-sec-${rmKey}">
             <div onclick="rbToggleRoom('${escJsStr(rm)}')" style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid ${isUnassigned ? 'var(--red)' : 'var(--gray-200)'};cursor:pointer;user-select:none;">
@@ -19469,6 +19483,7 @@ async function renderBoardsTab(T, proj) {
               </tr></thead>
               <tbody>
                 ${sectionItems.map(clip => {
+                  if (clip && clip._docResolveReadOnly) return _rbDocResolveRowHtml(proj.id, clip);
                   const imgSrc = clip.imageUrl || _firstCoercedGalleryUrl(clip) || '';
                   const imgTag = _boardTableImgHtml(imgSrc);
                   const qty = parseFloat(clip.qty || clip.quantity) || 1;
@@ -19500,9 +19515,9 @@ async function renderBoardsTab(T, proj) {
               </tbody>
               <tfoot><tr style="font-weight:600;border-top:2px solid var(--gray-200);">
                 <td colspan="${isUnassigned ? '6' : '5'}" style="text-align:right;">${window._boardViewMode === 'category' ? 'Category' : 'Room'} total:</td>
-                <td style="color:var(--gray-600);">${formatMoney(sectionItems.reduce((s,c) => s + (parseMoney(c.cost) || 0) * (parseFloat(c.qty) || 1), 0))}</td>
+                <td style="color:var(--gray-600);">${formatMoney(sectionItems.reduce((s,c) => (c && c._docResolveReadOnly) ? s : s + (parseMoney(c.cost) || 0) * (parseFloat(c.qty) || 1), 0))}</td>
                 <td></td><td></td><td></td>
-                <td style="color:var(--green);">${formatMoney(sectionItems.reduce((s,c) => s + (parseMoney(c.totalSelling) || parseMoney(c.clientPrice) * (parseFloat(c.qty) || 1) || 0), 0))}</td>
+                <td style="color:var(--green);">${formatMoney(sectionItems.reduce((s,c) => (c && c._docResolveReadOnly) ? s : s + (parseMoney(c.totalSelling) || parseMoney(c.clientPrice) * (parseFloat(c.qty) || 1) || 0), 0))}</td>
                 <td></td>
                 <td></td>
                 ${isUnassigned && availableRooms.length > 0 ? '<td></td>' : ''}
@@ -34083,6 +34098,180 @@ async function renderBoardsTab(T, proj) {
       return clips;
     }
     window.enrichClipsWithProjectDocLinks = enrichClipsWithProjectDocLinks;
+
+    /**
+     * RESOLVE-at-render (READ-ONLY — no Firestore writes, no clip moves/creates).
+     * A product billed into N rooms via proposals/invoices/POs should appear in every one of those
+     * rooms on the board and carry the doc # pill — even though it has only one clip (one room).
+     * Moving/creating clips would violate document isolation (cch-doc-isolation.js), so instead we
+     * append in-memory, read-only synthetic cards for (product x room) combos no real clip covers.
+     */
+    function _rbBaseKeyForProduct(x) {
+      var lib = String((x && (x.libraryProductId || x.linkedLibraryProductId)) || '').trim();
+      if (lib) return 'lib:' + lib;
+      var t = String((x && (x.title || x.name)) || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      var v = String((x && x.vendor) || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      if (!t) return '';
+      return 'tv:' + t + '|' + v;
+    }
+    function _rbRoomNorm(r) { return String(r || '').trim().toLowerCase().replace(/\s+/g, ' '); }
+    function _rbDocLineIsProduct(it) {
+      if (!it) return false;
+      if (it.isGroupHeader || it.groupHeader || it._isHeader) return false;
+      if (it._isService === true || it.itemType === 'service') return false;
+      var et = String(it.expenseType || '').toLowerCase().trim();
+      if (['service','sales_tax','shipping','handling','expense','other_expense','discount','labor','freight','tax','installation'].indexOf(et) >= 0) return false;
+      if (typeof boardClipIsTimeBillingRow === 'function' && boardClipIsTimeBillingRow(it)) return false;
+      var t = String(it.title || it.name || it.description || '').trim();
+      if (!t) return false;
+      return true;
+    }
+
+    async function cchResolveDocLinesIntoBoardCards(projectId, clips) {
+      if (!projectId || !Array.isArray(clips)) return clips;
+      var realPresence = {};   // baseKey|roomNorm -> true (a real clip already shows this product in this room)
+      var bestByBase = {};     // baseKey -> best real clip (prefer one with an image) for cloning display data
+      clips.forEach(function(c) {
+        if (!c) return;
+        var bk = _rbBaseKeyForProduct(c);
+        if (!bk) return;
+        realPresence[bk + '|' + _rbRoomNorm(c.room)] = true;
+        var hasImg = !!String(c.imageUrl || c.image || '').trim();
+        if (!bestByBase[bk] || (hasImg && !String(bestByBase[bk].imageUrl || bestByBase[bk].image || '').trim())) {
+          bestByBase[bk] = c;
+        }
+      });
+
+      var synthByKey = {};     // synthetic id -> card (dedupe across docs)
+      function consume(collName, docId, docData) {
+        var d = docData || {};
+        var prNum = String(d.proposalNum || d.number || d.name || '').trim();
+        var invNum = String(d.invoiceNum || d.number || d.name || '').trim();
+        var poNum = String(d.poNum || d.number || d.name || '').trim();
+        (d.items || []).forEach(function(it) {
+          if (!_rbDocLineIsProduct(it)) return;
+          var room = String(it.room || '').trim();
+          if (!room) return;                          // no room on the line -> cannot place a room card
+          var bk = _rbBaseKeyForProduct(it);
+          if (!bk) return;
+          var rn = _rbRoomNorm(room);
+          if (realPresence[bk + '|' + rn]) return;    // real clip already in this room -> nothing to do
+          var synthId = 'doccard:' + bk + '|' + rn;
+          var base = bestByBase[bk] || {};
+          var qty = parseFloat(it.qty || it.quantity) || 1;
+          var card = synthByKey[synthId];
+          if (!card) {
+            card = Object.assign({}, base, {
+              id: synthId,
+              room: room,
+              title: it.title || base.title || it.name || 'Untitled',
+              vendor: it.vendor || base.vendor || '',
+              category: it.category || base.category || '',
+              sku: it.sku || base.sku || '',
+              imageUrl: String(base.imageUrl || base.image || it.imageUrl || it.image || '').trim(),
+              cost: (it.cost != null ? it.cost : base.cost) || 0,
+              clientPrice: (it.amount != null ? it.amount : (it.clientPrice != null ? it.clientPrice : base.clientPrice)) || 0,
+              qty: qty,
+              libraryProductId: String((it.libraryProductId || it.linkedLibraryProductId || base.libraryProductId) || '').trim() || null,
+              source: 'doc-resolve',
+              _resolvedFromDoc: true,
+              _docResolveReadOnly: true,
+              _docResolveRealClipId: (base && base.id) ? String(base.id) : ''
+            });
+            if (prNum && collName === 'proposals') { card.proposalNum = prNum; card.proposalId = docId; }
+            if (invNum && collName === 'invoices') { card.invoiceNum = invNum; card.invoiceId = docId; }
+            if (poNum && collName === 'purchaseOrders') { card.poNum = poNum; card.poId = docId; }
+            synthByKey[synthId] = card;
+          } else {
+            if (prNum && collName === 'proposals' && !card.proposalNum) { card.proposalNum = prNum; card.proposalId = docId; }
+            if (invNum && collName === 'invoices' && !card.invoiceNum) { card.invoiceNum = invNum; card.invoiceId = docId; }
+            if (poNum && collName === 'purchaseOrders' && !card.poNum) { card.poNum = poNum; card.poId = docId; }
+          }
+        });
+      }
+      try {
+        var cols = ['proposals', 'invoices', 'purchaseOrders'];
+        for (var ci = 0; ci < cols.length; ci++) {
+          var snap = await db.collection('boards').doc(projectId).collection(cols[ci]).get();
+          snap.forEach(function(doc) { consume(cols[ci], doc.id, doc.data() || {}); });
+        }
+      } catch (e) {
+        console.warn('[cchResolveDocLinesIntoBoardCards]', projectId, e && e.message ? e.message : e);
+        return clips;
+      }
+      Object.keys(synthByKey).forEach(function(k) { clips.push(synthByKey[k]); });
+      return clips;
+    }
+    window.cchResolveDocLinesIntoBoardCards = cchResolveDocLinesIntoBoardCards;
+
+    function _rbResolvePrimaryDocHref(clip, projId) {
+      if (!clip || !projId) return '';
+      if (clip.invoiceId) return '#/project/' + projId + '/invoice/' + clip.invoiceId;
+      if (clip.poId) return '#/project/' + projId + '/po/' + clip.poId;
+      if (clip.proposalId) return '#/project/' + projId + '/proposal/' + clip.proposalId;
+      return '';
+    }
+    function _rbDocResolveSourceLabel(clip) {
+      var parts = [];
+      if (clip.invoiceNum) parts.push('INV ' + clip.invoiceNum);
+      if (clip.poNum) parts.push('PO ' + clip.poNum);
+      if (clip.proposalNum) parts.push('PR ' + clip.proposalNum);
+      return parts.join(' \u00b7 ') || 'document';
+    }
+    function _rbDocResolveCardHtml(projId, clip) {
+      // Mirror the standard board card (_renderRbBoardClipCard) exactly; signal read-only with a small
+      // header chip rather than a bespoke restyle. No drag / approval / room dropdown / delete.
+      var imgSrc = (typeof _clipBoardHeroUrl === 'function') ? _clipBoardHeroUrl(clip) : (clip.imageUrl || '');
+      var _imgCount = (typeof cchProposalLineImagesFromSource === 'function' ? (cchProposalLineImagesFromSource(clip).images || []).length : 0);
+      var _clipLbUrls = (typeof cpProposalLineImageList === 'function') ? cpProposalLineImageList(clip) : (imgSrc ? [imgSrc] : []);
+      var qty = parseFloat(clip.qty || clip.quantity) || 1;
+      var sell = parseMoney(clip.clientPrice) || parseFloat(clip.sellPrice) || parseFloat(clip.unitSellingPrice) || (parseMoney(clip.totalSelling) ? parseMoney(clip.totalSelling) / qty : 0) || parseFloat(clip.totalSell) || parseFloat(clip.price) || parseFloat(clip.retailPrice) || 0;
+      var isValid = imgSrc && (imgSrc.startsWith('http') || imgSrc.startsWith('data:') || imgSrc.startsWith('//') || (imgSrc.charAt(0) === '/' && imgSrc.length > 1));
+      var href = _rbResolvePrimaryDocHref(clip, projId);
+      var chip = '<span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#8a6d3b;background:rgba(201,169,110,0.16);padding:2px 6px;border-radius:3px;white-space:nowrap;" title="Billed to this room on a document \u2014 read-only here">From ' + esc(_rbDocResolveSourceLabel(clip)) + ' \u00b7 read-only</span>';
+      return '<div' + (href ? ' onclick="navigate(\'' + escAttr(href) + '\')"' : '') + ' class="rb-board-clip-card" style="background:white;border:1px solid var(--gray-200);border-radius:6px;overflow:hidden;' + (href ? 'cursor:pointer;' : '') + 'transition:box-shadow 0.2s,transform 0.15s;"' +
+        (href ? ' onmouseenter="this.style.boxShadow=\'0 4px 16px rgba(0,0,0,0.1)\';this.style.transform=\'translateY(-1px)\'" onmouseleave="this.style.boxShadow=\'none\';this.style.transform=\'none\'"' : '') + '>' +
+        '<div style="position:relative;">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:rgba(245,243,238,0.5);border-bottom:1px solid var(--gray-100);">' +
+            chip +
+            (sell > 0 ? '<span style="font-size:11px;font-weight:600;color:var(--gold);">$</span>' : '') +
+          '</div>' +
+          _boardClipPhotoHtml(imgSrc, isValid, _imgCount, _clipLbUrls) +
+        '</div>' +
+        '<div style="padding:10px 12px;">' +
+          '<div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#0F1A2E;">' + esc(clip.title || 'Untitled') + '</div>' +
+          (clip.vendor ? '<div style="font-size:11px;color:var(--gray-500);margin-top:2px;">By ' + esc(clip.vendor) + '</div>' : '') +
+          (typeof cchProductIdentityBadgesHtml === 'function' ? cchProductIdentityBadgesHtml(clip, { showIds: true, hideUnlinked: true }) : '') +
+          (sell > 0 ? '<div style="font-size:14px;font-weight:700;color:var(--gold);font-family:var(--font-mono);margin-top:6px;">' + formatMoney(sell) + (qty > 1 ? ' <span style="font-size:11px;color:var(--gray-400);font-weight:400;">x' + qty + '</span>' : '') + '</div>' : '') +
+          clipLinkedDocPillsHtml(clip, projId) +
+        '</div>' +
+      '</div>';
+    }
+    function _rbDocResolveRowHtml(projId, clip) {
+      var imgSrc = clip.imageUrl || (typeof _firstCoercedGalleryUrl === 'function' ? _firstCoercedGalleryUrl(clip) : '') || '';
+      var imgTag = (typeof _boardTableImgHtml === 'function') ? _boardTableImgHtml(imgSrc) : '';
+      var qty = parseFloat(clip.qty || clip.quantity) || 1;
+      var cost = parseMoney(clip.cost) || 0;
+      var sell = parseMoney(clip.clientPrice) || parseFloat(clip.price) || 0;
+      var markup = clip.markupPct || (cost > 0 && sell > 0 ? Math.round((sell - cost) / cost * 100) : 0);
+      var total = sell * qty;
+      var href = _rbResolvePrimaryDocHref(clip, projId);
+      var rowAttr = href ? (' onclick="navigate(\'' + escAttr(href) + '\')" style="cursor:pointer;"') : '';
+      return '<tr' + rowAttr + '>' +
+        '<td>' + imgTag + '</td>' +
+        '<td><strong>' + esc(clip.title || 'Untitled') + '</strong><br><span style="color:#8a6d3b;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">From ' + esc(_rbDocResolveSourceLabel(clip)) + ' \u00b7 read-only</span></td>' +
+        '<td style="font-size:12px;">' + esc(clip.vendor || '-') + '</td>' +
+        '<td style="font-size:12px;">' + esc(clip.category || '-') + '</td>' +
+        '<td style="font-size:12px;">' + esc(clip.room || '-') + '</td>' +
+        '<td style="color:var(--gray-600);">' + (cost > 0 ? formatMoney(cost) : '-') + '</td>' +
+        '<td style="color:var(--green);font-weight:600;">' + (sell > 0 ? formatMoney(sell) : '-') + '</td>' +
+        '<td>' + (markup > 0 ? markup + '%' : '-') + '</td>' +
+        '<td style="text-align:center;">' + qty + '</td>' +
+        '<td style="font-weight:600;color:var(--green);">' + (total > 0 ? formatMoney(total) : '-') + '</td>' +
+        '<td><span class="badge badge-draft">On doc</span></td>' +
+        '<td style="text-align:center;color:var(--gray-300);" title="Read-only \u2014 manage on the document">\u2014</td>' +
+        '</tr>';
+    }
 
     /**
      * Proposal lines can reference room-board clips via `clipId`. Persist proposal id + human proposal # on each clip
