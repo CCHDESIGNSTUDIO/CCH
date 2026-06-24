@@ -6489,23 +6489,7 @@
     };
   }
 
-  // Block PO edit when locked
-  var _origEdit = window.renderDocEditPage;
-  if (_origEdit) {
-    window.renderDocEditPage = async function(type, projectId, docId, docData, items, projData) {
-      if (type === 'po' && window.cchPoIsLocked(docData)) {
-        if (typeof window.showToast === 'function') {
-          window.showToast('This PO is locked after send. Use Receive vendor bill on the view page.', 'warning');
-        }
-        window._forceEditMode = false;
-        if (typeof window.renderDocViewPage === 'function') {
-          window.renderDocViewPage('po', projectId, docId, docData, items, projData);
-          return;
-        }
-      }
-      return _origEdit(type, projectId, docId, docData, items, projData);
-    };
-  }
+  // PO edit is allowed after send (vendor, ship-to, images, per-line ship-to).
 
   /** Unseen qb_payment_matched → modal (SPEC §6, 3a overlap) */
   window.cchPoPollPaymentMatchedNotifications = async function() {
