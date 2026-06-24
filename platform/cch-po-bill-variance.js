@@ -161,52 +161,31 @@
     return true;
   };
 
-  /** Two-line PO list cell: sent to vendor + vendor bill received. */
+  /** Project PO list — bill lane badge + paid/balance when bill is complete. */
   window.cchPoListBillWorkflowHtml = function(po) {
     po = po || {};
-    var sentInfo = window.cchPoWasSentToVendor(po);
-    var bill = po.bill || {};
-    var hasBill = !!(bill && bill.received);
-    var sentLine;
-    var billLine;
-
-    if (sentInfo.sent) {
-      var sentDate = cchPoFmtShortDate(sentInfo.at);
-      var sentTip = 'PO sent to vendor' + (sentDate ? ' · ' + sentDate : '') + (sentInfo.detail ? ' · ' + sentInfo.detail : '');
-      sentLine = '<span style="display:inline-flex;align-items:center;gap:5px;color:#1B5E20;font-weight:600;" title="' + escAttr(sentTip) + '">' +
-        '<span style="width:7px;height:7px;border-radius:50%;background:#5FA56B;display:inline-block;flex-shrink:0;"></span>' +
-        'Sent' + (sentDate ? ' <span style="font-weight:400;color:#5C6B80;">' + esc(sentDate) + '</span>' : '') +
-        '</span>';
-    } else {
-      sentLine = '<span style="display:inline-flex;align-items:center;gap:5px;color:#9CA3AF;" title="PO not sent yet — use Send PO on the PO view">' +
-        '<span style="width:7px;height:7px;border-radius:50%;background:#D1D5DB;display:inline-block;"></span>Not sent</span>';
+    var lane = typeof window.cchPoBillLaneId === 'function' ? window.cchPoBillLaneId(po) : 'na';
+    if (lane === 'na') {
+      return '<span style="font-size:11px;color:var(--gray-400);">—</span>';
     }
-
-    if (hasBill) {
-      var invNum = String(bill.vendorInvoiceNumber || '').trim();
-      var recvDate = cchPoFmtShortDate(bill.receivedAt);
+    var badge = typeof window.cchPoBillStatusBadgeHtml === 'function'
+      ? window.cchPoBillStatusBadgeHtml(po)
+      : esc(String(lane));
+    var money = '';
+    if (lane === 'complete') {
+      var paid = typeof window.cchPoVendorBillPaidAmount === 'function' ? window.cchPoVendorBillPaidAmount(po) : 0;
       var due = typeof window.cchPoAmountDue === 'function' ? window.cchPoAmountDue(po) : 0;
-      var billLabel = due <= 0.02 ? 'Bill · Paid' : 'Bill received';
-      var billColor = due <= 0.02 ? '#1B5E20' : '#92400E';
-      var billTip = 'Vendor bill recorded' +
-        (invNum ? ' · Inv ' + invNum : '') +
-        (recvDate ? ' · ' + recvDate : '') +
-        (bill.qbBillId ? ' · QB Bill #' + bill.qbBillId : '');
-      billLine = '<span style="display:inline-flex;align-items:center;gap:5px;color:' + billColor + ';font-weight:600;" title="' + escAttr(billTip) + '">' +
-        '<span style="width:7px;height:7px;border-radius:50%;background:' + (due <= 0.02 ? '#5FA56B' : '#CA8A04') + ';display:inline-block;"></span>' +
-        esc(billLabel) +
-        (invNum ? ' <span style="font-weight:500;color:#1B3352;">#' + esc(invNum) + '</span>' : '') +
-        '</span>';
-    } else if (sentInfo.sent) {
-      billLine = '<span style="display:inline-flex;align-items:center;gap:5px;color:#B45309;font-weight:600;" title="PO sent — waiting for vendor invoice">' +
-        '<span style="width:7px;height:7px;border-radius:50%;background:#CA8A04;display:inline-block;"></span>Awaiting bill</span>';
-    } else {
-      billLine = '<span style="display:inline-flex;align-items:center;gap:5px;color:#9CA3AF;" title="No vendor bill received yet">' +
-        '<span style="width:7px;height:7px;border-radius:50%;background:#D1D5DB;display:inline-block;"></span>No bill</span>';
+      money = '<div style="font-size:10px;color:#5C6B80;margin-top:3px;font-family:var(--font-mono);white-space:nowrap;">' +
+        fmt(paid) + ' paid · ' + fmt(due) + ' bal</div>';
+    } else if (lane === 'partial') {
+      var bill = po.bill || {};
+      if (bill.billTotal != null && Math.abs(parseFloat(bill.billTotal) || 0) > 0.01) {
+        money = '<div style="font-size:10px;color:#5C6B80;margin-top:3px;font-family:var(--font-mono);">' +
+          fmt(parseFloat(bill.billTotal)) + ' entered</div>';
+      }
     }
-
-    return '<div class="cch-po-bill-workflow-cell" style="display:flex;flex-direction:column;gap:4px;font-size:11px;line-height:1.35;white-space:nowrap;">' +
-      sentLine + billLine + '</div>';
+    return '<div class="cch-po-bill-workflow-cell" style="display:flex;flex-direction:column;gap:2px;font-size:11px;line-height:1.35;">' +
+      badge + money + '</div>';
   };
 
   /**
@@ -2316,18 +2295,24 @@
     var hasBill = bill && bill.received;
 
     if (!hasBill) {
-      var stEmpty = window.cchPoLifecycleStatus(docData);
-      var canReceive = stEmpty === 'sent' || stEmpty === 'draft';
+      var billLane = typeof window.cchPoBillLaneId === 'function'
+        ? window.cchPoBillLaneId(docData, poItems || docData.items || [])
+        : 'pending';
+      var billStatusLabel = billLane === 'partial' ? 'Partial' : (billLane === 'na' ? '—' : 'Pending');
+      var canReceive = billLane !== 'na';
       var btnHtml = '';
       if (canReceive) {
         btnHtml += '<button type="button" class="btn btn-primary btn-sm" onclick="cchPoOpenReceiveBillModal(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\')">Receive vendor bill</button>';
+        if (billLane === 'partial') {
+          btnHtml += '<button type="button" class="btn btn-secondary btn-sm" onclick="cchPoOpenAddToBillModal(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\')">+ Add vendor invoice</button>';
+        }
       }
       return '<div id="cchVendorBillDoc" style="margin-bottom:14px;padding:14px 16px;background:#fff;border:1px solid rgba(202,138,4,0.35);border-left:3px solid #CA8A04;border-radius:4px;">' +
         '<div style="display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px;">' +
           '<div style="min-width:0;flex:1;">' +
             '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#92400E;margin-bottom:6px;">Vendor bill <span style="font-weight:600;color:#B45309;">(from vendor)</span></div>' +
             '<p style="font-size:12px;color:#5C6B80;margin:0 0 8px;line-height:1.5;max-width:560px;">You send the <strong>PO</strong> to the vendor — they send <strong>their invoice</strong> back. When it arrives, check PO items, add freight/tax, and save. One combined bill per PO in Studio → one QuickBooks Bill.</p>' +
-            '<div style="font-size:13px;color:#1B3352;">Not received · PO ' + esc(poNumStr) + (vendor ? ' · ' + esc(vendor) : '') + '</div>' +
+            '<div style="font-size:13px;color:#1B3352;">' + esc(billStatusLabel) + ' · PO ' + esc(poNumStr) + (vendor ? ' · ' + esc(vendor) : '') + '</div>' +
           '</div>' +
           (btnHtml ? '<div style="display:flex;flex-wrap:wrap;gap:8px;flex-shrink:0;align-items:center;">' + btnHtml + '</div>' : '') +
         '</div></div>';
@@ -2517,6 +2502,144 @@
         inner + '</span>';
     }
     return inner;
+  };
+
+  /** Bill lane: na (draft PO) | pending | partial | complete */
+  window.cchPoBillHasPartialActivity = function(doc, poItems) {
+    doc = doc || {};
+    poItems = poItems || doc.items || [];
+    var bill = doc.bill || {};
+    if (bill.received) return false;
+    if (bill.items && bill.items.length) return true;
+    if (bill.attachments && bill.attachments.length) return true;
+    if (bill.vendorInvoices && bill.vendorInvoices.length) return true;
+    if (Array.isArray(bill.billedPoLineIds) && bill.billedPoLineIds.length) return true;
+    if (bill.billTotal != null && Math.abs(parseFloat(bill.billTotal) || 0) > 0.01) return true;
+    var groups = typeof window.cchPoVendorInvoiceGroupsUser === 'function'
+      ? window.cchPoVendorInvoiceGroupsUser(doc)
+      : (Array.isArray(doc.vendorInvoiceGroups) ? doc.vendorInvoiceGroups : []);
+    for (var i = 0; i < groups.length; i++) {
+      var g = groups[i] || {};
+      var dt = String(g.documentType || '').trim();
+      if (dt === 'confirmation') continue;
+      if (dt === 'ship_invoice') return true;
+      var inv = String(g.vendorInvoiceNumber || '').trim();
+      var gid = String(g.id || '').trim();
+      if (inv && gid.indexOf('vig_inferred') !== 0) return true;
+    }
+    return false;
+  };
+
+  window.cchPoBillLaneId = function(doc, poItems) {
+    doc = doc || {};
+    var bill = doc.bill || {};
+    if (bill.received || bill.qbBillId) return 'complete';
+    var poSt = String(doc.poStatus || '').trim().toLowerCase();
+    if (poSt === 'bill_received' || poSt === 'paid' || poSt === 'cleared') return 'complete';
+    if (window.cchPoProcurementLaneId(doc) === 'draft') return 'na';
+    if (window.cchPoBillHasPartialActivity(doc, poItems)) return 'partial';
+    return 'pending';
+  };
+
+  window.cchPoBillStatusLabel = function(doc, poItems) {
+    doc = doc || {};
+    var lane = window.cchPoBillLaneId(doc, poItems);
+    if (lane === 'na') return '—';
+    if (lane === 'pending') return 'Pending';
+    if (lane === 'partial') return 'Partial';
+    if (lane === 'complete') return 'Complete';
+    return '—';
+  };
+
+  window.cchPoBillStatusBadgeHtml = function(doc, opts) {
+    opts = opts || {};
+    doc = doc || {};
+    var label = window.cchPoBillStatusLabel(doc, opts.poItems);
+    if (label === '—') {
+      return '<span style="font-size:11px;color:var(--gray-400);">—</span>';
+    }
+    var inner = typeof window.statusBadge === 'function'
+      ? window.statusBadge(label)
+      : ('<span class="badge badge-draft">' + esc(label) + '</span>');
+    if (!opts.clickable || !opts.projectId || !opts.poId) return inner;
+    return '<span role="button" tabindex="0" title="Open PO — vendor bill" style="cursor:pointer;display:inline-block;" ' +
+      'onclick="event.stopPropagation();navigate(\'#/project/' + escJs(opts.projectId) + '/po/' + escJs(opts.poId) + '\')">' +
+      inner + '</span>';
+  };
+
+  window.cchPoBillLanePanelHtml = function(projectId, poId, docData, poItems) {
+    docData = docData || {};
+    poItems = poItems || docData.items || [];
+    var lane = window.cchPoBillLaneId(docData, poItems);
+
+    if (lane === 'na') {
+      return '<div class="cch-po-bill-lane" style="margin-bottom:12px;padding:12px 14px;background:var(--gray-50);border:1px solid rgba(15,26,46,0.08);border-radius:4px;">' +
+        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#5C6B80;margin-bottom:6px;">Bill status</div>' +
+        '<div style="font-size:12px;color:#9CA3AF;">— Applies after PO is sent</div></div>';
+    }
+
+    var steps = [
+      { id: 'pending', label: 'Pending' },
+      { id: 'partial', label: 'Partial' },
+      { id: 'complete', label: 'Complete' }
+    ];
+    var idx = lane === 'complete' ? 2 : (lane === 'partial' ? 1 : 0);
+    var chips = steps.map(function(st, i) {
+      var done = i < idx || (lane === 'complete' && i <= 2);
+      var active = i === idx && lane !== 'complete';
+      if (lane === 'complete') {
+        done = i <= 2;
+        active = false;
+      }
+      return '<span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:3px;' +
+        (done ? 'background:rgba(46,125,50,0.12);color:#1B5E20;border:1px solid rgba(46,125,50,0.2);' :
+          active ? 'background:#92400E;color:#fff;border:1px solid #92400E;' :
+          'background:#fff;color:#5C6B80;border:1px solid rgba(15,26,46,0.14);') + '">' +
+        (done ? '✓ ' : '') + esc(st.label) + '</span>' +
+        (i < steps.length - 1 ? '<span style="color:var(--gray-300);font-size:10px;">→</span>' : '');
+    }).join('');
+
+    var paid = 0;
+    var due = 0;
+    if (lane === 'complete') {
+      paid = typeof window.cchPoVendorBillPaidAmount === 'function' ? window.cchPoVendorBillPaidAmount(docData) : 0;
+      due = typeof window.cchPoAmountDue === 'function' ? window.cchPoAmountDue(docData) : 0;
+    }
+
+    var moneyHtml = '<div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:10px;font-size:12px;align-items:baseline;">' +
+      '<span><span style="color:#5C6B80;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;display:block;margin-bottom:2px;">Paid</span>' +
+      '<span style="font-family:var(--font-mono);font-weight:600;color:' + (paid > 0.01 ? '#1B5E20' : '#9CA3AF') + ';">' +
+      (lane === 'complete' ? fmt(paid) : '—') + '</span></span>' +
+      '<span><span style="color:#5C6B80;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;display:block;margin-bottom:2px;">Balance</span>' +
+      '<span style="font-family:var(--font-mono);font-weight:700;color:' + (due > 0.02 ? '#B45309' : (lane === 'complete' ? '#1B5E20' : '#9CA3AF')) + ';">' +
+      (lane === 'complete' ? fmt(due) : '—') + '</span></span></div>';
+
+    var actions = '';
+    if (lane === 'pending') {
+      actions = '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:12px;">' +
+        '<button type="button" class="btn btn-primary btn-sm" style="background:#92400E;" onclick="cchPoOpenReceiveBillModal(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\')">Receive vendor bill</button>' +
+        '<span style="font-size:11px;color:#5C6B80;line-height:1.45;max-width:520px;">PO sent — waiting for the vendor&apos;s combined invoice. Paid and balance appear here after the bill is received.</span>' +
+        '</div>';
+    } else if (lane === 'partial') {
+      actions = '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:12px;">' +
+        '<button type="button" class="btn btn-primary btn-sm" style="background:#92400E;" onclick="cchPoOpenReceiveBillModal(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\')">Receive vendor bill</button>' +
+        '<button type="button" class="btn btn-secondary btn-sm" onclick="cchPoOpenAddToBillModal(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\')">+ Add vendor invoice</button>' +
+        '<span style="font-size:11px;color:#5C6B80;line-height:1.45;">Ship invoices or bill lines entered — finish with <strong>Receive vendor bill</strong> when the combined invoice is ready.</span>' +
+        '</div>';
+    } else {
+      var recvStr = docData.bill && docData.bill.receivedAt && typeof window.formatDate === 'function'
+        ? window.formatDate(docData.bill.receivedAt)
+        : (docData.bill && docData.bill.receivedAt ? String(docData.bill.receivedAt).slice(0, 10) : '');
+      actions = '<div style="margin-top:10px;font-size:11px;color:#5C6B80;">' +
+        (recvStr ? 'Bill received ' + esc(recvStr) + ' · ' : '') +
+        'Use the vendor bill section below to edit, pay, or sync to QuickBooks.</div>';
+    }
+
+    return '<div class="cch-po-bill-lane" style="margin-bottom:12px;padding:12px 14px;background:var(--gray-50);border:1px solid rgba(15,26,46,0.08);border-radius:4px;">' +
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#5C6B80;margin-bottom:8px;">Bill status</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">' + chips + '</div>' +
+      moneyHtml + actions +
+      '</div>';
   };
 
   function cchPoProcurementStatusOptionsHtml(current, opts) {
@@ -4072,8 +4195,13 @@
     var variance = docData.variance;
     var hasBill = bill && bill.received;
     var poLane = window.cchPoProcurementLanePanelHtml(projectId, poId, docData);
+    var billLane = window.cchPoBillLanePanelHtml(projectId, poId, docData, poItems);
+    var billLaneId = window.cchPoBillLaneId(docData, poItems);
+    var showVendorInv = hasBill || billLaneId === 'partial';
 
-    var vendorInvPanel = window.cchPoVendorInvoiceGroupsPanelHtml(projectId, poId, docData, poItems);
+    var vendorInvPanel = showVendorInv
+      ? window.cchPoVendorInvoiceGroupsPanelHtml(projectId, poId, docData, poItems)
+      : '';
 
     var billDoc = window.cchPoVendorBillDocumentHtml(projectId, poId, docData, poItems, poNum(docData));
 
@@ -4099,8 +4227,8 @@
     }
 
     return hasBill
-      ? (poLane + billDoc + vendorInvPanel + billAttachments + varCard)
-      : (poLane + billDoc + varCard);
+      ? (poLane + billLane + billDoc + vendorInvPanel + billAttachments + varCard)
+      : (poLane + billLane + billDoc + vendorInvPanel + varCard);
   };
 
   window.cchPoVarianceResolveFormHtml = function(projectId, poId, docData) {
@@ -5605,9 +5733,11 @@
     var tbody = rows.length ? rows.map(function(r) {
       var poHash = '#/project/' + escAttr(r.projectId) + '/po/' + escAttr(r.poId);
       var isPaidRow = r.hasBill && r.due <= 0.02 && r.paid > 0.01;
-      var statusBadge = r.hasBill
-        ? window.cchPoVendorInvoicePayStatusBadgeHtml(r.paid, r.due)
-        : '<span style="font-size:11px;font-weight:600;color:#5C6B80;">Awaiting bill</span>';
+      var statusBadge = typeof window.cchPoBillStatusBadgeHtml === 'function' && r._po
+        ? window.cchPoBillStatusBadgeHtml(r._po)
+        : (r.hasBill
+          ? window.cchPoVendorInvoicePayStatusBadgeHtml(r.paid, r.due)
+          : '<span style="font-size:11px;font-weight:600;color:#5C6B80;">Pending</span>');
       var qbCell = typeof window.cchPoVendorBillQbStatusHtml === 'function'
         ? window.cchPoVendorBillQbStatusHtml(r)
         : (r.qbBillId ? 'Synced' : (r.hasBill ? 'Push pending' : '—'));
@@ -5637,7 +5767,7 @@
         '<td style="padding:12px 14px;text-align:center;">' + statusBadge + '</td>' +
         window.cchPoVendorBillRowActionsHtml(r) + '</tr>';
     }).join('') : (allRows.length
-      ? '<tr><td colspan="13" style="padding:40px;text-align:center;color:var(--gray-400);">No vendor bills match this filter. Try <button type="button" class="btn btn-secondary btn-sm" onclick="cchPoSetVendorBillsFilter(\'all\')">Show all</button> or <button type="button" class="btn btn-secondary btn-sm" onclick="cchPoSetVendorBillsFilter(\'awaiting_bill\')">Awaiting bill</button>.</td></tr>'
+      ? '<tr><td colspan="13" style="padding:40px;text-align:center;color:var(--gray-400);">No vendor bills match this filter. Try <button type="button" class="btn btn-secondary btn-sm" onclick="cchPoSetVendorBillsFilter(\'all\')">Show all</button> or <button type="button" class="btn btn-secondary btn-sm" onclick="cchPoSetVendorBillsFilter(\'awaiting_bill\')">Pending</button>.</td></tr>'
       : '<tr><td colspan="13" style="padding:40px;text-align:center;color:var(--gray-400);">No sent POs or received vendor bills yet. Send a PO to the vendor, then receive their invoice — those rows appear here.</td></tr>');
 
     var footerRow = recvInView.length
@@ -5660,11 +5790,11 @@
           '<div style="font-size:22px;font-weight:700;color:#1B5E20;font-family:var(--font-mono);">' + fmt(sumPaid) + '</div></div>' +
         '<div class="card" style="' + cardStyle + '"><div style="font-size:10px;text-transform:uppercase;color:#9CA3AF;">Balance</div>' +
           '<div style="font-size:22px;font-weight:700;color:' + (sumBalance > 0.02 ? openAccent : '#1B5E20') + ';font-family:var(--font-mono);">' + fmt(sumBalance) + '</div>' +
-          '<div style="font-size:10px;color:#5C6B80;margin-top:4px;">' + awaiting.length + ' awaiting bill</div></div>' +
+          '<div style="font-size:10px;color:#5C6B80;margin-top:4px;">' + awaiting.length + ' pending</div></div>' +
       '</div>' + presetBanner +
       '<div style="display:flex;flex-wrap:wrap;gap:0;margin-bottom:16px;border:1px solid rgba(10,31,61,0.14);width:fit-content;">' +
         chip('open', 'Open', openRows.length) +
-        chip('awaiting_bill', 'Awaiting bill', awaiting.length) +
+        chip('awaiting_bill', 'Pending', awaiting.length) +
         chip('paid', 'Paid', paidRows.length) +
         chip('received', 'All received') +
         chip('all', 'All') +
@@ -5706,10 +5836,8 @@
       var hasVariance = !!(po.variance && Math.abs(parseFloat(po.variance.amount) || 0) >= 0.01);
       var hasBill = !!(bill && bill.received);
       if (!hasBill && bill && bill.qbBillId) hasBill = true;
-      if (!hasBill && bill && (bill.billTotal != null || (bill.items && bill.items.length))) {
-        hasBill = true;
-      }
       if (!hasBill && hasVariance) hasBill = true;
+      var billLaneId = typeof window.cchPoBillLaneId === 'function' ? window.cchPoBillLaneId(po) : '';
       var poSt = String(po.poStatus || '').trim().toLowerCase();
       if (!hasBill && (poSt === 'bill_received' || poSt === 'paid' || poSt === 'cleared')) {
         hasBill = true;
@@ -5753,6 +5881,7 @@
         qbStatus: po.qbStatus || bill.qbStatus || '',
         billNumber: typeof window.cchPoQbBillDocNumberFromPo === 'function' ? window.cchPoQbBillDocNumberFromPo(po) : '',
         _po: po,
+        billLaneId: billLaneId,
         procurementStatus: typeof window.cchPoProcurementStatus === 'function' ? window.cchPoProcurementStatus(po) : ''
       });
     });

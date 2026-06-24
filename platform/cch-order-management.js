@@ -1119,31 +1119,39 @@
     var info = window.cchOmBillsInfo(po);
     var pid = escAttr(po.projectId);
     var poid = escAttr(po.id);
+    var billBadge = typeof window.cchPoBillStatusBadgeHtml === 'function'
+      ? window.cchPoBillStatusBadgeHtml(po, { projectId: po.projectId, poId: po.id, clickable: true })
+      : '';
+    var actions = '';
     if (!info.count) {
       if (info.awaitingBill) {
-        return '<button type="button" class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 8px;" ' +
+        actions = '<button type="button" class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 8px;" ' +
           'onclick="event.stopPropagation();window.cchOmOpenPoBill(\'' + pid + '\',\'' + poid + '\',\'\')">Receive bill</button>';
+      } else {
+        actions = '<span style="color:var(--gray-400);font-size:12px;">—</span>';
       }
-      return '<span style="color:var(--gray-400);font-size:12px;">—</span>';
-    }
-    if (info.count === 1) {
+    } else if (info.count === 1) {
       var b0 = info.bills[0];
       var gid0 = escAttr(b0.groupId || '');
-      return '<button type="button" class="btn btn-link btn-sm" style="font-size:12px;font-weight:700;color:var(--gold);padding:0;" ' +
+      actions = '<button type="button" class="btn btn-link btn-sm" style="font-size:12px;font-weight:700;color:var(--gold);padding:0;" ' +
         'onclick="event.stopPropagation();window.cchOmOpenPoBill(\'' + pid + '\',\'' + poid + '\',\'' + gid0 + '\')" ' +
         'title="Open ' + escAttr(b0.invNum) + '">1 bill</button>';
+    } else {
+      var menuItems = info.bills.map(function(b) {
+        return '<a onclick="event.stopPropagation();window.cchOmOpenPoBill(\'' + pid + '\',\'' + poid + '\',\'' +
+          escAttr(b.groupId || '') + '\');if(typeof closeAllMenus===\'function\')closeAllMenus()">' +
+          esc(b.invNum) + '</a>';
+      }).join('');
+      actions = '<div class="action-menu-wrap" style="display:inline-block;" onclick="event.stopPropagation()">' +
+        '<button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 10px;font-weight:700;white-space:nowrap;" ' +
+        'onclick="event.stopPropagation();if(typeof toggleActionMenu===\'function\')toggleActionMenu(this)" ' +
+        'title="View vendor invoices">' + info.count + ' bills ▾</button>' +
+        '<div class="action-dropdown" style="display:none;min-width:200px;max-width:280px;text-align:left;">' +
+        menuItems + '</div></div>';
     }
-    var menuItems = info.bills.map(function(b) {
-      return '<a onclick="event.stopPropagation();window.cchOmOpenPoBill(\'' + pid + '\',\'' + poid + '\',\'' +
-        escAttr(b.groupId || '') + '\');if(typeof closeAllMenus===\'function\')closeAllMenus()">' +
-        esc(b.invNum) + '</a>';
-    }).join('');
-    return '<div class="action-menu-wrap" style="display:inline-block;" onclick="event.stopPropagation()">' +
-      '<button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 10px;font-weight:700;white-space:nowrap;" ' +
-      'onclick="event.stopPropagation();if(typeof toggleActionMenu===\'function\')toggleActionMenu(this)" ' +
-      'title="View vendor invoices">' + info.count + ' bills ▾</button>' +
-      '<div class="action-dropdown" style="display:none;min-width:200px;max-width:280px;text-align:left;">' +
-      menuItems + '</div></div>';
+    if (!billBadge) return actions;
+    return '<div style="display:flex;flex-direction:column;align-items:center;gap:4px;">' + billBadge +
+      '<div>' + actions + '</div></div>';
   }
   window.cchOmBillsCellHtml = omBillsCellHtml;
 
