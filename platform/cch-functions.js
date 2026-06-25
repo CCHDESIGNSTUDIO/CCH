@@ -534,6 +534,12 @@ window.cchCollectLinkedProjectDocsSync = function(docType, docId, docData, lists
   _cchParseConnectedDocsField(docData.connectedDocs, lists, push);
   _cchInferLinkedDocsOverlap(docType, docId, docData, lists, push);
 
+  // PO sources surface only their proposal & invoice — never sibling POs (per
+  // Cynthia). Applied at discovery so both the Linked Docs column and the
+  // click-through popover (showConnectedDocs) stay consistent.
+  if (docType === 'po') {
+    return out.filter(function(d) { return d && d.type !== 'po'; });
+  }
   return out;
 };
 
