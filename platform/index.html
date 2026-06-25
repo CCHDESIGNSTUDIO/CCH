@@ -31154,9 +31154,22 @@ async function renderBoardsTab(T, proj) {
           vendorContactPreview = await window.cchPoVendorContactResolved(docData);
         } catch (_eVcPrev) { vendorContactPreview = null; }
       }
+      var shipToContactPreview = null;
+      if (type === 'po' && typeof window.cchPoShipToContactResolved === 'function') {
+        try {
+          shipToContactPreview = await window.cchPoShipToContactResolved(docData);
+        } catch (_eScPrev) { shipToContactPreview = null; }
+      }
       var shipToLegacyHtml = shipToLegacyRaw
         ? esc(shipToLegacyRaw).replace(/\n/g, '<br>')
         : '<span style="color:#bbb;font-size:12px;">Set ship-to on the PO or project address.</span>';
+      if (type === 'po' && shipToContactPreview && (shipToContactPreview.phone || shipToContactPreview.email) &&
+          typeof window.cchVendorContactBlockHtml === 'function') {
+        shipToLegacyHtml += window.cchVendorContactBlockHtml(
+          { name: '', address: '', phone: shipToContactPreview.phone, email: shipToContactPreview.email },
+          { labelColor: '#5C6B80', fontSize: '12px' }
+        );
+      }
 
       var docNum = docData.invoiceNum || docData.number || docData.proposalNum || docData.name || docId.slice(0,8);
       var docDate = (type === 'po' ? chPoDocPrimaryDateRaw(docData) : (docData.date || docData.createdAt)) || '';
@@ -39680,6 +39693,16 @@ async function renderBoardsTab(T, proj) {
             if (_poViewContact.email && !String(docData.vendorEmail || '').trim()) docData.vendorEmail = _poViewContact.email;
           }
         } catch (_ePoViewContact) {}
+      }
+      // Backfill ship-to / receiver contact (in-memory only) so the sync view block has phone/email.
+      if (typeof window.cchPoShipToContactResolved === 'function') {
+        try {
+          var _poViewShipContact = await window.cchPoShipToContactResolved(docData);
+          if (_poViewShipContact) {
+            if (_poViewShipContact.phone && !String(docData.receiverPhone || '').trim()) docData.receiverPhone = _poViewShipContact.phone;
+            if (_poViewShipContact.email && !String(docData.receiverEmail || '').trim()) docData.receiverEmail = _poViewShipContact.email;
+          }
+        } catch (_ePoViewShipContact) {}
       }
       if (window._forceEditMode) {
         window._forceEditMode = false;
@@ -72934,8 +72957,8 @@ ${pages}
   <script src="cch-line-icons.js?v=20260620a"></script>
   <script src="cch-proposals-invoices-fix.js?v=20260624posmk7"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
-  <script src="cch-po-bill-variance.js?v=20260624poc12"></script>
-  <script src="cch-order-management.js?v=20260624om25"></script>
+  <script src="cch-po-bill-variance.js?v=20260624poc13"></script>
+  <script src="cch-order-management.js?v=20260624om26"></script>
   <script src="cch-ffe-procurement.js?v=20260602"></script>
 </body>
 </html>

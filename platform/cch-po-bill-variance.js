@@ -1417,6 +1417,55 @@
     return html;
   };
 
+  /**
+   * Ship-to / receiver contact: { name, phone, email } for the receiver a PO is
+   * shipped to, so the vendor has someone to reach at the delivery location.
+   * Source (all existing data — no new schema): the PO's assigned receiver
+   * (docData.receiver / receiverName), resolved against the firm receivers
+   * catalog (cchPoLoadReceivers — Vendors with receiver/freight role + Team role
+   * receiver, each carrying { name, phone, email }). Falls back to matching the
+   * ship-to value (docData.shipTo / deliverTo) against the same catalog. Prefers
+   * any contact already saved on the PO (receiverPhone / receiverEmail). Never
+   * throws; returns a partial object. Phone/email may be '' when unknown.
+   */
+  window.cchPoShipToContactResolved = async function(docData) {
+    docData = docData || {};
+    var out = {
+      name: String(docData.receiver || docData.receiverName || '').trim(),
+      phone: String(docData.receiverPhone || '').trim(),
+      email: String(docData.receiverEmail || '').trim()
+    };
+    try {
+      if ((!out.phone || !out.email) && typeof window.cchPoLoadReceivers === 'function') {
+        var list = await window.cchPoLoadReceivers();
+        if (list && list.length) {
+          var candidates = [];
+          if (out.name) candidates.push(out.name);
+          var st = String(docData.shipTo || docData.deliverTo || '').trim();
+          if (st) {
+            candidates.push(st.split('\n')[0].trim());
+            candidates.push(st);
+          }
+          for (var ci = 0; ci < candidates.length && (!out.phone || !out.email); ci++) {
+            var cand = String(candidates[ci] || '').trim().toLowerCase();
+            if (!cand) continue;
+            for (var i = 0; i < list.length; i++) {
+              var r = list[i] || {};
+              var rn = String(r.name || '').trim().toLowerCase();
+              if (rn && (rn === cand || cand.indexOf(rn) === 0)) {
+                if (!out.name) out.name = String(r.name || '').trim();
+                if (!out.phone) out.phone = String(r.phone || '').trim();
+                if (!out.email) out.email = String(r.email || '').trim();
+                break;
+              }
+            }
+          }
+        }
+      }
+    } catch (_eShipRec) { /* graceful: keep whatever we have */ }
+    return out;
+  };
+
   /** Bill, paid, balance, variance cells for All POs / project PO lists. */
   window.cchPoListAllPosFinancialCellsHtml = function(po, tdStyle) {
     tdStyle = tdStyle || 'padding:12px 14px;font-size:14px;';

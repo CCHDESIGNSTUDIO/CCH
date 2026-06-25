@@ -57,7 +57,24 @@
       var m = String((pays[i] || {}).method || '').toLowerCase();
       if (m.indexOf('houzz') >= 0) return true;
     }
+    // Legacy Houzz POs were numbered 400xxx. Drop the CLOSED (zero-balance) ones
+    // from the active OM view; legacy POs that still carry a balance (e.g. Shimano
+    // Maverick) stay visible so they can be handled manually. Display-side only.
+    if (window.cchOmIsLegacyHouzzNumber(po) && window.cchOmPoIsZeroBalance(po)) return true;
     return false;
+  };
+
+  /** True when a PO number matches the legacy Houzz "400xxx" scheme. */
+  window.cchOmIsLegacyHouzzNumber = function(po) {
+    if (!po) return false;
+    var n = String(po.number || po.num || po.poNum || po.poNumber || '').trim();
+    return /^(?:po[-\s]?)?400\d+$/i.test(n);
+  };
+
+  /** True when total - paid is effectively zero (PO fully paid / closed). */
+  window.cchOmPoIsZeroBalance = function(po) {
+    if (!po) return false;
+    return Math.abs((poTotal(po) || 0) - (omPaidAmount(po) || 0)) <= 0.02;
   };
 
   window.cchOmIsStudioPo = function(po) {
