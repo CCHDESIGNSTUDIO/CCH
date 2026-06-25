@@ -5027,7 +5027,7 @@
         var bill = typeof window.cchPoListBillTotalForRow === 'function' ? window.cchPoListBillTotalForRow(po) : null;
         var paid = typeof window.cchPoListPaidForRow === 'function' ? window.cchPoListPaidForRow(po) : 0;
         var bal = typeof window.cchPoListBalanceForRow === 'function' ? window.cchPoListBalanceForRow(po) : 0;
-        var total = typeof window.cchPoListPoTotal === 'function' ? window.cchPoListPoTotal(po) : (parseFloat(po.total) || 0);
+        var total = typeof window.cchPoListDisplayTotal === 'function' ? window.cchPoListDisplayTotal(po) : (typeof window.cchPoListPoTotal === 'function' ? window.cchPoListPoTotal(po) : (parseFloat(po.total) || 0));
         var poSt = typeof window.cchPoProcurementStatusLabel === 'function' ? window.cchPoProcurementStatusLabel(po) : (po.status || '');
         var billSt = typeof window.cchPoBillStatusLabel === 'function' ? window.cchPoBillStatusLabel(po, po.items || []) : '';
         var shipSt = typeof window.cchPoShippingStatusLabel === 'function' ? window.cchPoShippingStatusLabel(po, po.items || []) : '';
@@ -5304,6 +5304,9 @@
         if (sortBy === 'amount') {
           if (pageType === 'invoices' && typeof invoiceListRowTotal === 'function') {
             return dir * (invoiceListRowTotal(a) - invoiceListRowTotal(b));
+          }
+          if (pageType === 'pos' && typeof window.cchPoListDisplayTotal === 'function') {
+            return dir * (window.cchPoListDisplayTotal(a) - window.cchPoListDisplayTotal(b));
           }
           if (pageType === 'pos' && typeof window.cchPoListPoTotal === 'function') {
             return dir * (window.cchPoListPoTotal(a) - window.cchPoListPoTotal(b));
@@ -25001,7 +25004,7 @@ async function renderBoardsTab(T, proj) {
                     <td style="font-size:11px;white-space:nowrap;" onclick="event.stopPropagation()">${typeof cchPoBillStatusEditorCellHtml==='function'?cchPoBillStatusEditorCellHtml(po, proj.id):(typeof cchPoListBillWorkflowHtml==='function'?cchPoListBillWorkflowHtml(po):'—')}</td>
                     <td style="font-size:11px;white-space:nowrap;" onclick="event.stopPropagation()">${typeof cchPoShippingStatusBadgeHtml==='function'?cchPoShippingStatusBadgeHtml(po,{projectId:proj.id,poId:po.id,clickable:true}):'—'}</td>
                     <td class="col-date">${formatDate(po.issueDate || po.orderDate || po.poDate || po.date || po.createdAt)}</td>
-                    <td class="col-amount">${formatMoney(typeof cchPoListPoTotal==='function'?cchPoListPoTotal(po):(po.total||0))}</td>
+                    <td class="col-amount">${formatMoney(typeof cchPoListDisplayTotal==='function'?cchPoListDisplayTotal(po):(typeof cchPoListPoTotal==='function'?cchPoListPoTotal(po):(po.total||0)))}</td>
                     ${typeof cchPoListAllPosFinancialCellsHtml==='function'?cchPoListAllPosFinancialCellsHtml(po, 'padding:10px 14px;font-size:13px;'):'<td class="col-amount">—</td><td class="col-amount">—</td><td class="col-amount">—</td><td class="col-amount">—</td>'}
                     <td class="col-date" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escAttr(_poShipToLabel)}">${esc(_poShipToLabel)}</td>
                     <td style="text-align:center;" onclick="event.stopPropagation()">${typeof cchPoQbDotCellHtml==='function'?cchPoQbDotCellHtml(po):(typeof cchPoQbListCellHtml==='function'?cchPoQbListCellHtml(po):qbCellBadge(getQbId(po), po.qbStatus, po))}</td>
@@ -61000,7 +61003,7 @@ async function renderBoardsTab(T, proj) {
           return true;
         });
         const totalAll = filtered.reduce(function(s, p) {
-          return s + (typeof window.cchPoListPoTotal === 'function' ? window.cchPoListPoTotal(p) : (parseFloat(p.total) || 0));
+          return s + (typeof window.cchPoListDisplayTotal === 'function' ? window.cchPoListDisplayTotal(p) : (typeof window.cchPoListPoTotal === 'function' ? window.cchPoListPoTotal(p) : (parseFloat(p.total) || 0)));
         }, 0);
         const totalPaidAll = filtered.reduce(function(s, p) {
           return s + (typeof window.cchPoListPaidForRow === 'function' ? window.cchPoListPaidForRow(p) : 0);
@@ -61097,7 +61100,7 @@ async function renderBoardsTab(T, proj) {
                     <td style="${tdStyle}text-align:center;white-space:nowrap;" onclick="event.stopPropagation()">${typeof cchPoListShippingStatusHtml==='function'?cchPoListShippingStatusHtml(po):'—'}</td>
                     <td style="${tdStyle}font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escAttr(shipToLabel)}">${shipToLabel ? esc(shipToLabel) : '—'}</td>
                     <td style="${tdStyle}color:var(--gray-500);font-size:12px;">${esc(po.eta||'—')}</td>
-                    <td style="${tdStyle}text-align:right;font-weight:600;font-family:monospace;">$${((typeof cchPoListPoTotal==='function'?cchPoListPoTotal(po):(parseFloat(po.total)||0))).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+                    <td style="${tdStyle}text-align:right;font-weight:600;font-family:monospace;">$${((typeof cchPoListDisplayTotal==='function'?cchPoListDisplayTotal(po):(typeof cchPoListPoTotal==='function'?cchPoListPoTotal(po):(parseFloat(po.total)||0)))).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
                     ${typeof cchPoListAllPosFinancialCellsHtml==='function'?cchPoListAllPosFinancialCellsHtml(po, tdStyle):'<td style="'+tdStyle+'">—</td><td style="'+tdStyle+'">—</td><td style="'+tdStyle+'">—</td><td style="'+tdStyle+'">—</td>'}
                     <td style="${tdStyle}text-align:center;" onclick="event.stopPropagation()">${typeof cchPoQbDotCellHtml==='function'?cchPoQbDotCellHtml(po):(typeof cchPoQbListCellHtml==='function'?cchPoQbListCellHtml(po):qbCellBadge(getQbId(po), po.qbStatus, po))}</td>
                     <td style="${tdStyle}text-align:center;" onclick="event.stopPropagation()">
@@ -72957,7 +72960,7 @@ ${pages}
   <script src="cch-line-icons.js?v=20260620a"></script>
   <script src="cch-proposals-invoices-fix.js?v=20260624posmk7"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
-  <script src="cch-po-bill-variance.js?v=20260624poc13"></script>
+  <script src="cch-po-bill-variance.js?v=20260625poc14"></script>
   <script src="cch-order-management.js?v=20260624om26"></script>
   <script src="cch-ffe-procurement.js?v=20260602"></script>
 </body>

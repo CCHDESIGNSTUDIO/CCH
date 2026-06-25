@@ -1231,6 +1231,21 @@
     return poTotal;
   };
 
+  /**
+   * Displayed "Total" for PO list pages so each row reconciles: Total − Paid = Balance.
+   * Balance and Paid are already authoritative — vendor bill (incl. vendor tax +
+   * shipping/freight) when a bill exists, PO merchandise total otherwise — so the
+   * shown total is simply their sum. This makes the Total column pick up tax +
+   * shipping whenever a vendor bill is received, and equal the PO total otherwise,
+   * WITHOUT changing cchPoListPoTotal (the variance baseline) or the Balance itself.
+   */
+  window.cchPoListDisplayTotal = function(po) {
+    if (!po) return 0;
+    var bal = window.cchPoListBalanceForRow(po) || 0;
+    var paid = window.cchPoListPaidForRow(po) || 0;
+    return Math.round((bal + paid) * 100) / 100;
+  };
+
   /** Short single-line ship-to label for PO lists (client, workroom, receiver, job site, etc.). */
   window.cchPoListShipToLabel = function(po) {
     po = po || {};
