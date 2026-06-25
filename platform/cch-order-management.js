@@ -5,7 +5,7 @@
 (function() {
   'use strict';
 
-  var OM_BUILD = '20260624om27';
+  var OM_BUILD = '20260624om28';
   var OM_NAVY = '#0F1A2E';
   var OM_NAVY_MID = '#1B3352';
   var OM_BORDER = 'rgba(15,26,46,0.12)';
@@ -44,8 +44,8 @@
       h.indexOf('cch-platform') >= 0;
   };
 
-  /** Houzz legacy import POs — excluded from Order Management (Studio workflow only). */
-  window.cchOmIsHouzzPo = function(po) {
+  /** Detect Houzz-import / legacy Houzz PO origin (400xxx, houzzImport, etc.). */
+  window.cchOmIsHouzzSourcePo = function(po) {
     if (!po) return false;
     if (po.houzzImport === true) return true;
     var src = String(po.source || po.dataSource || po.origin || '').trim().toLowerCase();
@@ -57,10 +57,18 @@
       var m = String((pays[i] || {}).method || '').toLowerCase();
       if (m.indexOf('houzz') >= 0) return true;
     }
-    // Legacy Houzz POs were numbered 400xxx. Drop the CLOSED (zero-balance) ones
-    // from the active OM view; legacy POs that still carry a balance (e.g. Shimano
-    // Maverick) stay visible so they can be handled manually. Display-side only.
-    if (window.cchOmIsLegacyHouzzNumber(po) && window.cchOmPoIsZeroBalance(po)) return true;
+    if (window.cchOmIsLegacyHouzzNumber(po)) return true;
+    return false;
+  };
+
+  /**
+   * Hide from Order Management only when Houzz AND closed/paid/zero-balance.
+   * Open Houzz POs with a balance stay on track tabs (Shimano Maverick, legacy 400xxx, etc.).
+   */
+  window.cchOmIsHouzzPo = function(po) {
+    if (!window.cchOmIsHouzzSourcePo(po)) return false;
+    if (!window.cchOmIsOpenPo(po)) return true;
+    if (window.cchOmPoIsZeroBalance(po)) return true;
     return false;
   };
 
@@ -176,18 +184,37 @@
     return !hasVendorAck(po);
   };
 
-  /** Open PO past Draft with no vendor bill received (pending / partial / none). */
+  /** Fulfillment status past draft even when procurement lane is still Draft. */
+  window.cchOmIsPastDraftForBilling = function(po) {
+    if (typeof window.cchPoProcurementLaneId === 'function' &&
+        window.cchPoProcurementLaneId(po) !== 'draft') return true;
+    var st = String(po.status || '').trim().toLowerCase();
+    return ['waiting for confirmation', 'ordered', 'back ordered', 'shipped', 'partial',
+      'partially received', 'sent to vendor', 'open', 'confirmed', 'pending',
+      'partially paid', 'no status'].indexOf(st) >= 0;
+  };
+
+  /**
+   * Open PO needing a vendor bill: Studio bill lane pending/partial, fulfillment past draft,
+   * or open Houzz with balance and no QB bill / Studio bill received.
+   */
   window.cchOmNeedsBill = function(po) {
-    if (!po || !window.cchOmIsStudioPo(po) || !window.cchOmIsOpenPo(po)) return false;
-    if (typeof window.cchPoProcurementLaneId === 'function' && window.cchPoProcurementLaneId(po) === 'draft') {
-      return false;
-    }
+    if (!po || !window.cchOmIsOpenPo(po)) return false;
+    if (window.cchOmIsHouzzPo(po)) return false;
+    if (typeof window.cchPoBillIsReceived === 'function' && window.cchPoBillIsReceived(po)) return false;
     if (typeof window.cchPoOrderClosed === 'function' && window.cchPoOrderClosed(po, po.items || [])) {
       return false;
     }
-    if (typeof window.cchPoBillIsReceived === 'function') return !window.cchPoBillIsReceived(po);
-    var info = window.cchOmBillsInfo(po);
-    return !!info.awaitingBill;
+    if (window.cchOmIsHouzzSourcePo(po)) {
+      if (window.cchOmPoIsZeroBalance(po)) return false;
+      if (typeof window.getQbId === 'function' && window.getQbId(po)) return false;
+      return true;
+    }
+    if (typeof window.cchPoBillLaneId === 'function') {
+      var lane = window.cchPoBillLaneId(po, po.items || []);
+      if (lane === 'pending' || lane === 'partial') return true;
+    }
+    return window.cchOmIsPastDraftForBilling(po);
   };
 
   function lineMissingEta(po, item, idx, items) {
@@ -411,7 +438,7 @@
       return 'Selection receiving vs PO fulfillment — linked clip order status.';
     }
     if (tab === 'nobill') {
-      return 'Studio POs past Draft with no vendor bill received yet.';
+      return 'Open POs with no vendor bill received — Studio workflow and open Houzz with balance (no QB bill).';
     }
     if (tab === 'noconfirm') {
       return 'Open Studio POs without a vendor order confirmation — includes Draft POs.';
@@ -520,7 +547,7 @@
       (filteredCount === totalCount
         ? esc(String(totalCount) + ' open Studio PO' + (totalCount !== 1 ? 's' : ''))
         : 'Showing ' + filteredCount + ' of ' + totalCount + ' open Studio POs') +
-      dedupeNote + ' · Houzz legacy imports excluded</p>';
+      dedupeNote + ' · Closed/paid Houzz POs hidden</p>';
   }
 
   function filterToolbar(projList, vendors, statuses, totalCount, filteredCount) {
@@ -694,7 +721,8 @@
 
   function missingBillsReport(rows) {
     var note = '<p style="font-size:12px;color:#5C6B80;margin:0 0 12px;max-width:820px;line-height:1.5;">' +
-      'POs past Draft with no vendor bill received (Pending or Partial). Draft POs are excluded — send the PO first. ' +
+      'Open POs with no vendor bill received. Studio: Pending/Partial bill lane or fulfillment past Draft. ' +
+      'Houzz: open balance with no QuickBooks bill. Pure Draft Studio POs are excluded until sent. ' +
       'Use <strong>Receive bill</strong> in the Bills column or <button type="button" class="btn btn-link btn-sm" style="font-size:12px;padding:0;color:var(--gold);font-weight:700;" ' +
       'onclick="navigate(\'#/ordermanagement/bills\')">Vendor bills</button>.</p>';
     if (!rows.length) {
@@ -1864,10 +1892,12 @@
       return;
     }
 
-    var studioPos = pos.filter(window.cchOmIsStudioPo);
-    var allOpen = studioPos.filter(window.cchOmIsOpenPo);
+    var trackablePos = pos.filter(function(p) { return !window.cchOmIsHouzzPo(p); });
+    var allOpen = trackablePos.filter(window.cchOmIsOpenPo);
     var noConfirm = allOpen.filter(window.cchOmNeedsConfirmation);
     var noBill = allOpen.filter(window.cchOmNeedsBill);
+    var noBillStudio = noBill.filter(function(p) { return !window.cchOmIsHouzzSourcePo(p); }).length;
+    var noBillHouzz = noBill.length - noBillStudio;
     var noConfirmDraft = noConfirm.filter(function(po) {
       return typeof window.cchPoProcurementLaneId === 'function' && window.cchPoProcurementLaneId(po) === 'draft';
     }).length;
@@ -1875,7 +1905,8 @@
     var missingEtaLines = 0;
     allOpen.forEach(function(po) { missingEtaLines += window.cchOmMissingEtaLineCount(po); });
     var openValue = allOpen.reduce(function(s, p) { return s + poTotal(p); }, 0);
-    var houzzExcluded = pos.length - studioPos.length;
+    var houzzExcluded = pos.filter(window.cchOmIsHouzzPo).length;
+    var houzzOpenIncluded = allOpen.filter(window.cchOmIsHouzzSourcePo).length;
 
     var vendors = [];
     var statusSet = {};
@@ -1921,7 +1952,7 @@
       }
       panel = receivingStatusReport(allOpen, clipsByProject, projList, recvVendors);
     } else if (tab === 'qb') {
-      panel = qbStatusReport(studioPos, projList);
+      panel = qbStatusReport(trackablePos, projList);
     } else if (tab === 'bills') {
       var vbPreset = window._vendorBillsPreset || '';
       if (vbPreset === 'variances') vbPreset = '';
@@ -1942,7 +1973,11 @@
 
     var showFulfillmentKpis = tab === 'open' || tab === 'noeta' || tab === 'noconfirm' || tab === 'nobill' || tab === 'receiving';
     var kpiInner = showFulfillmentKpis
-      ? kpiCard('Open POs', String(allOpen.length), 'Studio docs only', OM_NAVY, 'open') +
+      ? kpiCard('Open POs', String(allOpen.length),
+          houzzOpenIncluded > 0
+            ? ('Studio + ' + houzzOpenIncluded + ' open Houzz')
+            : 'Studio workflow POs',
+          OM_NAVY, 'open') +
         kpiCard('Missing confirmation', String(noConfirm.length),
           noConfirmDraft > 0
             ? (noConfirmDraft + ' draft' + (noConfirmDraft !== 1 ? 's' : '') +
@@ -1950,7 +1985,11 @@
             : 'Open POs — no vendor ack',
           OM_NAVY_MID, 'noconfirm') +
         kpiCard('Lines without ETA', String(missingEtaLines), 'On open POs', OM_NAVY, 'noeta') +
-        kpiCard('Missing bills', String(noBill.length), 'Past draft — bill not received', OM_NAVY_MID, 'nobill') +
+        kpiCard('Missing bills', String(noBill.length),
+          noBillHouzz > 0
+            ? (noBillStudio + ' Studio · ' + noBillHouzz + ' Houzz')
+            : 'Bill not received',
+          OM_NAVY_MID, 'nobill') +
         kpiCard('Open PO value', '$' + openValue.toLocaleString('en-US', { minimumFractionDigits: 2 }), 'Merchandise total', OM_NAVY)
       : '';
     var kpiBlock = showFulfillmentKpis
@@ -1989,7 +2028,9 @@
       var subEl = document.getElementById('cchOmSubtitle');
       if (subEl) {
         subEl.textContent = omPageSubtitle(tab) +
-          (showFulfillmentKpis && houzzExcluded > 0 ? ' (' + houzzExcluded + ' Houzz POs hidden on track tabs.)' : '');
+          (showFulfillmentKpis && houzzExcluded > 0
+            ? ' (' + houzzExcluded + ' closed/paid Houzz POs hidden.)'
+            : '');
       }
       if (panelEl) panelEl.innerHTML = panel;
       if (typeof window.cchRestoreListSearchFocus === 'function') window.cchRestoreListSearchFocus(focusSaved);

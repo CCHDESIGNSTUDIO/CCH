@@ -4257,9 +4257,17 @@
 
     var actions = '';
     if (lane === 'draft') {
-      actions = '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:12px;">' +
-        '<button type="button" class="btn btn-primary btn-sm" style="background:#1B3352;" onclick="cchPoSendToVendor(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\')">Send PO</button>' +
-        '<span style="font-size:11px;color:#5C6B80;line-height:1.45;max-width:520px;">Send the purchase order to the vendor. When they acknowledge, use <strong>Mark as confirmed</strong> with the order conf # and their confirmation PDF.</span>' +
+      actions = '<div style="margin-top:12px;">' +
+        '<div style="font-size:11px;font-weight:700;color:#1B3352;margin-bottom:8px;">How was this order placed?</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">' +
+        '<button type="button" class="btn btn-primary btn-sm" style="background:#C4A464;color:#0F1A2E;font-weight:700;border:none;" onclick="cchPoSendToVendor(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\')">Send PO to vendor</button>' +
+        '<button type="button" class="btn btn-primary btn-sm" style="background:#0277BD;color:#fff;font-weight:600;border:none;" onclick="cchPoOpenMarkConfirmedModal(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\',false,\'online\')">Online order — confirm</button>' +
+        '<button type="button" class="btn btn-secondary btn-sm" style="font-weight:600;color:#1B3352;border-color:rgba(15,26,46,0.25);" onclick="cchPoOpenMarkConfirmedModal(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\',false,\'skip_send\')">Mark confirmed (skip send)</button>' +
+        '</div>' +
+        '<p style="font-size:11px;color:#5C6B80;line-height:1.5;margin:0;max-width:680px;">' +
+        '<strong>Send PO to vendor</strong> — email or PDF the PO (locks line items). ' +
+        '<strong>Online order</strong> — you placed the order on the vendor website; enter their confirmation # here without sending a PO first. ' +
+        '<strong>Mark confirmed (skip send)</strong> — vendor acknowledged another way (phone, rep, etc.).</p>' +
         '</div>';
     } else if (lane === 'waiting') {
       var cur = window.cchPoProcurementStatus(docData);
@@ -4295,7 +4303,8 @@
       '</div>';
   };
 
-  window.cchPoOpenMarkConfirmedModal = async function(projectId, poId, isEdit) {
+  window.cchPoOpenMarkConfirmedModal = async function(projectId, poId, isEdit, orderMethod) {
+    window.__cchPoMarkConfirmCtx = { orderMethod: String(orderMethod || '').trim() };
     var snap = await firebase.firestore().collection('boards').doc(projectId).collection('purchaseOrders').doc(poId).get();
     var doc = snap.data() || {};
     var existingNum = window.cchPoOrderConfNumber(doc);
@@ -4307,11 +4316,19 @@
         break;
       }
     }
-    var title = isEdit ? 'Edit order confirmation' : 'Mark as confirmed';
+    var om = window.__cchPoMarkConfirmCtx.orderMethod;
+    var title = isEdit ? 'Edit order confirmation' : (om === 'online' ? 'Online order — confirm' : 'Mark as confirmed');
+    var blurb = isEdit
+      ? 'Update the vendor order confirmation # or attachment.'
+      : (om === 'online'
+        ? 'You placed this order on the vendor website. Enter their <strong>order confirmation / sales order #</strong> and attach the confirmation PDF or screenshot — no PO send required.'
+        : (om === 'skip_send'
+          ? 'The vendor acknowledged this order without a formal PO send. Enter their <strong>order confirmation / sales order #</strong> and attach their confirmation PDF or screenshot.'
+          : 'Vendor acknowledged the PO. Enter their <strong>order confirmation / sales order #</strong> and attach their confirmation PDF or screenshot.'));
     var html = '<div id="cchMarkConfirmedModal" style="position:fixed;inset:0;background:rgba(15,26,46,0.45);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)this.remove()">' +
       '<div style="background:#fff;max-width:480px;width:100%;padding:24px;border-radius:4px;box-shadow:0 16px 48px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">' +
       '<h3 style="margin:0 0 8px;font-size:18px;">' + esc(title) + '</h3>' +
-      '<p style="font-size:12px;color:#5C6B80;margin:0 0 16px;line-height:1.5;">Vendor acknowledged the PO. Enter their <strong>order confirmation / sales order #</strong> and attach their confirmation PDF or screenshot.</p>' +
+      '<p style="font-size:12px;color:#5C6B80;margin:0 0 16px;line-height:1.5;">' + blurb + '</p>' +
       '<div style="margin-bottom:12px;"><label class="form-label">Order conf # <span style="color:#B45309;">*</span></label>' +
         '<input type="text" id="cchMarkConfNum" class="form-input" value="' + escAttr(existingNum) + '" placeholder="SO415912"></div>' +
       '<div style="margin-bottom:12px;"><label class="form-label">Confirmed date</label>' +
@@ -4403,6 +4420,17 @@
         vendorInvoiceGroups: groups.length ? groups : null,
         updatedAt: new Date().toISOString()
       };
+      var markCtx = window.__cchPoMarkConfirmCtx || {};
+      if (markCtx.orderMethod === 'online') {
+        patch.orderMethod = 'online';
+        patch.orderedOnline = true;
+      } else if (markCtx.orderMethod === 'skip_send') {
+        patch.orderMethod = 'skip_send';
+      }
+      if (window.cchPoProcurementLaneId(doc) === 'draft' && !doc.poSentAt) {
+        patch.orderPlacedAt = new Date().toISOString();
+      }
+      try { delete window.__cchPoMarkConfirmCtx; } catch (_eCtx) { window.__cchPoMarkConfirmCtx = null; }
       var existingShip = window.cchPoShippingStatus(doc);
       if (!String(doc.shippingStatus || '').trim() && (!existingShip || existingShip === 'Pending')) {
         patch.shippingStatus = 'Pending';
@@ -4414,7 +4442,12 @@
       if (modal) modal.remove();
       if (typeof window.showToast === 'function') window.showToast('PO marked confirmed · ' + confNum, 'success');
       if (typeof window.logDocActivity === 'function') {
-        await window.logDocActivity(projectId, 'purchaseOrders', poId, 'po_confirmed', 'Vendor confirmation recorded — ' + confNum);
+        var _confNote = markCtx.orderMethod === 'online'
+          ? 'Online order confirmed — ' + confNum
+          : (markCtx.orderMethod === 'skip_send'
+            ? 'Confirmed without PO send — ' + confNum
+            : 'Vendor confirmation recorded — ' + confNum);
+        await window.logDocActivity(projectId, 'purchaseOrders', poId, 'po_confirmed', _confNote);
       }
       if (typeof window.invalidateSearchCache === 'function') window.invalidateSearchCache();
       if (typeof window._cacheTime !== 'undefined') window._cacheTime = 0;
@@ -6607,7 +6640,7 @@
         var pj = opts.projectId;
         var dj = opts.docId;
         var extra = '';
-        if (st === 'draft') extra += '<button class="btn btn-primary btn-sm" onclick="cchPoSendToVendor(\'' + escJs(pj) + '\',\'' + escJs(dj) + '\')">📤 Send</button>';
+        if (st === 'draft') extra += '<button class="btn btn-primary btn-sm" style="background:#C4A464;color:#0F1A2E;font-weight:700;border:none;" onclick="cchPoSendToVendor(\'' + escJs(pj) + '\',\'' + escJs(dj) + '\')">Send PO to vendor</button>';
         if (st === 'sent') extra += '<button class="btn btn-primary btn-sm" onclick="cchPoOpenReceiveBillModal(\'' + escJs(pj) + '\',\'' + escJs(dj) + '\')">📥 Receive bill</button>';
         if (opts.docData.bill && opts.docData.bill.received) {
           extra += cchPoPayBillBtnHtml(pj, dj, { label: '💳 Pay bill' });
