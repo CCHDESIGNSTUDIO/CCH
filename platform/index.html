@@ -33633,6 +33633,28 @@ async function renderBoardsTab(T, proj) {
       docEditAutoSave();
     }
 
+    // Ship-to DROPDOWN change: an explicit new destination was picked, so drop any
+    // stale saved address and re-resolve to THIS workroom/receiver/job-site.
+    // (resolvePOShipToDisplayText short-circuits on docData.shipToAddress, which is
+    // why a prior client pick kept showing under a newly chosen receiver.)
+    function docEditPOShipToSelectChange() {
+      if (!_docEdit || _docEdit.type !== 'po') return;
+      var sel = document.getElementById('docEditPOShipTo');
+      var elAddr = document.getElementById('docEditPOShipToAddress');
+      var raw = sel ? String(sel.value || '').trim() : '';
+      _docEdit.docData.shipTo = raw;
+      _docEdit.docData.shipToAddress = '';
+      var pd = window._docEditProjData || {};
+      var resolved = (typeof resolvePOShipToDisplayText === 'function')
+        ? resolvePOShipToDisplayText(raw, pd, _docEdit.docData)
+        : raw;
+      resolved = resolved ? String(resolved).trim() : '';
+      if (!resolved) resolved = raw;
+      if (elAddr) elAddr.value = resolved;
+      _docEdit.docData.shipToAddress = resolved;
+      docEditAutoSave();
+    }
+
     async function docEditPOVendorNameChange() {
       if (!_docEdit || _docEdit.type !== 'po') return;
       var elV = document.getElementById('docEditPOVendor');
@@ -38819,15 +38841,37 @@ async function renderBoardsTab(T, proj) {
             <div>
               <div style="font-size:12px;text-transform:uppercase;letter-spacing:2px;color:#0F1A2E;font-weight:700;margin-bottom:10px;">Ship to</div>
               <p style="font-size:11px;color:var(--gray-500);margin:0 0 10px;line-height:1.45;">Delivery destination for this PO. Workrooms and receivers come from <strong>Vendors → Workrooms</strong> and <strong>Delivery / Receivers</strong> (plus Team &amp; Contacts). Use per-line <strong>Ship to</strong> when lines go to different places.</p>
-              <select class="form-input" id="docEditPOShipTo" onchange="docEditPOVendorShipChange()" style="font-size:14px;padding:10px 12px;">${_piShipToOptions(docData.shipTo || docData.deliverTo || '')}</select>
+              <select class="form-input" id="docEditPOShipTo" onchange="docEditPOShipToSelectChange()" style="font-size:14px;padding:10px 12px;">${_piShipToOptions(docData.shipTo || docData.deliverTo || '')}</select>
               <label style="font-size:11px;color:#0F1A2E;font-weight:600;display:block;margin-top:12px;margin-bottom:4px;">Vendor-facing ship-to address</label>
               <textarea class="form-textarea" id="docEditPOShipToAddress" rows="3" placeholder="Full delivery address as it should appear on the PO to the vendor" onchange="docEditPOVendorShipChange()" style="font-size:13px;line-height:1.5;">${esc((function() {
                 var manual = String(docData.shipToAddress || '').trim();
-                if (manual) return manual;
                 var raw = _normalizePoShipToSelection(docData.shipTo || docData.deliverTo || '', projData);
-                if (raw && typeof resolvePOShipToDisplayText === 'function') {
-                  return resolvePOShipToDisplayText(raw, projData, docData) || raw;
+                var _resolveSel = function(key) {
+                  if (!key || typeof resolvePOShipToDisplayText !== 'function') return '';
+                  try { return String(resolvePOShipToDisplayText(key, projData, Object.assign({}, docData, { shipToAddress: '' })) || '').trim(); }
+                  catch (_e) { return ''; }
+                };
+                var resolvedSel = _resolveSel(raw);
+                if (manual) {
+                  // Auto-correct a stale client/job-site address left under a chosen
+                  // workroom/receiver (the reported bug): if the SELECTED destination
+                  // is not the client, and the saved address mentions the client name
+                  // while the destination's own address does NOT, the saved value is
+                  // stale → show the destination's address instead. A genuine manual
+                  // edit to a receiver address won't carry the client name, so real
+                  // edits are preserved.
+                  var _cAddrs = (typeof _poClientShipToAddrs === 'function') ? _poClientShipToAddrs(projData) : {};
+                  var selIsClient = !raw || /^(client|billing|job ?site|jobsite)/i.test(raw) ||
+                    raw === _cAddrs.clientHome || raw === _cAddrs.clientJob;
+                  var cName = String(projData.clientName || docData.clientName || '').trim().toLowerCase();
+                  if (!selIsClient && resolvedSel && cName) {
+                    var manualHasClient = manual.toLowerCase().indexOf(cName) >= 0;
+                    var resolvedHasClient = resolvedSel.toLowerCase().indexOf(cName) >= 0;
+                    if (manualHasClient && !resolvedHasClient) return resolvedSel;
+                  }
+                  return manual;
                 }
+                if (resolvedSel) return resolvedSel;
                 return raw;
               })())}</textarea>
               <div style="font-size:10px;color:var(--gray-500);margin-top:6px;line-height:1.4;">Pick a destination above, then edit this text if needed. Saves to the PO and prints on vendor PDFs.</div>
