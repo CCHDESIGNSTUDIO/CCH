@@ -5,7 +5,7 @@
 (function() {
   'use strict';
 
-  var OM_BUILD = '20260623om18';
+  var OM_BUILD = '20260624om27';
   var OM_NAVY = '#0F1A2E';
   var OM_NAVY_MID = '#1B3352';
   var OM_BORDER = 'rgba(15,26,46,0.12)';
@@ -170,21 +170,22 @@
     return false;
   }
 
+  /** Open PO with no vendor order confirmation (includes Draft — matches Open POs table). */
   window.cchOmNeedsConfirmation = function(po) {
     if (!window.cchOmIsOpenPo(po)) return false;
-    if (typeof window.cchPoProcurementLaneId === 'function' && window.cchPoProcurementLaneId(po) === 'confirmed') return false;
-    if (hasVendorAck(po)) return false;
-    if (typeof window.cchPoProcurementLaneId === 'function') {
-      return window.cchPoProcurementLaneId(po) === 'waiting';
-    }
-    var st = (po.status || '').toLowerCase();
-    if (st === 'waiting for confirmation') return true;
-    if (!poSentToVendor(po)) return false;
     return !hasVendorAck(po);
   };
 
+  /** Open PO past Draft with no vendor bill received (pending / partial / none). */
   window.cchOmNeedsBill = function(po) {
     if (!po || !window.cchOmIsStudioPo(po) || !window.cchOmIsOpenPo(po)) return false;
+    if (typeof window.cchPoProcurementLaneId === 'function' && window.cchPoProcurementLaneId(po) === 'draft') {
+      return false;
+    }
+    if (typeof window.cchPoOrderClosed === 'function' && window.cchPoOrderClosed(po, po.items || [])) {
+      return false;
+    }
+    if (typeof window.cchPoBillIsReceived === 'function') return !window.cchPoBillIsReceived(po);
     var info = window.cchOmBillsInfo(po);
     return !!info.awaitingBill;
   };
@@ -410,7 +411,10 @@
       return 'Selection receiving vs PO fulfillment — linked clip order status.';
     }
     if (tab === 'nobill') {
-      return 'Studio POs sent to the vendor with no vendor bill received yet.';
+      return 'Studio POs past Draft with no vendor bill received yet.';
+    }
+    if (tab === 'noconfirm') {
+      return 'Open Studio POs without a vendor order confirmation — includes Draft POs.';
     }
     return 'Studio PO operations — status, aging, and ETA gaps. Click a row to open the PO. Houzz legacy imports excluded.';
   }
@@ -690,8 +694,8 @@
 
   function missingBillsReport(rows) {
     var note = '<p style="font-size:12px;color:#5C6B80;margin:0 0 12px;max-width:820px;line-height:1.5;">' +
-      'POs sent to the vendor with no vendor invoice received. Use the <strong>Receive bill</strong> button in the Bills column, ' +
-      'or open the full list on <button type="button" class="btn btn-link btn-sm" style="font-size:12px;padding:0;color:var(--gold);font-weight:700;" ' +
+      'POs past Draft with no vendor bill received (Pending or Partial). Draft POs are excluded — send the PO first. ' +
+      'Use <strong>Receive bill</strong> in the Bills column or <button type="button" class="btn btn-link btn-sm" style="font-size:12px;padding:0;color:var(--gold);font-weight:700;" ' +
       'onclick="navigate(\'#/ordermanagement/bills\')">Vendor bills</button>.</p>';
     if (!rows.length) {
       return note + '<div class="empty-state"><div class="empty-icon">✓</div><div class="empty-text">No Studio POs awaiting a vendor bill.</div></div>';
@@ -701,8 +705,8 @@
 
   function missingConfirmReport(rows, missingEtaLines) {
     var note = '<p style="font-size:12px;color:#5C6B80;margin:0 0 12px;max-width:820px;line-height:1.5;">' +
-      'POs already sent to the vendor without an order confirmation. Draft POs are not included — ' +
-      'use <button type="button" class="btn btn-link btn-sm" style="font-size:12px;padding:0;color:var(--gold);font-weight:700;" ' +
+      'All open POs without a vendor order confirmation — includes Draft POs not yet sent. ' +
+      'Use <button type="button" class="btn btn-link btn-sm" style="font-size:12px;padding:0;color:var(--gold);font-weight:700;" ' +
       'onclick="navigate(\'#/ordermanagement/noeta\')">Missing ETA</button> for line-level delivery dates' +
       (missingEtaLines > 0 ? ' (' + missingEtaLines + ' lines on open POs).' : '.') +
       '</p>';
@@ -1072,6 +1076,10 @@
   };
 
   function omConfirmCellHtml(po) {
+    var lane = typeof window.cchPoProcurementLaneId === 'function' ? window.cchPoProcurementLaneId(po) : 'draft';
+    if (lane === 'draft') {
+      return '<span style="font-size:11px;color:#9CA3AF;">—</span>';
+    }
     var pid = escAttr(po.projectId);
     var poid = escAttr(po.id);
     var val = omDateInputValue(window.cchOmPoConfirmDate(po));
@@ -1082,6 +1090,10 @@
   }
 
   function omOrderConfCellHtml(po) {
+    var lane = typeof window.cchPoProcurementLaneId === 'function' ? window.cchPoProcurementLaneId(po) : 'draft';
+    if (lane === 'draft') {
+      return '<span style="font-size:11px;color:#9CA3AF;font-style:italic;" title="Send PO to vendor first">Not sent</span>';
+    }
     var pid = escAttr(po.projectId);
     var poid = escAttr(po.id);
     var val = typeof window.cchPoOrderConfNumber === 'function' ? String(window.cchPoOrderConfNumber(po) || '') : '';
@@ -1856,6 +1868,10 @@
     var allOpen = studioPos.filter(window.cchOmIsOpenPo);
     var noConfirm = allOpen.filter(window.cchOmNeedsConfirmation);
     var noBill = allOpen.filter(window.cchOmNeedsBill);
+    var noConfirmDraft = noConfirm.filter(function(po) {
+      return typeof window.cchPoProcurementLaneId === 'function' && window.cchPoProcurementLaneId(po) === 'draft';
+    }).length;
+    var noConfirmSent = noConfirm.length - noConfirmDraft;
     var missingEtaLines = 0;
     allOpen.forEach(function(po) { missingEtaLines += window.cchOmMissingEtaLineCount(po); });
     var openValue = allOpen.reduce(function(s, p) { return s + poTotal(p); }, 0);
@@ -1927,9 +1943,14 @@
     var showFulfillmentKpis = tab === 'open' || tab === 'noeta' || tab === 'noconfirm' || tab === 'nobill' || tab === 'receiving';
     var kpiInner = showFulfillmentKpis
       ? kpiCard('Open POs', String(allOpen.length), 'Studio docs only', OM_NAVY, 'open') +
-        kpiCard('Missing confirmation', String(noConfirm.length), 'Sent — no vendor ack', OM_NAVY_MID, 'noconfirm') +
+        kpiCard('Missing confirmation', String(noConfirm.length),
+          noConfirmDraft > 0
+            ? (noConfirmDraft + ' draft' + (noConfirmDraft !== 1 ? 's' : '') +
+              (noConfirmSent > 0 ? ' · ' + noConfirmSent + ' sent' : ''))
+            : 'Open POs — no vendor ack',
+          OM_NAVY_MID, 'noconfirm') +
         kpiCard('Lines without ETA', String(missingEtaLines), 'On open POs', OM_NAVY, 'noeta') +
-        kpiCard('Missing bills', String(noBill.length), 'Sent — no vendor invoice', OM_NAVY_MID, 'nobill') +
+        kpiCard('Missing bills', String(noBill.length), 'Past draft — bill not received', OM_NAVY_MID, 'nobill') +
         kpiCard('Open PO value', '$' + openValue.toLocaleString('en-US', { minimumFractionDigits: 2 }), 'Merchandise total', OM_NAVY)
       : '';
     var kpiBlock = showFulfillmentKpis
