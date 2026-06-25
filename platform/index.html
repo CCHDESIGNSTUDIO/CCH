@@ -4477,6 +4477,20 @@
                         document.querySelector(`.nav-item[data-page="projects"]`);
       if (activeNav) activeNav.classList.add('active');
 
+      // Remember where we came from when entering a document detail page, so the
+      // doc's Back button can return there (project list, All POs, Order
+      // Management, etc.). Toggling view↔edit of the SAME doc does not overwrite it.
+      try {
+        if (parts[0] === 'project' && parts.length >= 4 &&
+            (parts[2] === 'po' || parts[2] === 'invoice' || parts[2] === 'proposal')) {
+          var _docKeyNav = parts[1] + '/' + parts[2] + '/' + parts[3];
+          var _prevHashNav = String(window.location.hash || '');
+          if (_prevHashNav && _prevHashNav.indexOf(_docKeyNav) < 0) {
+            window._docReturnHash = _prevHashNav;
+          }
+        }
+      } catch (_eDocReturn) {}
+
       window.location.hash = rawHash;
 
       // O255-B fix: reset selections filter whenever leaving project view entirely
@@ -33882,9 +33896,10 @@ async function renderBoardsTab(T, proj) {
         if (ind) { ind.textContent = '✓ Saved'; ind.style.color = 'var(--green)'; setTimeout(() => { if (ind) ind.textContent = ''; }, 2000); }
         /* Document isolation: no doc→library price sync on docEditSave */
         if (goToViewAfter) {
-          if (d.type === 'invoice') navigate('#/project/' + d.projectId + '/invoices');
-          else if (d.type === 'proposal') navigate('#/project/' + d.projectId + '/proposals');
-          else if (d.type === 'po') navigate('#/project/' + d.projectId + '/pos');
+          // Save & Close returns to THIS document's view page; the view's Back
+          // button then returns to wherever you came from (see cchDocBackNav).
+          window._forceEditMode = false;
+          navigate(window.location.hash);
         }
       } catch(e) {
         console.error('Save failed:', e);
@@ -72958,7 +72973,7 @@ ${pages}
   <script src="cch-design-board.js?v=20260608db29"></script>
   <script src="cch-client-board.js?v=1774994684878"></script>
   <script src="cch-line-icons.js?v=20260620a"></script>
-  <script src="cch-proposals-invoices-fix.js?v=20260624posmk7"></script>
+  <script src="cch-proposals-invoices-fix.js?v=20260625posmk8"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
   <script src="cch-po-bill-variance.js?v=20260625poc14"></script>
   <script src="cch-order-management.js?v=20260624om26"></script>

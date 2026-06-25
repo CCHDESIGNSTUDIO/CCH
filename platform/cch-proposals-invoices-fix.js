@@ -2508,6 +2508,17 @@
       innerHtml + '</div></div>';
   }
 
+  /**
+   * Back navigation for document view/edit pages: return to wherever the user came
+   * from (project list, All POs, Order Management, etc.), captured in navigate() as
+   * window._docReturnHash. Falls back to the provided list hash when unknown.
+   */
+  window.cchDocBackNav = function(fallbackHash) {
+    var h = String(window._docReturnHash || '');
+    if (h && /^#\//.test(h) && h !== window.location.hash) { navigate(h); return; }
+    navigate(fallbackHash || '#/projects');
+  };
+
   window.cchBuildDocViewTopbar = function(opts) {
     opts = opts || {};
     var type = opts.type || 'invoice';
@@ -2523,7 +2534,7 @@
     var tearJs = "typeof generateTearSheetsFromDoc==='function'&&generateTearSheetsFromDoc('" + pj + "','" + collection + "','" + dj + "','" + cchEscJsStr(projName) + "')";
     var previewJs = "previewDocument('" + type + "','" + pj + "','" + dj + "')";
 
-    var html = '<button class="btn btn-secondary btn-sm" onclick="navigate(\'#/project/' + pj + '/' + backTab + '\')">← Back</button>';
+    var html = '<button class="btn btn-secondary btn-sm" onclick="cchDocBackNav(\'#/project/' + pj + '/' + backTab + '\')">← Back</button>';
 
     if (type === 'invoice') {
       var invVoidEarly = !!opts.invVoidEarly;
@@ -2674,7 +2685,7 @@
 
     var more = '';
     more += cchDocMoreItem('🕐 Timeline', "toggleDocTimeline('" + pj + "','" + collection + "','" + dj + "')");
-    more += cchDocMoreItem('← Back to list', "navigate('#/project/" + pj + '/' + backTab + "')");
+    more += cchDocMoreItem('← Back', "cchDocBackNav('#/project/" + pj + '/' + backTab + "')");
     more += cchDocMoreDivider();
     more += cchDocMoreItem('👁 Preview', previewJs);
     more += cchDocMoreItem('➕ Add items', "openDocItemsSidebar({mode:'docEdit'})");
