@@ -5,7 +5,7 @@
 (function() {
   'use strict';
 
-  var OM_BUILD = '20260624om28';
+  var OM_BUILD = '20260625om29';
   var OM_NAVY = '#0F1A2E';
   var OM_NAVY_MID = '#1B3352';
   var OM_BORDER = 'rgba(15,26,46,0.12)';
@@ -134,8 +134,13 @@
     if (!po) return false;
     var st = (po.status || '').toLowerCase();
     var paySt = (po.paymentStatus || '').toLowerCase();
-    if (st === 'received' || st === 'cancelled' || st === 'installed' ||
-        st === 'paid' || st === 'closed' || st === 'delivered') return false;
+    // Explicit close always wins.
+    if (st === 'cancelled' || st === 'closed') return false;
+    // Unshipped merchandise (per-line statuses set) keeps the PO open even if the
+    // received bills are fully paid — ship lane and pay lane are independent.
+    var prog = (typeof window.cchPoShipProgress === 'function') ? window.cchPoShipProgress(po) : null;
+    if (prog && prog.anyStatus && prog.openToShip > 0.01) return true;
+    if (st === 'received' || st === 'installed' || st === 'paid' || st === 'delivered') return false;
     if (paySt === 'paid') return false;
     return true;
   };

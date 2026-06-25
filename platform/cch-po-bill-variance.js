@@ -616,6 +616,64 @@
     return cchPoShippingStatusCanonicalId(current);
   }
 
+  /* ===== Per-line ship status (manual, set at confirmation) — drives partial-ship display ===== */
+  var CCH_PO_LINE_SHIP_STATUSES = [
+    { id: '', label: '—' },
+    { id: 'In stock', label: 'In stock' },
+    { id: 'Ordered', label: 'Ordered' },
+    { id: 'Back ordered', label: 'Back-ordered' },
+    { id: 'Shipped', label: 'Shipped' },
+    { id: 'Delivered', label: 'Delivered' },
+    { id: 'Received', label: 'Received' }
+  ];
+  window.cchPoLineShipStatuses = function() { return CCH_PO_LINE_SHIP_STATUSES.slice(); };
+
+  /** A per-line status that means the merchandise has left the vendor / is in the pipeline to client. */
+  window.cchPoLineShipIsFulfilled = function(item) {
+    var s = String((item && item.lineShipStatus) || '').trim().toLowerCase();
+    return s === 'shipped' || s === 'delivered' || s === 'received' ||
+      s === 'in transit' || s === 'at receiver' || s === 'at workroom' || s === 'installed';
+  };
+
+  function cchPoLineAmountForShip(it) {
+    if (!it) return 0;
+    if (it.amount != null && it.amount !== '') return parseFloat(it.amount) || 0;
+    var qty = parseFloat(it.qty) || 0;
+    var cost = parseFloat(it.cost != null ? it.cost : (it.rate != null ? it.rate : it.unitPrice)) || 0;
+    return Math.round(qty * cost * 100) / 100;
+  }
+
+  /** Ship-lane summary built from per-line lineShipStatus. anyStatus=false → no manual statuses set. */
+  window.cchPoShipProgress = function(doc, poItems) {
+    doc = doc || {};
+    var items = poItems || doc.items || [];
+    var total = 0, shipped = 0, totalAmt = 0, shippedAmt = 0, openAmt = 0, anyStatus = false;
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i] || {};
+      if (typeof window.isProposalGroupHeaderItem === 'function' && window.isProposalGroupHeaderItem(it)) continue;
+      if (typeof window.cchPoLineIsBillOnlyExpense === 'function' && window.cchPoLineIsBillOnlyExpense(it)) continue;
+      var amt = cchPoLineAmountForShip(it);
+      total++;
+      totalAmt += amt;
+      if (String(it.lineShipStatus || '').trim()) anyStatus = true;
+      if (window.cchPoLineShipIsFulfilled(it)) { shipped++; shippedAmt += amt; }
+      else { openAmt += amt; }
+    }
+    var r2 = function(n) { return Math.round(n * 100) / 100; };
+    return {
+      totalLines: total,
+      shippedLines: shipped,
+      openLines: total - shipped,
+      totalAmount: r2(totalAmt),
+      shippedAmount: r2(shippedAmt),
+      openToShip: r2(openAmt),
+      anyStatus: anyStatus,
+      allShipped: total > 0 && shipped === total,
+      noneShipped: shipped === 0,
+      partial: anyStatus && shipped > 0 && shipped < total
+    };
+  };
+
   /** Shipping lane active after vendor confirmation (or legacy shipping status on PO). */
   window.cchPoShippingLaneActive = function(doc) {
     doc = doc || {};
@@ -682,6 +740,14 @@
 
   window.cchPoShippingStatusLabel = function(doc, poItems) {
     doc = doc || {};
+    var prog = window.cchPoShipProgress(doc, poItems);
+    if (prog.anyStatus) {
+      if (prog.partial) return 'Partial shipped';
+      if (prog.allShipped) {
+        var stFull = window.cchPoShippingStatus(doc, poItems);
+        return stFull || 'Shipped';
+      }
+    }
     var st = window.cchPoShippingStatus(doc, poItems);
     if (st) return st;
     if (window.cchPoShippingLaneActive(doc)) return 'Pending';
@@ -1970,13 +2036,15 @@
     var lineId = window.cchPoResolveLineId(item, lineIdx);
     var grp = lineId ? window.cchPoVendorInvoiceGroupForLineId(doc, lineId, poItems) : null;
     var bill = doc.bill || {};
+    var lineSt = String(item.lineShipStatus || '').trim();
     if (grp) {
       return {
-        etaDate: String(grp.etaDate || '').trim(),
+        etaDate: String(item.etaDate || grp.etaDate || '').trim(),
         confirmedDate: String(grp.confirmedDate || '').trim(),
         estimatedShipDate: String(grp.estimatedShipDate || '').trim(),
         actualShipDate: String(grp.actualShipDate || '').trim(),
-        status: String(grp.status || '').trim(),
+        status: lineSt || String(grp.status || '').trim(),
+        lineShipStatus: lineSt,
         trackingNumber: String(grp.trackingNumber || '').trim(),
         trackingCarrier: String(grp.trackingCarrier || '').trim(),
         vendorInvoiceNumber: String(grp.vendorInvoiceNumber || '').trim()
@@ -1987,7 +2055,8 @@
       confirmedDate: String(item.confirmedDate || '').trim(),
       estimatedShipDate: String(item.estimatedShipDate || '').trim(),
       actualShipDate: String(item.actualShipDate || '').trim(),
-      status: '',
+      status: lineSt,
+      lineShipStatus: lineSt,
       trackingNumber: String(bill.trackingNumber || '').trim(),
       trackingCarrier: String(bill.trackingCarrier || '').trim(),
       vendorInvoiceNumber: String(bill.vendorInvoiceNumber || '').trim()
@@ -1997,10 +2066,19 @@
   window.cchPoLineEtaHtml = function(doc, item, lineIdx, poItems) {
     var meta = window.cchPoLineEtaMetaForItem(doc, item, lineIdx, poItems);
     var hasDates = !!(meta.confirmedDate || meta.estimatedShipDate || meta.actualShipDate || meta.etaDate);
-    if (!hasDates && !meta.trackingNumber) {
-      return '<span style="font-size:11px;color:#9CA3AF;" title="Set on Vendor invoices → Edit">—</span>';
+    if (!hasDates && !meta.trackingNumber && !meta.lineShipStatus) {
+      return '<span style="font-size:11px;color:#9CA3AF;" title="Set on Confirm order or Vendor invoices → Edit">—</span>';
     }
-    var html = window.cchPoVendorInvOrderTimelineHtml(meta);
+    var html = '';
+    if (meta.lineShipStatus) {
+      var _lc = meta.lineShipStatus.toLowerCase();
+      var _lcShip = (_lc === 'shipped' || _lc === 'delivered' || _lc === 'received');
+      var _lcBack = (_lc === 'back ordered');
+      var _bg = _lcShip ? 'rgba(46,125,50,0.12)' : (_lcBack ? 'rgba(180,83,9,0.12)' : 'rgba(15,26,46,0.08)');
+      var _fg = _lcShip ? '#1B5E20' : (_lcBack ? '#B45309' : '#1B3352');
+      html += '<span style="display:inline-block;font-size:10px;font-weight:600;padding:1px 6px;border-radius:3px;background:' + _bg + ';color:' + _fg + ';margin-bottom:2px;">' + esc(meta.lineShipStatus) + '</span>';
+    }
+    if (hasDates || meta.trackingNumber) html += window.cchPoVendorInvOrderTimelineHtml(meta);
     if (meta.trackingNumber) {
       html += '<div style="font-size:10px;color:#5C6B80;margin-top:3px;line-height:1.3;">' +
         esc((meta.trackingCarrier ? meta.trackingCarrier + ' ' : '') + meta.trackingNumber) + '</div>';
@@ -4317,6 +4395,33 @@
       }
     }
     var om = window.__cchPoMarkConfirmCtx.orderMethod;
+    var _confLineRows = '';
+    (function() {
+      var its = doc.items || [];
+      var rows = [];
+      for (var li = 0; li < its.length; li++) {
+        var it = its[li] || {};
+        if (typeof window.isProposalGroupHeaderItem === 'function' && window.isProposalGroupHeaderItem(it)) continue;
+        if (typeof window.cchPoLineIsBillOnlyExpense === 'function' && window.cchPoLineIsBillOnlyExpense(it)) continue;
+        var tt = esc(String(it.title || it.name || 'Item'));
+        var curSt = String(it.lineShipStatus || '').trim();
+        var curEta = String(it.etaDate || '').slice(0, 10);
+        var opts = window.cchPoLineShipStatuses().map(function(o) {
+          return '<option value="' + escAttr(o.id) + '"' + (o.id === curSt ? ' selected' : '') + '>' + esc(o.label) + '</option>';
+        }).join('');
+        rows.push('<div class="cch-confirm-line" data-line-idx="' + li + '" style="display:grid;grid-template-columns:1fr 104px 132px;gap:6px;align-items:center;margin-bottom:5px;">' +
+          '<div style="font-size:12px;color:#1B3352;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + tt + '">' + tt + '</div>' +
+          '<select class="form-input cch-confirm-line-status" style="font-size:11px;padding:4px;">' + opts + '</select>' +
+          '<input type="date" class="form-input cch-confirm-line-eta" value="' + escAttr(curEta) + '" style="font-size:11px;padding:4px;"></div>');
+      }
+      if (rows.length) {
+        _confLineRows = '<div style="margin-bottom:14px;border-top:1px solid rgba(27,51,82,0.1);padding-top:12px;">' +
+          '<label class="form-label" style="margin-bottom:6px;">Per-product status &amp; ETA <span style="font-weight:400;color:#9CA3AF;">(for partial shipments)</span></label>' +
+          '<div style="display:grid;grid-template-columns:1fr 104px 132px;gap:6px;margin-bottom:4px;font-size:10px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.04em;">' +
+            '<div>Product</div><div>Status</div><div>ETA</div></div>' +
+          rows.join('') + '</div>';
+      }
+    })();
     var title = isEdit ? 'Edit order confirmation' : (om === 'online' ? 'Online order — confirm' : 'Mark as confirmed');
     var blurb = isEdit
       ? 'Update the vendor order confirmation # or attachment.'
@@ -4325,14 +4430,15 @@
         : (om === 'skip_send'
           ? 'The vendor acknowledged this order without a formal PO send. Enter their <strong>order confirmation / sales order #</strong> and attach their confirmation PDF or screenshot.'
           : 'Vendor acknowledged the PO. Enter their <strong>order confirmation / sales order #</strong> and attach their confirmation PDF or screenshot.'));
-    var html = '<div id="cchMarkConfirmedModal" style="position:fixed;inset:0;background:rgba(15,26,46,0.45);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)this.remove()">' +
-      '<div style="background:#fff;max-width:480px;width:100%;padding:24px;border-radius:4px;box-shadow:0 16px 48px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">' +
+    var html =       '<div id="cchMarkConfirmedModal" style="position:fixed;inset:0;background:rgba(15,26,46,0.45);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)this.remove()">' +
+      '<div style="background:#fff;max-width:' + (_confLineRows ? '560' : '480') + 'px;width:100%;max-height:88vh;overflow:auto;padding:24px;border-radius:4px;box-shadow:0 16px 48px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">' +
       '<h3 style="margin:0 0 8px;font-size:18px;">' + esc(title) + '</h3>' +
       '<p style="font-size:12px;color:#5C6B80;margin:0 0 16px;line-height:1.5;">' + blurb + '</p>' +
       '<div style="margin-bottom:12px;"><label class="form-label">Order conf # <span style="color:#B45309;">*</span></label>' +
         '<input type="text" id="cchMarkConfNum" class="form-input" value="' + escAttr(existingNum) + '" placeholder="SO415912"></div>' +
       '<div style="margin-bottom:12px;"><label class="form-label">Confirmed date</label>' +
         '<input type="date" id="cchMarkConfDate" class="form-input" value="' + escAttr(existingDate) + '"></div>' +
+      _confLineRows +
       '<div style="margin-bottom:16px;"><label class="form-label">Attach confirmation (PDF or image)</label>' +
         '<input type="file" id="cchMarkConfFile" class="form-input" accept=".pdf,image/*" style="font-size:12px;padding:6px;"></div>' +
       '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
@@ -4420,6 +4526,24 @@
         vendorInvoiceGroups: groups.length ? groups : null,
         updatedAt: new Date().toISOString()
       };
+      var _confLineEls = document.querySelectorAll('#cchMarkConfirmedModal .cch-confirm-line');
+      if (_confLineEls && _confLineEls.length) {
+        var _newItems = items.map(function(x) { return x; });
+        var _touched = false;
+        for (var _ri = 0; _ri < _confLineEls.length; _ri++) {
+          var _row = _confLineEls[_ri];
+          var _idx = parseInt(_row.getAttribute('data-line-idx'), 10);
+          if (isNaN(_idx) || !_newItems[_idx]) continue;
+          var _stEl = _row.querySelector('.cch-confirm-line-status');
+          var _etaEl = _row.querySelector('.cch-confirm-line-eta');
+          var _copy = Object.assign({}, _newItems[_idx]);
+          _copy.lineShipStatus = _stEl ? String(_stEl.value || '').trim() : String(_copy.lineShipStatus || '').trim();
+          _copy.etaDate = _etaEl ? String(_etaEl.value || '').trim() : String(_copy.etaDate || '').trim();
+          _newItems[_idx] = _copy;
+          _touched = true;
+        }
+        if (_touched) patch.items = _newItems;
+      }
       var markCtx = window.__cchPoMarkConfirmCtx || {};
       if (markCtx.orderMethod === 'online') {
         patch.orderMethod = 'online';

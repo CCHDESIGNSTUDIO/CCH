@@ -3481,6 +3481,10 @@
         : '<span style="font-size:10px;color:#9CA3AF;">—</span>';
       var _poHasVendorBill = !!(docData.bill && docData.bill.received);
       var _poBillTotal = _poHasVendorBill && typeof window.cchPoVendorBillTotal === 'function' ? window.cchPoVendorBillTotal(docData) : null;
+      var _poShipProg = typeof window.cchPoShipProgress === 'function' ? window.cchPoShipProgress(docData, items) : null;
+      var _poOpenToShip = _poShipProg ? _poShipProg.openToShip : 0;
+      var _poShowOpenToShip = !!(_poShipProg && _poShipProg.anyStatus && _poOpenToShip > 0.01);
+      var _poPartialPaid = (totalPaid > 0.01 && totalPaid < grandTotal - 0.01);
       var poRailHTML =
         '<aside class="cch-doc-view-rail">' +
           '<div class="cch-doc-view-rail-card">' +
@@ -3489,12 +3493,16 @@
             '<div class="cch-doc-view-rail-row"><span>Merchandise</span><strong>' + formatMoney(subtotal) + '</strong></div>' +
             (totalShipping > 0 ? '<div class="cch-doc-view-rail-row"><span>Shipping</span><strong>' + formatMoney(totalShipping) + '</strong></div>' : '') +
             '<div class="cch-doc-view-rail-row cch-doc-view-rail-grand"><span>PO total</span><strong>' + formatMoney(grandTotal) + '</strong></div>' +
+            (_poShowOpenToShip
+              ? '<div class="cch-doc-view-rail-row" style="margin-top:4px;"><span>Open to ship</span><strong style="color:var(--gold);">' + formatMoney(_poOpenToShip) + '</strong></div>'
+              : '') +
             (_poHasVendorBill && _poBillTotal != null
               ? '<div class="cch-doc-view-rail-row" style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(27,51,82,0.08);"><span>Vendor bill</span><strong>' + formatMoney(_poBillTotal) + '</strong></div>'
               : '') +
             (showPaymentTotals
-              ? '<div class="cch-doc-view-rail-row"><span>Paid</span><strong style="color:#2E7D32;">-' + formatMoney(totalPaid) + '</strong></div>' +
-                '<div class="cch-doc-view-rail-row cch-doc-view-rail-balance"><span>' + (_poHasVendorBill ? 'Bill balance' : 'Balance') + '</span><strong style="color:' + (balance <= 0.01 ? '#2E7D32' : 'var(--gold)') + ';">' + formatMoney(balance) + '</strong></div>'
+              ? '<div class="cch-doc-view-rail-row"><span>Paid' + (_poHasVendorBill ? ' to vendor' : '') + '</span><strong style="color:#2E7D32;">-' + formatMoney(totalPaid) + '</strong></div>' +
+                '<div class="cch-doc-view-rail-row cch-doc-view-rail-balance"><span>' + (_poHasVendorBill ? 'Bill balance' : 'Balance') + '</span><strong style="color:' + (balance <= 0.01 ? '#2E7D32' : 'var(--gold)') + ';">' + formatMoney(balance) + '</strong></div>' +
+                (_poPartialPaid ? '<div style="font-size:10px;color:#B45309;margin-top:2px;line-height:1.35;">Partially paid · ' + formatMoney(totalPaid) + ' of ' + formatMoney(grandTotal) + '</div>' : '')
               : '<div class="cch-doc-view-rail-row cch-doc-view-rail-balance"><span>Balance due</span><strong>' + formatMoney(balance > 0 ? balance : grandTotal) + '</strong></div>') +
             '<p style="margin:8px 0 0;font-size:10px;color:#5C6B80;line-height:1.35;">Sales tax on vendor bill only</p>' +
             '<div class="cch-doc-view-rail-row" style="margin-top:4px;"><span>Lines</span><strong>' + items.length + '</strong></div>' +
