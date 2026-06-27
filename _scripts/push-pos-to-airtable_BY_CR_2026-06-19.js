@@ -56,6 +56,8 @@ const PO = {
   number: 'fldATxqfNhq3CkpWK',      // merge key
   vendor: 'fldVn8PVjfmNBVAvd',
   shipTo: 'fldQJbWEKb0Thi0fs',
+  receiverName: 'Receiver',         // written BY NAME (PAT lacks schema scope to fetch the id) -- field must be named exactly "Receiver"
+  receiverEmail: 'Receiver Email',  // written BY NAME -- must match Airtable column exactly
   client: 'fldrQTqPYNGYcXj0l',
   project: 'fldsHArDlNKaiaqRZ',     // singleSelect
   shipToType: 'fldjVFlumus08RBuc',  // singleSelect (left unset; receiver/Cynthia classifies)
@@ -157,6 +159,33 @@ function cleanShipTo(raw, client) {
   return s;
 }
 
+// Auto-classify the Ship-to type singleSelect from the PO's ship-to / workroom / receiver / vendor text.
+// Exact option strings must match the Airtable field: "Window workroom", "Receiver / warehouse", "Other".
+function classifyShipToType(po, shipTo) {
+  // Respect an explicit, already-correct value on the PO if present.
+  const explicit = str(po && po.shipToType).toLowerCase();
+  if (/work\s*room/.test(explicit)) return 'Window workroom';
+  if (/receiv|warehouse/.test(explicit)) return 'Receiver / warehouse';
+  const hay = [shipTo, po && po.workroom, po && po.shipTo, po && po.deliverTo, po && po.receiver, po && po.vendor]
+    .map(str).join(' ').toLowerCase();
+  if (!hay.trim()) return 'Other';
+  if (/work\s*room|fabricat|drapery|drapes|window treatment|seamstress|upholster|sew/.test(hay)) return 'Window workroom';
+  if (/receiv|warehouse|moving|logistics|freight|storage|delivery|deliver|3pl|distribution/.test(hay)) return 'Receiver / warehouse';
+  return 'Other';
+}
+
+// Clean receiving-party NAME for grouping/filtering (no address/phone). Prefer explicit po.receiver,
+// else the company name = first segment of the ship-to before the address ("·" or "," separator).
+function cleanReceiverName(po, shipTo) {
+  let r = str(po && po.receiver).trim();
+  if (!r) {
+    const s = str(shipTo).trim();
+    if (s) r = s.split('·')[0].split(',')[0].trim();
+  }
+  if (SHIPTO_JUNK.has(r.toLowerCase())) return '';
+  return r;
+}
+
 // Pull a candidate image URL string off a line item (mirrors index.html getProposalLineHeroImageUrl order).
 function rawImageCandidate(it) {
   const direct = firstStr(it.imageUrl, it.image, it.productImage, it.thumbnail);
@@ -235,6 +264,77 @@ async function listExistingKeys(tableId, fieldId) {
 
 function chunk(arr, n) { const out = []; for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n)); return out; }
 
+// Ship-to contacts (receivers + workrooms) for email resolution on Airtable push.
+async function loadShipToContacts() {
+  const out = [];
+  const seen = new Set();
+  const add = (name, email, phone) => {
+    name = str(name);
+    if (!name || seen.has(name.toLowerCase())) return;
+    seen.add(name.toLowerCase());
+    out.push({ name, email: str(email), phone: str(phone) });
+  };
+  try {
+    const vs = await db.collection('vendors').get();
+    vs.forEach((d) => {
+      const v = d.data() || {};
+      const cat = str(v.category);
+      const typ = str(v.type || v.vendorType).toLowerCase();
+      const email = v.email || v.contactEmail;
+      const phone = v.phone || v.contactPhone;
+      const name = v.name || v.company || v.vendor;
+      if (cat === 'Delivery / Receiver' || cat === 'Freight / Receiver' ||
+          v.type === 'receiver' || v.isReceiver === true ||
+          typ.indexOf('receiver') >= 0 || typ.indexOf('freight') >= 0) {
+        add(name, email, phone);
+      }
+      if (cat === 'Workroom' || v.isWorkroom === true || typ === 'workroom' || typ.indexOf('upholster') >= 0) {
+        add(name, email, phone);
+      }
+    });
+  } catch (_e) {}
+  try {
+    const ws = await db.collection('workrooms').get();
+    ws.forEach((d) => {
+      const w = d.data() || {};
+      add(w.name || w.title || w.workroomName || d.id, w.email || w.contactEmail, w.phone || w.contactPhone);
+    });
+  } catch (_e) {}
+  try {
+    const ts = await db.collection('team').get();
+    ts.forEach((d) => {
+      const t = d.data() || {};
+      const role = str(t.role).toLowerCase();
+      if (role === 'receiver' || role === 'workroom') add(t.name || t.company, t.email || t.contactEmail, t.phone || t.contactPhone);
+    });
+  } catch (_e) {}
+  return out;
+}
+
+// Resolve receiver email like Studio's cchPoShipToContactResolved: explicit po.receiverEmail,
+// else match the receiver / ship-to name to a contact record's email.
+function resolveReceiverEmail(po, shipTo, contacts) {
+  const direct = str(po && po.receiverEmail);
+  if (direct) return direct;
+  if (!contacts || !contacts.length) return '';
+  const candidates = [];
+  const nm = str(po && (po.receiver || po.receiverName));
+  if (nm) candidates.push(nm.toLowerCase());
+  const st = str(shipTo);
+  if (st) {
+    candidates.push(st.split('\n')[0].split('·')[0].split(',')[0].trim().toLowerCase());
+    candidates.push(st.toLowerCase());
+  }
+  for (const cand of candidates) {
+    if (!cand) continue;
+    for (const r of contacts) {
+      const rn = str(r.name).toLowerCase();
+      if (rn && (rn === cand || cand.indexOf(rn) === 0) && r.email) return r.email;
+    }
+  }
+  return '';
+}
+
 // ---- main -------------------------------------------------------------------------------------
 (async () => {
   const stats = { pos: 0, lines: 0, images: 0, skippedImages: 0 };
@@ -244,6 +344,7 @@ function chunk(arr, n) { const out = []; for (let i = 0; i < arr.length; i += n)
   const board = boardDoc.data() || {};
   const boardName = str(board.name || board.projectName);
   const boardClient = str(board.clientName || board.client);
+  const receiverContacts = await loadShipToContacts();
 
   let poDocs;
   if (ONLY_PO) {
@@ -274,7 +375,12 @@ function chunk(arr, n) { const out = []; for (let i = 0; i < arr.length; i += n)
     poFields[PO.number] = poNumber;
     if (str(po.vendor)) poFields[PO.vendor] = str(po.vendor);
     if (shipTo) poFields[PO.shipTo] = shipTo;
-    if (client) poFields[PO.client] = client;
+    const receiverName = cleanReceiverName(po, shipTo);
+    if (receiverName) poFields[PO.receiverName] = receiverName;
+    const receiverEmail = resolveReceiverEmail(po, shipTo, receiverContacts);
+    if (receiverEmail) poFields[PO.receiverEmail] = receiverEmail;
+    // Client name intentionally NOT pushed -- receivers must never see the client (privacy guardrail).
+    poFields[PO.shipToType] = classifyShipToType(po, shipTo);
     poFields[PO.project] = projectOption;
     const iso = poDateIso(po);
     if (iso) poFields[PO.date] = iso;

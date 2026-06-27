@@ -1539,35 +1539,114 @@
       phone: String(docData.receiverPhone || '').trim(),
       email: String(docData.receiverEmail || '').trim()
     };
-    try {
-      if ((!out.phone || !out.email) && typeof window.cchPoLoadReceivers === 'function') {
-        var list = await window.cchPoLoadReceivers();
-        if (list && list.length) {
-          var candidates = [];
-          if (out.name) candidates.push(out.name);
-          var st = String(docData.shipTo || docData.deliverTo || '').trim();
-          if (st) {
-            candidates.push(st.split('\n')[0].trim());
-            candidates.push(st);
-          }
-          for (var ci = 0; ci < candidates.length && (!out.phone || !out.email); ci++) {
-            var cand = String(candidates[ci] || '').trim().toLowerCase();
-            if (!cand) continue;
-            for (var i = 0; i < list.length; i++) {
-              var r = list[i] || {};
-              var rn = String(r.name || '').trim().toLowerCase();
-              if (rn && (rn === cand || cand.indexOf(rn) === 0)) {
-                if (!out.name) out.name = String(r.name || '').trim();
-                if (!out.phone) out.phone = String(r.phone || '').trim();
-                if (!out.email) out.email = String(r.email || '').trim();
-                break;
-              }
-            }
+    var candidates = [];
+    if (out.name) candidates.push(out.name);
+    var st = String(docData.shipTo || docData.deliverTo || '').trim();
+    if (st) {
+      candidates.push(st.split('\n')[0].split('·')[0].split(',')[0].trim());
+      candidates.push(st.split('\n')[0].trim());
+      candidates.push(st);
+    }
+    function matchInto(list) {
+      if (!list || !list.length) return;
+      for (var ci = 0; ci < candidates.length && (!out.phone || !out.email); ci++) {
+        var cand = String(candidates[ci] || '').trim().toLowerCase();
+        if (!cand) continue;
+        for (var i = 0; i < list.length; i++) {
+          var r = list[i] || {};
+          var rn = String(r.name || '').trim().toLowerCase();
+          if (rn && (rn === cand || cand.indexOf(rn) === 0)) {
+            if (!out.name) out.name = String(r.name || '').trim();
+            if (!out.phone) out.phone = String(r.phone || '').trim();
+            if (!out.email) out.email = String(r.email || '').trim();
+            break;
           }
         }
       }
+    }
+    try {
+      // Receivers first (the Receiver field points here), then workrooms (ship-to may be a workroom).
+      if ((!out.phone || !out.email) && typeof window.cchPoLoadReceivers === 'function') {
+        matchInto(await window.cchPoLoadReceivers());
+      }
+      if ((!out.phone || !out.email) && typeof window.cchPoLoadWorkrooms === 'function') {
+        matchInto(await window.cchPoLoadWorkrooms());
+      }
     } catch (_eShipRec) { /* graceful: keep whatever we have */ }
     return out;
+  };
+
+  /** Sync ship-to contact lookup (uses cached receivers/workrooms — for sync PO render paths). */
+  window.cchPoShipToContactSync = function(docData) {
+    docData = docData || {};
+    var out = {
+      name: String(docData.receiver || docData.receiverName || '').trim(),
+      phone: String(docData.receiverPhone || '').trim(),
+      email: String(docData.receiverEmail || '').trim()
+    };
+    if (out.phone && out.email) return out;
+    var candidates = [];
+    if (out.name) candidates.push(out.name);
+    var st = String(docData.shipTo || docData.deliverTo || '').trim();
+    if (st) {
+      candidates.push(st.split('\n')[0].split('·')[0].split(',')[0].trim());
+      candidates.push(st.split('\n')[0].trim());
+      candidates.push(st);
+    }
+    function matchInto(list) {
+      if (!list || !list.length) return;
+      for (var ci = 0; ci < candidates.length && (!out.phone || !out.email); ci++) {
+        var cand = String(candidates[ci] || '').trim().toLowerCase();
+        if (!cand) continue;
+        for (var i = 0; i < list.length; i++) {
+          var r = list[i] || {};
+          var rn = String(r.name || '').trim().toLowerCase();
+          if (rn && (rn === cand || cand.indexOf(rn) === 0)) {
+            if (!out.name) out.name = String(r.name || '').trim();
+            if (!out.phone) out.phone = String(r.phone || '').trim();
+            if (!out.email) out.email = String(r.email || '').trim();
+            break;
+          }
+        }
+      }
+    }
+    matchInto(window._cchReceiversCache);
+    matchInto(window._cchWorkroomsCache);
+    return out;
+  };
+
+  /** Ship-to block for PO view/preview: address text + phone/email when not already in the body. */
+  window.cchPoShipToDisplayHtml = function(docData, shipToText, opts) {
+    docData = docData || {};
+    opts = opts || {};
+    var fontSize = opts.fontSize || '13px';
+    var shipHtml = shipToText
+      ? '<div style="white-space:pre-wrap;">' + esc(String(shipToText)).replace(/\n/g, '<br>') + '</div>'
+      : '<span style="color:var(--gray-400);">—</span>';
+    var rPhone = String(docData.receiverPhone || '').trim();
+    var rEmail = String(docData.receiverEmail || '').trim();
+    if ((!rPhone || !rEmail) && typeof window.cchPoShipToContactSync === 'function') {
+      var sc = window.cchPoShipToContactSync(docData);
+      if (sc) {
+        if (!rPhone) rPhone = String(sc.phone || '').trim();
+        if (!rEmail) rEmail = String(sc.email || '').trim();
+      }
+    }
+    var hay = String(shipToText || '').toLowerCase();
+    var showPhone = rPhone && hay.indexOf(rPhone.toLowerCase()) < 0;
+    var showEmail = rEmail && hay.indexOf(rEmail.toLowerCase()) < 0;
+    if (showPhone || showEmail) {
+      if (typeof window.cchVendorContactBlockHtml === 'function') {
+        shipHtml += window.cchVendorContactBlockHtml(
+          { name: '', address: '', phone: showPhone ? rPhone : '', email: showEmail ? rEmail : '' },
+          { labelColor: '#5C6B80', fontSize: fontSize }
+        );
+      } else {
+        if (showPhone) shipHtml += '<div style="margin-top:4px;color:#5C6B80;font-size:' + fontSize + ';">Phone: ' + esc(rPhone) + '</div>';
+        if (showEmail) shipHtml += '<div style="margin-top:4px;color:#5C6B80;font-size:' + fontSize + ';">Email: ' + esc(rEmail) + '</div>';
+      }
+    }
+    return shipHtml;
   };
 
   /** Bill, paid, balance, variance cells for All POs / project PO lists. */
@@ -3277,6 +3356,53 @@
     return out;
   };
 
+  /** Load workroom contacts once (Vendors category/type Workroom/upholster + workrooms collection + Team role workroom), cached.
+   *  Separate from receivers so the Receiver picker stays receivers-only, but ship-to email/phone can resolve for workrooms too. */
+  window._cchWorkroomsCache = window._cchWorkroomsCache || null;
+  window.cchPoLoadWorkrooms = async function(force) {
+    if (window._cchWorkroomsCache && !force) return window._cchWorkroomsCache;
+    var out = [];
+    var seen = {};
+    function add(name, data) {
+      name = String(name || '').trim();
+      if (!name || seen[name.toLowerCase()]) return;
+      seen[name.toLowerCase()] = true;
+      out.push({
+        name: name,
+        email: String((data && (data.email || data.contactEmail)) || '').trim(),
+        phone: String((data && (data.phone || data.contactPhone)) || '').trim()
+      });
+    }
+    try {
+      var vs = await firebase.firestore().collection('vendors').get();
+      vs.forEach(function(d) {
+        var v = d.data() || {};
+        var cat = String(v.category || '').trim();
+        var typ = String(v.type || v.vendorType || '').trim().toLowerCase();
+        if (cat === 'Workroom' || v.isWorkroom === true || typ === 'workroom' || typ.indexOf('upholster') >= 0) {
+          add(v.name || v.company || v.vendor, v);
+        }
+      });
+    } catch (_e) {}
+    try {
+      var ws = await firebase.firestore().collection('workrooms').get();
+      ws.forEach(function(d) {
+        var w = d.data() || {};
+        add(w.name || w.title || w.workroomName || d.id, w);
+      });
+    } catch (_e) {}
+    try {
+      var ts = await firebase.firestore().collection('team').get();
+      ts.forEach(function(d) {
+        var t = d.data() || {};
+        if (String(t.role || '').trim().toLowerCase() === 'workroom') add(t.name || t.company, t);
+      });
+    } catch (_e) {}
+    out.sort(function(a, b) { return a.name.localeCompare(b.name); });
+    window._cchWorkroomsCache = out;
+    return out;
+  };
+
   /** <option> list for a receiver picker; always includes the current value even if not in the list. */
   window.cchPoReceiverOptionsHtml = function(selected) {
     selected = String(selected || '').trim();
@@ -3330,9 +3456,10 @@
     }
   };
 
-  if (typeof firebase !== 'undefined' && firebase.firestore) {
-    try { window.cchPoLoadReceivers(); } catch (_e) {}
-  }
+if (typeof firebase !== 'undefined' && firebase.firestore) {
+  try { window.cchPoLoadReceivers(); } catch (_e) {}
+  try { window.cchPoLoadWorkrooms(); } catch (_e2) {}
+}
 
   window.cchPoShippingLanePanelHtml = function(projectId, poId, docData, poItems) {
     docData = docData || {};
@@ -7108,8 +7235,7 @@
   // PO variance blocks are inlined in renderDocViewPage (cch-proposals-invoices-fix.js).
   var _origDocView = window.renderDocViewPage;
   if (_origDocView) {
-    window.renderDocViewPage = function(type, projectId, docId, docData, items, projData) {
-      _origDocView(type, projectId, docId, docData, items, projData);
+    function _cchAfterDocView(type, projectId, docId) {
       if (type === 'po') {
         setTimeout(function() {
           if (typeof window.cchPoLoadInvoiceOptionsForVariance === 'function') {
@@ -7117,6 +7243,25 @@
           }
         }, 0);
       }
+    }
+    window.renderDocViewPage = function(type, projectId, docId, docData, items, projData) {
+      // For POs, resolve the ship-to contact (receiver OR workroom) so the Ship To block can show phone/email.
+      if (type === 'po' && docData &&
+          (!String(docData.receiverEmail || '').trim() || !String(docData.receiverPhone || '').trim()) &&
+          typeof window.cchPoShipToContactResolved === 'function') {
+        window.cchPoShipToContactResolved(docData).then(function(c) {
+          if (c) {
+            if (c.email && !String(docData.receiverEmail || '').trim()) docData.receiverEmail = c.email;
+            if (c.phone && !String(docData.receiverPhone || '').trim()) docData.receiverPhone = c.phone;
+          }
+        }).catch(function() {}).then(function() {
+          _origDocView(type, projectId, docId, docData, items, projData);
+          _cchAfterDocView(type, projectId, docId);
+        });
+        return;
+      }
+      _origDocView(type, projectId, docId, docData, items, projData);
+      _cchAfterDocView(type, projectId, docId);
     };
   }
 

@@ -28848,10 +28848,11 @@ async function renderBoardsTab(T, proj) {
       return addr;
     }
 
-    /** Multiline ship-to body (street, city/state/zip, phone) — no company name line. */
+    /** Multiline ship-to body (street, city/state/zip, phone, email) — no company name line. */
     function _shipToBodyFromRecord(rec, phone) {
       rec = rec || {};
       phone = String(phone || rec.phone || rec.contactPhone || '').trim();
+      var email = String(rec.email || rec.contactEmail || '').trim();
       var parts = cchCoerceStructuredAddressParts(cchAddressPartsFromRecord(rec));
       var lines = [];
       var body = cchComposeAddressMultiline(parts);
@@ -28861,6 +28862,7 @@ async function renderBoardsTab(T, proj) {
         if (legacy) lines.push(legacy.replace(/\s*·\s*/g, '\n'));
       }
       if (phone) lines.push(phone);
+      if (email) lines.push(email);
       return lines.join('\n');
     }
 

@@ -3558,7 +3558,9 @@
               '</div>' +
               '<div>' +
                 '<div style="font-size:9px;text-transform:uppercase;letter-spacing:0.06em;color:#9CA3AF;margin-bottom:6px;">Ship to</div>' +
-                (_poShipTo ? '<div style="white-space:pre-wrap;">' + esc(_poShipTo).replace(/\n/g, '<br>') + '</div>' : '<span style="color:var(--gray-400);">—</span>') +
+                (typeof window.cchPoShipToDisplayHtml === 'function'
+                  ? window.cchPoShipToDisplayHtml(docData, _poShipTo, { fontSize: '13px' })
+                  : (_poShipTo ? '<div style="white-space:pre-wrap;">' + esc(_poShipTo).replace(/\n/g, '<br>') + '</div>' : '<span style="color:var(--gray-400);">—</span>')) +
               '</div>' +
             '</div>' +
             (_poDateStr ? '<div style="margin-top:12px;font-size:12px;color:#5C6B80;"><span style="font-size:9px;text-transform:uppercase;letter-spacing:0.06em;color:#9CA3AF;">PO date</span> <strong style="color:#1B3352;">' + esc(_poDateStr) + '</strong></div>' : '') +
@@ -4477,6 +4479,9 @@
         var s = String(it.shipTo || it.deliverTo || '').trim();
         if (s) _poShipSet[s] = true;
       });
+      if (typeof window.cchPoShipToDisplayHtml === 'function') {
+        shipToHtml = window.cchPoShipToDisplayHtml(docData, shipToDisplay, { fontSize: '12px' });
+      }
       if (Object.keys(_poShipSet).length > 1) {
         shipToHtml += '<div style="margin-top:6px;font-size:11px;color:#B45309;font-weight:600;">Multiple ship-to locations — see each line item below.</div>';
       }
