@@ -2406,9 +2406,10 @@
   // 25. Publish = client dashboard visibility only (do NOT set Sent)
   // ============================================================
   var _origTogglePublished = window.togglePublished;
-  /** Client-facing invoice/proposal PDF header — firm address only (no personal name). */
-  function cchPremiumDocCompanyInfoHtml() {
-    return '2481 N. Riverside Dr. · Santa Ana, CA 92706<br>(949) 497-7979 · cindy@cchdesign.com<br>www.cchdesign.com';
+  /** Client-facing doc PDF header — firm address only (no personal name). PO uses orders@ inbox. */
+  function cchPremiumDocCompanyInfoHtml(docType) {
+    var email = (docType === 'po') ? 'orders@cchdesign.com' : 'cindy@cchdesign.com';
+    return '2481 N. Riverside Dr. · Santa Ana, CA 92706<br>(949) 497-7979 · ' + email + '<br>www.cchdesign.com';
   }
 
   /** Preview badge: published invoices should not show Draft when visible on the client portal. */
@@ -3519,6 +3520,9 @@
           '<div class="cch-doc-view-rail-card cch-doc-view-rail-actions">' +
             '<button type="button" class="btn btn-primary btn-sm" style="background:#1B3352;color:#EDE8E0;" onclick="window._forceEditMode=true;navigate(window.location.hash)">✏️ Edit PO</button>' +
             '<button type="button" class="btn btn-secondary btn-sm" onclick="previewDocument(\'po\',\'' + projectId + '\',\'' + docId + '\')">👁️ Preview</button>' +
+            (typeof window.cchPoSendToVendor === 'function'
+              ? '<button type="button" class="btn btn-secondary btn-sm" style="background:#1B3352;color:#EDE8E0;border-color:#1B3352;" onclick="cchPoSendToVendor(\'' + projectId + '\',\'' + docId + '\')">📧 Send to vendor</button>'
+              : '') +
             (_poHasVendorBill && typeof window.cchPoOpenPaymentModal === 'function'
               ? '<button type="button" class="btn btn-secondary btn-sm" style="background:#1B3352;color:#EDE8E0;border-color:#1B3352;" onclick="cchPoOpenPaymentModal(\'' + projectId + '\',\'' + docId + '\')">💳 Pay bill</button>'
               : (_poIsLegacyHouzz && typeof window.cchPoOpenPaymentModal === 'function'
@@ -3584,6 +3588,9 @@
                 '<div class="cch-doc-hdr-actions">' + _connBtn + '</div>' +
               '</div>' +
               poDetailsHTML +
+              (typeof window.cchPoVendorCommsPanelHtml === 'function'
+                ? window.cchPoVendorCommsPanelHtml(projectId, docId, docData, projData)
+                : '') +
               (typeof window.cchPoBillVarianceMainBlocksHtml === 'function'
                 ? window.cchPoBillVarianceMainBlocksHtml(projectId, docId, docData, items)
                 : '') +
@@ -4710,7 +4717,7 @@
           '<div class="logo-block">' +
             '<div class="logo-cch">CCH</div>' +
             '<div class="logo-sub">Design Inc</div>' +
-            '<div class="company-info">' + cchPremiumDocCompanyInfoHtml() + '</div>' +
+            '<div class="company-info">' + cchPremiumDocCompanyInfoHtml(type) + '</div>' +
           '</div>' +
           '<div class="doc-meta">' +
             premiumDocTypeHtml +

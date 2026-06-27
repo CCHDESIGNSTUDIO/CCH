@@ -61536,7 +61536,10 @@ async function renderBoardsTab(T, proj) {
     function startInvoiceFromProposal(projectId, proposalId) { navigate('#/project/' + projectId + '/invoices'); }
     function exportProposalPDF(projectId, proposalId) { navigate('#/project/' + projectId + '/proposal/' + proposalId); }
     async function sendInvoiceReminder(projectId, invoiceId) { await cchAlert('Reminder feature coming soon — will email client with outstanding balance.', 'Invoice Reminder'); }
-    async function emailVendorPO(projectId, poId) { await cchAlert('Email PO feature coming soon — will email vendor with PO details.', 'Email Vendor'); }
+    async function emailVendorPO(projectId, poId) {
+      if (typeof window.cchPoSendToVendor === 'function') return window.cchPoSendToVendor(projectId, poId);
+      await cchAlert('Email PO feature coming soon — will email vendor with PO details.', 'Email Vendor');
+    }
 
     // PO Attachments
     function addPOAttachment(projectId, poId) {
@@ -73273,9 +73276,10 @@ ${pages}
   <script src="cch-design-board.js?v=20260608db29"></script>
   <script src="cch-client-board.js?v=1774994684878"></script>
   <script src="cch-line-icons.js?v=20260620a"></script>
-  <script src="cch-proposals-invoices-fix.js?v=20260625posmk9"></script>
+  <script src="cch-proposals-invoices-fix.js?v=20260627comms1"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
   <script src="cch-po-bill-variance.js?v=20260519poc19"></script>
+  <script src="cch-po-vendor-comms.js?v=20260627comms1"></script>
   <script src="cch-order-management.js?v=20260519om31"></script>
   <script src="cch-ffe-procurement.js?v=20260602"></script>
 </body>
