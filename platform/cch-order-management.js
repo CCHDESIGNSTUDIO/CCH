@@ -5,7 +5,7 @@
 (function() {
   'use strict';
 
-  var OM_BUILD = '20260625om29';
+  var OM_BUILD = '20260519om31';
   var OM_NAVY = '#0F1A2E';
   var OM_NAVY_MID = '#1B3352';
   var OM_BORDER = 'rgba(15,26,46,0.12)';
@@ -136,12 +136,15 @@
     var paySt = (po.paymentStatus || '').toLowerCase();
     // Explicit close always wins.
     if (st === 'cancelled' || st === 'closed') return false;
-    // Unshipped merchandise (per-line statuses set) keeps the PO open even if the
-    // received bills are fully paid — ship lane and pay lane are independent.
+    // Ship lane: unshipped merchandise keeps the PO open — independent of paymentStatus.
     var prog = (typeof window.cchPoShipProgress === 'function') ? window.cchPoShipProgress(po) : null;
-    if (prog && prog.anyStatus && prog.openToShip > 0.01) return true;
+    if (prog && prog.openToShip > 0.01) return true;
     if (st === 'received' || st === 'installed' || st === 'paid' || st === 'delivered') return false;
-    if (paySt === 'paid') return false;
+    // Vendor bills paid (paymentStatus) ≠ PO closed — only close when ship lane is also complete.
+    if (paySt === 'paid') {
+      if (prog && prog.anyStatus && prog.openToShip <= 0.01) return false;
+      return true;
+    }
     return true;
   };
 
@@ -183,9 +186,34 @@
     return false;
   }
 
+  /**
+   * A PO that is already paid, billed, or closed is PAST the confirmation stage —
+   * it should never be nagged to confirm (Change 16/17). A finished/in-progress-billed
+   * PO predates or supersedes the confirmation gate.
+   */
+  window.cchOmIsPastConfirmation = function(po) {
+    if (!po) return false;
+    var st = (po.status || '').toLowerCase();
+    if (st === 'closed' || st === 'cancelled' || st === 'received' ||
+        st === 'installed' || st === 'paid' || st === 'delivered') return true;
+    var poSt = String(po.poStatus || '').trim().toLowerCase();
+    if (poSt === 'paid' || poSt === 'closed' || poSt === 'cleared' || poSt === 'bill_received') return true;
+    // Bill received (vendor invoice logged / QB bill) = past confirmation.
+    if (typeof window.cchPoBillIsReceived === 'function' && window.cchPoBillIsReceived(po)) return true;
+    var bill = po.bill || {};
+    if (bill.received || bill.qbBillId || (Array.isArray(bill.vendorInvoices) && bill.vendorInvoices.length)) return true;
+    // Any vendor-bill payment recorded (covers "Partially Paid").
+    if (typeof window.cchPoVendorBillPaidAmount === 'function' &&
+        window.cchPoVendorBillPaidAmount(po) > 0.01) return true;
+    if (String(po.paymentStatus || '').toLowerCase().indexOf('paid') >= 0) return true;
+    return false;
+  };
+
   /** Open PO with no vendor order confirmation (includes Draft — matches Open POs table). */
   window.cchOmNeedsConfirmation = function(po) {
     if (!window.cchOmIsOpenPo(po)) return false;
+    // Paid / billed / closed POs are past confirmation — don't nag (Change 16).
+    if (window.cchOmIsPastConfirmation(po)) return false;
     return !hasVendorAck(po);
   };
 

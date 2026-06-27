@@ -643,10 +643,24 @@
     return Math.round(qty * cost * 100) / 100;
   }
 
+  function cchPoShippedLineIdsFromGroups(doc, poItems) {
+    var map = {};
+    var groups = typeof window.cchPoVendorInvoiceGroupsDisplay === 'function'
+      ? window.cchPoVendorInvoiceGroupsDisplay(doc, poItems)
+      : (doc.vendorInvoiceGroups || []);
+    groups.forEach(function(g) {
+      if (String(g.documentType || '').trim() === 'confirmation') return;
+      if (!String(g.vendorInvoiceNumber || '').trim()) return;
+      (g.poLineIds || []).forEach(function(id) { if (id) map[id] = true; });
+    });
+    return map;
+  }
+
   /** Ship-lane summary built from per-line lineShipStatus. anyStatus=false → no manual statuses set. */
   window.cchPoShipProgress = function(doc, poItems) {
     doc = doc || {};
     var items = poItems || doc.items || [];
+    var shippedFromGroups = cchPoShippedLineIdsFromGroups(doc, items);
     var total = 0, shipped = 0, totalAmt = 0, shippedAmt = 0, openAmt = 0, anyStatus = false;
     for (var i = 0; i < items.length; i++) {
       var it = items[i] || {};
@@ -655,8 +669,13 @@
       var amt = cchPoLineAmountForShip(it);
       total++;
       totalAmt += amt;
-      if (String(it.lineShipStatus || '').trim()) anyStatus = true;
-      if (window.cchPoLineShipIsFulfilled(it)) { shipped++; shippedAmt += amt; }
+      var lineId = typeof window.cchPoResolveLineId === 'function' ? window.cchPoResolveLineId(it, i) : null;
+      var manualSt = String(it.lineShipStatus || '').trim();
+      if (manualSt) anyStatus = true;
+      var onShipInv = !!(lineId && shippedFromGroups[lineId]);
+      if (onShipInv) anyStatus = true;
+      var isShipped = manualSt ? window.cchPoLineShipIsFulfilled(it) : onShipInv;
+      if (isShipped) { shipped++; shippedAmt += amt; }
       else { openAmt += amt; }
     }
     var r2 = function(n) { return Math.round(n * 100) / 100; };
@@ -1199,8 +1218,12 @@
   window.cchPoVendorBillTotal = function(doc) {
     if (!doc) return 0;
     var bill = doc.bill || {};
-    if (bill.billTotal != null && (bill.received || bill.qbBillId || (bill.vendorInvoices && bill.vendorInvoices.length))) {
-      return parseFloat(bill.billTotal) || 0;
+    if (bill.received || bill.qbBillId || (bill.vendorInvoices && bill.vendorInvoices.length)) {
+      if (typeof window.cchPoRecalcBillTotalFromDoc === 'function') {
+        var recalc = window.cchPoRecalcBillTotalFromDoc(doc);
+        if (recalc != null) return recalc;
+      }
+      if (bill.billTotal != null) return parseFloat(bill.billTotal) || 0;
     }
     if (doc.poTotalAtSend != null) return parseFloat(doc.poTotalAtSend) || 0;
     return window.cchPoDocTotal(doc);
@@ -2209,6 +2232,68 @@
     return src + ':' + inv + ':' + amt + ':' + ids;
   }
 
+  function cchPoPoLineTitleNorm(t) {
+    return String(t || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  /** Extra charge row that mirrors merchandise already on the bill (common data-entry mistake). */
+  function cchPoExtraRowDuplicatesPoMerch(r, allPoLines, billedIds) {
+    var src = cchPoVendorInvoiceSource(r.type);
+    if (src === 'merchandise') return true;
+    var amt = Math.round((parseFloat(r.amount) || 0) * 100) / 100;
+    if (Math.abs(amt) < 0.01) return false;
+    billedIds = billedIds || [];
+    var idsForSub = billedIds.length ? billedIds : (allPoLines || []).map(function(l) { return l.lineId; });
+    var merchSub = cchPoSumPoLineAmounts(allPoLines, idsForSub);
+    if (billedIds.length && Math.abs(amt - merchSub) < 0.02) return true;
+    if (src !== 'extra') return false;
+    var desc = cchPoPoLineTitleNorm(r.description);
+    for (var i = 0; i < (allPoLines || []).length; i++) {
+      var l = allPoLines[i];
+      if (billedIds.length && billedIds.indexOf(l.lineId) < 0) continue;
+      var lineAmt = Math.round((parseFloat(l.amount) || 0) * 100) / 100;
+      if (Math.abs(lineAmt - amt) > 0.02) continue;
+      var title = cchPoPoLineTitleNorm(l.title);
+      if (!desc || desc === title || title.indexOf(desc) >= 0 || desc.indexOf(title) >= 0) return true;
+      if (!desc && billedIds.length === 1) return true;
+    }
+    return false;
+  }
+
+  function cchPoFilterDuplicateMerchExtraRows(rows, allPoLines, billedIds) {
+    return (rows || []).filter(function(r) {
+      return !cchPoExtraRowDuplicatesPoMerch(r, allPoLines, billedIds);
+    });
+  }
+
+  function cchPoFilterDuplicateMerchChargeItems(items, allPoLines, billedIds) {
+    return (items || []).filter(function(it) {
+      if (!it || it.source === 'po') return true;
+      return !cchPoExtraRowDuplicatesPoMerch({
+        type: 'extra',
+        description: it.note || it.title || '',
+        amount: it.amount
+      }, allPoLines, billedIds);
+    });
+  }
+
+  window.cchPoRecalcBillTotalFromDoc = function(doc) {
+    doc = doc || {};
+    var bill = doc.bill || {};
+    if (!bill.received && !bill.qbBillId && !(bill.vendorInvoices && bill.vendorInvoices.length)) return null;
+    var poItems = doc.items || [];
+    var poLines = (bill.poLines && bill.poLines.length) ? bill.poLines : cchPoPoLineMetaList(poItems);
+    var billedIds = cchPoBillBilledLineIds(bill, poLines);
+    var kept = cchPoFilterDuplicateMerchExtraRows(cchPoBillVendorInvoicesFromBill(bill), poLines, billedIds);
+    var poSubtotal = cchPoSumPoLineAmounts(poLines, billedIds);
+    var additionalSubtotal = kept.reduce(function(s, r) {
+      if (cchPoVendorInvoiceSource(r.type) === 'merchandise') return s;
+      return s + (parseFloat(r.amount) || 0);
+    }, 0);
+    additionalSubtotal = Math.round(additionalSubtotal * 100) / 100;
+    return Math.round((poSubtotal + additionalSubtotal) * 100) / 100;
+  };
+
   /** Charge rows stored on bill.items (when not duplicated in vendorInvoices[]). */
   function cchPoBillItemChargeRows(bill) {
     var out = [];
@@ -2479,6 +2564,26 @@
     }
   };
 
+  /**
+   * Change 15: dedupe a vendor invoice-number string so it can never become "X, X".
+   * Comma-separated tokens are trimmed and de-duplicated case-insensitively.
+   */
+  function cchPoDedupeInvoiceNumberString(raw) {
+    var s = String(raw == null ? '' : raw).trim();
+    if (!s || s.indexOf(',') < 0) return s;
+    var seen = {}, out = [];
+    s.split(',').forEach(function(part) {
+      var t = part.trim();
+      if (!t) return;
+      var k = t.toLowerCase();
+      if (seen[k]) return;
+      seen[k] = true;
+      out.push(t);
+    });
+    return out.join(', ');
+  }
+  window.cchPoDedupeInvoiceNumberString = cchPoDedupeInvoiceNumberString;
+
   function cchPoReadBillVendorInvoiceMetaFromDom() {
     var invEl = document.getElementById('cchBillVendorInvNum');
     var dateEl = document.getElementById('cchBillVendorInvDate');
@@ -2487,7 +2592,7 @@
     var etaEl = document.getElementById('cchBillEtaDate');
     var notesEl = document.getElementById('cchBillShipmentNotes');
     return {
-      vendorInvoiceNumber: invEl ? String(invEl.value || '').trim() : '',
+      vendorInvoiceNumber: invEl ? cchPoDedupeInvoiceNumberString(invEl.value) : '',
       vendorInvoiceDate: dateEl ? String(dateEl.value || '').trim() : '',
       trackingNumber: trackEl ? String(trackEl.value || '').trim() : '',
       trackingCarrier: carrierEl ? String(carrierEl.value || '').trim() : '',
@@ -2624,6 +2729,7 @@
     bill = bill || {};
     if (Array.isArray(bill.vendorInvoices) && bill.vendorInvoices.length) {
       return bill.vendorInvoices.filter(function(r) {
+        if (cchPoVendorInvoiceSource(r.type) === 'merchandise') return false;
         return Math.abs(parseFloat(r.amount) || 0) > 0.01;
       }).map(function(r) {
         var src = cchPoVendorInvoiceSource(r.type);
@@ -2830,6 +2936,20 @@
           poLineIds: r.poLineIds
         };
       });
+    } else {
+      extras = cchPoFilterDuplicateMerchExtraRows(cchPoBillVendorInvoicesFromBill(bill), allPoLines, billedIds)
+        .filter(function(r) {
+          return cchPoVendorInvoiceSource(r.type) !== 'merchandise' && Math.abs(parseFloat(r.amount) || 0) > 0.01;
+        })
+        .map(function(r) {
+          return {
+            title: r.description || cchPoVendorInvoiceTypeLabel(r.type),
+            amount: r.amount,
+            source: cchPoVendorInvoiceSource(r.type),
+            vendorInvoiceNumber: r.vendorInvoiceNumber,
+            poLineIds: r.poLineIds
+          };
+        });
     }
     var html = '<table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:8px;">';
     if (invNum) {
@@ -2885,6 +3005,10 @@
     doc = doc || {};
     var proc = String(doc.procurementStatus || '').trim();
     if (proc === 'Confirmed') return 'confirmed';
+    // Change 17: a bill-received / paid PO is PAST confirmation. Resolve the lane
+    // deterministically to 'confirmed' so the chip + "Mark as confirmed" control
+    // can't flicker between waiting/confirmed on an already-billed PO.
+    if (typeof window.cchPoBillIsReceived === 'function' && window.cchPoBillIsReceived(doc)) return 'confirmed';
     if (proc === 'Waiting for Confirmation' || proc === 'Sent to Vendor') return 'waiting';
     if (doc.poSentAt || doc.poLocked || String(doc.poStatus || '').trim().toLowerCase() === 'sent') return 'waiting';
     return 'draft';
@@ -2892,6 +3016,10 @@
 
   window.cchPoProcurementStatusLabel = function(doc) {
     doc = doc || {};
+    // Terminal/done POs should read their real status, not "Draft" (label-only; lane logic unchanged).
+    var _st = String(doc.status || '').trim().toLowerCase();
+    var _terminal = { closed: 'Closed', delivered: 'Delivered', received: 'Received', installed: 'Installed', cancelled: 'Cancelled', paid: 'Paid' };
+    if (_terminal[_st]) return _terminal[_st];
     var lane = window.cchPoProcurementLaneId(doc);
     if (lane === 'confirmed') return 'Confirmed';
     if (lane === 'waiting') {
@@ -3661,8 +3789,7 @@
     if (!bill.received) return groups;
     var onGroups = {};
     groups.forEach(function(g) {
-      var n = String(g.vendorInvoiceNumber || '').trim();
-      if (n) onGroups[cchPoNormVendorInvNum(n)] = true;
+      cchPoVendorGroupRefKeys(g).forEach(function(k) { onGroups[k] = true; });
     });
     cchPoDistinctBillInvoiceNumbers(bill).forEach(function(num) {
       if (onGroups[cchPoNormVendorInvNum(num)]) return;
@@ -3671,6 +3798,36 @@
     });
     return cchPoDedupeVendorInvoiceGroups(groups);
   };
+
+  /** After bill receive — upgrade matching order confirmation → ship invoice (same ref #). */
+  function cchPoPromoteConfirmationToShipInvoice(groups, invNum, invDate, poLineIds, bill) {
+    invNum = String(invNum || '').trim();
+    if (!invNum) return groups || [];
+    var norm = cchPoNormVendorInvNum(invNum);
+    groups = (groups || []).map(function(g) { return Object.assign({}, g); });
+    var confIdx = -1;
+    for (var i = 0; i < groups.length; i++) {
+      if (String(groups[i].documentType || '').trim() !== 'confirmation') continue;
+      var keys = cchPoVendorGroupRefKeys(groups[i]);
+      if (keys.indexOf(norm) >= 0) { confIdx = i; break; }
+    }
+    if (confIdx < 0) return groups;
+    var g = groups[confIdx];
+    g.documentType = 'ship_invoice';
+    g.vendorInvoiceNumber = invNum;
+    if (invDate) g.vendorInvoiceDate = invDate;
+    if (poLineIds && poLineIds.length) g.poLineIds = poLineIds.slice();
+    bill = bill || {};
+    var actF = (bill.vendorInvoices || []).reduce(function(s, r) {
+      if (cchPoVendorInvoiceSource(r.type) !== 'freight') return s;
+      return s + (parseFloat(r.amount) || 0);
+    }, 0);
+    actF = Math.round(actF * 100) / 100;
+    if (actF > 0.005) g.actualFreight = actF;
+    if (!g.status || g.status === 'Confirmed') g.status = 'Ordered';
+    groups[confIdx] = g;
+    return groups;
+  }
 
   /** After bill receive — persist bill invoice # into vendorInvoiceGroups when missing. */
   function cchPoEnsureBillInvoicesInGroups(doc, bill, poItems) {
@@ -3682,8 +3839,7 @@
     });
     var onGroups = {};
     groups.forEach(function(g) {
-      var n = String(g.vendorInvoiceNumber || '').trim();
-      if (n) onGroups[cchPoNormVendorInvNum(n)] = true;
+      cchPoVendorGroupRefKeys(g).forEach(function(k) { onGroups[k] = true; });
     });
     cchPoDistinctBillInvoiceNumbers(bill).forEach(function(num) {
       if (onGroups[cchPoNormVendorInvNum(num)]) return;
@@ -3790,14 +3946,16 @@
     var invDate = String(document.getElementById('cchVigInvDate') && document.getElementById('cchVigInvDate').value || '').trim();
     var selectedIds = cchPoReadVigPoLineIdsFromDom();
     var chargeRows = cchPoReadVigChargeRowsFromDom();
+    var docType = String(document.getElementById('cchVigDocumentType') && document.getElementById('cchVigDocumentType').value || '').trim();
+    var isConfirmation = docType === 'confirmation';
     var thisMerch = cchPoSumPoLineAmounts(poLines, selectedIds);
     var thisCharges = chargeRows.reduce(function(s, r) { return s + (parseFloat(r.amount) || 0); }, 0);
     var thisInvTotal = Math.round((thisMerch + thisCharges) * 100) / 100;
-    var merged = bill.received
+    var merged = bill.received && !isConfirmation
       ? cchPoMergeVigChargesIntoBill(bill, doc, oldInvNum, invNum, invDate, selectedIds, chargeRows)
       : { bill: bill, varianceAmt: thisInvTotal - poAtSend };
-    var billTotal = merged.bill.billTotal != null ? merged.bill.billTotal : thisInvTotal;
-    var variance = billTotal - poAtSend;
+    var billTotal = isConfirmation ? thisInvTotal : (merged.bill.billTotal != null ? merged.bill.billTotal : thisInvTotal);
+    var variance = isConfirmation ? 0 : (billTotal - poAtSend);
     function row(label, amt) {
       if (Math.abs(amt) < 0.01) return '';
       return '<tr><td style="padding:4px 0;color:#5C6B80;">' + (amt >= 0 ? '+ ' : '− ') + esc(label) + '</td>' +
@@ -3824,8 +3982,8 @@
       invHdr + chargeDetail +
       (Math.abs(thisCharges) > 0.01 ? '<tr><td style="padding:4px 0;color:#5C6B80;">Charges on this invoice</td><td style="text-align:right;font-weight:600;color:#B45309;">' + cchPoFormatBillLineAmount(thisCharges) + '</td></tr>' : '') +
       '<tr style="border-top:1px solid rgba(15,26,46,0.1);"><td style="padding:6px 0;font-weight:600;">This invoice subtotal</td><td style="text-align:right;font-weight:700;">' + fmt(thisInvTotal) + '</td></tr>' +
-      (bill.received ? '<tr style="border-top:1px solid rgba(15,26,46,0.12);"><td style="padding:8px 0;font-weight:700;">= Combined vendor bill total</td><td style="text-align:right;font-weight:700;">' + fmt(billTotal) + '</td></tr>' : '') +
-      '<tr><td style="padding:4px 0;font-size:11px;color:#5C6B80;">Variance vs PO at send (' + fmt(poAtSend) + ')</td><td style="text-align:right;font-size:11px;font-weight:600;color:' + (Math.abs(variance) > 0.01 ? '#B45309' : '#15803D') + ';">' + fmt(variance) + '</td></tr>' +
+      (bill.received && !isConfirmation ? '<tr style="border-top:1px solid rgba(15,26,46,0.12);"><td style="padding:8px 0;font-weight:700;">= Combined vendor bill total</td><td style="text-align:right;font-weight:700;">' + fmt(billTotal) + '</td></tr>' : '') +
+      (!isConfirmation ? '<tr><td style="padding:4px 0;font-size:11px;color:#5C6B80;">Variance vs PO at send (' + fmt(poAtSend) + ')</td><td style="text-align:right;font-size:11px;font-weight:600;color:' + (Math.abs(variance) > 0.01 ? '#B45309' : '#15803D') + ';">' + fmt(variance) + '</td></tr>' : '') +
       '</table>';
   };
 
@@ -3901,7 +4059,7 @@
     invNum = String(invNum || '').trim();
     var allVi = cchPoBillVendorInvoicesFromBill(bill);
     var kept = allVi.filter(function(r) {
-      if (cchPoVendorInvoiceSource(r.type) === 'merchandise') return true;
+      if (cchPoVendorInvoiceSource(r.type) === 'merchandise') return false;
       var n = String(r.vendorInvoiceNumber || '').trim();
       if (oldInvNum && cchPoNormVendorInvNum(n) === cchPoNormVendorInvNum(oldInvNum)) return false;
       if (!oldInvNum && invNum && cchPoNormVendorInvNum(n) === cchPoNormVendorInvNum(invNum)) return false;
@@ -3926,6 +4084,9 @@
     var poAtSend = bill.poTotalAtSend != null ? bill.poTotalAtSend : window.cchPoDocTotal(doc);
     var allPoLines = bill.poLines || cchPoPoLineMetaList(doc.items || []);
     var billedIds = cchPoBillBilledLineIds(bill, allPoLines);
+    poLineIds.forEach(function(id) { if (id && billedIds.indexOf(id) < 0) billedIds.push(id); });
+    kept = cchPoFilterDuplicateMerchExtraRows(kept, allPoLines, billedIds);
+    bill.vendorInvoices = kept;
     var poSubtotal = cchPoSumPoLineAmounts(allPoLines, billedIds);
     var additionalSubtotal = kept.reduce(function(s, r) {
       if (cchPoVendorInvoiceSource(r.type) === 'merchandise') return s;
@@ -3933,7 +4094,8 @@
     }, 0);
     additionalSubtotal = Math.round(additionalSubtotal * 100) / 100;
     var legacy = cchPoLegacyAggregatesFromVendorInvoices(kept);
-    var chargeItems = cchPoChargeItemsFromVendorInvoices(kept, allPoLines);
+    var chargeItems = cchPoFilterDuplicateMerchChargeItems(
+      cchPoChargeItemsFromVendorInvoices(kept, allPoLines), allPoLines, billedIds);
     var billedPoLines = allPoLines.filter(function(l) { return billedIds.indexOf(l.lineId) >= 0; });
     bill.poSubtotal = poSubtotal;
     bill.additionalSubtotal = additionalSubtotal;
@@ -3954,19 +4116,68 @@
     return String(n || '').trim().replace(/\s+/g, '').toUpperCase();
   }
 
+  function cchPoVendorGroupDedupeKey(g) {
+    g = g || {};
+    var n = String(g.vendorInvoiceNumber || '').trim();
+    if (n) return cchPoNormVendorInvNum(n);
+    var so = String(g.salesOrderNumber || g.orderConfNumber || '').trim();
+    if (so) return cchPoNormVendorInvNum(so);
+    return 'id:' + String(g.id || '');
+  }
+
+  function cchPoVendorGroupRefKeys(g) {
+    g = g || {};
+    var keys = [];
+    var vn = String(g.vendorInvoiceNumber || '').trim();
+    var so = String(g.salesOrderNumber || g.orderConfNumber || '').trim();
+    if (vn) keys.push(cchPoNormVendorInvNum(vn));
+    if (so) keys.push(cchPoNormVendorInvNum(so));
+    if (!keys.length) keys.push('id:' + String(g.id || ''));
+    return keys;
+  }
+
+  function cchPoPickBetterVendorInvoiceGroup(a, b) {
+    var aConf = String(a.documentType || '').trim() === 'confirmation';
+    var bConf = String(b.documentType || '').trim() === 'confirmation';
+    if (aConf && !bConf) return b;
+    if (bConf && !aConf) return a;
+    if (a._fromBill && !b._fromBill) return b;
+    if (b._fromBill && !a._fromBill) return a;
+    if ((b.poLineIds || []).length > (a.poLineIds || []).length) return b;
+    return a;
+  }
+
   /** One row per vendor invoice # — prefer saved tracking rows over synthetic "On bill" rows. */
   function cchPoDedupeVendorInvoiceGroups(groups) {
     var byKey = {};
+    var ordered = [];
     (groups || []).forEach(function(g) {
-      var num = String(g.vendorInvoiceNumber || '').trim();
-      var key = num ? cchPoNormVendorInvNum(num) : ('id:' + String(g.id || ''));
-      var prev = byKey[key];
-      if (!prev) { byKey[key] = g; return; }
-      if (prev._fromBill && !g._fromBill) { byKey[key] = g; return; }
-      if (!prev._fromBill && g._fromBill) return;
-      if ((g.poLineIds || []).length > (prev.poLineIds || []).length) byKey[key] = g;
+      var keys = cchPoVendorGroupRefKeys(g);
+      var existingKey = null;
+      for (var i = 0; i < keys.length; i++) {
+        if (byKey[keys[i]]) { existingKey = keys[i]; break; }
+      }
+      if (!existingKey) {
+        keys.forEach(function(k) { byKey[k] = g; });
+        ordered.push(g);
+        return;
+      }
+      var winner = cchPoPickBetterVendorInvoiceGroup(byKey[existingKey], g);
+      keys.forEach(function(k) { byKey[k] = winner; });
+      for (var j = 0; j < ordered.length; j++) {
+        if (ordered[j] === byKey[existingKey] || ordered[j] === g) {
+          ordered[j] = winner;
+        }
+      }
+      byKey[existingKey] = winner;
     });
-    return Object.keys(byKey).map(function(k) { return byKey[k]; });
+    var seen = {};
+    return ordered.filter(function(g) {
+      var id = String(g.id || '') + '|' + cchPoVendorGroupDedupeKey(g);
+      if (seen[id]) return false;
+      seen[id] = true;
+      return true;
+    });
   }
 
   function cchPoVendorInvoiceGroupTotal(bill, invNum, poLineIds, poLines) {
@@ -4064,9 +4275,20 @@
     return sel ? String(sel.value || '').trim() : '';
   }
 
-  function cchPoGroupChargesCellHtml(bill, invNum, poLineIds, poLines) {
+  function cchPoGroupChargesCellHtml(bill, group, poLines) {
     bill = bill || {};
-    poLineIds = poLineIds || [];
+    group = group || {};
+    var docType = String(group.documentType || '').trim() || 'ship_invoice';
+    var invNum = String(group.vendorInvoiceNumber || '').trim();
+    var poLineIds = group.poLineIds || [];
+    if (docType === 'confirmation') {
+      var estF = parseFloat(group.estimatedFreight);
+      if (!isNaN(estF) && estF > 0.005) {
+        return '<span style="font-family:var(--font-mono);font-weight:600;color:#5C6B80;">' + fmt(estF) + '</span>' +
+          '<div style="font-size:10px;color:#9CA3AF;margin-top:2px;">Est. freight only</div>';
+      }
+      return '<span style="color:#9CA3AF;font-size:11px;">—</span>';
+    }
     var total = cchPoVendorInvoiceGroupTotal(bill, invNum, poLineIds, poLines);
     if (Math.abs(total) < 0.01) return '<span style="color:#9CA3AF;">—</span>';
     var lines = (bill.poLines && bill.poLines.length) ? bill.poLines : (poLines || []);
@@ -4211,6 +4433,98 @@
     if (doc.procurementStatus) return String(doc.procurementStatus).trim();
     if (doc.poLocked || doc.poSentAt) return 'Waiting for Confirmation';
     return 'Draft';
+  };
+
+  /** Saved order-confirmation vendor-invoice row (documentType confirmation). */
+  function cchPoOrderConfirmationGroup(doc) {
+    doc = doc || {};
+    var groups = typeof window.cchPoVendorInvoiceGroupsUser === 'function'
+      ? window.cchPoVendorInvoiceGroupsUser(doc)
+      : (Array.isArray(doc.vendorInvoiceGroups) ? doc.vendorInvoiceGroups : []);
+    for (var i = 0; i < groups.length; i++) {
+      if (String(groups[i].documentType || '').trim() === 'confirmation') return groups[i];
+    }
+    return null;
+  }
+
+  /** Map confirmation row → receive-bill form defaults (merch lines + header; tax/shipping left blank). */
+  function cchPoBillPrefillFromConfirmation(conf, poLines) {
+    conf = conf || {};
+    poLines = poLines || [];
+    var invNum = String(conf.salesOrderNumber || conf.vendorInvoiceNumber || '').trim();
+    var invDate = String(conf.confirmedDate || conf.vendorInvoiceDate || '').trim().slice(0, 10);
+    var lineIds = (conf.poLineIds && conf.poLineIds.length)
+      ? conf.poLineIds.slice()
+      : poLines.map(function(l) { return l.lineId; });
+    var estF = parseFloat(conf.estimatedFreight);
+    var actF = parseFloat(conf.actualFreight);
+    var freightAmt = '';
+    if (!isNaN(actF) && actF > 0.005) freightAmt = Math.round(actF * 100) / 100;
+    else if (!isNaN(estF) && estF > 0.005) freightAmt = Math.round(estF * 100) / 100;
+    return {
+      vendorInvoiceNumber: invNum,
+      vendorInvoiceDate: invDate,
+      trackingNumber: String(conf.trackingNumber || '').trim(),
+      trackingCarrier: String(conf.trackingCarrier || '').trim(),
+      etaDate: String(conf.etaDate || '').trim().slice(0, 10),
+      shipmentNotes: String(conf.notes || '').trim(),
+      poLineIds: lineIds,
+      freightAmt: freightAmt,
+      confLabel: invNum || String(conf.label || 'order confirmation').trim()
+    };
+  }
+
+  function cchPoBillFromConfirmationPanelHtml(confLabel) {
+    confLabel = String(confLabel || 'order confirmation').trim();
+    return '<div id="cchBillFromConfirmationWrap" style="margin-bottom:14px;padding:12px 14px;background:rgba(2,136,209,0.06);border:1px solid rgba(2,136,209,0.22);border-radius:4px;">' +
+      '<label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:12px;color:#1B3352;line-height:1.5;margin:0;">' +
+      '<input type="checkbox" id="cchBillFromConfirmation" checked onchange="cchPoApplyBillFromConfirmation()" style="accent-color:var(--gold);margin-top:3px;flex-shrink:0;">' +
+      '<span><strong>Same as order confirmation</strong> (' + esc(confLabel) + ') — copies conf #, date, and PO items. ' +
+      'Enter <strong>sales tax</strong>, <strong>shipping</strong>, and any other charges from the vendor receipt below.</span>' +
+      '</label></div>';
+  }
+
+  /** Apply or skip confirmation → bill copy when the checkbox is toggled. */
+  window.cchPoApplyBillFromConfirmation = function() {
+    var pre = window.__cchBillConfPrefill;
+    if (!pre) return;
+    var cb = document.getElementById('cchBillFromConfirmation');
+    var on = !!(cb && cb.checked);
+    var invNumEl = document.getElementById('cchBillVendorInvNum');
+    var invDateEl = document.getElementById('cchBillVendorInvDate');
+    if (invNumEl) invNumEl.value = on ? (pre.vendorInvoiceNumber || '') : '';
+    if (invDateEl) invDateEl.value = on ? (pre.vendorInvoiceDate || '') : '';
+    var carEl = document.getElementById('cchBillTrackingCarrier');
+    var trkEl = document.getElementById('cchBillTrackingNum');
+    var etaEl = document.getElementById('cchBillEtaDate');
+    var noteEl = document.getElementById('cchBillShipmentNotes');
+    if (on) {
+      if (carEl) carEl.value = pre.trackingCarrier || '';
+      if (trkEl) trkEl.value = pre.trackingNumber || '';
+      if (etaEl) etaEl.value = pre.etaDate || '';
+      if (noteEl) noteEl.value = pre.shipmentNotes || '';
+    }
+    document.querySelectorAll('.cch-bill-po-line-cb').forEach(function(lineCb) {
+      if (lineCb.disabled) return;
+      if (!on) return;
+      lineCb.checked = (pre.poLineIds || []).indexOf(lineCb.value) >= 0;
+    });
+    var firstRow = document.querySelector('#cchVendorInvoicesList .cch-vi-row');
+    if (firstRow) {
+      var typeSel = firstRow.querySelector('.cch-vi-type');
+      var amtEl = firstRow.querySelector('.cch-vi-amt');
+      if (typeSel) typeSel.value = 'freight';
+      if (amtEl) amtEl.value = (on && pre.freightAmt !== '') ? String(pre.freightAmt) : '';
+    }
+    if (on) {
+      document.querySelectorAll('#cchVendorInvoicesList .cch-vi-row').forEach(function(row, idx) {
+        var typeSel = row.querySelector('.cch-vi-type');
+        var amtEl = row.querySelector('.cch-vi-amt');
+        if (!typeSel || !amtEl) return;
+        if (typeSel.value === 'tax') amtEl.value = '';
+      });
+    }
+    window.cchPoUpdateBillPreview(window.__cchBillPoAtSend);
   };
 
   /** Vendor order confirmation / sales order # — PO header or confirmation vendor-invoice row. */
@@ -4631,7 +4945,7 @@
       var noteCell = g.notes
         ? '<span title="' + escAttr(g.notes) + '">' + esc(g.notes.length > 48 ? g.notes.slice(0, 46) + '…' : g.notes) + '</span>'
         : '<span style="color:#9CA3AF;">—</span>';
-      var chargesCell = hasBill ? cchPoGroupChargesCellHtml(bill, g.vendorInvoiceNumber, g.poLineIds, lineMeta) : '<span style="color:#9CA3AF;">—</span>';
+      var chargesCell = hasBill ? cchPoGroupChargesCellHtml(bill, g, lineMeta) : '<span style="color:#9CA3AF;">—</span>';
       var invPaid = hasBill
         ? cchPoVendorInvoicePaidAmount(docData.payments || [], g.vendorInvoiceNumber, null)
         : 0;
@@ -5104,16 +5418,38 @@
           : 'Check PO items on this invoice and add any additional charges.'));
     var snapshotPoLines = cchPoSnapshotPoLinesForBill(d.items || [], poAtSend);
     var poLines = snapshotPoLines.length ? snapshotPoLines : cchPoBillPoLines(b, d.items || [], poAtSend);
+    var multiTrackHtml = (!isAdd && (isEdit || b.received)) ? cchPoBillMultiTrackingGroupsHtml(d, d.items || []) : '';
+    var confGroup = (!isEdit && (!b.received || isAdd)) ? cchPoOrderConfirmationGroup(d) : null;
+    var confPrefill = confGroup ? cchPoBillPrefillFromConfirmation(confGroup, poLines) : null;
+    window.__cchBillConfPrefill = confPrefill;
     window.__cchBillPoLines = poLines;
     var lockedIds = isAdd ? cchPoBillBilledLineIds(b, poLines) : [];
     window.__cchBillLockedPoLineIds = lockedIds;
     var selectedIds = isEdit
       ? cchPoBillBilledLineIds(b, poLines)
       : (isAdd ? lockedIds.slice() : poLines.map(function(l) { return l.lineId; }));
+    if (confPrefill && !isEdit) selectedIds = confPrefill.poLineIds.slice();
     if (!selectedIds.length && !isAdd) selectedIds = poLines.map(function(l) { return l.lineId; });
+    if (confPrefill && !isEdit) {
+      billInvMeta.vendorInvoiceNumber = confPrefill.vendorInvoiceNumber;
+      billInvMeta.vendorInvoiceDate = confPrefill.vendorInvoiceDate;
+      if (!multiTrackHtml) {
+        billInvMeta.trackingNumber = confPrefill.trackingNumber;
+        billInvMeta.trackingCarrier = confPrefill.trackingCarrier;
+        billInvMeta.etaDate = confPrefill.etaDate;
+        billInvMeta.shipmentNotes = confPrefill.shipmentNotes;
+      }
+      if (viRows.length) {
+        viRows.forEach(function(r) {
+          if (cchPoVendorInvoiceSource(r.type) === 'freight' && confPrefill.freightAmt !== '') {
+            r.amount = confPrefill.freightAmt;
+          }
+        });
+      }
+    }
     var poItemsHtml = cchPoBillPoLinePickerHtml(poLines, selectedIds, lockedIds, poAtSend);
     var viListHtml = viRows.map(function(r) { return cchPoVendorChargeRowHtml(r); }).join('');
-    var multiTrackHtml = (!isAdd && (isEdit || b.received)) ? cchPoBillMultiTrackingGroupsHtml(d, d.items || []) : '';
+    var confPanelHtml = confPrefill ? cchPoBillFromConfirmationPanelHtml(confPrefill.confLabel) : '';
     var viHeaderHtml = cchPoBillVendorInvoiceHeaderHtml(billInvMeta, isAdd, !!multiTrackHtml);
     var html = '<div id="cchReceiveBillModal" style="position:fixed;inset:0;background:rgba(15,26,46,0.45);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)cchPoCloseModal()">' +
       '<div style="background:#fff;max-width:720px;width:100%;padding:24px;border-radius:4px;box-shadow:0 16px 48px rgba(0,0,0,0.2);max-height:90vh;overflow:auto;" onclick="event.stopPropagation()">' +
@@ -5121,6 +5457,7 @@
       '<p style="font-size:12px;color:var(--gray-500);margin:0 0 14px;">' + blurb + '</p>' +
       poItemsHtml +
       multiTrackHtml +
+      confPanelHtml +
       '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#B45309;margin:0 0 8px;">2. Vendor invoice &amp; additional charges</div>' +
       '<p style="font-size:11px;color:#5C6B80;margin:0 0 10px;line-height:1.45;">Enter the <strong>vendor invoice #</strong> once, then add freight, tax, price changes, or fees on separate lines (same invoice). Lines with $0 are ignored.</p>' +
       viHeaderHtml +
@@ -5155,6 +5492,7 @@
     if (window.__cchBillAddMode && window.__cchBillExistingVendorInvoices && window.__cchBillExistingVendorInvoices.length) {
       vendorInvoices = window.__cchBillExistingVendorInvoices.concat(vendorInvoices);
     }
+    vendorInvoices = cchPoFilterDuplicateMerchExtraRows(vendorInvoices, allPoLines, selectedIds);
     var addl = vendorInvoices.reduce(function(s, r) {
       if (cchPoVendorInvoiceSource(r.type) === 'merchandise') return s;
       return s + (parseFloat(r.amount) || 0);
@@ -5206,6 +5544,7 @@
   window.cchPoCloseModal = function() {
     var m = document.getElementById('cchReceiveBillModal') || document.getElementById('cchPoPayModal');
     if (m) m.remove();
+    window.__cchBillConfPrefill = null;
   };
 
   window.cchPoSaveReceiveBill = async function(projectId, poId, poAtSend, pushQb) {
@@ -5234,6 +5573,22 @@
       r.vendorInvoiceNumber = invNum;
       r.vendorInvoiceDate = invDate;
     });
+
+    var ref = firebase.firestore().collection('boards').doc(projectId).collection('purchaseOrders').doc(poId);
+    var snap = await ref.get();
+    var d = snap.data() || {};
+    var prevBill = d.bill || {};
+    var snapshotPoLines = cchPoSnapshotPoLinesForBill(d.items || [], poAtSend);
+    var allPoLines = snapshotPoLines.length ? snapshotPoLines : cchPoBillPoLines(prevBill, d.items || [], poAtSend);
+    vendorInvoices = cchPoFilterDuplicateMerchExtraRows(vendorInvoices, allPoLines, selectedIds);
+    vendorInvoices = vendorInvoices.filter(function(r) {
+      return cchPoVendorInvoiceSource(r.type) !== 'merchandise';
+    });
+    legacy = cchPoLegacyAggregatesFromVendorInvoices(vendorInvoices);
+    freight = legacy.freight;
+    tax = legacy.tax;
+    priceChange = legacy.priceChange;
+    extra = legacy.extras;
     var additionalSubtotal = vendorInvoices.reduce(function(s, r) {
       if (cchPoVendorInvoiceSource(r.type) === 'merchandise') return s;
       return s + (parseFloat(r.amount) || 0);
@@ -5249,17 +5604,12 @@
       return;
     }
 
-    var ref = firebase.firestore().collection('boards').doc(projectId).collection('purchaseOrders').doc(poId);
-    var snap = await ref.get();
-    var d = snap.data() || {};
-    var prevBill = d.bill || {};
-    var snapshotPoLines = cchPoSnapshotPoLinesForBill(d.items || [], poAtSend);
-    var allPoLines = snapshotPoLines.length ? snapshotPoLines : cchPoBillPoLines(prevBill, d.items || [], poAtSend);
     var billedPoLines = allPoLines.filter(function(l) { return selectedIds.indexOf(l.lineId) >= 0; });
     var poSubtotal = cchPoSumPoLineAmounts(allPoLines, selectedIds);
     var billTotal = poSubtotal + additionalSubtotal;
     var varianceAmt = billTotal - poAtSend;
-    var chargeItems = cchPoChargeItemsFromVendorInvoices(vendorInvoices, allPoLines);
+    var chargeItems = cchPoFilterDuplicateMerchChargeItems(
+      cchPoChargeItemsFromVendorInvoices(vendorInvoices, allPoLines), allPoLines, selectedIds);
     var bill = cchPoMergeBillPreserve(prevBill, {
       received: true,
       receivedAt: prevBill.receivedAt || new Date().toISOString(),
@@ -5294,6 +5644,11 @@
       bill,
       d.items || []
     );
+    var fromConfCb = document.getElementById('cchBillFromConfirmation');
+    if (fromConfCb && fromConfCb.checked) {
+      ensuredGroups = cchPoPromoteConfirmationToShipInvoice(ensuredGroups, invNum, invDate, selectedIds, bill);
+    }
+    ensuredGroups = cchPoDedupeVendorInvoiceGroups(ensuredGroups);
     if (ensuredGroups.length) patch.vendorInvoiceGroups = ensuredGroups;
     if (window.cchPoLifecycleStatus(d) === 'draft') {
       patch.poLocked = true;
@@ -5463,13 +5818,20 @@
     var snap = await firebase.firestore().collection('boards').doc(projectId).collection('purchaseOrders').doc(poId).get();
     if (!snap.exists) return;
     var d = snap.data() || {};
-    if (!d.bill || !d.bill.received) {
+    // Houzz / legacy POs (400xxx scheme, houzz-import source, or clip-built) never had a
+    // Studio vendor bill — the bill-first rule must NOT apply to them. Allow a direct
+    // payment against the PO total. Real Studio POs still require a received bill.
+    var _isLegacyHouzzPay = (typeof window.cchOmIsHouzzSourcePo === 'function' && window.cchOmIsHouzzSourcePo(d)) ||
+      (typeof window.cchOmIsLegacyHouzzNumber === 'function' && window.cchOmIsLegacyHouzzNumber(d)) ||
+      d._fromClips === true;
+    if ((!d.bill || !d.bill.received) && !_isLegacyHouzzPay) {
       if (typeof window.cchAlert === 'function') {
         await window.cchAlert('Receive the vendor bill first (PO + additional charges), then record payment.', 'Vendor payment');
       }
       return;
     }
-    var poAtSend = d.bill.poTotalAtSend != null ? d.bill.poTotalAtSend : (d.poTotalAtSend != null ? d.poTotalAtSend : window.cchPoDocTotal(d));
+    var _bill = d.bill || {};
+    var poAtSend = _bill.poTotalAtSend != null ? _bill.poTotalAtSend : (d.poTotalAtSend != null ? d.poTotalAtSend : window.cchPoDocTotal(d));
     var num = poNum(d);
     var editing = typeof editIdx === 'number' && editIdx >= 0;
     var existing = editing ? ((d.payments || [])[editIdx] || null) : null;
@@ -6726,10 +7088,14 @@
         try {
           var snap = await firebase.firestore().collection('boards').doc(projectId).collection('purchaseOrders').doc(docId).get();
           var d = snap.exists ? snap.data() : null;
-          if (d && d.bill && d.bill.received && typeof window.cchPoOpenPaymentModal === 'function') {
+          // Houzz / legacy POs have no Studio vendor bill — let them pay directly.
+          var _isLegacyHouzzPay = d && ((typeof window.cchOmIsHouzzSourcePo === 'function' && window.cchOmIsHouzzSourcePo(d)) ||
+            (typeof window.cchOmIsLegacyHouzzNumber === 'function' && window.cchOmIsLegacyHouzzNumber(d)) ||
+            d._fromClips === true);
+          if (d && ((d.bill && d.bill.received) || _isLegacyHouzzPay) && typeof window.cchPoOpenPaymentModal === 'function') {
             return window.cchPoOpenPaymentModal(projectId, docId);
           }
-          if (d && (!d.bill || !d.bill.received) && typeof window.cchAlert === 'function') {
+          if (d && (!d.bill || !d.bill.received) && !_isLegacyHouzzPay && typeof window.cchAlert === 'function') {
             await window.cchAlert('Receive the vendor bill first (PO amount + freight/pre-paid tax/extras), then record payment.', 'Vendor payment');
             return;
           }

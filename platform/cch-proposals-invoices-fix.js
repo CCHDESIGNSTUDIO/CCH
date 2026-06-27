@@ -3480,6 +3480,11 @@
           : (typeof window.statusBadge === 'function' ? window.statusBadge(_poShipLabel) : '<span class="badge badge-draft" style="font-size:10px;">' + esc(_poShipLabel) + '</span>'))
         : '<span style="font-size:10px;color:#9CA3AF;">—</span>';
       var _poHasVendorBill = !!(docData.bill && docData.bill.received);
+      // Houzz / legacy POs never had a Studio vendor bill — they still need a way to
+      // record a direct payment. The bill-first rule is Studio-only.
+      var _poIsLegacyHouzz = (typeof window.cchOmIsHouzzSourcePo === 'function' && window.cchOmIsHouzzSourcePo(docData)) ||
+        (typeof window.cchOmIsLegacyHouzzNumber === 'function' && window.cchOmIsLegacyHouzzNumber(docData)) ||
+        docData._fromClips === true;
       var _poBillTotal = _poHasVendorBill && typeof window.cchPoVendorBillTotal === 'function' ? window.cchPoVendorBillTotal(docData) : null;
       var _poShipProg = typeof window.cchPoShipProgress === 'function' ? window.cchPoShipProgress(docData, items) : null;
       var _poOpenToShip = _poShipProg ? _poShipProg.openToShip : 0;
@@ -3516,7 +3521,9 @@
             '<button type="button" class="btn btn-secondary btn-sm" onclick="previewDocument(\'po\',\'' + projectId + '\',\'' + docId + '\')">👁️ Preview</button>' +
             (_poHasVendorBill && typeof window.cchPoOpenPaymentModal === 'function'
               ? '<button type="button" class="btn btn-secondary btn-sm" style="background:#1B3352;color:#EDE8E0;border-color:#1B3352;" onclick="cchPoOpenPaymentModal(\'' + projectId + '\',\'' + docId + '\')">💳 Pay bill</button>'
-              : '') +
+              : (_poIsLegacyHouzz && typeof window.cchPoOpenPaymentModal === 'function'
+                ? '<button type="button" class="btn btn-secondary btn-sm" style="background:#1B3352;color:#EDE8E0;border-color:#1B3352;" onclick="cchPoOpenPaymentModal(\'' + projectId + '\',\'' + docId + '\')" title="Record a payment on this legacy Houzz PO">💳 Record payment</button>'
+                : '')) +
             (lineItemsQbBtn ? '<div style="margin-top:6px;">' + lineItemsQbBtn + '</div>' : '') +
           '</div>' +
         '</aside>';
