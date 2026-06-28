@@ -1,8 +1,8 @@
 # CCH Studio — Current Priorities
 
-**Last updated:** May 27, 2026 (rev — Claude added COS Agent spec)
+**Last updated:** June 9, 2026 (rev — DOC-1 sku/finish partial fix; F-131 propagation deferred)
 **Maintainer:** Cynthia Holloway
-**Last revised by:** Claude (May 27, 2026 — added item 3c Chief of Staff Agent v1.0 spec reference)
+**Last revised by:** Cursor (CR) (Jun 9, 2026)
 
 This file holds time-bound priorities. CLAUDE.md is canon and timeless — anything dated lives here.
 
@@ -52,6 +52,7 @@ This file holds time-bound priorities. CLAUDE.md is canon and timeless — anyth
    - Three-column LINKED section in Edit dialog (Proposals / Invoices / POs)
 6. **Re-add Replace Image button** on product edit modal. Must UPDATE existing doc, not CREATE a new product.
 7. **Categories regression** — Design services and Expenses leaked back into Product Library type dropdown and Selections category dropdown. Filter out by `expenseType: 'service'` / `expenseType: 'expense'`.
+7b. **DOC-1 — SKU + finish on new financial doc lines** (Jun 9, 2026). Partial fix landed in `index.html` (generate proposal from clips, add-from-selections, library rail, stamp-from-clip). **Staging verify** then deploy. Existing proposal/PO lines not backfilled — edit manually or re-add from selections if needed.
 
 ## MEDIUM
 
@@ -73,6 +74,7 @@ This file holds time-bound priorities. CLAUDE.md is canon and timeless — anyth
 12. **Triple-DUP cleanup on Cloud-Rolling-Hills** (~1,043 duplicate clips — same SKU added 3x with different categories).
 13. **Implement Display ID prefix system** (H-/S-/C-) per AI Session Rule #6. Currently future-state.
 14. **Reconcile `products/` and `productLibrary/`** — pick canonical row per houzzId, migrate refs, eventually retire `productLibrary/`.
+14b. **F-131 — Full catalog field propagation** (library → selections → proposal → invoice → PO): single `cchCopyCatalogFieldsToDocLine` + RESOLVE/APPLY for dimensions, materials, descriptions, spec URLs, full gallery — **after** library cleanup (item 14). Tracked in `KNOWN_ISSUES.md` F-131. Jun 9 partial: sku/finish only (DOC-1).
 15. **Clipper ID format revision** — replace ugly slug `soapstone_kitchen_sinks__m_teixeira_soapstone__appliances___plumbing` with clean numeric `#`. Architecture: Clipper writes to Product Library FIRST, then routes to Project + Room.
 
 ---

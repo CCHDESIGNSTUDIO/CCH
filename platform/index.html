@@ -2788,41 +2788,59 @@
     .data-table { width: 100%; border-collapse: collapse; }
     .data-table th, .data-table td { padding: 10px 12px; text-align: left; vertical-align: middle; font-size: 13px; border-bottom: 1px solid var(--border, #eee); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .data-table td.col-actions, .data-table td.col-links { overflow: visible !important; white-space: normal !important; }
-    /* Smart Time ledger: scroll inside card; .main has overflow-x:hidden so wide tables must not grow past viewport */
+    /* Smart Time ledger: vertical scroll in card; pager stays outside the wide table */
     .card.time-ledger-card {
       max-width: 100%;
       min-width: 0;
     }
+    .time-ledger-pager-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 10px 12px;
+      font-size: 13px;
+      color: var(--gray-500);
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      margin-bottom: 8px;
+    }
+    .time-ledger-pager-bar:last-child { margin-bottom: 0; margin-top: 8px; }
     .table-wrap.time-ledger-wrap {
-      overflow-x: auto;
-      overflow-y: visible;
+      overflow: auto;
+      max-height: min(68vh, calc(100vh - 300px));
       max-width: 100%;
       width: 100%;
       min-width: 0;
       -webkit-overflow-scrolling: touch;
-      padding-bottom: 8px;
+      border: 1px solid var(--gray-200);
     }
     table.data-table.time-ledger-table {
-      width: max-content;
-      min-width: 100%;
+      width: 100%;
+      min-width: 960px;
       table-layout: auto;
+      font-size: 13px;
     }
     table.data-table.time-ledger-table > thead > tr > th,
     table.data-table.time-ledger-table > tbody > tr > td {
       overflow: visible;
       text-overflow: clip;
       white-space: nowrap;
+      padding: 10px 12px;
     }
     table.data-table.time-ledger-table .time-ledger-desc {
-      max-width: 280px;
+      max-width: 220px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     table.data-table.time-ledger-table > thead > tr > th {
-      position: static;
-      top: auto;
-      z-index: auto;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: var(--gray-50);
+      box-shadow: 0 1px 0 var(--gray-200);
     }
     table.data-table.time-ledger-table th.time-ledger-inv,
     table.data-table.time-ledger-table td.time-ledger-inv {
@@ -2835,31 +2853,15 @@
       font-size: 12px;
       line-height: 1.4;
     }
-    /* Edit sticks at right when scrolling horizontally (skip pager colspan row) */
+    /* Edit column only — avoid triple sticky overlap on narrow screens */
     table.data-table.time-ledger-table thead th:last-child,
-    table.data-table.time-ledger-table tbody tr:not(.time-ledger-pager) td:last-child {
+    table.data-table.time-ledger-table tbody td:last-child {
       position: sticky;
       right: 0;
-      z-index: 3;
-      background: var(--card-bg, #fff);
-      box-shadow: -10px 0 14px -8px rgba(27, 51, 82, 0.18);
-      white-space: nowrap;
-    }
-    table.data-table.time-ledger-table.time-ledger-full thead th:nth-last-child(2),
-    table.data-table.time-ledger-table.time-ledger-full tbody tr:not(.time-ledger-pager) td:nth-last-child(2) {
-      position: sticky;
-      right: 5.5rem;
-      z-index: 2;
+      z-index: 4;
       background: var(--card-bg, #fff);
       box-shadow: -8px 0 12px -8px rgba(27, 51, 82, 0.12);
-    }
-    table.data-table.time-ledger-table.time-ledger-full thead th:nth-last-child(3),
-    table.data-table.time-ledger-table.time-ledger-full tbody tr:not(.time-ledger-pager) td:nth-last-child(3) {
-      position: sticky;
-      right: 11rem;
-      z-index: 2;
-      background: var(--card-bg, #fff);
-      box-shadow: -6px 0 10px -6px rgba(27, 51, 82, 0.1);
+      white-space: nowrap;
     }
     table.data-table.time-ledger-table .time-ledger-studio-link {
       color: #075985 !important;
@@ -3044,6 +3046,12 @@
         </button>
         <button class="nav-item" data-page="vendors">
           <span class="nav-icon">◇</span><span class="nav-label">Vendors</span>
+        </button>
+        <button class="nav-item" data-page="showrooms" onclick="event.stopImmediatePropagation();navigate('#/showrooms')">
+          <span class="nav-icon">🏛</span><span class="nav-label">Showrooms</span>
+        </button>
+        <button class="nav-item" data-page="contractors" onclick="event.stopImmediatePropagation();navigate('#/contractors')">
+          <span class="nav-icon">🔧</span><span class="nav-label">Subcontractors</span>
         </button>
         <button class="nav-item" data-page="workrooms">
           <span class="nav-icon">◇</span><span class="nav-label">Workrooms</span>
@@ -3467,7 +3475,7 @@
     const TEAM_CONFIG = {
       owner: { names: ['cynthia', 'cindy', 'holloway'], rate: 250, label: 'Cindy Holloway' },
       contractors: [
-        { names: ['vanessa', 'vanessaholiday', 'vanessa-holiday', 'vanessa-holliday', 'vholliday'], rate: 125, label: 'Vanessa Holliday' }
+        { names: ['vanessa', 'vanessaholiday', 'vanessa-holiday', 'vanessa-holliday', 'vholliday'], rate: 125, costRate: 65, label: 'Vanessa Holliday' }
       ],
       blendedRate: 195,
       installationRate: 125,
@@ -3496,6 +3504,24 @@
       var m = (memberStr || '').toLowerCase();
       return TEAM_CONFIG.owner.names.some(function(n) { return m.indexOf(n) >= 0; });
     }
+    function _ownerPrincipalRate() {
+      return parseFloat(TEAM_CONFIG.owner.rate) || 250;
+    }
+    /** Owner labor for P&L — principal rate ($250), not Smart Time entry rates (e.g. $125 blended). */
+    function _ownerLaborRateForEntry(t) {
+      var entryRate = parseFloat(t && (t.rate || t.hourlyRate || t.billableRate));
+      if (!isNaN(entryRate) && entryRate <= 0.001) return 0;
+      var svc = String((t && (t.service || t.category || t.billingCategory)) || '').trim();
+      if (/^(ELU|CCH Admin|Non-Billable)$/i.test(svc)) return 0;
+      return _ownerPrincipalRate();
+    }
+    function _ownerLaborValueFromEntries(entries, billableOnly) {
+      return (entries || []).reduce(function(s, t) {
+        if (!_isOwnerMember(t.member || t.user || '')) return s;
+        if (billableOnly && t.billable === false) return s;
+        return s + ((parseFloat(t.hours) || 0) * _ownerLaborRateForEntry(t));
+      }, 0);
+    }
     function _isContractorMember(memberStr) {
       var m = (memberStr || '').toLowerCase();
       return !_isOwnerMember(memberStr) && m !== '' && m !== 'unknown';
@@ -3513,7 +3539,9 @@
       var m = (memberStr || '').toLowerCase();
       for (var i = 0; i < TEAM_CONFIG.contractors.length; i++) {
         var c = TEAM_CONFIG.contractors[i];
-        if (c.names.some(function(n) { return m.indexOf(n) >= 0; })) return c.rate;
+        if (c.names.some(function(n) { return m.indexOf(n) >= 0; })) {
+          return (c.costRate != null && c.costRate !== '') ? c.costRate : c.rate;
+        }
       }
       return DEFAULT_CONTRACTOR_RATE;
     }
@@ -4018,6 +4046,27 @@
       return 0;
     }
     window.poResolvedPaidAmount = poResolvedPaidAmount;
+
+    /** Vendor bill total for P&L — invoiced − sub fees − total bills (not PO doc total or paid amount). */
+    function vendorBillCostForProfit(po) {
+      if (!po) return 0;
+      if (typeof window.cchPoVendorBillTotal === 'function') {
+        return window.cchPoVendorBillTotal(po) || 0;
+      }
+      var bill = po.bill || {};
+      if (bill.billTotal != null && (bill.received || bill.qbBillId || (bill.vendorInvoices && bill.vendorInvoices.length))) {
+        return parseFloat(bill.billTotal) || 0;
+      }
+      if (po.poTotalAtSend != null) return parseFloat(po.poTotalAtSend) || 0;
+      var t = parseFloat(po.total || po.amount) || 0;
+      if (!t && po.items && po.items.length) {
+        t = po.items.reduce(function(s2, i) {
+          return s2 + (parseFloat(i.lineTotal || i.total || i.amount || i.cost) || 0);
+        }, 0);
+      }
+      return t;
+    }
+    window.vendorBillCostForProfit = vendorBillCostForProfit;
 
     /** One PO # per project tab / profit bar — prefer real Firestore PO over clip-po synthetic. */
     function dedupePurchaseOrdersForProjectList(pos) {
@@ -4600,8 +4649,26 @@
       else if (page === 'team') renderTeamPage();
       else if (page === 'clients') renderClients();
       else if (page === 'vendors') {
+        if (parts[1] === 'unclassified') {
+          window._vendorKindFilter = 'unclassified';
+          renderVendors();
+        } else if (parts[1]) {
+          window._vendorKindFilter = '';
+          routeToVendorDetail(decodeURIComponent(parts[1]));
+        } else {
+          window._vendorKindFilter = '';
+          renderVendors();
+        }
+      }
+      else if (page === 'showrooms') {
         if (parts[1]) routeToVendorDetail(decodeURIComponent(parts[1]));
-        else renderVendors();
+        else if (typeof renderShowrooms === 'function') renderShowrooms();
+        else navigate('#/vendors');
+      }
+      else if (page === 'contractors') {
+        if (parts[1]) routeToVendorDetail(decodeURIComponent(parts[1]));
+        else if (typeof renderContractors === 'function') renderContractors();
+        else navigate('#/vendors');
       }
       else if (page === 'workrooms') renderWorkrooms();
       else if (page === 'deliveryreceivers') renderDeliveryReceivers();
@@ -5687,6 +5754,7 @@
       const totalCollected = periodInvoices.filter(i => _normStatus(i.status) === 'paid').reduce((s, i) => s + _sumInvoiceAmount(i), 0);
       const totalOutstanding = totalInvoiced - totalCollected;
       const totalPOCost = periodPOs.reduce((s, po) => s + _sumPOAmount(po), 0);
+      const totalVendorBillCost = periodPOs.reduce((s, po) => s + vendorBillCostForProfit(po), 0);
 
       // Per-project profit data (for owner's profit tracker) — uses period-filtered data
       const projectFinancials = currentProjects.map(p => {
@@ -5695,7 +5763,7 @@
         const ppo = periodPOs.filter(po => po.projectId === p.id);
         const fee = pi.reduce((s,i) => s + _sumInvoiceAmount(i), 0);
         const collected = pi.filter(i => _normStatus(i.status) === 'paid').reduce((s,i) => s + _sumInvoiceAmount(i), 0);
-        const costs = ppo.reduce((s,po) => s + _sumPOAmount(po), 0);
+        const costs = ppo.reduce((s,po) => s + vendorBillCostForProfit(po), 0);
         const tp = timeByProject[name] || timeByProject[p.id] || { hours: 0, billable: 0 };
         const laborCost = tp.hours * getMemberRate(currentUser ? currentUser.email : '');
         const profit = fee - costs - laborCost;
@@ -5735,14 +5803,16 @@
       // Studio-wide KPIs — same scope as Financial Overview (all period invoices/POs, not only "current" 90-day projects)
       const kpiTotalInvoiced = totalInvoiced;
       const kpiPOCost = totalPOCost;
+      const kpiVendorBillCost = totalVendorBillCost;
       const kpiLaborCost = periodEntries.reduce(function(s, t) {
         var h = parseFloat(t.hours) || 0;
         if (h <= 0) return s;
+        if (_isOwnerMember(t.member || t.user || '')) return s;
         var r = parseFloat(t.internalCostRate);
-        if (!(r >= 0) || isNaN(r)) r = getMemberRate(t.member || t.user || (t.email && String(t.email)) || (currentUser && currentUser.email) || '');
+        if (!(r >= 0) || isNaN(r)) r = _getContractorRate(t.member || t.user || (t.email && String(t.email)) || '');
         return s + h * r;
       }, 0);
-      const kpiProfit = kpiTotalInvoiced - kpiPOCost - kpiLaborCost;
+      const kpiProfit = kpiTotalInvoiced - kpiVendorBillCost - kpiLaborCost;
       const kpiMargin = kpiTotalInvoiced > 0 ? Math.round((kpiProfit / kpiTotalInvoiced) * 100) : 0;
 
       // Profit totals — P&L breakdown (top strip + footer match Financial Overview)
@@ -5750,9 +5820,9 @@
       const totalSubcontractors = periodEntries.filter(t => {
         var m = (t.member || t.user || '').toLowerCase();
         return !TEAM_CONFIG.owner.names.some(n => m.includes(n));
-      }).reduce((s,t) => s + ((parseFloat(t.hours)||0) * (parseFloat(t.internalCostRate) || (TEAM_CONFIG.contractors[0] ? TEAM_CONFIG.contractors[0].rate : DEFAULT_CONTRACTOR_RATE))), 0);
+      }).reduce((s,t) => s + ((parseFloat(t.hours)||0) * (parseFloat(t.internalCostRate) || _getContractorRate(t.member || t.user || ''))), 0);
       const totalLaborCost = kpiLaborCost;
-      const totalVendorCost = kpiPOCost;
+      const totalVendorCost = kpiVendorBillCost;
       const totalFees = kpiTotalInvoiced;
       const totalProfit = kpiProfit;
       const profitMargin = kpiMargin;
@@ -5903,9 +5973,9 @@
               <div class="db-ins-sub">labor cost</div>
             </div>
             <div class="db-ins-card c3">
-              <div class="db-ins-label">Cost of Goods</div>
-              <div class="db-ins-val">${formatMoney(kpiPOCost)}</div>
-              <div class="db-ins-sub">POs & expenses</div>
+              <div class="db-ins-label">Vendor Bills</div>
+              <div class="db-ins-val">${formatMoney(kpiVendorBillCost)}</div>
+              <div class="db-ins-sub">received bill totals</div>
             </div>
             <div class="db-ins-card c4">
               <div class="db-ins-label">Total Profit</div>
@@ -6130,8 +6200,8 @@
                 <div class="db-panel-row"><span class="db-panel-rl">Total Invoiced</span><span class="db-panel-rv">${formatMoney(totalInvoiced)}</span></div>
                 <div class="db-panel-row"><span class="db-panel-rl">Payments Received</span><span class="db-panel-rv">${formatMoney(totalCollected)}</span></div>
                 <div class="db-panel-row"><span class="db-panel-rl">Outstanding</span><span class="db-panel-rv" style="color:${totalOutstanding > 0 ? '#D4A574' : '#C4A464'};">${formatMoney(totalOutstanding)}</span></div>
-                <div class="db-panel-row"><span class="db-panel-rl">Vendor Costs</span><span class="db-panel-rv">${formatMoney(totalPOCost)}</span></div>
-                <div class="db-panel-row" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:10px;margin-top:4px;"><span class="db-panel-rl" style="font-weight:600;color:#0F1A2E;">Net Revenue</span><span class="db-panel-rv">${formatMoney(totalCollected - totalPOCost)}</span></div>
+                <div class="db-panel-row"><span class="db-panel-rl">Vendor Bills</span><span class="db-panel-rv">${formatMoney(totalVendorBillCost)}</span></div>
+                <div class="db-panel-row" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:10px;margin-top:4px;"><span class="db-panel-rl" style="font-weight:600;color:#0F1A2E;">Net Revenue</span><span class="db-panel-rv">${formatMoney(totalCollected - totalVendorBillCost)}</span></div>
               </div>
 
               <!-- Time Tracker -->
@@ -6197,7 +6267,7 @@
             </div>
             <div class="db-footer-item">
               <div class="db-footer-val">${formatMoney(totalVendorCost)}</div>
-              <div class="db-footer-label">Vendor Costs</div>
+              <div class="db-footer-label">Vendor Bills</div>
             </div>
             <div class="db-footer-item">
               <div class="db-footer-val">${formatMoney(totalLaborCost)}</div>
@@ -14005,17 +14075,16 @@
       const _loggedHours = _projTime.reduce((s, t) => s + (parseFloat(t.hours) || 0), 0);
       const _billableTime = _projTime.filter(t => t.billable !== false);
       const _loggedValue = _billableTime.reduce((s, t) => {
-        const rate = parseFloat(t.rate || t.hourlyRate || t.billableRate) || 100;
+        const memberStr = t.member || t.user || '';
+        const rate = _isOwnerMember(memberStr)
+          ? _ownerLaborRateForEntry(t)
+          : (parseFloat(t.rate || t.hourlyRate || t.billableRate) || _getMemberRate(memberStr));
         return s + ((parseFloat(t.hours) || 0) * rate);
       }, 0);
 
       // === THREE COST BUCKETS ===
-      // 1. Direct Project Costs (POs, freight, misc)
-      const _directCosts = _projPOs.reduce((s, po) => {
-        let t = parseFloat(po.total || po.amount) || 0;
-        if (!t && po.items) t = po.items.reduce((s2, i) => s2 + (parseFloat(i.total || i.amount) || 0), 0);
-        return s + t;
-      }, 0);
+      // 1. Vendor bills (received bill totals — not PO doc total or paid amount)
+      const _directCosts = _projPOs.reduce((s, po) => s + vendorBillCostForProfit(po), 0);
 
       // 2. Contractor Labor Cost (non-owner team) — uses TEAM_CONFIG
       const _contractorCosts = _projTime.reduce((s, t) => {
@@ -14032,10 +14101,7 @@
       // 3. Owner Labor Value — tracked, not deducted in cash profit — uses TEAM_CONFIG
       const _ownerTime = _projTime.filter(t => _isOwnerMember(t.member || t.user || ''));
       const _ownerHours = _ownerTime.reduce((s, t) => s + (parseFloat(t.hours) || 0), 0);
-      const _ownerLaborValue = _ownerTime.reduce((s, t) => {
-        const rate = parseFloat(t.rate || t.hourlyRate || t.billableRate) || TEAM_CONFIG.owner.rate;
-        return s + ((parseFloat(t.hours) || 0) * rate);
-      }, 0);
+      const _ownerLaborValue = _ownerLaborValueFromEntries(_projTime);
 
       // === REVENUE ===
       const _invoicedValue = _projInvoices.reduce((s, i) => s + (invoiceComputedGrandTotal(i) || parseFloat(i.total || i.amount) || 0), 0);
@@ -14083,7 +14149,7 @@
           <div style="margin-bottom:12px;">
             <div style="font-size:9px;color:var(--gray-500);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Costs</div>
             <div style="display:flex;flex-wrap:wrap;gap:6px;">
-              ${_directCosts > 0 ? '<span style="display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:0;font-size:12px;font-weight:600;font-family:var(--font-mono);background:rgba(196,164,100,0.08);color:#C4A464;border:1px solid rgba(196,164,100,0.15);">PO ' + formatMoney(_directCosts) + ' <span style="font-size:10px;opacity:0.7;">(' + _projPOs.length + ')</span></span>' : ''}
+              ${_directCosts > 0 ? '<span style="display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:0;font-size:12px;font-weight:600;font-family:var(--font-mono);background:rgba(196,164,100,0.08);color:#C4A464;border:1px solid rgba(196,164,100,0.15);">Bills ' + formatMoney(_directCosts) + ' <span style="font-size:10px;opacity:0.7;">(' + _projPOs.length + ' POs)</span></span>' : ''}
               ${_contractorCosts > 0 ? '<span style="display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:0;font-size:12px;font-weight:600;font-family:var(--font-mono);background:rgba(237,232,224,0.08);color:#FFFFFF;border:1px solid rgba(237,232,224,0.12);">Contractors ' + formatMoney(_contractorCosts) + '</span>' : ''}
               ${_ownerLaborValue > 0 ? '<span style="display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:0;font-size:12px;font-weight:600;font-family:var(--font-mono);background:rgba(196,164,100,0.1);color:var(--gold);border:1px solid rgba(196,164,100,0.2);">Cindy ' + formatMoney(_ownerLaborValue) + '</span>' : ''}
               ${_directCosts === 0 && _contractorCosts === 0 && _ownerLaborValue === 0 ? '<span style="font-size:12px;color:var(--gray-500);">No costs recorded yet</span>' : ''}
@@ -14095,7 +14161,7 @@
             <div>
               <div style="font-size:9px;color:var(--gray-500);text-transform:uppercase;letter-spacing:1px;">Cash Profit</div>
               <div style="font-size:20px;font-weight:700;color:${_cashProfit >= 0 ? '#C4A464' : '#D4A574'};font-family:var(--font-mono);">${formatMoney(_cashProfit)}</div>
-              <div style="font-size:9px;color:var(--gray-500);margin-top:1px;">revenue − POs − contractors${_revenue > 0 ? ' · <span style="color:' + (_cashProfit >= 0 ? '#C4A464' : '#D4A574') + ';font-weight:600;">' + (_cashProfit / _revenue * 100).toFixed(1) + '% margin</span>' : ''}</div>
+              <div style="font-size:9px;color:var(--gray-500);margin-top:1px;">invoiced − bills − sub fees${_revenue > 0 ? ' · <span style="color:' + (_cashProfit >= 0 ? '#C4A464' : '#D4A574') + ';font-weight:600;">' + (_cashProfit / _revenue * 100).toFixed(1) + '% margin</span>' : ''}</div>
             </div>
             <div>
               <div style="font-size:9px;color:var(--gray-500);text-transform:uppercase;letter-spacing:1px;">Loaded Profit</div>
@@ -17792,6 +17858,7 @@
       const totalProposed = pProposals.filter(p => p.status !== 'Invoiced' && p.status !== 'Converted').reduce((s,p) => s + (parseFloat(p.total)||0), 0);
       const totalInvoiced = pInvoicesForFinancials.reduce((s,i) => s + (invoiceComputedGrandTotal(i) || parseFloat(i.total) || 0), 0);
       const totalPOCost = pPOs.reduce((s,p) => s + (parseFloat(p.total)||0), 0);
+      const totalVendorBillCost = pPOs.reduce((s,p) => s + vendorBillCostForProfit(p), 0);
       let totalPaid = 0;
       pInvoicesForFinancials.forEach(inv => {
         totalPaid += typeof invoiceListRowCollected === 'function'
@@ -17805,13 +17872,13 @@
       const _pSubCost = pTimeEntries.filter(function(t){
         var m = (t.member || t.user || '').toLowerCase();
         return !TEAM_CONFIG.owner.names.some(function(n){ return m.includes(n); });
-      }).reduce(function(s,t){ return s + ((parseFloat(t.hours)||0) * (parseFloat(t.internalCostRate) || (TEAM_CONFIG.contractors[0] ? TEAM_CONFIG.contractors[0].rate : DEFAULT_CONTRACTOR_RATE))); }, 0);
+      }).reduce(function(s,t){ return s + ((parseFloat(t.hours)||0) * (parseFloat(t.internalCostRate) || _getContractorRate(t.member || t.user || ''))); }, 0);
       // Owner labor cost for this project
       const _pOwnerLabor = pTimeEntries.filter(function(t){
         var m = (t.member || t.user || '').toLowerCase();
         return TEAM_CONFIG.owner.names.some(function(n){ return m.includes(n); });
       }).reduce(function(s,t){ return s + ((parseFloat(t.hours)||0) * TEAM_CONFIG.owner.rate); }, 0);
-      const _pProfit = totalInvoiced - totalPOCost - _pSubCost - _pOwnerLabor;
+      const _pProfit = totalInvoiced - totalVendorBillCost - _pSubCost;
       const margin = totalInvoiced > 0 ? Math.round((_pProfit / totalInvoiced) * 100) : 0;
 
       // Group clips by room
@@ -17846,7 +17913,10 @@
       const _activePOs = pos.filter(p => !['Installed','Received','Cancelled','Closed'].includes(p.status));
       const _poTotal = _activePOs.reduce((s,p) => s + (parseFloat(p.total)||0), 0);
       const _contractorHrs = _timeEntries.filter(t => !_isOwnerMember(t.member||t.user||'')).reduce((s,t) => s + (parseFloat(t.hours)||0), 0);
-      const _contractorCost = _contractorHrs * (TEAM_CONFIG.contractors[0] ? TEAM_CONFIG.contractors[0].rate : DEFAULT_CONTRACTOR_RATE);
+      const _contractorCost = _timeEntries.reduce(function(s, t) {
+        if (_isOwnerMember(t.member || t.user || '')) return s;
+        return s + ((parseFloat(t.hours) || 0) * (parseFloat(t.internalCostRate) || _getContractorRate(t.member || t.user || '')));
+      }, 0);
 
       // Compact overview (client-portal style) — default on; optional per-project dashboardConfig or toggle
       window._ovCompactMode = window._ovCompactMode || {};
@@ -22633,7 +22703,7 @@ async function renderBoardsTab(T, proj) {
 
     function cchProductModalVendorOptions(p) {
       var set = {};
-      (vendorsCache || []).forEach(function(v) { if (v && v.name) set[String(v.name).trim()] = true; });
+      (window.vendorsCache || []).forEach(function(v) { if (v && v.name) set[String(v.name).trim()] = true; });
       (libraryProducts || []).forEach(function(x) { if (x && x.vendor) set[String(x.vendor).trim()] = true; });
       var cur = String((p && p.vendor) || '').trim();
       if (cur) set[cur] = true;
@@ -26334,9 +26404,7 @@ async function renderBoardsTab(T, proj) {
       // Owner time — uses TEAM_CONFIG
       var ownerTime = allTime.filter(function(t) { return _isOwnerMember(t.member || t.user || ''); });
       var ownerHours = ownerTime.reduce(function(s, t) { return s + (parseFloat(t.hours) || 0); }, 0);
-      var ownerValue = ownerTime.filter(function(t) { return t.billable !== false; }).reduce(function(s, t) {
-        return s + ((parseFloat(t.hours) || 0) * (parseFloat(t.rate || t.hourlyRate || t.billableRate) || TEAM_CONFIG.owner.rate));
-      }, 0);
+      var ownerValue = _ownerLaborValueFromEntries(allTime, true);
 
       // Contractor (non-owner) time — uses TEAM_CONFIG
       var contractorTime = allTime.filter(function(t) { return !_isOwnerMember(t.member || t.user || ''); });
@@ -26358,12 +26426,13 @@ async function renderBoardsTab(T, proj) {
         return s + ((parseFloat(t.hours) || 0) * (parseFloat(t.rate || t.hourlyRate || t.billableRate) || firstContractor.rate));
       }, 0);
 
-      // PO costs
+      // PO document totals (display) vs vendor bills (profit)
       var poCost = pos.reduce(function(s, po) {
         var t = parseFloat(po.total || po.amount) || 0;
         if (!t && po.items) t = po.items.reduce(function(s2, i) { return s2 + ((parseFloat(i.cost || i.totalCost || 0)) * (parseFloat(i.qty) || 1)); }, 0);
         return s + t;
       }, 0);
+      var vendorBillCost = pos.reduce(function(s, po) { return s + vendorBillCostForProfit(po); }, 0);
       var poPaid = pos.reduce(function(s, po) {
         var st = (po.status || '').toLowerCase();
         var paySt = (po.paymentStatus || '').toLowerCase();
@@ -26390,9 +26459,9 @@ async function renderBoardsTab(T, proj) {
         }
       });
 
-      // Profit calculations
+      // Profit calculations — invoiced − sub fees − vendor bills
       var revenue = contractFee > 0 ? contractFee : invoicedTotal;
-      var totalCost = poCost + contractorCost;
+      var totalCost = vendorBillCost + contractorCost;
       var cashProfit = revenue - totalCost;
       var loadedProfit = cashProfit - ownerValue;
       var cashMargin = revenue > 0 ? (cashProfit / revenue * 100) : 0;
@@ -26521,7 +26590,7 @@ async function renderBoardsTab(T, proj) {
         '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;">' +
           kpiCard('Logged Design Value', formatMoney(loggedValue), totalHours.toFixed(1) + ' total hours', 'var(--cyan)') +
           kpiCard('Outsourced Labor Cost', formatMoney(contractorCost), contractorHours.toFixed(1) + ' contractor hours', '#E16A5B') +
-          kpiCard('Purchases / PO Cost', formatMoney(poCost), pos.length + ' purchase orders', '#1abc9c') +
+          kpiCard('Vendor Bills', formatMoney(vendorBillCost), pos.length + ' POs · bill totals for profit', '#1abc9c') +
           kpiCard('Gross Project Revenue', formatMoney(invoicedTotal), '<span style="font-size:13px;font-weight:700;color:' + (cashProfit >= 0 ? '#5FA56B' : '#E16A5B') + ';">Profit: ' + formatMoney(cashProfit) + '</span>', 'var(--gold)') +
         '</div>' +
 
@@ -26576,6 +26645,11 @@ async function renderBoardsTab(T, proj) {
             '<div style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gray-400);font-weight:600;margin-bottom:10px;">Purchase Orders & Expenses</div>' +
             '<div style="background:rgba(30,30,40,0.5);border-radius:0;border:1px solid rgba(255,255,255,0.05);padding:20px;">' +
               '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">' +
+                '<div>' +
+                  '<div style="font-size:10px;color:var(--gray-400);text-transform:uppercase;">Vendor Bill Total</div>' +
+                  '<div style="font-size:20px;font-weight:700;color:#1abc9c;font-family:var(--font-mono);margin-top:4px;">' + formatMoney(vendorBillCost) + '</div>' +
+                  '<div style="font-size:11px;color:var(--gray-500);">used in profit calc</div>' +
+                '</div>' +
                 '<div>' +
                   '<div style="font-size:10px;color:var(--gray-400);text-transform:uppercase;">Total PO Cost</div>' +
                   '<div style="font-size:20px;font-weight:700;color:var(--cyan);font-family:var(--font-mono);margin-top:4px;">' + formatMoney(poCost) + '</div>' +
@@ -28859,6 +28933,22 @@ async function renderBoardsTab(T, proj) {
       if (!_shipToWorkrooms.length && !_shipToReceivers.length) {
         console.warn('[ship-to] No workrooms or receivers loaded — add under Vendors → Workrooms / Delivery Receivers, or Team & Contacts.');
       }
+    }
+
+    function docEditRefreshShipToDropdowns() {
+      if (!_docEdit || _docEdit.type !== 'po') return;
+      var sel = document.getElementById('docEditPOShipTo');
+      var cur = sel ? sel.value : (_docEdit.docData.shipTo || '');
+      var html = _piShipToOptions(cur);
+      if (sel) {
+        sel.innerHTML = html;
+        if (cur) sel.value = _normalizePoShipToSelection(cur, window._docEditProjData || {});
+      }
+      document.querySelectorAll('#docEditItemsArea select[data-field="shipTo"]').forEach(function(el) {
+        var prev = el.value;
+        el.innerHTML = _piShipToOptions(prev);
+        if (prev) el.value = prev;
+      });
     }
 
     function docEditRefreshShipToDropdowns() {
@@ -33563,10 +33653,13 @@ async function renderBoardsTab(T, proj) {
       docEditAutoSave();
     }
 
-    function docEditUpdatePOShipToResolvedPreview() {
+    function docEditUpdatePOShipToResolvedPreview(force) {
       if (!_docEdit || _docEdit.type !== 'po') return;
       var el = document.getElementById('docEditPOShipToAddress');
       if (!el) return;
+      if (!force && document.activeElement === el) return;
+      var pd = window._docEditProjData || {};
+      var dd = _docEdit.docData || {};
       var raw = '';
       var sel = document.getElementById('docEditPOShipTo');
       if (sel && sel.value) raw = String(sel.value).trim();
@@ -33599,7 +33692,24 @@ async function renderBoardsTab(T, proj) {
         _docEdit.docData.issueDate = ds;
         _docEdit.docData.orderDate = ds;
       }
-      docEditUpdatePOShipToResolvedPreview();
+      docEditAutoSave();
+    }
+
+    async function docEditPOVendorNameChange() {
+      if (!_docEdit || _docEdit.type !== 'po') return;
+      var elV = document.getElementById('docEditPOVendor');
+      var elA = document.getElementById('docEditPOVendorAddress');
+      var name = elV ? elV.value.trim() : '';
+      _docEdit.docData.vendor = name;
+      if (elA && !elA.value.trim() && name && typeof window.cchPoVendorAddressResolved === 'function') {
+        try {
+          var resolved = await window.cchPoVendorAddressResolved({ vendor: name });
+          if (resolved) {
+            elA.value = resolved;
+            _docEdit.docData.vendorAddress = resolved;
+          }
+        } catch (_eVenFill) {}
+      }
       docEditAutoSave();
     }
 
@@ -37015,7 +37125,13 @@ async function renderBoardsTab(T, proj) {
           if (Array.isArray(d.vendorList)) d.vendorList.forEach(function(n) { if (n) set[String(n).trim()] = true; });
         }
       } catch (_eV) {}
-      (vendorsCache || []).forEach(function(v) { if (v && v.name) set[String(v.name).trim()] = true; });
+      (window.vendorsCache || []).forEach(function(v) { if (v && v.name) set[String(v.name).trim()] = true; });
+      try {
+        if (typeof window.loadProjectVendors === 'function') {
+          var _lpv = await window.loadProjectVendors(projectId);
+          (_lpv || []).forEach(function(n) { if (n) set[String(n).trim()] = true; });
+        }
+      } catch (_eLpv) {}
       return Object.keys(set).filter(Boolean).sort(function(a, b) { return a.localeCompare(b, undefined, { sensitivity: 'base' }); });
     }
 
@@ -39658,6 +39774,19 @@ async function renderBoardsTab(T, proj) {
           console.warn('[renderPODetail] category hydrate', ePoCat);
         }
       }
+      if (typeof window.cchPoHydrateLineVendorsFromDoc === 'function') {
+        try {
+          if (window.cchPoHydrateLineVendorsFromDoc(items, docData)) {
+            await db.collection('boards').doc(projectId).collection('purchaseOrders').doc(poId).update({
+              items: items,
+              updatedAt: new Date().toISOString()
+            });
+            docData.items = items;
+          }
+        } catch (ePoVend) {
+          console.warn('[renderPODetail] vendor hydrate', ePoVend);
+        }
+      }
 
       // View-first parity with invoices: read-only page shows payment history; Edit opens full editor.
       if (typeof _loadShipToContacts === 'function') {
@@ -40681,7 +40810,10 @@ async function renderBoardsTab(T, proj) {
         const loggedHours = pTime.reduce((s, t) => s + (parseFloat(t.hours) || 0), 0);
         const billableTime = pTime.filter(t => t.billable !== false);
         const loggedValue = billableTime.reduce((s, t) => {
-          const rate = parseFloat(t.rate || t.hourlyRate || t.billableRate) || _getMemberRate(t.member || t.user || '');
+          const memberStr = t.member || t.user || '';
+          const rate = _isOwnerMember(memberStr)
+            ? _ownerLaborRateForEntry(t)
+            : (parseFloat(t.rate || t.hourlyRate || t.billableRate) || _getMemberRate(memberStr));
           return s + ((parseFloat(t.hours) || 0) * rate);
         }, 0);
         // Contractor cost (non-owner team) — owner's time is profit, not cost — uses TEAM_CONFIG
@@ -40695,9 +40827,7 @@ async function renderBoardsTab(T, proj) {
         // Owner's logged hours & value (separate tracking) — uses TEAM_CONFIG
         const cynthiaTime = pTime.filter(t => _isOwnerMember(t.member || t.user || ''));
         const cynthiaHours = cynthiaTime.reduce((s, t) => s + (parseFloat(t.hours) || 0), 0);
-        const cynthiaValue = cynthiaTime.filter(t => t.billable !== false).reduce((s, t) => {
-          return s + ((parseFloat(t.hours) || 0) * (parseFloat(t.rate || t.hourlyRate || t.billableRate) || TEAM_CONFIG.owner.rate));
-        }, 0);
+        const cynthiaValue = _ownerLaborValueFromEntries(pTime);
 
         // First contractor's hours — uses TEAM_CONFIG
         const _fc = TEAM_CONFIG.contractors[0] || { names: [], rate: DEFAULT_CONTRACTOR_RATE };
@@ -40706,11 +40836,7 @@ async function renderBoardsTab(T, proj) {
 
         // POs for this project
         const pPO = allPOs.filter(po => po.projectId === p.id);
-        const poCost = pPO.reduce((s, po) => {
-          let t = parseFloat(po.total || po.amount) || 0;
-          if (!t && po.items) t = po.items.reduce((s2, i) => s2 + (parseFloat(i.total || i.amount) || 0), 0);
-          return s + t;
-        }, 0);
+        const poCost = pPO.reduce((s, po) => s + vendorBillCostForProfit(po), 0);
 
         // Invoices for this project
         const pInv = allInvoices.filter(i => i.projectId === p.id);
@@ -40718,7 +40844,7 @@ async function renderBoardsTab(T, proj) {
         const collectedValue = pInv.filter(i => i.status === 'Paid').reduce((s, i) => s + (parseFloat(i.total || i.amount) || 0), 0);
 
         // === THREE BUCKETS ===
-        const directCosts = poCost; // PO / product spend
+        const directCosts = poCost; // vendor bill totals
         const ownerLaborValue = cynthiaValue; // tracked but not cash expense
 
         // === DUAL PROFIT ===
@@ -40855,9 +40981,9 @@ async function renderBoardsTab(T, proj) {
               <div class="pt-kc-sub">total invoiced</div>
             </div>
             <div class="pt-kc teal">
-              <div class="pt-kc-label">Direct Costs (POs)</div>
+              <div class="pt-kc-label">Vendor Bills</div>
               <div class="pt-kc-val" style="color:#1abc9c;">${formatMoney(totals.directCosts)}</div>
-              <div class="pt-kc-sub">product / vendor spend</div>
+              <div class="pt-kc-sub">received bill totals</div>
             </div>
             <div class="pt-kc red">
               <div class="pt-kc-label">Contractor Costs</div>
@@ -40872,7 +40998,7 @@ async function renderBoardsTab(T, proj) {
             <div class="pt-kc amber">
               <div class="pt-kc-label">Owner Labor Value</div>
               <div class="pt-kc-val" style="color:#C4A464;">${formatMoney(totals.ownerLaborValue)}</div>
-              <div class="pt-kc-sub">Cindy tracked cost</div>
+              <div class="pt-kc-sub">Cindy @ $${TEAM_CONFIG.owner.rate}/hr</div>
             </div>
             <div class="pt-kc cyan">
               <div class="pt-kc-label">Loaded Profit</div>
@@ -40916,7 +41042,7 @@ async function renderBoardsTab(T, proj) {
                   <th>Project</th>
                   <th>Model</th>
                   <th class="num">Revenue</th>
-                  <th class="num">PO Costs</th>
+                  <th class="num">Vendor Bills</th>
                   <th class="num">Contractors</th>
                   <th class="num">Cindy</th>
                   <th class="num">Cash Profit</th>
@@ -41550,6 +41676,57 @@ async function renderBoardsTab(T, proj) {
         return 0;
       });
     }
+
+    function timeLedgerPageSize() {
+      var ps = parseInt(window._tlPageSize, 10);
+      return (ps > 0 && ps <= 500) ? ps : 100;
+    }
+    function timeLedgerResetPageIfFiltersChanged() {
+      var key = [timeFilter.project, timeFilter.client, timeFilter.service, timeFilter.member, timeFilter.dateFrom, timeFilter.dateTo, timeFilter.billable, timeFilter.invoiced, timeViewMode, smartTimeTab].join('|');
+      if (window._tlFilterKey !== key) {
+        window._tlFilterKey = key;
+        window._tlPage = 1;
+      }
+      if (!window._tlPage || window._tlPage < 1) window._tlPage = 1;
+    }
+    function timeLedgerPagerBar(total, extraClass) {
+      var ps = timeLedgerPageSize();
+      var pages = Math.max(1, Math.ceil(total / ps));
+      if (window._tlPage > pages) window._tlPage = pages;
+      var start = (window._tlPage - 1) * ps;
+      var end = Math.min(start + ps, total);
+      var cls = 'time-ledger-pager-bar' + (extraClass ? ' ' + extraClass : '');
+      var sizeOpts = [50, 100, 250].map(function(n) {
+        return '<option value="' + n + '"' + (ps === n ? ' selected' : '') + '>' + n + '</option>';
+      }).join('');
+      var nav = '';
+      if (total > ps) {
+        nav = '<span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
+          '<label style="font-size:12px;display:flex;align-items:center;gap:4px;color:var(--gray-500);">Rows ' +
+          '<select class="form-input" style="width:72px;padding:4px 6px;font-size:12px;" onchange="window._tlPageSize=parseInt(this.value,10)||100;window._tlPage=1;renderTimeView();">' + sizeOpts + '</select></label>' +
+          (window._tlPage > 1 ? '<button type="button" class="btn btn-secondary btn-sm" onclick="window._tlPage--;renderTimeView();">← Prev</button>' : '') +
+          '<span style="font-size:12px;font-weight:700;color:var(--navy);">Page ' + window._tlPage + ' of ' + pages + '</span>' +
+          (window._tlPage < pages ? '<button type="button" class="btn btn-secondary btn-sm" onclick="window._tlPage++;renderTimeView();">Next →</button>' : '') +
+          '</span>';
+      }
+      return '<div class="' + cls + '"><span><strong>' + total + ' entries</strong>' +
+        (total > 0 ? ' · showing ' + (start + 1) + '–' + end : '') + '</span>' + nav + '</div>';
+    }
+    function timeLedgerHoursCellHtml(t, ledgerFull) {
+      if (!ledgerFull) return '<td class="amount">' + formatHours(t.hours) + '</td>';
+      var added = parseFloat(t.addedHrs) || 0;
+      var val = added > 0 ? String(added) : '';
+      var inpStyle = 'width:54px;text-align:right;font-size:11px;padding:2px 4px;border:1px solid var(--gray-200);margin-top:4px;';
+      if (added > 0) inpStyle += 'color:var(--gold);font-weight:700;';
+      return '<td class="amount" onclick="event.stopPropagation()">' +
+        '<div style="font-weight:700;font-family:var(--font-mono);">' + formatHours(t.hours) + '</div>' +
+        '<input type="text" inputmode="decimal" class="tl-added-hrs-inp" value="' + escAttr(val) + '" placeholder="+hrs" ' +
+        'onfocus="this.select()" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}if(event.key===\'Escape\'){event.preventDefault();this.value=\'' + escAttr(val) + '\';this.blur();}" ' +
+        'onchange="tlSetAddedHrs(\'' + escAttr(t.id) + '\',this.value)" title="Hours to add (e.g. 1.5)" style="' + inpStyle + '">' +
+        (t.addedReason ? (' <span title="' + escAttr(t.addedReason) + '" style="cursor:help;">📝</span>') : '') +
+        '</td>';
+    }
+    window.timeLedgerHoursCellHtml = timeLedgerHoursCellHtml;
 
     // Activity types with billing rates
     // ==================== REPORTS HUB ====================
@@ -44944,7 +45121,7 @@ async function renderBoardsTab(T, proj) {
               <option value="yes" ${timeFilter.invoiced==='yes'?'selected':''}>Invoiced</option>
             </select>` : ''}
             <button class="btn btn-secondary btn-sm" onclick="showNewTimeEntryModal({date: timeFilter.dateFrom || new Date().toISOString().slice(0,10)})" style="font-weight:600;">+ New Entry</button>
-            ${uninvoiced.length > 0 ? `<button type="button" id="timeLedgerCreateInvoiceBtn" class="btn btn-primary btn-sm" data-uninv-n="${uninvoiced.length}" data-uninv-amt="${uninvoicedTotal}" onclick="showCreateInvoiceFromTime()" style="font-weight:700;">🧾 Create Invoice (${uninvoiced.length} uninvoiced in view · ${formatMoney(uninvoicedTotal)})</button><span style="font-size:11px;color:var(--gray-500);max-width:420px;line-height:1.35;"><strong>Checked rows</strong> change the button to show that count and total. Leave all unchecked to invoice <em>every</em> uninvoiced billable row matching filters below. ${ledgerFull ? 'You can include any team member\'s time.' : 'Widen dates or clear filters to include older logs.'}</span>` : ''}
+            ${uninvoiced.length > 0 ? `<button type="button" id="timeLedgerCreateInvoiceBtn" class="btn btn-primary btn-sm" data-uninv-n="${uninvoiced.length}" data-uninv-amt="${uninvoicedTotal}" onclick="showCreateInvoiceFromTime()" style="font-weight:700;" title="Leave all unchecked to invoice every uninvoiced billable row matching filters. Checked rows limit the invoice to your selection.">🧾 Create Invoice (${uninvoiced.length} uninvoiced · ${formatMoney(uninvoicedTotal)})</button>` : ''}
           </div>
 
           <div id="timeViewContent"></div>
@@ -45380,6 +45557,9 @@ async function renderBoardsTab(T, proj) {
       }
       // Sort entries
       var sorted = sortTimeLedgerEntries(filtered);
+      timeLedgerResetPageIfFiltersChanged();
+      var ps = timeLedgerPageSize();
+      var pageRows = sorted.slice((window._tlPage - 1) * ps, window._tlPage * ps);
       // Sort arrow helper
       var sa = function(col) {
         if (timeLedgerSort.field !== col) return '';
@@ -45396,15 +45576,15 @@ async function renderBoardsTab(T, proj) {
           </div>
           ${(function(){ const under15 = filtered.filter(t => (parseFloat(t.hours)||0) <= 0.25 && !t.invoiceId); return under15.length > 0 ? `<button class="btn btn-sm" style="background:var(--gold);color:var(--black);border:none;font-weight:700;" onclick="showConsolidateModal()">⚡ Consolidate 15min & Under</button><span style="font-size:11px;color:var(--gray-400);margin-left:4px;">${under15.length} entries · choose which groups to merge</span>` : `<span style="font-size:11px;color:var(--gray-400);">No entries under 15min</span>`; })()}
         </div>
+        ${timeLedgerPagerBar(sorted.length, '')}
         <div class="card time-ledger-card"><div class="table-wrap time-ledger-wrap">
           <table class="data-table time-ledger-table${ledgerFull ? ' time-ledger-full' : ''}">
             <thead><tr>
               ${ledgerFull ? '<th style="width:30px;"><input type="checkbox" id="timeSelectAll" onchange="toggleAllTimeEntries(this.checked)"></th>' : ''}
-              <th style="${thStyle}" onclick="toggleTimeLedgerSort('project')">Project${sa('project')}</th>${ledgerFull ? `<th style="${thStyle}" onclick="toggleTimeLedgerSort('member')">Member${sa('member')}</th>` : ''}<th style="${thStyle}" onclick="toggleTimeLedgerSort('date')">Date${sa('date')}</th><th style="${thStyle}" onclick="toggleTimeLedgerSort('service')">Service${sa('service')}</th><th>Description</th><th style="width:60px;">Billable</th>${ledgerFull ? `<th class="amount" style="${thStyle}" onclick="toggleTimeLedgerSort('hours')">Logged${sa('hours')}</th><th class="amount" title="Hours to add">+ Hrs</th><th class="amount">Total</th>` : `<th class="amount" style="${thStyle}" onclick="toggleTimeLedgerSort('hours')">Hours${sa('hours')}</th>`}${ledgerFull ? `<th class="amount" style="${thStyle}" onclick="toggleTimeLedgerSort('rate')">Rate${sa('rate')}</th><th class="amount" style="${thStyle}" onclick="toggleTimeLedgerSort('total')">Total${sa('total')}</th><th class="time-ledger-inv" style="${thStyle}" onclick="toggleTimeLedgerSort('invoiceId')" title="Houzz invoice # (invoiceRef) and/or linked Studio invoice">Houzz #${sa('invoiceId')}</th><th class="amount" style="${thStyle}" onclick="toggleTimeLedgerSort('invoicedAmount')">Invoiced $${sa('invoicedAmount')}</th><th style="${thStyle}" onclick="toggleTimeLedgerSort('status')">Status${sa('status')}</th>` : ''}<th style="width:40px;"></th>
+              <th style="${thStyle}" onclick="toggleTimeLedgerSort('project')">Project${sa('project')}</th>${ledgerFull ? `<th style="${thStyle}" onclick="toggleTimeLedgerSort('member')">Member${sa('member')}</th>` : ''}<th style="${thStyle}" onclick="toggleTimeLedgerSort('date')">Date${sa('date')}</th><th style="${thStyle}" onclick="toggleTimeLedgerSort('service')">Service${sa('service')}</th><th>Description</th><th style="width:60px;">Billable</th><th class="amount" style="${thStyle}" onclick="toggleTimeLedgerSort('hours')">Hours${sa('hours')}</th>${ledgerFull ? `<th class="amount" style="${thStyle}" onclick="toggleTimeLedgerSort('rate')">Rate${sa('rate')}</th><th class="amount" style="${thStyle}" onclick="toggleTimeLedgerSort('total')">Amount${sa('total')}</th><th class="time-ledger-inv" style="${thStyle}" onclick="toggleTimeLedgerSort('invoiceId')" title="Houzz invoice # (invoiceRef) and/or linked Studio invoice">Invoice #${sa('invoiceId')}</th><th class="amount" style="${thStyle}" onclick="toggleTimeLedgerSort('invoicedAmount')">Invoiced $${sa('invoicedAmount')}</th><th style="${thStyle}" onclick="toggleTimeLedgerSort('status')">Status${sa('status')}</th>` : ''}<th style="width:40px;"></th>
             </tr></thead>
             <tbody>
-              ${(function(){ if(!window._tlPage) window._tlPage=1; var _csp = ledgerFull ? 16 : 7; return sorted.length > 50 ? '<tr class="time-ledger-pager"><td colspan="' + _csp + '" style="padding:8px 12px;font-size:13px;color:var(--gray-500);background:var(--gray-50);"><strong>' + sorted.length + ' entries</strong> — Page ' + window._tlPage + ' of ' + Math.ceil(sorted.length/50) + ' <span style="float:right;">' + (window._tlPage > 1 ? '<button class=btn onclick="window._tlPage--;renderTimeView();" style="padding:3px 10px;font-size:11px;margin-right:4px;">← Prev</button>' : '') + (window._tlPage*50 < sorted.length ? '<button class=btn onclick="window._tlPage++;renderTimeView();" style="padding:3px 10px;font-size:11px;">Next →</button>' : '') + '</span></td></tr>' : ''; })()}
-              ${sorted.slice(((window._tlPage||1)-1)*50, (window._tlPage||1)*50).map(t => `
+              ${pageRows.map(t => `
                 <tr class="${t.invoiceId ? '' : t.billable ? 'row-billable' : 'row-nonbillable'}">
                   ${ledgerFull ? `<td><input type="checkbox" class="time-cb" data-id="${t.id}" data-invoiced="${t.invoiceId ? '1' : ''}" data-total="${parseFloat(t.total)||0}" ${(t.invoiceId && typeof isTimeAdmin === 'function' && !isTimeAdmin()) ? 'disabled' : ''} onchange="updateTimeSelectionInfo()"></td>` : ''}
                   <td ondblclick="event.stopPropagation();tlInlineProjectEdit(this,'${t.id}')" title="Double-click to change project / client"><strong>${esc(t.project || '')}</strong></td>
@@ -45413,7 +45593,7 @@ async function renderBoardsTab(T, proj) {
                   <td style="font-size:12px;" ondblclick="event.stopPropagation();tlInlineEdit(this,'${t.id}','service')" title="Double-click to edit">${esc(t.service || '')}</td>
                   <td class="time-ledger-desc" style="font-size:12px;" ondblclick="event.stopPropagation();tlInlineEdit(this,'${t.id}','description')" title="Double-click to edit">${esc(t.description || '')}</td>
                   <td style="font-size:11px;text-align:center;">${t.billable ? '<span style="color:#5FA56B;font-weight:600;">Billable</span>' : '<span style="color:var(--gray-400);">Non-Bill</span>'}</td>
-                  ${ledgerFull ? `<td class="amount" title="Tracked time (read-only)">${formatHours((t.trackedHrs!=null?(parseFloat(t.trackedHrs)||0):((parseFloat(t.hours)||0)-(parseFloat(t.addedHrs)||0))))}</td>${timeLedgerAddedHrsCell(t)}<td class="amount" title="Total hours"><strong>${formatHours(t.hours)}</strong></td>` : `<td class="amount">${formatHours(t.hours)}</td>`}
+                  ${timeLedgerHoursCellHtml(t, ledgerFull)}
                   ${ledgerFull ? `<td class="amount">${formatMoney(t.rate || 0)}</td>
                   <td class="amount"><strong>${formatMoney(t.total || 0)}</strong></td>
                   <td class="time-ledger-inv">${timeLedgerInvoiceCellHtml(t)}</td>
@@ -45427,6 +45607,7 @@ async function renderBoardsTab(T, proj) {
             </tbody>
           </table>
         </div></div>
+        ${timeLedgerPagerBar(sorted.length, 'time-ledger-pager-bottom')}
       `;
       if (window.updateTimeSelectionInfo) updateTimeSelectionInfo();
     }
@@ -50298,8 +50479,8 @@ async function renderBoardsTab(T, proj) {
             <table class="data-table time-ledger-table">
               <thead><tr>
                 ${ledgerFull ? '<th style="width:32px;"><input type="checkbox" id="timeSelectAll" onchange="toggleAllTimeEntries(this.checked)"></th>' : ''}
-                <th>Project</th>${ledgerFull ? '<th>Member</th>' : ''}<th>Date</th><th>Service</th><th>Notes</th><th style="width:72px;">Billable</th>${ledgerFull ? '<th class="amount">Logged</th><th class="amount" title="Hours to add">+ Hrs</th><th class="amount">Total</th>' : '<th class="amount">Hours</th>'}
-                ${ledgerFull ? '<th class="amount">Rate</th><th class="amount">Total</th><th class="time-ledger-inv" title="Houzz invoice # and/or Studio invoice">Houzz #</th><th>Status</th>' : ''}<th></th>
+                <th>Project</th>${ledgerFull ? '<th>Member</th>' : ''}<th>Date</th><th>Service</th><th>Notes</th><th style="width:72px;">Billable</th><th class="amount">Hours</th>
+                ${ledgerFull ? '<th class="amount">Rate</th><th class="amount">Amount</th><th class="time-ledger-inv" title="Houzz invoice # and/or Studio invoice">Invoice #</th><th>Status</th>' : ''}<th></th>
               </tr></thead>
               <tbody>
                 ${sortTimeLedgerEntries(monthEntries).map(t => `
@@ -50311,7 +50492,7 @@ async function renderBoardsTab(T, proj) {
                   <td style="font-size:12px;">${esc(t.service || '')}</td>
                   <td class="time-ledger-desc" style="font-size:12px;">${esc(t.notes || t.note || t.description || '')}</td>
                   <td style="font-size:11px;text-align:center;">${t.billable ? '<span style="color:#5FA56B;font-weight:600;">Yes</span>' : '<span style="color:var(--gray-400);">No</span>'}</td>
-                  ${ledgerFull ? `<td class="amount" title="Tracked time (read-only)">${formatHours((t.trackedHrs!=null?(parseFloat(t.trackedHrs)||0):((parseFloat(t.hours)||0)-(parseFloat(t.addedHrs)||0))))}</td>${timeLedgerAddedHrsCell(t)}<td class="amount" title="Total hours"><strong>${formatHours(t.hours)}</strong></td>` : `<td class="amount">${formatHours(t.hours)}</td>`}
+                  ${timeLedgerHoursCellHtml(t, ledgerFull)}
                   ${ledgerFull ? `<td class="amount">${formatMoney(t.rate || 0)}</td>
                   <td class="amount"><strong>${formatMoney(t.total || 0)}</strong></td>
                   <td class="time-ledger-inv">${timeLedgerInvoiceCellHtml(t)}</td>
@@ -54996,11 +55177,11 @@ async function renderBoardsTab(T, proj) {
         : ((document.getElementById('prodVendor') && document.getElementById('prodVendor').value) || '').trim();
       if (!name) { showToast('Type a vendor name first', 'warning'); return; }
       // Check if already exists
-      var exists = (vendorsCache || []).some(function(v) { return v.name.toLowerCase() === name.toLowerCase(); });
+      var exists = (window.vendorsCache || []).some(function(v) { return v.name.toLowerCase() === name.toLowerCase(); });
       if (exists) { showToast(name + ' already in vendors list'); return; }
       try {
         await db.collection('vendors').add({ name: name, createdAt: new Date().toISOString(), owner: currentUser.email });
-        vendorsCache = null; // bust cache
+        window.vendorsCache = null; // bust cache
         showToast('Vendor "' + name + '" added!');
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
@@ -61245,7 +61426,10 @@ async function renderBoardsTab(T, proj) {
     function startInvoiceFromProposal(projectId, proposalId) { navigate('#/project/' + projectId + '/invoices'); }
     function exportProposalPDF(projectId, proposalId) { navigate('#/project/' + projectId + '/proposal/' + proposalId); }
     async function sendInvoiceReminder(projectId, invoiceId) { await cchAlert('Reminder feature coming soon — will email client with outstanding balance.', 'Invoice Reminder'); }
-    async function emailVendorPO(projectId, poId) { await cchAlert('Email PO feature coming soon — will email vendor with PO details.', 'Email Vendor'); }
+    async function emailVendorPO(projectId, poId) {
+      if (typeof window.cchPoEmailVendor === 'function') return window.cchPoEmailVendor(projectId, poId);
+      await cchAlert('PO vendor email module not loaded — refresh the page (Ctrl+Shift+R).', 'Email Vendor');
+    }
 
     // PO Attachments
     function addPOAttachment(projectId, poId) {
@@ -66969,11 +67153,20 @@ async function renderBoardsTab(T, proj) {
         var vendSnap = await db.collection('vendors').limit(3000).get();
         vendSnap.forEach(function(d) {
           var vd = d.data() || {};
+          if (typeof window.cchContactKindClipperEligible === 'function' &&
+              typeof window.cchResolveContactKind === 'function' &&
+              !window.cchContactKindClipperEligible(window.cchResolveContactKind(vd))) return;
           add(vd.name || vd.company || vd.vendor);
         });
       } catch (e) {}
-      if (typeof vendorsCache !== 'undefined' && vendorsCache) {
-        vendorsCache.forEach(function(v) { if (v && v.name) add(v.name); });
+      if (typeof window.vendorsCache !== 'undefined' && window.vendorsCache) {
+        window.vendorsCache.forEach(function(v) {
+          if (!v || !v.name) return;
+          if (typeof window.cchContactKindClipperEligible === 'function' &&
+              typeof window.cchResolveContactKind === 'function' &&
+              !window.cchContactKindClipperEligible(window.cchResolveContactKind(v))) return;
+          add(v.name);
+        });
       }
       return Object.keys(set).sort(function(a, b) {
         return a.localeCompare(b, undefined, { sensitivity: 'base' });
@@ -72936,6 +73129,7 @@ ${pages}
   <script src="cch-qb-dashboard.js?v=20260528"></script>
   <script src="cch-po-bill-variance.js?v=20260624poc11"></script>
   <script src="cch-order-management.js?v=20260624om25"></script>
+  <script src="cch-po-vendor-comms.js?v=20260627c"></script>
   <script src="cch-ffe-procurement.js?v=20260602"></script>
 </body>
 </html>

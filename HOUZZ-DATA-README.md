@@ -44,8 +44,22 @@ Other bundles in the same folder (for example catalog CSV + image pulls named li
 2. Compare to the logic around `chParseHouzzTxnPurchaseOrderRows` / `chHouzzTxnMoneyCell` in `platform/index.html` (and any parallel assumptions in `import-houzz-data.js`).
 3. Extend the parser for the new header names, or ask Houzz for an export that matches the **“All transactions”** layout you last validated.
 
+## Legacy repair (clients, document tags, duplicate docs)
+
+`import-houzz-data.js` only reads **transaction** workbooks. It does **not** map **Document Tags**, and it sets minimal board client fields (`clientName` from project title, `clientAddress` from first row). Re-imports created **case duplicates** (`in-12006` + `IN-12006`). The full **Clients.csv** dump was used for recon, not merged back.
+
+Use **`merge-houzz-legacy.js`** instead of more spreadsheets:
+
+1. **`HOUZZ_CLIENTS_CSV`** → `Houzz FILES/ARCHIVE/Clients.csv` (email, phone, address on `boards/{id}`).
+2. **`HOUZZ_TXN_XLSX`** → per-project **transaction** export (same shape as `Cloud - HB reports-….xlsx` or “All transactions”), **not** `project_tracker_report` files.
+3. Dedupes invoice/proposal docs (keeps lowercase id when present).
+
+Dry run (no writes): `node merge-houzz-legacy.js --project cloud-susan`  
+Apply with backup: `node merge-houzz-legacy.js --project cloud-susan --apply --backup ./_backup/cloud-susan`
+
 ## Quick checklist after a new Houzz drop
 
 1. Save the **2026-04-26** (or newer) **transaction** `.xlsx` under `Houzz FILES` (or a dated subfolder) and record the **full path**.
 2. Set `HOUZZ_ALL_TXN_XLSX` or update `XLS_PATH` in `import-houzz-data.js`, then run the CLI import if you use it.
-3. In Studio (admin): run **PO payments (Houzz)** with the **same** workbook so PO `payments[]` stays aligned with the CLI/book of record.
+3. Run **`merge-houzz-legacy.js`** (dry run first) to backfill **Clients.csv** + **Document Tags** and remove case duplicates.
+4. In Studio (admin): run **PO payments (Houzz)** with the **same** workbook so PO `payments[]` stays aligned with the CLI/book of record.

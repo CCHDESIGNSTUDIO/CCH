@@ -1,6 +1,7 @@
 /** Gen2 Cloud Functions (matches production deploy — Gen1 manifest caused "Cannot set CPU" errors). */
 const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onDocumentWritten, onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const admin = require("firebase-admin");
 admin.initializeApp();
 
@@ -864,6 +865,17 @@ function assertQbPushAllowed(request) {
   }
 }
 
+/** Vendor bill push targets live QuickBooks — never staging Firebase project. */
+function assertQbBillPushEnvironment() {
+  const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || "";
+  if (projectId === "cch-studio-staging") {
+    throw new HttpsError(
+      "failed-precondition",
+      "QuickBooks bill push is disabled on staging. Receive and edit bills in Studio here; push from production only."
+    );
+  }
+}
+
 /**
  * One-shot / dry-run: set CCH `projectId` on all `timelyEntries` from `project` name (Admin only).
  * Call from Studio signed in as billing admin: httpsCallable with `{ apply: false }` then `{ apply: true }`.
@@ -1043,11 +1055,19 @@ function qbStudioInvoiceLineTaxable(item) {
   return (parseFloat(item.cost) || 0) > 0 || et === "product" || !et;
 }
 
+/** Effective client sales-tax rate: invoice rate if > 0, else project rate. (0 on the doc must NOT block the project rate.) */
+function qbEffectiveInvoiceTaxRate(invoice, proj) {
+  let rate = parseFloat(invoice && invoice.taxRate);
+  if (Number.isFinite(rate) && rate > 0) return rate;
+  rate = parseFloat(proj && proj.taxRate);
+  return Number.isFinite(rate) && rate > 0 ? rate : 0;
+}
+
 /** Client sales tax for QB — uses taxAmount/tax on doc or computes from taxable lines × taxRate. */
 function qbStudioInvoiceSalesTax(invoice, proj) {
   const explicit = parseFloat(invoice.tax ?? invoice.taxAmount);
   if (Number.isFinite(explicit) && explicit > 0.01) return Math.round(explicit * 100) / 100;
-  const taxRate = parseFloat(invoice.taxRate ?? proj.taxRate) || 0;
+  const taxRate = qbEffectiveInvoiceTaxRate(invoice, proj);
   if (taxRate <= 0) return 0;
   let taxableSub = 0;
   for (const item of invoice.items || []) {
@@ -1630,11 +1650,23 @@ function mergeQbPaymentRowsIntoPatch(existing, patch, qbPayRows, refTotal, qbBal
     patch.qbPaymentDate = latestDate;
     if (!existing.datePaid) patch.datePaid = latestDate;
   }
-  if (refTotal > 0.01 && paidSum >= refTotal - 0.02) {
+  // QB is source of truth: if QB shows the invoice fully paid ($0 balance), mark Paid
+  // even when the Studio total drifted higher (lines/tax edited after QB was paid).
+  const qbFullyPaid =
+    qbBalance != null && qbBalance !== "" && Number.isFinite(parseFloat(qbBalance)) && parseFloat(qbBalance) <= 0.02;
+  if (qbFullyPaid || (refTotal > 0.01 && paidSum >= refTotal - 0.02)) {
     patch.status = "Paid";
     patch.qbStatus = "paid";
-    patch.paidAmount = paidSum;
+    patch.paidAmount = qbFullyPaid ? Math.max(paidSum, refTotal) : paidSum;
     patch.balance = 0;
+    if (qbFullyPaid && refTotal > 0.01 && paidSum < refTotal - 0.02) {
+      patch.qbTotalMismatch = {
+        studioTotal: Math.round(refTotal * 100) / 100,
+        qbCollected: Math.round(paidSum * 100) / 100,
+        note: "QB fully paid; Studio total higher (edited after QB paid)",
+        flaggedAt: new Date().toISOString()
+      };
+    }
     patch.qbPaymentConfirmation =
       "QB payment" +
       (qbPayRows[0] && qbPayRows[0].qbPaymentId ? " " + qbPayRows[0].qbPaymentId : "") +
@@ -1715,20 +1747,21 @@ function buildFirestorePatchFromQBInvoice(existing, qbInv, qbPayRows) {
         }];
         updates.paymentCount = 1;
       }
+      // QB balance is ~0 here, so QB considers the invoice fully paid. Trust QB and mark
+      // Paid even if the Studio total is higher (edited after QB was paid); flag the gap.
       const rowsPaid = (updates.payments || payLines).reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
       const paidAmt = rowsPaid > 0.02 ? rowsPaid : qbPaidAmt;
-      if (paidAmt >= refTotal - 0.02) {
-        updates.status = "Paid";
-        updates.qbStatus = "paid";
-        updates.paidAmount = paidAmt;
-        updates.balance = 0;
-      } else if (paidAmt > 0.02) {
-        updates.status = "Partially Paid";
-        updates.qbStatus = "partial";
-        updates.paidAmount = paidAmt;
-        updates.balance = Math.max(0, refTotal - paidAmt);
-      } else {
-        updates.qbStatus = "paid";
+      updates.status = "Paid";
+      updates.qbStatus = "paid";
+      updates.paidAmount = Math.max(paidAmt, refTotal);
+      updates.balance = 0;
+      if (refTotal > 0.01 && paidAmt < refTotal - 0.02) {
+        updates.qbTotalMismatch = {
+          studioTotal: Math.round(refTotal * 100) / 100,
+          qbCollected: Math.round(paidAmt * 100) / 100,
+          note: "QB fully paid; Studio total higher (edited after QB paid)",
+          flaggedAt: new Date().toISOString()
+        };
       }
     }
   } else if (paidFromQb > 0.02) {
@@ -1786,69 +1819,103 @@ exports.syncInvoiceBalanceFromQB = onCall(QB_CALLABLE, async (request) => {
 );
 
 /**
+ * Shared batch-refresh logic: scan boards' invoice subcollections and refresh paid status
+ * from QuickBooks (GET per row). Used by the manual callable and the twice-daily scheduler.
+ */
+async function runBatchInvoiceBalanceSync(opts) {
+  const maxInvoices = Math.min(
+    Math.max(parseInt(String(opts && opts.maxInvoices != null ? opts.maxInvoices : 200), 10) || 200, 1),
+    500
+  );
+  const onlyProjectId = opts && opts.onlyProjectId ? String(opts.onlyProjectId).trim() : "";
+  const { accessToken, realmId } = await getQBAccessToken();
+  let boardsSnap;
+  if (onlyProjectId) {
+    const one = await db.collection("boards").doc(onlyProjectId).get();
+    boardsSnap = one.exists ? { docs: [one] } : { docs: [] };
+  } else {
+    boardsSnap = await db.collection("boards").get();
+  }
+  let scanned = 0;
+  let updated = 0;
+  let errors = 0;
+  const sampleErrors = [];
+
+  outer: for (const boardDoc of boardsSnap.docs) {
+    const projectId = boardDoc.id;
+    let invSnap;
+    try {
+      invSnap = await db.collection("boards").doc(projectId).collection("invoices").get();
+    } catch (e) {
+      continue;
+    }
+    for (const invDoc of invSnap.docs) {
+      if (scanned >= maxInvoices) break outer;
+      const data = invDoc.data();
+      const qbId = _qbInvoiceEntityId(data);
+      const docNumCandidates = _studioInvoiceDocNumberCandidates(data);
+      if (!qbId && !docNumCandidates.length) continue;
+      scanned++;
+      try {
+        const { qbInv, canonicalQbId } = await fetchQBInvoiceForStudio(accessToken, realmId, data);
+        let qbPayRows = [];
+        try {
+          qbPayRows = await pullQbPaymentLinesForInvoice(accessToken, realmId, qbInv);
+        } catch (pe) {
+          console.warn("[runBatchInvoiceBalanceSync] payment pull", invDoc.id, pe.message);
+        }
+        const patch = buildFirestorePatchFromQBInvoice(data, qbInv, qbPayRows);
+        const prevQb = String(data.qbDocId || data.qbInvoiceId || "").trim();
+        if (canonicalQbId && prevQb !== canonicalQbId) {
+          patch.qbDocId = canonicalQbId;
+        }
+        await invDoc.ref.update(patch);
+        updated++;
+      } catch (e) {
+        errors++;
+        const msg = (e && e.message) ? e.message : String(e);
+        if (sampleErrors.length < 10) sampleErrors.push(invDoc.id + ": " + msg);
+      }
+    }
+  }
+
+  return { success: true, scanned, updated, errors, sampleErrors };
+}
+
+/**
  * Scan all boards' invoice subcollections and refresh paid status from QuickBooks (GET per row).
  * Run from Studio when payments were recorded in QB but webhook did not update Firestore.
  */
 exports.batchSyncInvoiceBalancesFromQB = onCall(QB_BATCH_CALLABLE, async (request) => {
     assertQbPushAllowed(request);
-    const rawMax = request.data && request.data.maxInvoices;
-    const maxInvoices = Math.min(Math.max(parseInt(String(rawMax != null ? rawMax : 200), 10) || 200, 1), 500);
-    const onlyProjectId = request.data && request.data.projectId
-      ? String(request.data.projectId).trim()
-      : "";
-    const { accessToken, realmId } = await getQBAccessToken();
-    let boardsSnap;
-    if (onlyProjectId) {
-      const one = await db.collection("boards").doc(onlyProjectId).get();
-      boardsSnap = one.exists ? { docs: [one] } : { docs: [] };
-    } else {
-      boardsSnap = await db.collection("boards").get();
-    }
-    let scanned = 0;
-    let updated = 0;
-    let errors = 0;
-    const sampleErrors = [];
-
-    outer: for (const boardDoc of boardsSnap.docs) {
-      const projectId = boardDoc.id;
-      let invSnap;
-      try {
-        invSnap = await db.collection("boards").doc(projectId).collection("invoices").get();
-      } catch (e) {
-        continue;
-      }
-      for (const invDoc of invSnap.docs) {
-        if (scanned >= maxInvoices) break outer;
-        const data = invDoc.data();
-        const qbId = _qbInvoiceEntityId(data);
-        const docNumCandidates = _studioInvoiceDocNumberCandidates(data);
-        if (!qbId && !docNumCandidates.length) continue;
-        scanned++;
-        try {
-          const { qbInv, canonicalQbId } = await fetchQBInvoiceForStudio(accessToken, realmId, data);
-          let qbPayRows = [];
-          try {
-            qbPayRows = await pullQbPaymentLinesForInvoice(accessToken, realmId, qbInv);
-          } catch (pe) {
-            console.warn("[batchSyncInvoiceBalancesFromQB] payment pull", invDoc.id, pe.message);
-          }
-          const patch = buildFirestorePatchFromQBInvoice(data, qbInv, qbPayRows);
-          const prevQb = String(data.qbDocId || data.qbInvoiceId || "").trim();
-          if (canonicalQbId && prevQb !== canonicalQbId) {
-            patch.qbDocId = canonicalQbId;
-          }
-          await invDoc.ref.update(patch);
-          updated++;
-        } catch (e) {
-          errors++;
-          const msg = (e && e.message) ? e.message : String(e);
-          if (sampleErrors.length < 10) sampleErrors.push(invDoc.id + ": " + msg);
-        }
-      }
-    }
-
-    return { success: true, scanned, updated, errors, sampleErrors };
+    return runBatchInvoiceBalanceSync({
+      maxInvoices: request.data && request.data.maxInvoices,
+      onlyProjectId: request.data && request.data.projectId
+    });
   });
+
+/**
+ * Twice-daily automatic QB balance/payment refresh (07:00 and 16:00 America/Los_Angeles).
+ * Backstop for the webhook: catches payments QB recorded without firing the webhook.
+ */
+exports.scheduledQbInvoiceSync = onSchedule(
+  {
+    schedule: "0 7,16 * * *",
+    timeZone: "America/Los_Angeles",
+    region: REGION,
+    secrets: QB_SECRET_NAMES,
+    timeoutSeconds: 540,
+    memory: "512MiB"
+  },
+  async () => {
+    try {
+      const result = await runBatchInvoiceBalanceSync({ maxInvoices: 500 });
+      console.log("[scheduledQbInvoiceSync]", JSON.stringify(result));
+    } catch (e) {
+      console.error("[scheduledQbInvoiceSync] failed:", e && e.message ? e.message : e);
+    }
+  }
+);
 
 /**
  * Same push as pushInvoiceToQB without Firebase user — for Zapier/n8n/cron.
@@ -2098,6 +2165,75 @@ function poLineTitlesFromBill(bill, poLineIds) {
   }).filter(Boolean);
 }
 
+/** Houzz/QB convention: PO-12931 → BL-12931 (QB Bill DocNumber mirrors PO, not PO-12931-BILL). */
+function qbBillDocNumberFromPo(poNum) {
+  const raw = String(poNum || "").trim();
+  if (!raw) return "BL-";
+  if (/^BL-/i.test(raw)) return raw;
+  const suffix = raw.replace(/^PO-/i, "");
+  return "BL-" + suffix;
+}
+
+/** DocNumbers to try when linking an existing Houzz/QB bill before creating a duplicate. */
+function qbBillDocNumberCandidates(poNum) {
+  const primary = qbBillDocNumberFromPo(poNum);
+  const raw = String(poNum || "").trim();
+  const suffix = raw.replace(/^PO-/i, "");
+  const out = [];
+  function add(s) {
+    const t = String(s || "").trim();
+    if (t && !out.includes(t)) out.push(t);
+  }
+  add(primary);
+  add(raw);
+  if (suffix && suffix !== raw) add(suffix);
+  return out;
+}
+
+/** Query QB for an existing Bill by DocNumber (BL-12931, etc.). */
+async function findQBBillByDocNumber(accessToken, realmId, docNumberCandidates) {
+  const minor = "minorversion=65";
+  for (const docNum of docNumberCandidates || []) {
+    const safe = String(docNum).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    const q = "select * from Bill where DocNumber = '" + safe + "'";
+    const endpoint = "query?query=" + encodeURIComponent(q) + "&" + minor;
+    const res = await qbApiCall("GET", endpoint, accessToken, realmId, null);
+    const fr = (res.QueryResponse && res.QueryResponse.Bill) || [];
+    const list = Array.isArray(fr) ? fr : (fr ? [fr] : []);
+    if (list.length === 1) return list[0];
+    if (list.length > 1) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Multiple QuickBooks bills match DocNumber '" + docNum + "'. Remove duplicates in QB or set bill.qbBillId on the PO."
+      );
+    }
+  }
+  return null;
+}
+
+/**
+ * Resolve QB Bill for push: stored qbBillId, else link existing Houzz BL- bill by DocNumber.
+ * @returns {Promise<{ bill: object, linkedExisting: boolean }|null>}
+ */
+async function fetchQBBillForStudioPush(accessToken, realmId, pushState, docNumberCandidates) {
+  if (pushState.isUpdate && pushState.qbBillId) {
+    try {
+      const fetched = await qbApiCall("GET", "bill/" + pushState.qbBillId, accessToken, realmId);
+      const existing = fetched.Bill;
+      if (existing && existing.Id) {
+        return { bill: existing, linkedExisting: false };
+      }
+    } catch (_e) {
+      /* qbBillId stale — fall through to DocNumber lookup */
+    }
+  }
+  const found = await findQBBillByDocNumber(accessToken, realmId, docNumberCandidates);
+  if (found && found.Id) {
+    return { bill: found, linkedExisting: true };
+  }
+  return null;
+}
+
 function buildVendorBillQbLineItems(po, bill) {
   function itemRefForSource(source, poLineItem) {
     if (poLineItem) return qbItemRefForStudioLine(poLineItem);
@@ -2202,9 +2338,10 @@ function buildVendorBillQbLineItems(po, bill) {
   });
 
   const txnDate = (bill.vendorInvoiceDate || po.date || new Date().toISOString()).toString().slice(0, 10);
-  const docNumber = String(bill.vendorInvoiceNumber || poNum + "-BILL").trim().slice(0, 21);
+  const docNumber = qbBillDocNumberFromPo(poNum).slice(0, 21);
   const privateNote =
     "CCH Studio vendor bill · PO " + poNum +
+    (bill.vendorInvoiceNumber ? " · Vendor inv " + String(bill.vendorInvoiceNumber).trim() : "") +
     (bill.billTotal != null ? " · Total $" + bill.billTotal : "");
 
   return { lineItems, txnDate, docNumber, privateNote };
@@ -2216,11 +2353,18 @@ async function clearQbBillPushLock(docRef) {
   }).catch(() => {});
 }
 
-// ─── PUSH VENDOR BILL → QB (Bill entity — bank transaction match target) ──
+// ─── PUSH VENDOR BILL → QB (Bill entity only — never BillPayment / never Studio paid status) ──
 exports.pushBillToQB = onCall(QB_CALLABLE, async (request) => {
   assertQbPushAllowed(request);
+  assertQbBillPushEnvironment();
 
-  const { projectId, docId } = request.data || {};
+  const { projectId, docId, syncPayments, paymentOnly, markPaid } = request.data || {};
+  if (syncPayments || paymentOnly || markPaid) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Bill-only workflow: vendor bill lines only. Studio payment/paid status is never pushed to QuickBooks."
+    );
+  }
   if (!projectId || !docId) {
     throw new HttpsError("invalid-argument", "projectId and docId required");
   }
@@ -2243,6 +2387,7 @@ exports.pushBillToQB = onCall(QB_CALLABLE, async (request) => {
     const vendorId = await resolveQbVendorIdForPush(accessToken, realmId, vendorName);
     const poNum = po.number || po.num || po.poNum || docId.slice(0, 10);
     const { lineItems, txnDate, docNumber, privateNote } = buildVendorBillQbLineItems(po, bill);
+    const docNumberCandidates = qbBillDocNumberCandidates(poNum);
 
     if (!lineItems.length) {
       throw new HttpsError("failed-precondition", "Vendor bill has no billable lines to push.");
@@ -2250,13 +2395,17 @@ exports.pushBillToQB = onCall(QB_CALLABLE, async (request) => {
 
     let qbBillId;
     let message;
+    let wasUpdate = false;
+    let linkedExisting = false;
 
-    if (pushState.isUpdate && pushState.qbBillId) {
-      const fetched = await qbApiCall("GET", "bill/" + pushState.qbBillId, accessToken, realmId);
-      const existing = fetched.Bill;
-      if (!existing || !existing.Id) {
-        throw new HttpsError("not-found", "QuickBooks Bill not found: " + pushState.qbBillId);
-      }
+    const existingResult = await fetchQBBillForStudioPush(
+      accessToken, realmId, pushState, docNumberCandidates
+    );
+
+    if (existingResult) {
+      wasUpdate = true;
+      linkedExisting = existingResult.linkedExisting;
+      const existing = existingResult.bill;
       const qbBillPayload = {
         Id: existing.Id,
         SyncToken: existing.SyncToken,
@@ -2272,7 +2421,9 @@ exports.pushBillToQB = onCall(QB_CALLABLE, async (request) => {
       if (!qbBillId) {
         throw new HttpsError("internal", "QuickBooks did not return a Bill Id after update.");
       }
-      message = "QuickBooks Bill updated with latest charges";
+      message = linkedExisting
+        ? "Linked to existing QuickBooks Bill " + (existing.DocNumber || docNumber) + " and updated lines"
+        : "QuickBooks Bill updated with latest charges";
     } else {
       const qbBillPayload = {
         Line: lineItems,
@@ -2286,21 +2437,34 @@ exports.pushBillToQB = onCall(QB_CALLABLE, async (request) => {
       if (!qbBillId) {
         throw new HttpsError("internal", "QuickBooks did not return a Bill Id.");
       }
-      message = "Vendor bill pushed to QuickBooks";
+      message = "Vendor bill pushed to QuickBooks as " + docNumber;
     }
 
     const ts = new Date().toISOString();
     const billTotal = parseFloat(bill.billTotal) || 0;
-    await docRef.update({
+    const storedDocNumber = existingResult && existingResult.bill && existingResult.bill.DocNumber
+      ? String(existingResult.bill.DocNumber)
+      : docNumber;
+    const patch = {
       "bill.qbBillId": String(qbBillId),
       "bill.qbSyncedAt": ts,
       "bill.qbSyncedTotal": billTotal,
-      "bill.qbDocNumber": docNumber,
+      "bill.qbDocNumber": storedDocNumber,
       "bill.qbPushLockAt": admin.firestore.FieldValue.delete(),
       lastQbBillPushAt: admin.firestore.FieldValue.serverTimestamp()
-    });
+    };
+    if (linkedExisting) patch["bill.qbLinkedExisting"] = true;
+    else patch["bill.qbLinkedExisting"] = admin.firestore.FieldValue.delete();
+    await docRef.update(patch);
 
-    return { success: true, qbBillId: String(qbBillId), message, updated: !!pushState.isUpdate };
+    return {
+      success: true,
+      qbBillId: String(qbBillId),
+      qbDocNumber: storedDocNumber,
+      message,
+      updated: wasUpdate,
+      linkedExisting
+    };
   } catch (err) {
     await clearQbBillPushLock(docRef);
     throw err;

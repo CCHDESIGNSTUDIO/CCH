@@ -55,6 +55,46 @@ service cloud.firestore {
         && request.resource.data.meta is map;
     }
 
+    /** Client portal timeline (views, inspiration feedback, messages) — unauthenticated. */
+    function portalClientActivityCreate() {
+      return !isAuth()
+        && request.resource.data.meta is map
+        && request.resource.data.meta.source == 'client_portal'
+        && request.resource.data.keys().hasAll(['type', 'action', 'description', 'projectId', 'projectName', 'user', 'timestamp', 'createdAt', 'meta'])
+        && request.resource.data.description is string
+        && request.resource.data.projectId is string
+        && (
+          request.resource.data.type == 'client_portal'
+          || request.resource.data.type == 'client_first_visit'
+          || request.resource.data.type == 'inspiration'
+          || request.resource.data.type == 'proposal'
+          || request.resource.data.type == 'message'
+          || request.resource.data.type == 'invoice'
+        )
+        && (
+          request.resource.data.user == 'Client'
+          || (request.resource.data.meta.clientEmail is string
+              && request.resource.data.user == request.resource.data.meta.clientEmail)
+        );
+    }
+
+    function portalClientSessionWrite() {
+      return !isAuth()
+        && request.resource.data.keys().hasAll(['clientName', 'clientEmail', 'lastVisit', 'projectId'])
+        && request.resource.data.clientName is string
+        && request.resource.data.clientEmail is string
+        && request.resource.data.lastVisit is string
+        && request.resource.data.projectId is string
+        && request.resource.data.clientName.size() > 0
+        && request.resource.data.clientEmail.size() > 3;
+    }
+
+    /** Inspiration board stars/comments/notes — clients update images[] only. */
+    function portalIdeabookClientFeedbackUpdate() {
+      return !isAuth()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['images', 'updatedAt']);
+    }
+
     // Room-board clips = furnishing products only (Studio + Clipper). Admin SDK / imports bypass rules.
     function clipStr(d, k) {
       return (k in d && d[k] is string) ? d[k] : '';
@@ -148,14 +188,19 @@ service cloud.firestore {
       }
       match /ideabooks/{docId} {
         allow read: if true;
-        allow write: if isAuth();
+        allow create, delete: if isAuth();
+        allow update: if isAuth() || portalIdeabookClientFeedbackUpdate();
+      }
+      match /clientSessions/{docId} {
+        allow read: if isAuth();
+        allow create, update: if isAuth() || portalClientSessionWrite();
       }
       match /notes/{docId} {
         allow read: if true;
         allow write: if isAuth();
       }
       match /tasks/{docId} {
-        allow read: if isAuth();
+        allow read: if true;
         allow write: if isAuth();
       }
       match /messages/{docId} {
@@ -197,6 +242,17 @@ service cloud.firestore {
         allow read: if true;
         allow write: if isAuth();
       }
+      match /notifications/{docId} {
+        allow read: if isAuth();
+        allow create: if isAuth();
+        allow update: if isAuth();
+        allow delete: if isAuth();
+      }
+      // Project correspondence + PO vendor email thread (index.html + cch-po-vendor-comms.js)
+      match /correspondence/{docId} {
+        allow read: if isAuth();
+        allow write: if isAuth();
+      }
     }
 
     // settings/* — was public read/write; counters + rates + integrations are sensitive.
@@ -229,7 +285,7 @@ service cloud.firestore {
     // Activity: global read still wide (portal + dashboard). Writes: Studio or narrow client rows.
     match /activity/{docId} {
       allow read: if true;
-      allow create: if isAuth() || portalActivityCreate();
+      allow create: if isAuth() || portalActivityCreate() || portalClientActivityCreate();
       allow update, delete: if isAuth();
     }
 
@@ -253,7 +309,8 @@ service cloud.firestore {
 
     match /products/{docId} {
       allow read: if true;
-      allow create, update: if true;
+      // Was if true — any client could pollute catalog; signed-in Studio/Clipper only.
+      allow create, update: if isAuth();
       allow delete: if isAdmin();
     }
 
@@ -303,6 +360,17 @@ service cloud.firestore {
 
     // Studio writes productLibrary heavily; align rule with app (was admin-only write).
     match /productLibrary/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth();
+    }
+
+    // Junk Library quarantine (productLibrary_archive / products_archive).
+    match /productLibrary_archive/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth();
+    }
+
+    match /products_archive/{docId} {
       allow read: if isAuth();
       allow write: if isAuth();
     }
