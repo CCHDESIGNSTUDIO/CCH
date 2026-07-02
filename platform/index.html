@@ -1845,7 +1845,7 @@
     .rb-hide-btn:hover { border-color: #0F1A2E; color: #0F1A2E; background: #F4F6FA; }
     .rb-drag-handle {
       cursor: grab; color: var(--gray-400); font-size: 14px; line-height: 1; padding: 2px 4px;
-      border-radius: 4px; user-select: none; letter-spacing: -2px;
+      border-radius: 4px; user-select: none; letter-spacing: -2px; touch-action: none;
     }
     .rb-drag-handle:active { cursor: grabbing; color: #0F1A2E; background: rgba(15,26,46,0.06); }
     .rb-board-clip-card.rb-drag-source { opacity: 0.45; transform: scale(0.98); }
@@ -7752,7 +7752,7 @@
       item = item || {};
       var parts = [];
       var rm = String(item.room || '').trim();
-      if (rm) parts.push({ label: 'Room', value: rm });
+      if (rm && !opts.omitRoom) parts.push({ label: 'Room', value: rm });
       var tag = (typeof cchLineTagText === 'function' ? cchLineTagText(item) : '') ||
         String(item.lineTag || item.lineTagCode || item.fixtureTag || '').trim();
       if (tag) parts.push({ label: 'Tag', value: tag });
@@ -16107,6 +16107,17 @@
     }
     return '';
   }
+  function _disResolveAnyClipIdFromIndex(index, r) {
+    if (!index || !r) return '';
+    var existingClipId = String(r.clipId || r._clipDocId || '').trim();
+    if (existingClipId) return existingClipId;
+    var lib = String(r.libraryProductId || r._libDocId || '').trim();
+    if (lib && index.byLib[lib]) return index.byLib[lib];
+    var tv = (String(r.title || '').trim().toLowerCase() + '|' + String(r.vendor || '').trim().toLowerCase());
+    var matches = index.byTV[tv];
+    if (matches && matches.length) return matches[0].id;
+    return '';
+  }
 
     // Inline room on Selections list — updates clip (room board); library rows find or create one clip.
     window.setSelectionItemRoom = async function(idx, room) {
@@ -18813,12 +18824,14 @@
     var _rbClipDrag = null;
 
     function rbClipDragStart(event, projectId, sectionKey, index, clipId) {
+      event.stopPropagation();
       _rbClipDrag = { projectId: projectId, sectionKey: sectionKey, index: index, clipId: clipId };
       event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', String(clipId || index));
+      try { event.dataTransfer.setData('text/plain', String(clipId || index)); } catch (_dt) {}
       var card = event.target.closest('.rb-board-clip-card');
       if (card) card.classList.add('rb-drag-source');
-      event.target.addEventListener('dragend', function() {
+      document.addEventListener('dragend', function rbDragEndOnce() {
+        document.removeEventListener('dragend', rbDragEndOnce);
         _rbClipDrag = null;
         document.querySelectorAll('.rb-board-clip-card').forEach(function(n) {
           n.classList.remove('rb-drag-source', 'rb-drag-over-left', 'rb-drag-over-right');
@@ -18829,6 +18842,7 @@
     function rbClipDragOver(event, el) {
       if (!_rbClipDrag) return;
       event.preventDefault();
+      event.stopPropagation();
       event.dataTransfer.dropEffect = 'move';
       var rect = el.getBoundingClientRect();
       el.classList.remove('rb-drag-over-left', 'rb-drag-over-right');
@@ -18840,10 +18854,30 @@
       el.classList.remove('rb-drag-over-left', 'rb-drag-over-right');
     }
 
-    async function rbClipDropOnItem(event, projectId, sectionKey, toIndex) {
+    function rbGridDragOverCapture(event) {
+      if (!_rbClipDrag) return;
+      event.preventDefault();
+      var card = event.target && event.target.closest ? event.target.closest('.rb-board-clip-card') : null;
+      if (card) rbClipDragOver(event, card);
+    }
+
+    async function rbGridDropCapture(event) {
+      if (!_rbClipDrag) return;
       event.preventDefault();
       event.stopPropagation();
-      var el = event.currentTarget;
+      var card = event.target && event.target.closest ? event.target.closest('.rb-board-clip-card') : null;
+      if (!card) return;
+      var projId = card.getAttribute('data-rb-proj') || '';
+      var sectionKey = card.getAttribute('data-rb-section') || '';
+      var toIndex = parseInt(card.getAttribute('data-rb-idx'), 10);
+      if (!projId || !sectionKey || isNaN(toIndex)) return;
+      await rbClipDropOnItem(event, projId, sectionKey, toIndex, card);
+    }
+
+    async function rbClipDropOnItem(event, projectId, sectionKey, toIndex, el) {
+      event.preventDefault();
+      event.stopPropagation();
+      el = el || event.currentTarget;
       if (el) el.classList.remove('rb-drag-over-left', 'rb-drag-over-right');
       if (!_rbClipDrag || _rbClipDrag.projectId !== projectId) return;
       if (_rbClipDrag.sectionKey !== sectionKey) {
@@ -18851,9 +18885,11 @@
         _rbClipDrag = null;
         return;
       }
+      var ids = (window._rbSectionClipOrders && window._rbSectionClipOrders[sectionKey]) ? window._rbSectionClipOrders[sectionKey].slice() : [];
+      var fromIdx = _rbClipDrag.clipId ? ids.indexOf(_rbClipDrag.clipId) : _rbClipDrag.index;
+      if (fromIdx < 0) fromIdx = _rbClipDrag.index;
       var rect = el.getBoundingClientRect();
       var insertAt = event.clientX < rect.left + rect.width / 2 ? toIndex : toIndex + 1;
-      var fromIdx = _rbClipDrag.index;
       _rbClipDrag = null;
       if (fromIdx < insertAt) insertAt--;
       if (fromIdx === insertAt) return;
@@ -18891,6 +18927,8 @@
     window.rbClipDragStart = rbClipDragStart;
     window.rbClipDragOver = rbClipDragOver;
     window.rbClipDragLeave = rbClipDragLeave;
+    window.rbGridDragOverCapture = rbGridDragOverCapture;
+    window.rbGridDropCapture = rbGridDropCapture;
     window.rbClipDropOnItem = rbClipDropOnItem;
 
     function getClipApprovalStatus(clip) {
@@ -19175,8 +19213,8 @@
       var qty = parseFloat(clip.qty || clip.quantity) || 1;
       var sell = parseMoney(clip.clientPrice) || parseFloat(clip.sellPrice) || parseFloat(clip.unitSellingPrice) || (parseMoney(clip.totalSelling) ? parseMoney(clip.totalSelling) / qty : 0) || parseFloat(clip.totalSell) || parseFloat(clip.price) || parseFloat(clip.retailPrice) || 0;
       var isValid = imgSrc && (imgSrc.startsWith('http') || imgSrc.startsWith('data:') || imgSrc.startsWith('//') || (imgSrc.charAt(0) === '/' && imgSrc.length > 1));
-      return '<div onclick="showClipDetail(\'' + escAttr(projId) + '\',\'' + escAttr(clip.id) + '\')" class="rb-board-clip-card' + _boardClipHiddenCardClass(clip) + '" style="background:white;border:1px solid var(--gray-200);border-radius:6px;overflow:hidden;cursor:pointer;transition:box-shadow 0.2s,transform 0.15s;"' +
-        ' ondragover="rbClipDragOver(event,this)" ondragleave="rbClipDragLeave(this)" ondrop="rbClipDropOnItem(event,\'' + escJsStr(projId) + '\',\'' + escJsStr(sectionKey) + '\',' + idx + ')"' +
+      return '<div onclick="showClipDetail(\'' + escAttr(projId) + '\',\'' + escAttr(clip.id) + '\')" class="rb-board-clip-card' + _boardClipHiddenCardClass(clip) + '" data-rb-proj="' + escAttr(projId) + '" data-rb-section="' + escAttr(sectionKey) + '" data-rb-idx="' + idx + '" style="background:white;border:1px solid var(--gray-200);border-radius:6px;overflow:hidden;cursor:pointer;transition:box-shadow 0.2s,transform 0.15s;"' +
+        ' ondragover="rbClipDragOver(event,this)" ondragenter="event.preventDefault()" ondragleave="rbClipDragLeave(this)" ondrop="rbClipDropOnItem(event,\'' + escJsStr(projId) + '\',\'' + escJsStr(sectionKey) + '\',' + idx + ',this)"' +
         (boardClipIsHidden(clip) ? '' : ' onmouseenter="this.style.boxShadow=\'0 4px 16px rgba(0,0,0,0.1)\';this.style.transform=\'translateY(-1px)\'" onmouseleave="this.style.boxShadow=\'none\';this.style.transform=\'none\'"') + '>' +
         '<div style="position:relative;">' +
           _boardClipHiddenBadgeHtml(clip) +
@@ -19243,8 +19281,9 @@
               '<button type="button" class="btn btn-secondary btn-sm" onclick="rbGridClearRoomFocus(\'' + escJsStr(projId) + '\',\'' + escJsStr(projectName || '') + '\')">\u2190 All rooms</button>' +
               '<div style="font-size:15px;font-weight:700;color:#0F1A2E;letter-spacing:0.02em;">' + esc(focusRm) + '</div>' +
               '<div style="font-size:12px;color:var(--gray-500);">' + focusItems.length + ' item' + (focusItems.length === 1 ? '' : 's') + (focusTotal > 0 ? ' \u00b7 ' + formatMoney(focusTotal) : '') + '</div>' +
+              '<button type="button" class="btn btn-primary btn-sm" onclick="openDocItemsSidebar({mode:\'selections\',projectId:\'' + escJsStr(projId) + '\',roomPrefill:\'' + escJsStr(focusRm) + '\'})">+ Add item</button>' +
             '</div>' +
-            '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;">' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;" ondragover="rbGridDragOverCapture(event)" ondrop="rbGridDropCapture(event)">' +
             (focusItems.length === 0
               ? '<div style="grid-column:1/-1;padding:32px 20px;text-align:center;color:var(--gray-500);font-size:13px;line-height:1.5;background:white;border:1px dashed var(--gray-200);border-radius:8px;">' +
                   'This room has no products yet. Add from Selections, the clipper, or <strong>+ Add → Add product item</strong> (room will prefill).<br>' +
@@ -19311,7 +19350,7 @@
             '</div>' +
           '</div>' +
           '<div id="rb-sec-' + rmKey + '" style="' + (isCollapsed ? 'display:none;' : '') + 'padding:16px 0 24px;">' +
-          '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;">' +
+          '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;" ondragover="rbGridDragOverCapture(event)" ondrop="rbGridDropCapture(event)">' +
           items.map(function(clip, idx) {
             return _renderRbBoardClipCard(projId, clip, idx, rm, boardRoomSelectList);
           }).join('') +
@@ -19491,6 +19530,7 @@ async function renderBoardsTab(T, proj) {
       // Grand totals
       const grandCost = clips.reduce((s,c) => (c && c._docResolveReadOnly) ? s : s + ((parseMoney(c.cost)||0) * (parseFloat(c.qty)||1)), 0);
       const grandSell = clips.reduce((s,c) => (c && c._docResolveReadOnly) ? s : s + (parseMoney(c.totalSelling) || ((parseMoney(c.clientPrice)||0) * (parseFloat(c.qty)||1))), 0);
+      const rbFocusRm = String(window._rbGridFocusRoom || '').trim();
 
       T.innerHTML = `
         <!-- TOP BAR: view toggles left, actions right -->
@@ -19534,7 +19574,7 @@ async function renderBoardsTab(T, proj) {
             <div class="action-menu-wrap" style="position:relative;display:inline-block;">
               <button class="btn btn-secondary btn-sm" onclick="toggleActionMenu(this)" style="font-size:12px;">+ Add <span style="font-size:10px;">▾</span></button>
               <div class="action-dropdown" style="display:none;right:0;left:auto;min-width:180px;">
-                <a onclick="openDocItemsSidebar({mode:'selections',projectId:'${proj.id}'});closeAllMenus()">⭐ Add product item</a>
+                <a onclick="openDocItemsSidebar({mode:'selections',projectId:'${proj.id}'${rbFocusRm ? ",roomPrefill:'" + escAttr(rbFocusRm) + "'" : ''}});closeAllMenus()">${rbFocusRm ? '⭐ Add to ' + esc(rbFocusRm) : '⭐ Add product item'}</a>
                 <a onclick="createNewRoom('${escAttr(proj.id)}');closeAllMenus()">🏠 New Room</a>
                 <a onclick="showImportTearSheetModal('${proj.id}','${escAttr(proj.name)}');closeAllMenus()">📦 Import tear sheet PDF</a>
                 <a onclick="importFFEReport('${proj.id}','${escAttr(proj.name)}');closeAllMenus()">📊 Import FFE</a>
@@ -33946,6 +33986,18 @@ async function renderBoardsTab(T, proj) {
             _safeItems[i] = cchEnforcePoLineSingleImage(item);
           });
         }
+        if (d.type === 'po') {
+          var _priorItems = (d.docData && d.docData.items) ? d.docData.items : [];
+          for (var _pi = 0; _pi < _safeItems.length; _pi++) {
+            var _pr = _priorItems[_pi];
+            if (!_pr || !_safeItems[_pi]) continue;
+            ['etaDate', 'lineShipStatus', 'lineId', 'confirmedDate', 'estimatedShipDate', 'actualShipDate'].forEach(function(k) {
+              var pv = _pr[k];
+              if (pv == null || pv === '') return;
+              if (_safeItems[_pi][k] == null || _safeItems[_pi][k] === '') _safeItems[_pi][k] = pv;
+            });
+          }
+        }
         d.items = _safeItems;
         // Prevent accidental Firestore wipes: never save an empty line-item array on invoices
         // that are already in a billing lifecycle (common cause: bad client state + auto-save).
@@ -35018,35 +35070,66 @@ async function renderBoardsTab(T, proj) {
             var added = 0, moved = 0, skipped = 0;
             var lastMoveRoom = '';
             var clipIndex = await _disBuildProjectClipIndex(t.projectId);
+            var ts = new Date().toISOString();
             for (var ri = 0; ri < rows.length; ri++) {
               var r = rows[ri];
               var targetRoom = String((roomPrefill || r.room) || '').trim();
-              var existingClipId = _disResolveClipIdFromIndex(clipIndex, r, targetRoom);
-              if (!existingClipId && targetRoom) {
+              var explicitClipId = String(r.clipId || r._clipDocId || '').trim();
+              var libraryCatalogAdd = !explicitClipId && !!(String(r.libraryProductId || r._libDocId || '').trim());
+              var clipId = explicitClipId;
+              if (!clipId && targetRoom) {
+                clipId = _disResolveClipIdFromIndex(clipIndex, r, targetRoom);
+              }
+              // Move-from-other-room only when user picked an existing room-board clip — not a master-catalog add
+              if (!clipId && !libraryCatalogAdd) {
+                clipId = _disResolveAnyClipIdFromIndex(clipIndex, r);
+              }
+              if (clipId) {
+                var clipRefExist = db.collection('boards').doc(t.projectId).collection('clips').doc(clipId);
+                var existSnap = await clipRefExist.get();
+                if (existSnap.exists) {
+                  var clipData = existSnap.data() || {};
+                  if (typeof cchClipIsLockedOnDoc === 'function' && cchClipIsLockedOnDoc(clipData)) {
+                    showToast('"' + (r.title || 'Item') + '" is on a proposal/invoice/PO — room cannot be changed here.', 'warning');
+                    skipped++;
+                    continue;
+                  }
+                  var curRoom = String(clipData.room || '').trim();
+                  if (targetRoom && curRoom === targetRoom) {
+                    skipped++;
+                    continue;
+                  }
+                  if (targetRoom && curRoom !== targetRoom) {
+                    var dupeInTarget = _disResolveClipIdFromIndex(clipIndex, r, targetRoom);
+                    if (dupeInTarget && dupeInTarget !== clipId) {
+                      skipped++;
+                      continue;
+                    }
+                    await clipRefExist.update({ room: targetRoom, updatedAt: ts });
+                    var libMove = String(clipData.libraryProductId || r.libraryProductId || '').trim();
+                    if (libMove) clipIndex.byLibRoom[libMove + '|' + targetRoom.toLowerCase()] = clipId;
+                    var tvMove = (String(clipData.title || r.title || '').trim().toLowerCase() + '|' + String(clipData.vendor || r.vendor || '').trim().toLowerCase());
+                    if (tvMove !== '|' && clipIndex.byTV[tvMove]) {
+                      clipIndex.byTV[tvMove].forEach(function(m) { if (m.id === clipId) m.room = targetRoom; });
+                    }
+                    moved++;
+                    lastMoveRoom = targetRoom;
+                    continue;
+                  }
+                  if (curRoom && !targetRoom) {
+                    skipped++;
+                    continue;
+                  }
+                } else {
+                  clipId = '';
+                }
+              }
+              if (!clipId && targetRoom) {
                 var tvKey = (String(r.title || '').trim().toLowerCase() + '|' + String(r.vendor || '').trim().toLowerCase());
                 var tvMatches = clipIndex.byTV[tvKey];
                 if (tvMatches && tvMatches.length) {
                   var alreadyThere = tvMatches.some(function(m) { return m.room === targetRoom; });
                   if (alreadyThere) { skipped++; continue; }
-                }
-              }
-              if (existingClipId) {
-                var clipRefExist = db.collection('boards').doc(t.projectId).collection('clips').doc(existingClipId);
-                var existSnap = await clipRefExist.get();
-                if (!existSnap.exists) {
-                  existingClipId = '';
-                } else {
-                  var curRoom = String((existSnap.data() || {}).room || '').trim();
-                  if (targetRoom && curRoom === targetRoom) {
-                    skipped++;
-                    continue;
-                  }
-                  if (targetRoom && curRoom && curRoom !== targetRoom) {
-                    existingClipId = '';
-                  } else if (curRoom) {
-                    skipped++;
-                    continue;
-                  }
                 }
               }
               var clipRef = db.collection('boards').doc(t.projectId).collection('clips').doc();
@@ -35066,6 +35149,7 @@ async function renderBoardsTab(T, proj) {
                 addedAt: new Date().toISOString()
               };
               if (r.libraryProductId) _clipRow.libraryProductId = r.libraryProductId;
+              else if (r._libDocId) _clipRow.libraryProductId = r._libDocId;
               if (cchLineHasAdditionalNotes(r)) {
                 _clipRow.includeAdditionalNote = true;
                 _clipRow.additionalNotes = cchLineAdditionalNotesText(r);
@@ -35421,6 +35505,13 @@ async function renderBoardsTab(T, proj) {
         return;
       }
 
+      if (target.mode === 'selections' && !String(target.roomPrefill || '').trim()) {
+        var _autoRm = String(window._rbGridFocusRoom || '').trim();
+        if (_autoRm && typeof currentProjectTab !== 'undefined' && currentProjectTab === 'boards') {
+          target.roomPrefill = _autoRm;
+        }
+      }
+
       var loadPid = target.mode === 'docEdit' ? _docEdit.projectId : target.projectId;
       if (!loadPid) {
         showToast('Missing project.', 'error');
@@ -35457,7 +35548,7 @@ async function renderBoardsTab(T, proj) {
       var _roomPrefillLbl = String(target.roomPrefill || '').trim();
       var headerSub = target.mode === 'selections'
         ? (_roomPrefillLbl
-          ? 'Best: set <strong>Room</strong> on the Selections list. Here: tap a row to move an existing clip to <strong>' + esc(_roomPrefillLbl) + '</strong> (no duplicates).'
+          ? '<strong>All Products</strong> tab: tap to add from the master library to <strong>' + esc(_roomPrefillLbl) + '</strong>. <strong>Project Selections</strong> tab: tap an existing clip to move it here (no duplicates).'
           : 'Tap a row to add it to this project\'s Selections — or set Room on the Selections list.')
         : (target.mode === 'proposal'
           ? 'Four categories: Products/Materials, Design Services, Labor, Expenses (incl. tax). Library items need a <strong>QB category</strong> (or you will be prompted).'
@@ -35513,7 +35604,9 @@ async function renderBoardsTab(T, proj) {
       };
       document.addEventListener('keydown', window._disEscHandler);
 
-      window._disFilter = (window._disProposalRail || window._disSelectionRail || window._disDocEditRail) ? 'project_selections' : 'products';
+      window._disFilter = String(target.roomPrefill || '').trim()
+        ? 'products'
+        : ((window._disProposalRail || window._disSelectionRail || window._disDocEditRail) ? 'project_selections' : 'products');
       window._disProducts = [];
       window._disProposalExcludeKeys = new Set();
       window._disSelectionProducts = [];
@@ -35627,7 +35720,11 @@ async function renderBoardsTab(T, proj) {
       };
 
       if (target.mode === 'selections' || window._disSelectionRail) {
-        setTimeout(function() { window._disEnsureCatalogLoaded(); }, 400);
+        if (String(target.roomPrefill || '').trim()) {
+          await _disLoadGlobalCatalog(loadPid);
+        } else {
+          setTimeout(function() { window._disEnsureCatalogLoaded(); }, 400);
+        }
       } else {
         await _disLoadGlobalCatalog(loadPid);
       }
@@ -63790,11 +63887,13 @@ async function renderBoardsTab(T, proj) {
         if (ev.target === overlay) window.cpProposalLineLightboxClose();
       });
       var inner = document.createElement('div');
-      inner.style.cssText = 'position:relative;max-width:96vw;max-height:92vh;display:flex;flex-direction:column;align-items:center;cursor:default;';
+      inner.style.cssText = 'position:relative;width:min(92vw,1040px);max-height:92vh;display:flex;flex-direction:column;align-items:center;cursor:default;';
       inner.addEventListener('click', function(ev) { ev.stopPropagation(); });
       var closeTop = '<button type="button" style="position:absolute;top:-40px;right:0;background:transparent;border:none;color:#0A1F3D;font-size:28px;line-height:1;cursor:pointer;padding:4px 10px;" aria-label="Close" onclick="event.stopPropagation();cpProposalLineLightboxClose()">&times;</button>';
       var _lbSrc = typeof _escImgSrcAttr === 'function' ? _escImgSrcAttr(urls[idx]) : escAttr(urls[idx]);
-      var imgHtml = '<img src="' + _lbSrc + '" alt="" style="max-width:96vw;max-height:calc(92vh - 100px);object-fit:contain;border-radius:0;display:block;" referrerpolicy="no-referrer">';
+      var imgHtml = '<div class="cp-lb-stage" style="width:100%;height:min(calc(85vh - 100px),720px);min-height:420px;display:flex;align-items:center;justify-content:center;background:#F4F6FA;border:1px solid #E8ECF3;box-sizing:border-box;padding:20px;">' +
+        '<img src="' + _lbSrc + '" alt="" class="cp-lb-stage-img" style="width:100%;height:100%;object-fit:contain;object-position:center;display:block;" referrerpolicy="no-referrer">' +
+        '</div>';
       var navHtml = '';
       if (urls.length > 1) {
         navHtml = '<div style="display:flex;gap:14px;align-items:center;margin-top:14px;flex-wrap:wrap;justify-content:center;">' +
@@ -64540,6 +64639,8 @@ async function renderBoardsTab(T, proj) {
         '.cp-room-board-page { max-width: none !important; margin: 0 !important; padding-left: 24px !important; padding-right: 24px !important; width: 100%; box-sizing: border-box; }' +
         '.cp-room-board-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; width: 100%; }' +
         '.cp-room-board-card { position: relative; }' +
+        '.cp-room-board-card .cp-product-img { width: 100%; aspect-ratio: 1; min-height: 280px; object-fit: contain; object-position: center; background: linear-gradient(180deg, #FAFBFC 0%, #F0F2F5 100%); padding: 16px; box-sizing: border-box; }' +
+        '.cp-room-board-card .cp-product-img[style*="display:flex"] { padding: 0; }' +
         '.cp-room-card { overflow: hidden; cursor: pointer; position: relative; }' +
         '.cp-room-img { width: 100%; aspect-ratio: 1; object-fit: cover; background: linear-gradient(135deg, #E8ECF3, #D4DAE6); min-height: 200px; }' +
         '.cp-room-overlay { position:absolute;left:0;right:0;bottom:0;padding:10px 14px;background:linear-gradient(180deg,rgba(10,31,61,0) 0%,rgba(10,31,61,0.82) 100%); }' +
@@ -66105,7 +66206,8 @@ async function renderBoardsTab(T, proj) {
             .cv-modal-bg { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.75); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(8px); animation:cvFadeIn 0.2s ease; }
             .cv-modal { background:#FFFFFF; border-radius:0; max-width:600px; width:100%; max-height:85vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.5); animation:cvSlideUp 0.3s ease; border:1px solid rgba(15,26,46,0.08); }
             @keyframes cvSlideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
-            .cv-modal-img { width:100%; height:320px; object-fit:contain; background:#152A45; border-radius:0 16px 0 0; }
+            .cv-modal-img-wrap { width:100%; height:min(55vh,480px); min-height:320px; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg,#FAFBFC 0%,#F0F2F5 100%); border-radius:0; padding:20px; box-sizing:border-box; }
+            .cv-modal-img { width:100%; height:100%; max-width:100%; max-height:100%; object-fit:contain; object-position:center; display:block; background:transparent; border-radius:0; }
             .cv-modal-body { padding:28px; }
             .cv-modal-title { font-family:'Playfair Display',Georgia,serif; font-size:22px; margin-bottom:6px; color:#0F1A2E; }
             .cv-modal-vendor { font-size:13px; color:rgba(255,255,255,0.4); margin-bottom:16px; }
@@ -66221,7 +66323,8 @@ async function renderBoardsTab(T, proj) {
               .cv-quick-link { padding:16px 12px !important; font-size:13px !important; }
               .cv-quick-link-icon { font-size:24px !important; margin-bottom:6px !important; }
               .cv-modal { max-width:95vw !important; max-height:90vh !important; }
-              .cv-modal-img { height:220px !important; }
+              .cv-modal-img-wrap { min-height:220px !important; height:min(45vh,360px) !important; padding:14px !important; }
+              .cv-modal-img { height:100% !important; width:100% !important; }
               .cv-modal-body { padding:20px !important; }
               .cv-modal-title { font-size:18px !important; }
               .cv-modal-details { grid-template-columns:1fr 1fr !important; }
@@ -66723,7 +66826,7 @@ async function renderBoardsTab(T, proj) {
       modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
       modal.innerHTML = '<div class="cv-modal" style="position:relative;">' +
         '<button class="cv-modal-close" onclick="this.closest(\'.cv-modal-bg\').remove()">✕</button>' +
-        (d.img ? '<img class="cv-modal-img" src="' + esc(d.img) + '" onerror="this.style.display=\'none\'">' : '<div style="height:200px;background:#152A45;display:flex;align-items:center;justify-content:center;font-size:64px;border-radius:0;">🪑</div>') +
+        (d.img ? '<div class="cv-modal-img-wrap"><img class="cv-modal-img" src="' + esc(d.img) + '" referrerpolicy="no-referrer" onerror="this.closest(\'.cv-modal-img-wrap\').innerHTML=\'<div style=\\\'display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:64px;color:#C4A464;\\\'>🪑</div>\'"></div>' : '<div style="height:320px;background:#F0F2F5;display:flex;align-items:center;justify-content:center;font-size:64px;border-radius:0;">🪑</div>') +
         '<div class="cv-modal-body">' +
           '<div class="cv-modal-title">' + esc(d.title) + '</div>' +
           '<div class="cv-modal-vendor">' + esc(d.vendor) + (d.sku ? ' · ' + esc(d.sku) : '') + '</div>' +
@@ -73382,15 +73485,16 @@ ${pages}
 
   </script>
   <script src="cch-invoice-tax-rules.js?v=20260520prod"></script>
-  <script src="cch-functions.js?v=20260602ldd2"></script>
-  <script src="cch-design-board.js?v=20260608db29"></script>
+  <script src="cch-functions.js?v=20260629vtypes"></script>
+  <script src="cch-design-board.js?v=20260630db32"></script>
   <script src="cch-client-board.js?v=1774994684878"></script>
   <script src="cch-line-icons.js?v=20260620a"></script>
-  <script src="cch-proposals-invoices-fix.js?v=20260629timeinv"></script>
+  <script src="cch-proposals-invoices-fix.js?v=20260702poview7"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
-  <script src="cch-po-bill-variance.js?v=20260627poc13"></script>
-  <script src="cch-order-management.js?v=20260624om25"></script>
-  <script src="cch-po-vendor-comms.js?v=20260627c"></script>
+  <script src="cch-airtable-push.js?v=20260630a"></script>
+  <script src="cch-po-bill-variance.js?v=20260702poc22"></script>
+  <script src="cch-order-management.js?v=20260702om35"></script>
+  <script src="cch-po-vendor-comms.js?v=20260630e"></script>
   <script src="cch-ffe-procurement.js?v=20260602"></script>
 </body>
 </html>

@@ -554,6 +554,20 @@
     .cch-doc-view-rail-balance { font-size: 14px !important; }
     .cch-doc-view-rail-actions { display: flex; flex-direction: column; gap: 4px; }
     .cch-doc-view-rail-actions .btn { width: 100%; justify-content: center; font-size: 11px; padding: 6px 10px; }
+    .cch-po-status-rail-card { padding: 0 !important; background: transparent !important; border: none !important; }
+    .cch-po-status-rail .cch-po-procurement-lane,
+    .cch-po-status-rail .cch-po-bill-lane,
+    .cch-po-status-rail .cch-po-shipping-lane {
+      margin-bottom: 8px !important;
+      padding: 8px 10px !important;
+      background: #FAFAF8 !important;
+      border: 1px solid rgba(27,51,82,0.1) !important;
+      border-radius: 0 !important;
+    }
+    .cch-po-status-rail .cch-po-procurement-lane:last-child,
+    .cch-po-status-rail .cch-po-shipping-lane:last-child { margin-bottom: 0 !important; }
+    .cch-po-status-rail .btn { font-size: 10px !important; padding: 4px 8px !important; }
+    .cch-po-status-rail select.form-input { max-width: 100% !important; font-size: 11px !important; }
     .cch-doc-view-header h1 { font-size: 18px !important; }
     .cch-doc-view-header .cch-doc-hdr-actions { margin-left: auto; text-align: right; flex-shrink: 0; }
     .cch-doc-view-panel { background: #FFFFFF; padding: 10px 14px; margin-bottom: 10px; border: 1px solid rgba(200,185,154,0.08); }
@@ -2584,10 +2598,9 @@
       more += cchDocMoreItem('🗑️ Delete', "deleteInvoice('" + pj + "','" + dj + "')", true);
       html += cchDocMoreMenuWrap(more);
     } else if (type === 'po') {
-      html += '<button class="btn btn-secondary btn-sm" onclick="' + previewJs + '">👁 Preview</button>';
+      html += '<button class="btn btn-secondary btn-sm" onclick="' + previewJs + '">🖨 Print / PDF</button>';
       html += '<button class="btn btn-primary btn-sm" onclick="window._forceEditMode=true;navigate(window.location.hash)" style="background:#1B3352;color:#EDE8E0;">✏️ Edit PO</button>';
       var poMore = '';
-      poMore += cchDocMoreItem('📑 Tear sheets', tearJs);
       poMore += cchDocMoreItem('🖨 Print / PDF', previewJs);
       poMore += cchDocMoreDivider();
       poMore += cchDocMoreItem('🕐 Timeline', "toggleDocTimeline('" + pj + "','" + collection + "','" + dj + "')");
@@ -2874,7 +2887,7 @@
       balance = invVoidEarly ? 0 : (paySummary.balance != null ? paySummary.balance : (grandTotal - totalPaid));
     }
     var payments = paySummary.rows || docData.payments || [];
-    var showPaymentTotals = (type === 'invoice' || type === 'po') && !invVoidEarly &&
+    var showPaymentTotals = type === 'invoice' && !invVoidEarly &&
       (totalPaid > 0.01 || (paySummary.rows && paySummary.rows.length > 0) ||
         (type === 'invoice' && String(docData.status || '').toLowerCase() === 'paid') ||
         (type === 'invoice' && typeof window.invoiceQbPaidDateRaw === 'function' && window.invoiceQbPaidDateRaw(docData)) ||
@@ -2990,13 +3003,13 @@
     }
 
     var _showLineTagCol = type === 'invoice' || type === 'proposal' || type === 'po';
-    var _showPoVendorInvCols = type === 'po' && typeof window.cchPoVendorInvoiceGroupLineCellsHtml === 'function';
-    var _showPoLinePayCol = _showPoVendorInvCols && !!(docData.bill && docData.bill.received);
-    var _showPoLineEtaCol = _showPoVendorInvCols && typeof window.cchPoLineEtaHtml === 'function';
+    var _showPoVendorCol = type !== 'po';
+    var _showPoLineEtaCol = false;
+    var _showPoShippingCol = type !== 'po';
     /** Invoices: tax is footer-only (Totals rail), not per-line — no Tax column on product rows. */
     var _showPoSalesTaxCol = (type === 'proposal');
     var _showMarkupCol = type !== 'po';
-    var _poExtraCols = (_showPoVendorInvCols ? 2 : 0) + (_showPoLineEtaCol ? 1 : 0) + (_showPoLinePayCol ? 1 : 0);
+    var _poExtraCols = (_showPoLineEtaCol ? 1 : 0);
     var _invTableColspan = type === 'invoice' ? 10 : (type === 'proposal' ? 10 : (9 + _poExtraCols));
 
     var _docViewTableHeadHtml =
@@ -3004,17 +3017,13 @@
         '<thead><tr style="border-bottom:1px solid var(--gray-200);">' +
           '<th style="width:80px;padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;"></th>' +
           '<th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Item</th>' +
-          '<th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Vendor</th>' +
-          (_showPoVendorInvCols ? '<th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;min-width:88px;">Vendor inv #</th>' +
-          '<th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;min-width:72px;">Order status</th>' +
-          (_showPoLineEtaCol ? '<th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;min-width:100px;">Ship / ETA</th>' : '') +
-          (_showPoLinePayCol ? '<th style="padding:8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;min-width:72px;">Payment</th>' : '') : '') +
+          (_showPoVendorCol ? '<th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Vendor</th>' : '') +
           (_showLineTagCol ? '<th style="padding:8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;width:52px;" title="Optional label: fixture, fabric/trim, builder code">Tag</th>' : '') +
           (type === 'invoice' ? '<th style="padding:8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;width:64px;">Notes</th>' : '') +
           '<th style="padding:8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Qty</th>' +
           '<th style="padding:8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Cost</th>' +
           (_showMarkupCol ? '<th style="padding:8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Markup</th>' : '') +
-          '<th style="padding:8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Shipping</th>' +
+          (_showPoShippingCol ? '<th style="padding:8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Shipping</th>' : '') +
           (_showPoSalesTaxCol ? '<th style="padding:8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;width:50px;">Tax</th>' : '') +
           '<th style="padding:8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;"' + (type === 'invoice' ? ' title="Line merchandise (pre-tax; sales tax is in Totals only)"' : '') + '>Total</th>' +
         '</tr></thead><tbody>';
@@ -3088,7 +3097,7 @@
         }
         var expandDetail = type === 'invoice' ? (descTrim.length > 200) : false;
         var poSpecsHtml = (type === 'po' && typeof window.cchPoLineSpecsBlockHtml === 'function')
-          ? window.cchPoLineSpecsBlockHtml(item, { includeDescription: true })
+          ? window.cchPoLineSpecsBlockHtml(item, { includeDescription: true, omitRoom: true })
           : '';
         var descHtmlInner = (type === 'po')
           ? poSpecsHtml
@@ -3144,13 +3153,9 @@
         var _lineTitle = typeof window.invoiceLineDisplayTitle === 'function' ? window.invoiceLineDisplayTitle(item) : (item.title || 'Untitled');
         var _poRoomTagHtml = '';
         if (type === 'po') {
-          var _poRm = String(item.room || '').trim();
-          if (_poRm || lineTag) {
+          if (lineTag) {
             _poRoomTagHtml = '<div style="font-size:11px;color:#5C6B80;margin-top:4px;line-height:1.4;">' +
-              (_poRm ? '<span style="font-weight:600;">🏠 ' + esc(_poRm) + '</span>' : '') +
-              (_poRm && lineTag ? ' · ' : '') +
-              (lineTag ? '<span style="font-weight:700;color:#1B3352;">Tag ' + esc(lineTag) + '</span>' : '') +
-              '</div>';
+              '<span style="font-weight:700;color:#1B3352;">Tag ' + esc(lineTag) + '</span></div>';
           }
         }
         var typeBadgeHtml = '';
@@ -3165,9 +3170,9 @@
         } else if (item.expenseType && item.expenseType !== 'product') {
           typeBadgeHtml = '<div style="font-size:10px;margin-top:4px;"><span style="padding:2px 8px;border-radius:8px;background:rgba(200,169,110,0.12);color:var(--gold);font-weight:600;">' + esc(item.expenseType) + '</span></div>';
         }
-        var _poVigCells = (_showPoVendorInvCols && lineIdx >= 0)
-          ? window.cchPoVendorInvoiceGroupLineCellsHtml(docData, item, lineIdx, items)
-          : null;
+        var _poEtaHtml = (type === 'po' && _showPoLineEtaCol && lineIdx >= 0 && typeof window.cchPoLineEtaHtml === 'function')
+          ? window.cchPoLineEtaHtml(docData, item, lineIdx, items)
+          : '—';
         rows += '<tr style="border-bottom:1px solid var(--gray-100);">' +
           '<td style="padding:10px 8px;">' + imgTag + '</td>' +
           '<td style="padding:10px 8px;"><div style="font-size:14px;font-weight:600;">' + esc(_lineTitle) + '</div>' +
@@ -3177,17 +3182,13 @@
             (item.shipTo && type !== 'invoice' ? '<div style="font-size:11px;color:var(--teal);margin-top:2px;">📍 ' + esc(item.shipTo) + '</div>' : '') +
             typeBadgeHtml +
           '</td>' +
-          '<td style="padding:10px 8px;font-size:13px;color:var(--gray-500);">' + esc((type === 'po' && typeof window.cchPoLineDisplayVendor === 'function') ? window.cchPoLineDisplayVendor(item, docData) : (item.vendor || '')) + '</td>' +
-          (_showPoVendorInvCols ? '<td style="padding:10px 8px;vertical-align:middle;">' + (_poVigCells ? _poVigCells.invHtml : '—') + '</td>' +
-          '<td style="padding:10px 8px;vertical-align:middle;">' + (_poVigCells ? _poVigCells.statusHtml : '—') + '</td>' +
-          (_showPoLineEtaCol ? '<td style="padding:10px 8px;vertical-align:middle;">' + (_poVigCells ? _poVigCells.etaHtml : '—') + '</td>' : '') +
-          (_showPoLinePayCol ? '<td style="padding:10px 8px;vertical-align:middle;text-align:center;">' + (_poVigCells ? _poVigCells.payHtml : '—') + '</td>' : '') : '') +
+          (_showPoVendorCol ? '<td style="padding:10px 8px;font-size:13px;color:var(--gray-500);">' + esc(item.vendor || '') + '</td>' : '') +
           (_showLineTagCol ? '<td style="padding:10px 8px;text-align:center;vertical-align:middle;font-size:12px;font-weight:700;color:#1B3352;">' + esc(lineTag || '—') + '</td>' : '') +
           (type === 'invoice' ? '<td style="padding:10px 8px;text-align:center;vertical-align:middle;">' + invNoteBtnHtml + '</td>' : '') +
           '<td style="padding:10px 8px;text-align:center;font-size:14px;">' + qty + '</td>' +
           '<td style="padding:10px 8px;text-align:right;font-size:13px;font-family:monospace;">' + (cost > 0 ? formatMoney(cost) : '—') + '</td>' +
           (_showMarkupCol ? '<td style="padding:10px 8px;text-align:right;font-size:13px;color:' + (mkup > 0 ? 'var(--green)' : 'var(--gray-400)') + ';">' + (mkup > 0 ? mkup + '%' : '—') + '</td>' : '') +
-          '<td style="padding:10px 8px;text-align:right;font-size:13px;color:var(--gray-400);">' + (ship > 0 ? formatMoney(ship) : '—') + '</td>' +
+          (_showPoShippingCol ? '<td style="padding:10px 8px;text-align:right;font-size:13px;color:var(--gray-400);">' + (ship > 0 ? formatMoney(ship) : '—') + '</td>' : '') +
           (_showPoSalesTaxCol ? '<td style="padding:10px 8px;text-align:center;">' + (isTaxable ? '<span style="color:#5FA56B;font-weight:700;">✓</span>' : '<span style="color:#ccc;">—</span>') + '</td>' : '') +
           '<td style="padding:10px 8px;text-align:right;font-size:14px;font-weight:600;font-family:monospace;">' + formatMoney(lineAmtForRow) + '</td>' +
         '</tr>' + invNoteRowHtml;
@@ -3203,6 +3204,12 @@
       });
       itemsHTML += '<div class="cch-inv-line-group" style="margin-bottom:14px;">' +
         _docViewTableHeadHtml + _docViewLineRowsHtml(_flatItems) + '</tbody></table></div>';
+    } else if (type === 'po') {
+      var _flatPoItems = (items || []).filter(function(it) {
+        return !(typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it));
+      });
+      itemsHTML += '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;margin-bottom:14px;">' +
+        _docViewTableHeadHtml + _docViewLineRowsHtml(_flatPoItems) + '</tbody></table></div>';
     } else {
       _groupKeys.forEach(function(cat) {
         var catItems = grouped[cat];
@@ -3466,27 +3473,38 @@
             }).join('') + '</div>';
         }
       }
-      var _poShipLabel = typeof window.cchPoShippingStatusLabel === 'function'
-        ? window.cchPoShippingStatusLabel(docData, items)
-        : (typeof window.cchPoDisplayStatus === 'function' ? window.cchPoDisplayStatus(docData) : String(docData.status || '').trim());
-      var _poShipBadge = _poShipLabel && _poShipLabel !== '—'
-        ? (typeof window.cchPoShippingStatusBadgeHtml === 'function'
-          ? window.cchPoShippingStatusBadgeHtml(docData)
-          : (typeof window.statusBadge === 'function' ? window.statusBadge(_poShipLabel) : '<span class="badge badge-draft" style="font-size:10px;">' + esc(_poShipLabel) + '</span>'))
-        : '<span style="font-size:10px;color:#9CA3AF;">—</span>';
       var _poHasVendorBill = !!(docData.bill && docData.bill.received);
       var _poBillTotal = _poHasVendorBill && typeof window.cchPoVendorBillTotal === 'function' ? window.cchPoVendorBillTotal(docData) : null;
+      var _poBillFreight = _poHasVendorBill && typeof window.cchPoBillFreightTotal === 'function'
+        ? window.cchPoBillFreightTotal(docData) : 0;
+      var _poBillVariance = typeof window.cchPoListVarianceForRow === 'function'
+        ? window.cchPoListVarianceForRow(docData) : null;
+      var _poStatusRail = typeof window.cchPoStatusPanelsHtml === 'function'
+        ? window.cchPoStatusPanelsHtml(projectId, docId, docData, items) : '';
+      var _poLineTotalsFooter = typeof window.cchPoViewLineTotalsFooterHtml === 'function'
+        ? window.cchPoViewLineTotalsFooterHtml(docData, subtotal) : '';
+      var _poRailActions =
+        '<div class="cch-doc-view-rail-card cch-doc-view-rail-actions">' +
+          '<button type="button" class="btn btn-primary btn-sm" style="background:#1B3352;color:#EDE8E0;" onclick="window._forceEditMode=true;navigate(window.location.hash)">✏️ Edit PO</button>' +
+          '<button type="button" class="btn btn-secondary btn-sm" onclick="previewDocument(\'po\',\'' + projectId + '\',\'' + docId + '\')">🖨 Print / PDF</button>' +
+          (_poHasVendorBill && typeof window.cchPoOpenPaymentModal === 'function'
+            ? '<button type="button" class="btn btn-secondary btn-sm" style="background:#1B3352;color:#EDE8E0;border-color:#1B3352;" onclick="cchPoOpenPaymentModal(\'' + projectId + '\',\'' + docId + '\')">💳 Pay bill</button>'
+            : '') +
+          (lineItemsQbBtn ? '<div style="margin-top:6px;">' + lineItemsQbBtn + '</div>' : '') +
+        '</div>';
       var poRailHTML =
         '<aside class="cch-doc-view-rail">' +
           '<div class="cch-doc-view-rail-card">' +
             '<div class="cch-doc-view-rail-title" style="margin:0 0 6px;">Totals</div>' +
-            '<div style="font-size:10px;color:#5C6B80;margin-bottom:8px;">Receiving ' + _poShipBadge + '</div>' +
             '<div class="cch-doc-view-rail-row"><span>Merchandise</span><strong>' + formatMoney(subtotal) + '</strong></div>' +
-            (totalShipping > 0 ? '<div class="cch-doc-view-rail-row"><span>Shipping</span><strong>' + formatMoney(totalShipping) + '</strong></div>' : '') +
-            '<div class="cch-doc-view-rail-row cch-doc-view-rail-grand"><span>PO total</span><strong>' + formatMoney(grandTotal) + '</strong></div>' +
-            (_poHasVendorBill && _poBillTotal != null
-              ? '<div class="cch-doc-view-rail-row" style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(27,51,82,0.08);"><span>Vendor bill</span><strong>' + formatMoney(_poBillTotal) + '</strong></div>'
+            (_poHasVendorBill && Math.abs(_poBillFreight) >= 0.01
+              ? '<div class="cch-doc-view-rail-row"><span>Bill shipping</span><strong>' + formatMoney(_poBillFreight) + '</strong></div>'
               : '') +
+            (_poBillVariance != null && Math.abs(_poBillVariance) >= 0.01
+              ? '<div class="cch-doc-view-rail-row"><span>Variance</span><strong style="color:' + (_poBillVariance > 0 ? '#B45309' : '#15803D') + ';">' +
+                (_poBillVariance > 0 ? '+' : '−') + formatMoney(Math.abs(_poBillVariance)) + '</strong></div>'
+              : '') +
+            '<div class="cch-doc-view-rail-row cch-doc-view-rail-grand"><span>' + (_poHasVendorBill ? 'Bill total' : 'PO total') + '</span><strong>' + formatMoney(_poHasVendorBill && _poBillTotal != null ? _poBillTotal : grandTotal) + '</strong></div>' +
             (showPaymentTotals
               ? '<div class="cch-doc-view-rail-row"><span>Paid</span><strong style="color:#2E7D32;">-' + formatMoney(totalPaid) + '</strong></div>' +
                 '<div class="cch-doc-view-rail-row cch-doc-view-rail-balance"><span>' + (_poHasVendorBill ? 'Bill balance' : 'Balance') + '</span><strong style="color:' + (balance <= 0.01 ? '#2E7D32' : 'var(--gold)') + ';">' + formatMoney(balance) + '</strong></div>'
@@ -3497,20 +3515,17 @@
               ? '<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(27,51,82,0.08);"><div class="cch-doc-view-rail-title">Applied payments</div>' + _poRailPayCompact + '</div>'
               : '') +
           '</div>' +
+          _poRailActions +
+          (_poStatusRail
+            ? '<div class="cch-doc-view-rail-card cch-po-status-rail-card">' + _poStatusRail + '</div>'
+            : '') +
           _poRailAttach +
-          '<div class="cch-doc-view-rail-card cch-doc-view-rail-actions">' +
-            '<button type="button" class="btn btn-primary btn-sm" style="background:#1B3352;color:#EDE8E0;" onclick="window._forceEditMode=true;navigate(window.location.hash)">✏️ Edit PO</button>' +
-            '<button type="button" class="btn btn-secondary btn-sm" onclick="previewDocument(\'po\',\'' + projectId + '\',\'' + docId + '\')">👁️ Preview</button>' +
-            (_poHasVendorBill && typeof window.cchPoOpenPaymentModal === 'function'
-              ? '<button type="button" class="btn btn-secondary btn-sm" style="background:#1B3352;color:#EDE8E0;border-color:#1B3352;" onclick="cchPoOpenPaymentModal(\'' + projectId + '\',\'' + docId + '\')">💳 Pay bill</button>'
-              : '') +
-            (lineItemsQbBtn ? '<div style="margin-top:6px;">' + lineItemsQbBtn + '</div>' : '') +
-          '</div>' +
         '</aside>';
 
       var _poDateRaw = (typeof chPoDocPrimaryDateRaw === 'function' ? chPoDocPrimaryDateRaw(docData) : (docData.date || docData.createdAt)) || '';
       var _poDateStr = _poDateRaw && typeof formatDate === 'function' ? formatDate(_poDateRaw) : '';
       var _poVendor = String(docData.vendor || '').trim();
+      var _poBillFrom = (docData.bill && docData.bill.billFromVendor) ? String(docData.bill.billFromVendor).trim() : '';
       var _poVendorAddr = String(docData.vendorAddress || '').trim();
       var _poShipToRaw = String(docData.shipTo || docData.deliverTo || '').trim();
       var _poShipTo = _poShipToRaw;
@@ -3525,16 +3540,22 @@
         poDetailsHTML =
           '<div class="cch-doc-view-panel">' +
             '<div class="cch-doc-view-panel-title">Vendor &amp; ship to</div>' +
-            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px;line-height:1.5;color:#0F1A2E;">' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:14px;line-height:1.5;color:#0F1A2E;">' +
               '<div>' +
-                '<div style="font-size:9px;text-transform:uppercase;letter-spacing:0.06em;color:#9CA3AF;margin-bottom:6px;">Bill to (vendor)</div>' +
+                '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#5C6B80;margin-bottom:8px;">PO vendor (manufacturer)</div>' +
                 ((_poVendor && typeof window.cchVendorContactBlockHtml === 'function')
                   ? window.cchVendorContactBlockHtml(
                       { name: _poVendor, address: _poVendorAddr, phone: String(docData.vendorPhone || '').trim(), email: String(docData.vendorEmail || '').trim() },
-                      { labelColor: '#5C6B80', addrColor: '#5C6B80', fontSize: '13px' }
+                      { labelColor: '#5C6B80', addrColor: '#5C6B80', fontSize: '13px', nameFontSize: '18px' }
                     )
-                  : ((_poVendor ? '<strong>' + esc(_poVendor) + '</strong>' : '<span style="color:var(--gray-400);">—</span>') +
-                     (_poVendorAddr ? '<div style="margin-top:6px;color:#5C6B80;white-space:pre-wrap;">' + esc(_poVendorAddr) + '</div>' : ''))) +
+                  : ((_poVendor ? '<div style="font-size:18px;font-weight:700;color:#0F1A2E;">' + esc(_poVendor) + '</div>' : '<span style="color:var(--gray-400);">—</span>') +
+                     (_poVendorAddr ? '<div style="margin-top:6px;color:#5C6B80;white-space:pre-wrap;font-size:13px;">' + esc(_poVendorAddr) + '</div>' : ''))) +
+                (_poBillFrom && _poVendor && _poBillFrom.toLowerCase() !== _poVendor.toLowerCase()
+                  ? ('<div style="margin-top:12px;padding:10px 12px;background:rgba(146,64,14,0.06);border:1px solid rgba(146,64,14,0.18);border-radius:4px;">' +
+                      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#92400E;margin-bottom:4px;">Bill from (AP payee)</div>' +
+                      '<div style="font-size:16px;font-weight:700;color:#92400E;">' + esc(_poBillFrom) + '</div>' +
+                      '<div style="font-size:11px;color:#5C6B80;margin-top:4px;">Showroom/retailer invoiced direct — PO and print stay on manufacturer above.</div></div>')
+                  : '') +
               '</div>' +
               '<div>' +
                 '<div style="font-size:9px;text-transform:uppercase;letter-spacing:0.06em;color:#9CA3AF;margin-bottom:6px;">Ship to</div>' +
@@ -3545,6 +3566,34 @@
             '<p style="font-size:11px;color:#5C6B80;margin:12px 0 0;line-height:1.45;">Edit vendor, ship-to, line items, and images from <strong>Edit PO</strong>. Click a line photo to change it.</p>' +
           '</div>';
       }
+
+      var _poLineItemsPanelHtml = (docData.bill && docData.bill.received)
+        ? '<div class="cch-doc-view-panel" style="margin-bottom:10px;padding:12px 14px;background:rgba(27,51,82,0.03);">' +
+            '<div class="cch-doc-view-panel-title" style="margin:0 0 6px;">Purchase order line items</div>' +
+            (items.length === 0 ? '<div style="padding:12px;text-align:center;color:var(--gray-400);font-size:12px;">No items</div>' : itemsHTML + _poLineTotalsFooter) +
+            '<p style="font-size:11px;color:#5C6B80;margin:10px 0 0;line-height:1.45;">Click a line photo to edit it, or use <strong>Edit PO</strong> → <strong>Edit image</strong> on any row.</p>' +
+          '</div>'
+        : '<div class="cch-doc-view-panel" style="margin-bottom:10px;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">' +
+              '<div class="cch-doc-view-panel-title" style="margin:0;color:#1B3352;font-weight:700;letter-spacing:1.2px;">Purchase order line items</div>' +
+              (docGroupMode === 'category' ? '' : '<span style="font-size:11px;color:var(--gray-400);font-weight:500;">Grouped by ' + esc(_docGroupLabel) + '</span>') +
+            '</div>' +
+            (items.length === 0 ? '<div style="padding:12px;text-align:center;color:var(--gray-400);font-size:12px;">No items</div>' : itemsHTML + _poLineTotalsFooter) +
+          '</div>';
+      var _poOmBlocksInner = typeof window.cchPoBillVarianceMainBlocksHtml === 'function'
+        ? window.cchPoBillVarianceMainBlocksHtml(projectId, docId, docData, items) : '';
+      var _poOmSectionHtml = _poOmBlocksInner
+        ? '<div class="cch-doc-view-panel" style="margin-bottom:10px;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">' +
+              '<div class="cch-doc-view-panel-title" style="margin:0;">Order management</div>' +
+              (typeof window.cchOmPageEnabled === 'function' && window.cchOmPageEnabled()
+                ? '<a href="#/ordermanagement/open" onclick="event.preventDefault();navigate(\'#/ordermanagement/open\')" style="font-size:11px;color:#00796B;font-weight:600;text-decoration:none;">Open Order Management →</a>'
+                : '') +
+            '</div>' +
+            '<p style="font-size:11px;color:#5C6B80;margin:0 0 12px;line-height:1.45;">Vendor confirmations, ship invoices, combined bill, and variance — status controls are in the right sidebar.</p>' +
+            _poOmBlocksInner +
+          '</div>'
+        : '';
 
       T.innerHTML =
         '<div class="cch-doc-view-page">' +
@@ -3562,28 +3611,14 @@
                 '<div class="cch-doc-hdr-actions">' + _connBtn + '</div>' +
               '</div>' +
               poDetailsHTML +
-              (typeof window.cchPoBillVarianceMainBlocksHtml === 'function'
-                ? window.cchPoBillVarianceMainBlocksHtml(projectId, docId, docData, items)
-                : '') +
-              ((docData.bill && docData.bill.received)
-                ? '<div class="cch-doc-view-panel" style="margin-bottom:10px;padding:12px 14px;background:rgba(27,51,82,0.03);">' +
-                    '<div class="cch-doc-view-panel-title" style="margin:0 0 6px;">Purchase order line items</div>' +
-                    '<p style="font-size:12px;color:#5C6B80;margin:0 0 10px;line-height:1.45;">Vendor invoice order status and ship dates are managed under <strong>Vendor invoices → Edit</strong>. Use <strong>Edit PO</strong> to change ship-to, vendor, line images, and per-line ship-to.</p>' +
-                    (items.length === 0 ? '<div style="padding:12px;text-align:center;color:var(--gray-400);font-size:12px;">No items</div>' : itemsHTML) +
-                    '<p style="font-size:11px;color:#5C6B80;margin:10px 0 0;line-height:1.45;">Click a line photo to edit it, or use <strong>Edit PO</strong> → <strong>Edit image</strong> on any row.</p>' +
-                  '</div>'
-                : '<div class="cch-doc-view-panel" style="margin-bottom:10px;">' +
-                    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">' +
-                      '<div class="cch-doc-view-panel-title" style="margin:0;color:#1B3352;font-weight:700;letter-spacing:1.2px;">Purchase order line items</div>' +
-                      (docGroupMode === 'category' ? '' : '<span style="font-size:11px;color:var(--gray-400);font-weight:500;">Grouped by ' + esc(_docGroupLabel) + '</span>') +
-                    '</div>' +
-                    (items.length === 0 ? '<div style="padding:12px;text-align:center;color:var(--gray-400);font-size:12px;">No items</div>' : itemsHTML) +
-                  '</div>') +
+              _poLineItemsPanelHtml +
+              _poOmSectionHtml +
               _tagsMemoBlock +
             '</div>' +
             poRailHTML +
           '</div>' +
         '</div>';
+      if (typeof window.cchOmEnsureNavVisible === 'function') window.cchOmEnsureNavVisible();
       return;
     }
 
@@ -4157,8 +4192,8 @@
     // Build items table with taxable column
     var itemsHtml = '';
     var subtotal = 0, taxableSubtotal = 0, totalShipping = 0;
-    // Show thumbnails on invoices too when product images exist (Houzz-style printouts).
-    var _showPremiumImgCol = true;
+    // Show thumbnails on invoices/proposals — PO vendor print is compact text table (no tear-sheet layout).
+    var _showPremiumImgCol = type !== 'po';
     var _premiumGroupColSpan = type === 'po' ? 6 : type === 'invoice' ? 5 : 6;
     var _hasProposalSectionGroups = type === 'proposal' && items.some(function(it) { return it && it.lineKind === 'group'; });
     /** One Item column (thumb + text in a grid) — avoids squeezing text when tag/notes add height. */
@@ -4224,19 +4259,12 @@
       return html;
     }
 
-    /** Vendor PO PDF sidemark — room + line tag (fixture / label). */
-    function _poVendorSidemarkText(it, groupLabel) {
+    /** Vendor PO PDF sidemark — line tag only (room is not shown on vendor PO print). */
+    function _poVendorSidemarkText(it) {
       it = it || {};
-      var room = String(it.room || it.category || '').trim();
-      if (!room && groupLabel && docGroupMode === 'room') {
-        room = String(groupLabel || '').trim();
-      }
       var tag = (typeof window.cchLineTagText === 'function') ? String(window.cchLineTagText(it) || '').trim() : '';
       if (!tag) tag = String(it.lineTag || it.lineTagCode || it.fixtureTag || '').trim();
-      var parts = [];
-      if (room) parts.push(room);
-      if (tag) parts.push(tag);
-      return parts.join(' · ');
+      return tag;
     }
 
     function _premiumAppendLineRow(it, groupLabel) {
@@ -4313,7 +4341,7 @@
           periodHtml = '<div class="item-svc-period">Service date: ' + esc(p0) + '</div>';
         }
       }
-      var notesUnder = (type === 'invoice' || type === 'proposal' || type === 'po') ? _invoicePreviewTagNotesHtml(it) : _lineNotesHtml(_rawNotes);
+      var notesUnder = (type === 'invoice' || type === 'proposal') ? _invoicePreviewTagNotesHtml(it) : _lineNotesHtml(_rawNotes);
       var _poLineNote = (typeof cchLineAdditionalNotesText === 'function')
         ? cchLineAdditionalNotesText(it)
         : (String(it.additionalNotes || it.workroomNote || '').trim());
@@ -4330,12 +4358,12 @@
       }
       // PO vendor print: SKU / Finish / Dimensions block (reuse on-screen helper) + per-line ship-to.
       var poSpecsUnder = (type === 'po' && typeof window.cchPoLineSpecsBlockHtml === 'function')
-        ? window.cchPoLineSpecsBlockHtml(it, { includeDescription: false })
+        ? window.cchPoLineSpecsBlockHtml(it, { includeDescription: false, omitRoom: true })
         : '';
       var poShipToUnder = '';
       if (type === 'po') {
         var _lineShip = String(it.shipTo || it.deliverTo || '').trim();
-        if (_lineShip) {
+        if (_lineShip && Object.keys(_poShipSetForPrint || {}).length > 1) {
           var _lineShipDisp = _lineShip;
           if (typeof window.resolvePOShipToDisplayText === 'function') {
             try {
@@ -4354,11 +4382,11 @@
           '<div class="cch-premium-item-text">' +
             '<strong>' + esc(lineLabel) + '</strong>' +
             poSpecsUnder +
-            '<div class="prop-line-detail-stack">' +
+            (type === 'po' ? '' : ('<div class="prop-line-detail-stack">' +
             (descBody ? '<div style="margin-top:6px;"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Description</div><div class="item-desc item-desc-multiline">' + esc(descBody) + '</div></div>' : '') +
             periodHtml +
             notesUnder +
-            '</div>' +
+            '</div>')) +
             workroomUnder +
             poShipToUnder +
             (it.vendor && type !== 'po' && type !== 'invoice' ? '<div class="item-vendor">' + esc(it.vendor) + '</div>' : '') +
@@ -4366,7 +4394,7 @@
         '</div>';
       itemsHtml += '<tr><td class="line-item-main">' + itemInner + '</td>' +
         (type === 'po' ? '<td class="sidemark-cell">' + (function() {
-          var sm = _poVendorSidemarkText(it, groupLabel);
+          var sm = _poVendorSidemarkText(it);
           return sm ? esc(sm) : '<span style="color:#C4C4C4;">—</span>';
         })() + '</td>' : '') +
         '<td style="text-align:center;">' + qty + '</td>' +
@@ -4394,6 +4422,20 @@
         _premiumAppendLineRow(it);
       });
       itemsHtml += '</tbody></table></div>';
+    } else if (type === 'po') {
+      var _flatPoPrint = (items || []).filter(function(it) {
+        return !(typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it));
+      });
+      itemsHtml += '<table class="cch-premium-items-table cch-po-vendor-pdf">' + _premiumColgroup + '<thead><tr><th>' + _thItemLabel + '</th>' +
+        '<th>Sidemark</th>' +
+        '<th style="text-align:center;">Qty</th>' +
+        '<th class="r">Price</th>' +
+        '<th class="r">Shipping</th>' +
+        '<th class="r">Total</th></tr></thead><tbody>';
+      _flatPoPrint.forEach(function(it) {
+        _premiumAppendLineRow(it);
+      });
+      itemsHtml += '</tbody></table>';
     } else {
       _premiumGroupKeys.forEach(function(cat) {
         var catItems = grouped[cat];
@@ -4449,7 +4491,7 @@
         if (p.date) payLbl += ' — ' + new Date(p.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         totalsHtml += '<div class="total-row payment" style="font-size:11px;opacity:0.92;"><span>' + payLbl + '</span><span>-' + formatMoney(p.amount) + '</span></div>';
       });
-    } else if ((docData.payments || []).length > 0) {
+    } else if (type !== 'po' && (docData.payments || []).length > 0) {
       (docData.payments || []).forEach(function(p) {
         totalsHtml += '<div class="total-row payment"><span>Payment' + (p.date ? ' — ' + new Date(p.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '') + (p.method ? ' (' + esc(p.method) + ')' : '') + '</span><span>-' + formatMoney(p.amount) + '</span></div>';
       });
@@ -4547,6 +4589,10 @@
     var premiumDocDateHtml = (type === 'invoice') ? '' : (dateStr ? '<div class="doc-date">' + esc(dateStr) + '</div>' : '');
     var premiumDocTypeHtml = (type === 'invoice') ? '' : ('<div class="doc-type">' + typeLabel + '</div>');
     var premiumToolbarTitle = (type === 'invoice') ? esc(docNum) : esc(typeLabel + ' ' + docNum);
+    var poPrintBodyClass = type === 'po' ? ' class="cch-po-vendor-print"' : '';
+    var poPrintHint = type === 'po'
+      ? 'Print dialog opens automatically. Turn off <strong>Headers and footers</strong> in print settings for a clean PDF.'
+      : 'For a clean PDF: in Print → <strong>More settings</strong>, turn off <strong>Headers and footers</strong>. Otherwise Chrome adds the date and title at the top and <strong>about:blank</strong> (or the page URL) at the bottom — that is not part of your invoice.';
 
     // Build the premium preview (reuse tab opened synchronously on click)
     var win = previewWin;
@@ -4607,6 +4653,8 @@
       '.room-header { display:flex; justify-content:space-between; align-items:center; padding:8px 0 6px; border-bottom:2px solid #1B3352; margin-bottom:4px; }' +
       '.room-header span:first-child { font-size:11px; text-transform:uppercase; letter-spacing:2px; color:#C4A464; font-weight:700; }' +
       '.room-header span:last-child { font-size:12px; color:#5C6B80; font-weight:600; font-family:"DM Sans"; }' +
+      '.cch-po-vendor-pdf { width:100%; border-collapse:collapse; }' +
+      '.cch-po-vendor-pdf thead tr { border-bottom:2px solid #1B3352; }' +
       'table.cch-premium-items-table { width:100%; border-collapse:collapse; table-layout:fixed; }' +
       'col.pc-item { width:44%; }' +
       'col.pc-qty { width:8%; }' +
@@ -4662,8 +4710,22 @@
       '.footer-tagline { font-size:10px; color:#9E9A8F; font-style:italic; margin-top:2px; }' +
       '.footer-contact { font-size:10px; color:#bbb; margin-top:6px; }' +
 
+      /* PO vendor print — screen matches print (no preview/print mismatch) */
+      'body.cch-po-vendor-print { display:block; min-height:auto; background:#fff; }' +
+      'body.cch-po-vendor-print .page { min-height:auto; box-shadow:none; flex:none; max-width:100%; margin:0; }' +
+      'body.cch-po-vendor-print .page-body { flex:none; }' +
+      'body.cch-po-vendor-print .items-section { padding:16px 32px 12px; }' +
+      'body.cch-po-vendor-print .totals-section { padding:0 32px 20px; }' +
+      'body.cch-po-vendor-print .info-section { padding:16px 32px; }' +
+      'body.cch-po-vendor-print .doc-footer { margin-top:16px; }' +
+      'body.cch-po-vendor-print .cch-premium-item-grid { grid-template-columns:minmax(0,1fr); }' +
+      'body.cch-po-vendor-print .cch-premium-item-thumb { display:none; }' +
+      'body.cch-po-vendor-print .cch-po-line-specs { margin-top:4px; }' +
+      'body.cch-po-vendor-print .cch-po-line-specs div { display:inline; margin-right:10px; }' +
+      'body.cch-po-vendor-print .cch-po-line-specs div span:first-child { margin-right:4px; }' +
+
       /* Print */
-      '@media print { .toolbar{display:none!important;} .print-hint-screen{display:none!important;} body{background:white;display:block;min-height:auto;} .page{min-height:auto;box-shadow:none;flex:none;} .page-body{flex:none;} .doc-footer{position:relative;margin-top:16px;} }' +
+      '@media print { .toolbar{display:none!important;} .print-hint-screen{display:none!important;} body{background:white;display:block;min-height:auto;} .page{min-height:auto;box-shadow:none;flex:none;} .page-body{flex:none;} .doc-footer{position:relative;margin-top:16px;} .cch-po-vendor-pdf tr{page-break-inside:avoid;} .room-section{page-break-inside:auto;} .room-header{page-break-after:avoid;} }' +
       '@page { margin:0.5in; }' +
 
       /* Tear sheet pages (preview only — scoped; do not inject _getTearSheetCSSRedesign; it overrides body/toolbar) */
@@ -4678,17 +4740,20 @@
       '.ts-spec-label { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.8px; color:#5C6B80; width:120px; }' +
       '.ts-spec-val { font-size:13px; color:#1B3352; }' +
       '.ts-price { margin-top:auto; padding-top:16px; border-top:2px solid #1B3352; font-family:"Cormorant Garamond",serif; font-size:32px; font-weight:700; color:#1B3352; }' +
-      '</style></head><body>' +
+      '</style></head><body' + poPrintBodyClass + '>' +
 
       /* Toolbar */
       '<div class="toolbar">' +
         '<div class="toolbar-left">' +
         '<div class="toolbar-title">' + premiumToolbarTitle + '</div>' +
-        '<div class="print-hint-screen">For a clean PDF: in Print → <strong>More settings</strong>, turn off <strong>Headers and footers</strong>. Otherwise Chrome adds the date and title at the top and <strong>about:blank</strong> (or the page URL) at the bottom — that is not part of your invoice.</div>' +
+        '<div class="print-hint-screen">' + poPrintHint + '</div>' +
         '</div>' +
         '<div class="toolbar-actions">' +
-          '<button class="tb-btn" onclick="window.print()">🖨️ Print / PDF</button>' +
-          '<button class="tb-btn" id="tsToggle" onclick="toggleTearSheets()">📑 Include Tear Sheets</button>' +
+          (type === 'po'
+            ? '<button class="tb-btn" onclick="window.close()">Close</button>' +
+              '<button class="tb-btn tb-btn-primary" onclick="window.print()">🖨️ Print / PDF</button>'
+            : '<button class="tb-btn" onclick="window.print()">🖨️ Print / PDF</button>' +
+              '<button class="tb-btn" id="tsToggle" onclick="toggleTearSheets()">📑 Include Tear Sheets</button>') +
         '</div>' +
       '</div>' +
 
@@ -4707,7 +4772,11 @@
             premiumDocTypeHtml +
             '<div class="doc-num">' + esc(docNum) + '</div>' +
             premiumDocDateHtml +
-            '<div class="doc-status">' + esc(type === 'invoice' ? cchInvoiceClientDisplayStatus(docData) : (docData.status || 'Draft')) + '</div>' +
+            '<div class="doc-status">' + esc(type === 'invoice'
+              ? cchInvoiceClientDisplayStatus(docData)
+              : (typeof window.cchPoShippingStatus === 'function'
+                ? (window.cchPoShippingStatus(docData, items) || docData.status || 'Draft')
+                : (docData.status || 'Draft'))) + '</div>' +
           '</div>' +
         '</div>' +
         '<div class="gold-line"></div>' +
@@ -4728,12 +4797,17 @@
         /* Footer */
         '<div class="doc-footer">' +
           '<div class="footer-brand">CCH</div>' +
-          '<div class="footer-tagline">residential & yacht design · Valid 30 days</div>' +
+          '<div class="footer-tagline">' + (type === 'po' ? 'residential &amp; yacht design · purchase order' : 'residential & yacht design · Valid 30 days') + '</div>' +
           '<div class="footer-contact">www.cchdesign.com · @cchdesigninc · Thank you for your business</div>' +
         '</div>' +
       '</div>');
 
+    if (type === 'po') {
+      win.document.write('<script>window.addEventListener("load",function(){setTimeout(function(){try{window.focus();window.print();}catch(_e){}},400);});<\/script>');
+    }
+
     // Tear sheet pages (hidden by default, toggled by button)
+    if (type !== 'po') {
     win.document.write('<div id="tearSheetPages" style="display:none;">');
     items.forEach(function(item, idx) {
       var _heroImg = '';
@@ -4768,9 +4842,8 @@
         '</div>');
     });
     win.document.write('</div>');
-
-    // Tear sheets toggle script
     win.document.write('<script>var _tsVisible=false; function toggleTearSheets(){ _tsVisible=!_tsVisible; document.getElementById("tearSheetPages").style.display=_tsVisible?"block":"none"; document.getElementById("tsToggle").style.background=_tsVisible?"#C8B99A":"transparent"; document.getElementById("tsToggle").style.color=_tsVisible?"#1B3352":"#C8B99A"; document.getElementById("tsToggle").textContent=_tsVisible?"📑 Tear Sheets Included":"📑 Include Tear Sheets"; }<\/script>');
+    }
 
     win.document.write('</body></html>');
     win.document.close();
