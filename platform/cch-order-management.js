@@ -5,7 +5,7 @@
 (function() {
   'use strict';
 
-  var OM_BUILD = '20260519om31';
+  var OM_BUILD = '20260630om32';
   var OM_NAVY = '#0F1A2E';
   var OM_NAVY_MID = '#1B3352';
   var OM_BORDER = 'rgba(15,26,46,0.12)';
@@ -245,7 +245,10 @@
     }
     if (typeof window.cchPoBillLaneId === 'function') {
       var lane = window.cchPoBillLaneId(po, po.items || []);
+      // Draft POs (bill lane na) stay off Missing bills until sent/confirmed — matches tab copy.
+      if (lane === 'na') return false;
       if (lane === 'pending' || lane === 'partial') return true;
+      return false;
     }
     return window.cchOmIsPastDraftForBilling(po);
   };
@@ -258,7 +261,6 @@
         window.cchPoLineIsBillOnlyExpense(item)) return false;
     var et = String(item.expenseType || item.itemType || 'product').trim().toLowerCase();
     if (et === 'freight' || et === 'service' || et === 'expense' || et === 'sales_tax') return false;
-    if (po.eta) return false;
     var meta = null;
     if (typeof window.cchPoLineEtaMetaForItem === 'function') {
       meta = window.cchPoLineEtaMetaForItem(po, item, idx, items);
@@ -353,9 +355,34 @@
       }
     }
   }
+  window.cchOmPatchCachedPo = cchOmPatchCachedPo;
+
+  window.cchOmRefreshCachedPo = async function(projectId, poId) {
+    if (!projectId || !poId) return;
+    if (!window._omPosCache || !Array.isArray(window._omPosCache.pos)) return;
+    var idx = -1;
+    for (var i = 0; i < window._omPosCache.pos.length; i++) {
+      var p = window._omPosCache.pos[i];
+      if (p.projectId === projectId && p.id === poId) { idx = i; break; }
+    }
+    if (idx < 0) return;
+    try {
+      var snap = await firebase.firestore().collection('boards').doc(projectId)
+        .collection('purchaseOrders').doc(poId).get();
+      if (!snap.exists) return;
+      var data = snap.data() || {};
+      var prev = window._omPosCache.pos[idx];
+      window._omPosCache.pos[idx] = Object.assign({}, prev, data, {
+        id: poId,
+        projectId: projectId,
+        projectName: prev.projectName,
+        _displayVendor: prev._displayVendor
+      });
+    } catch (_e) { /* ignore */ }
+  };
 
   window.cchOmSoftRefresh = function() {
-    window._omSoftRender = true;
+    window._omForceLoad = true;
     return window.renderOrderManagementPage();
   };
 
@@ -738,6 +765,7 @@
       return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="navigate(\'#/project/' +
         escAttr(po.projectId) + '/po/' + escAttr(po.id) + '\')">' +
         '<td style="' + td + 'font-family:monospace;color:var(--gold);font-weight:600;">' + esc(po.number || po.id) + '</td>' +
+        '<td style="' + td + 'text-align:center;font-size:12px;color:var(--gray-500);">' + esc(String(row.idx + 1)) + '</td>' +
         '<td style="' + td + '">' + esc(po._displayVendor || po.vendor || '—') + '</td>' +
         '<td style="' + td + '">' + esc(po.projectName || '') + '</td>' +
         '<td style="' + td + '">' + esc(row.title) + '</td>' +
@@ -748,14 +776,14 @@
     var more = lines.length > 500 ? '<p style="font-size:12px;color:var(--gray-500);margin:12px 0;">Showing first 500 of ' + lines.length + ' lines. Set ETA inline or click a row to open the PO.</p>' : '';
     return more + '<div class="card" style="overflow-x:auto;margin-top:8px;"><table style="width:100%;border-collapse:collapse;">' +
       '<thead><tr style="border-bottom:2px solid var(--gray-200);">' +
-      '<th style="' + th + '">PO #</th><th style="' + th + '">Vendor</th><th style="' + th + '">Project</th>' +
+      '<th style="' + th + '">PO #</th><th style="' + th + 'text-align:center;">Line #</th><th style="' + th + '">Vendor</th><th style="' + th + '">Project</th>' +
       '<th style="' + th + '">Line item</th><th style="' + th + '">PO status</th><th style="' + th + '">ETA</th></tr></thead><tbody>' + body + '</tbody></table></div>';
   }
 
   function missingBillsReport(rows) {
     var note = '<p style="font-size:12px;color:#5C6B80;margin:0 0 12px;max-width:820px;line-height:1.5;">' +
-      'Open POs with no vendor bill received. Studio: Pending/Partial bill lane or fulfillment past Draft. ' +
-      'Houzz: open balance with no QuickBooks bill. Pure Draft Studio POs are excluded until sent. ' +
+      'Open POs with no <strong>combined vendor bill</strong> received in Studio. Order confirmations alone do not count — use <strong>Receive bill</strong> when the vendor&apos;s invoice arrives. ' +
+      'Houzz: open balance with no QuickBooks bill. Pure Draft POs are excluded until sent. ' +
       'Use <strong>Receive bill</strong> in the Bills column or <button type="button" class="btn btn-link btn-sm" style="font-size:12px;padding:0;color:var(--gold);font-weight:700;" ' +
       'onclick="navigate(\'#/ordermanagement/bills\')">Vendor bills</button>.</p>';
     if (!rows.length) {
@@ -781,7 +809,13 @@
     return String(po.number || po.num || po.poNum || po.name || '').trim();
   }
 
-  /** Vendor invoice rows on this PO (same sources as Vendor Bills list). */
+  /** Order confirmation groups — not vendor bills (ship invoice / combined bill). */
+  function cchOmVendorGroupIsConfirmation(g) {
+    g = g || {};
+    return String(g.documentType || '').trim().toLowerCase() === 'confirmation';
+  }
+
+  /** Vendor invoice rows on this PO — ship invoices + combined bill only (not order confirmations). */
   window.cchOmBillsInfo = function(po) {
     po = po || {};
     var bill = po.bill || {};
@@ -793,30 +827,44 @@
     var groups = typeof window.cchPoVendorInvoiceGroupsDisplay === 'function'
       ? window.cchPoVendorInvoiceGroupsDisplay(po, items)
       : (Array.isArray(po.vendorInvoiceGroups) ? po.vendorInvoiceGroups : []);
-    var bills = groups.map(function(g) {
-      return {
-        invNum: String(g.vendorInvoiceNumber || g.label || '').trim() || 'Vendor invoice',
-        groupId: String(g.id || '').trim()
+    var confirms = [];
+    var bills = [];
+    groups.forEach(function(g) {
+      var row = {
+        invNum: String(g.vendorInvoiceNumber || g.label || '').trim() || (cchOmVendorGroupIsConfirmation(g) ? 'Order confirmation' : 'Vendor invoice'),
+        groupId: String(g.id || '').trim(),
+        documentType: String(g.documentType || '').trim()
       };
-    }).filter(function(b) { return b.groupId || b.invNum; });
-    var seen = {};
-    bills = bills.filter(function(b) {
-      var key = (b.groupId || '') + '|' + b.invNum;
-      if (seen[key]) return false;
-      seen[key] = true;
-      return true;
+      if (!row.groupId && !row.invNum) return;
+      if (cchOmVendorGroupIsConfirmation(g)) confirms.push(row);
+      else bills.push(row);
     });
+    function dedupeRows(rows) {
+      var seen = {};
+      return rows.filter(function(b) {
+        var key = (b.groupId || '') + '|' + b.invNum;
+        if (seen[key]) return false;
+        seen[key] = true;
+        return true;
+      });
+    }
+    confirms = dedupeRows(confirms);
+    bills = dedupeRows(bills);
     if (!bills.length && hasBill) {
       var inv = String(bill.vendorInvoiceNumber || '').trim();
       var blRef = typeof window.cchPoQbBillDocNumberFromPo === 'function'
         ? window.cchPoQbBillDocNumberFromPo(po) : '';
       bills.push({
         invNum: inv || blRef || 'Vendor bill',
-        groupId: 'vig_from_bill_primary'
+        groupId: 'vig_from_bill_primary',
+        documentType: 'ship_invoice'
       });
     }
     return {
       count: bills.length,
+      billCount: bills.length,
+      confirmCount: confirms.length,
+      confirms: confirms,
       hasBill: hasBill,
       awaitingBill: sent && !hasBill,
       bills: bills
@@ -874,15 +922,30 @@
 
   window.cchOmPoEtaDateIso = function(po) {
     po = po || {};
+    var items = po.items || [];
+    var earliest = '';
+    for (var li = 0; li < items.length; li++) {
+      var it = items[li] || {};
+      if (typeof window.isProposalGroupHeaderItem === 'function' &&
+          window.isProposalGroupHeaderItem(it)) continue;
+      if (typeof window.cchPoLineIsBillOnlyExpense === 'function' &&
+          window.cchPoLineIsBillOnlyExpense(it)) continue;
+      var d = '';
+      if (typeof window.cchPoLineEtaMetaForItem === 'function') {
+        d = omDateInputValue(window.cchPoLineEtaMetaForItem(po, it, li, items).etaDate);
+      }
+      if (!d) d = omDateInputValue(it.etaDate || it.eta || '');
+      if (d && (!earliest || d < earliest)) earliest = d;
+    }
+    if (earliest) return earliest;
     if (po.eta) return omDateInputValue(po.eta);
     var bill = po.bill || {};
     if (bill.etaDate) return omDateInputValue(bill.etaDate);
-    var items = po.items || [];
     var groups = typeof window.cchPoVendorInvoiceGroupsDisplay === 'function'
       ? window.cchPoVendorInvoiceGroupsDisplay(po, items) : [];
-    for (var i = 0; i < groups.length; i++) {
-      var d = omDateInputValue(groups[i].etaDate || groups[i].estimatedShipDate);
-      if (d) return d;
+    for (var gi = 0; gi < groups.length; gi++) {
+      var gd = omDateInputValue(groups[gi].etaDate || groups[gi].estimatedShipDate);
+      if (gd) return gd;
     }
     return '';
   };
@@ -1062,7 +1125,9 @@
     var poid = escAttr(po.id);
     var lane = typeof window.cchPoProcurementLaneId === 'function' ? window.cchPoProcurementLaneId(po) : 'draft';
     if (lane === 'draft') {
-      return '<span style="font-size:11px;font-weight:600;color:#5C6B80;">Draft</span>';
+      return '<span style="font-size:11px;font-weight:600;color:#5C6B80;">Draft</span>' +
+        '<button type="button" class="btn btn-link btn-sm" style="font-size:10px;padding:0 0 0 6px;color:#0277BD;font-weight:700;white-space:nowrap;" ' +
+        'onclick="event.stopPropagation();window.cchPoOpenMarkConfirmedModal&&window.cchPoOpenMarkConfirmedModal(\'' + pid + '\',\'' + poid + '\')">Confirm</button>';
     }
     if (lane === 'confirmed') {
       var confNum = typeof window.cchPoOrderConfNumber === 'function' ? window.cchPoOrderConfNumber(po) : '';
@@ -1137,10 +1202,6 @@
   };
 
   function omConfirmCellHtml(po) {
-    var lane = typeof window.cchPoProcurementLaneId === 'function' ? window.cchPoProcurementLaneId(po) : 'draft';
-    if (lane === 'draft') {
-      return '<span style="font-size:11px;color:#9CA3AF;">—</span>';
-    }
     var pid = escAttr(po.projectId);
     var poid = escAttr(po.id);
     var val = omDateInputValue(window.cchOmPoConfirmDate(po));
@@ -1151,12 +1212,13 @@
   }
 
   function omOrderConfCellHtml(po) {
-    var lane = typeof window.cchPoProcurementLaneId === 'function' ? window.cchPoProcurementLaneId(po) : 'draft';
-    if (lane === 'draft') {
-      return '<span style="font-size:11px;color:#9CA3AF;font-style:italic;" title="Send PO to vendor first">Not sent</span>';
-    }
     var pid = escAttr(po.projectId);
     var poid = escAttr(po.id);
+    var lane = typeof window.cchPoProcurementLaneId === 'function' ? window.cchPoProcurementLaneId(po) : 'draft';
+    if (lane === 'draft') {
+      return '<button type="button" class="btn btn-link btn-sm" style="font-size:11px;padding:0;color:#0277BD;font-weight:700;white-space:nowrap;" ' +
+        'onclick="event.stopPropagation();window.cchPoOpenMarkConfirmedModal&&window.cchPoOpenMarkConfirmedModal(\'' + pid + '\',\'' + poid + '\')">Confirm order</button>';
+    }
     var val = typeof window.cchPoOrderConfNumber === 'function' ? String(window.cchPoOrderConfNumber(po) || '') : '';
     return '<input type="text" class="form-input" style="font-size:11px;padding:4px 8px;width:120px;max-width:140px;" ' +
       'value="' + escAttr(val) + '" placeholder="Order conf #" onclick="event.stopPropagation()" ' +
@@ -1197,14 +1259,23 @@
       ? window.cchPoBillStatusBadgeHtml(po, { projectId: po.projectId, poId: po.id, poItems: po.items || [], clickable: true })
       : '';
     var actions = '';
-    if (!info.count) {
+    var billCount = info.billCount != null ? info.billCount : info.count;
+    var confirmCount = info.confirmCount || 0;
+    if (!billCount) {
+      if (confirmCount === 1) {
+        actions = '<span style="font-size:11px;color:#5C6B80;font-weight:600;" title="Order confirmation on file — not a vendor bill">1 confirm</span>';
+      } else if (confirmCount > 1) {
+        actions = '<span style="font-size:11px;color:#5C6B80;font-weight:600;" title="Order confirmations on file — not vendor bills">' +
+          confirmCount + ' confirms</span>';
+      }
       if (info.awaitingBill) {
-        actions = '<button type="button" class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 8px;" ' +
+        actions += (actions ? '<br>' : '') +
+          '<button type="button" class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 8px;margin-top:2px;" ' +
           'onclick="event.stopPropagation();window.cchOmOpenPoBill(\'' + pid + '\',\'' + poid + '\',\'\')">Receive bill</button>';
-      } else {
+      } else if (!actions) {
         actions = '<span style="color:var(--gray-400);font-size:12px;">—</span>';
       }
-    } else if (info.count === 1) {
+    } else if (billCount === 1) {
       var b0 = info.bills[0];
       var gid0 = escAttr(b0.groupId || '');
       actions = '<button type="button" class="btn btn-link btn-sm" style="font-size:12px;font-weight:700;color:var(--gold);padding:0;" ' +
@@ -1219,13 +1290,17 @@
       actions = '<div class="action-menu-wrap" style="display:inline-block;" onclick="event.stopPropagation()">' +
         '<button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 10px;font-weight:700;white-space:nowrap;" ' +
         'onclick="event.stopPropagation();if(typeof toggleActionMenu===\'function\')toggleActionMenu(this)" ' +
-        'title="View vendor invoices">' + info.count + ' bills ▾</button>' +
+        'title="View vendor invoices">' + billCount + ' bills ▾</button>' +
         '<div class="action-dropdown" style="display:none;min-width:200px;max-width:280px;text-align:left;">' +
         menuItems + '</div></div>';
     }
+    if (billCount > 0 && confirmCount > 0) {
+      actions += '<div style="font-size:10px;color:#9CA3AF;margin-top:2px;">+' + confirmCount + ' confirm' +
+        (confirmCount !== 1 ? 's' : '') + '</div>';
+    }
     if (!billBadge) return actions;
     return '<div style="display:flex;flex-direction:column;align-items:center;gap:4px;">' + billBadge +
-      '<div>' + actions + '</div></div>';
+      '<div style="text-align:center;">' + actions + '</div></div>';
   }
   window.cchOmBillsCellHtml = omBillsCellHtml;
 
@@ -1372,6 +1447,9 @@
       '<option value="intransit"' + (fr === 'intransit' ? ' selected' : '') + '>In transit</option>' +
       '<option value="noclips"' + (fr === 'noclips' ? ' selected' : '') + '>No linked selections</option>' +
       '</select>' +
+      (typeof window.cchAirtablePushBtnHtml === 'function'
+        ? window.cchAirtablePushBtnHtml({ scope: 'firm', label: 'Refresh Airtable' })
+        : '') +
       '</div>';
   }
 
@@ -1931,6 +2009,7 @@
     var noBill = allOpen.filter(window.cchOmNeedsBill);
     var noBillStudio = noBill.filter(function(p) { return !window.cchOmIsHouzzSourcePo(p); }).length;
     var noBillHouzz = noBill.length - noBillStudio;
+    var noBillValue = noBill.reduce(function(s, p) { return s + poTotal(p); }, 0);
     var noConfirmDraft = noConfirm.filter(function(po) {
       return typeof window.cchPoProcurementLaneId === 'function' && window.cchPoProcurementLaneId(po) === 'draft';
     }).length;
@@ -2019,9 +2098,12 @@
           OM_NAVY_MID, 'noconfirm') +
         kpiCard('Lines without ETA', String(missingEtaLines), 'On open POs', OM_NAVY, 'noeta') +
         kpiCard('Missing bills', String(noBill.length),
-          noBillHouzz > 0
-            ? (noBillStudio + ' Studio · ' + noBillHouzz + ' Houzz')
-            : 'Bill not received',
+          (noBill.length
+            ? ('$' + noBillValue.toLocaleString('en-US', { minimumFractionDigits: 2 }) + ' awaiting bill' +
+              (noBillHouzz > 0 ? ' · ' + noBillStudio + ' Studio · ' + noBillHouzz + ' Houzz' : ''))
+            : (noBillHouzz > 0
+              ? (noBillStudio + ' Studio · ' + noBillHouzz + ' Houzz')
+              : 'Bill not received')),
           OM_NAVY_MID, 'nobill') +
         kpiCard('Open PO value', '$' + openValue.toLocaleString('en-US', { minimumFractionDigits: 2 }), 'Merchandise total', OM_NAVY)
       : '';
@@ -2086,16 +2168,20 @@
     if (tab !== 'variances') omDeferVarianceBadge();
   };
 
+  window.cchOmEnsureNavVisible = function() {
+    if (!window.cchOmPageEnabled()) return;
+    var nav = document.getElementById('navOrderManagement');
+    if (nav) nav.style.display = '';
+    var vbNav = document.getElementById('navVendorBills');
+    var varNav = document.getElementById('navBillVariances');
+    if (vbNav) vbNav.style.display = 'none';
+    if (varNav) varNav.style.display = 'none';
+  };
+
   document.addEventListener('DOMContentLoaded', function() {
-    if (window.cchOmPageEnabled()) {
-      var nav = document.getElementById('navOrderManagement');
-      if (nav) nav.style.display = '';
-      var vbNav = document.getElementById('navVendorBills');
-      var varNav = document.getElementById('navBillVariances');
-      if (vbNav) vbNav.style.display = 'none';
-      if (varNav) varNav.style.display = 'none';
-    }
+    window.cchOmEnsureNavVisible();
   });
+  if (document.readyState !== 'loading') window.cchOmEnsureNavVisible();
 
   console.log('[CCH Order Management] loaded', OM_BUILD);
 })();

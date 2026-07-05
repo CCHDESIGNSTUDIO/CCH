@@ -533,7 +533,6 @@
     dbEditor.viewZoomMode = 'fit';
     dbEditor.nextId = dbEditor.elements.length + 1;
     dbEditor.clipCategory = 'All';
-    dbEditor.clipRoom = 'All';
     dbEditor.clipListFilter = '';
     dbEditor.projectRooms = [];
     dbEditor.sourceTab = 'room';
@@ -577,8 +576,20 @@
     dbEditor.projectRooms = Object.keys(roomSet).map(function(k) { return roomSet[k]; }).sort(function(a, b) {
       return a.localeCompare(b, undefined, { sensitivity: 'base' });
     });
-    // Default All rooms so boards named "Showroom" do not hide every clip (clip.room often unset).
-    dbEditor.clipRoom = 'All';
+    var boardRoomPref = String((dbEditor.boardData && dbEditor.boardData.room) || '').trim();
+    if (boardRoomPref) {
+      var brLow = boardRoomPref.toLowerCase();
+      var brMatch = dbEditor.projectRooms.find(function(r) { return String(r).toLowerCase() === brLow; });
+      if (!brMatch) {
+        dbEditor.projectRooms.push(boardRoomPref);
+        dbEditor.projectRooms.sort(function(a, b) { return a.localeCompare(b, undefined, { sensitivity: 'base' }); });
+        brMatch = boardRoomPref;
+      }
+      dbEditor.clipRoom = brMatch;
+    } else {
+      // Default All rooms so boards named "Showroom" do not hide every clip (clip.room often unset).
+      dbEditor.clipRoom = 'All';
+    }
 
     // Fix in-memory tiles that still point at app-root junk (e.g. …/68.jpeg 404s) using clip + gallery pickers
     try {
@@ -641,6 +652,9 @@
           dbEditor.libItems = out;
         }
       }
+      dbEditor.libItems = (dbEditor.libItems || []).filter(function(row) {
+        return dbClipIsFurnishingProduct(row.data || row);
+      });
       dbEditor.libItemsLoaded = true;
     } catch (eLib) {
       console.warn('[design board] library load:', eLib);
@@ -732,7 +746,8 @@
       '.db-el-desc{margin-top:3px;font-size:12px;color:#4B5563;text-align:center;pointer-events:none;line-height:1.4;white-space:pre-wrap;}' +
       '.db-el-price{margin-top:3px;font-size:14px;font-weight:700;color:#0A1F3D;text-align:center;pointer-events:none;line-height:1.25;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}' +
       '.db-el-annotation{margin-top:4px;font-size:12px;color:#6B7280;text-align:center;font-style:italic;pointer-events:none;white-space:pre-line;line-height:1.35;}' +
-      '.db-resize{position:absolute;width:12px;height:12px;background:var(--gold);border:2px solid #fff;border-radius:2px;z-index:20;box-shadow:0 1px 3px rgba(0,0,0,0.2);pointer-events:auto;}' +
+      '.db-resize{position:absolute;width:22px;height:22px;background:var(--gold);border:2px solid #fff;border-radius:4px;z-index:20;box-shadow:0 2px 8px rgba(0,0,0,0.28);pointer-events:auto;touch-action:none;}' +
+      '.db-resize::before{content:"";position:absolute;inset:-10px;}' +
       '.db-source-tab{flex:1;padding:8px 4px;font-size:10px;font-weight:600;border:none;background:transparent;color:#6b7280;cursor:pointer;border-bottom:2px solid transparent;}' +
       '.db-source-tab:hover{color:#1B3352;}' +
       '.db-source-tab--active{color:#1B3352;border-bottom-color:#C4A464;}' +
@@ -897,10 +912,31 @@
     if (pid) navigate('#/project/' + pid + '/designboards');
   };
 
+  /** Furnishing products only — same rules as Room Boards / Selections (no design fees, labor, expenses). */
+  function dbClipIsFurnishingProduct(d) {
+    if (!d) return false;
+    if (typeof window._disSidebarItemIsProjectSelectionProduct === 'function') {
+      return window._disSidebarItemIsProjectSelectionProduct(Object.assign({}, d, { _source: 'selection' }));
+    }
+    if (typeof window.boardClipIsTimeBillingRow === 'function' && window.boardClipIsTimeBillingRow(d)) return false;
+    if (typeof window.isRealProduct === 'function') {
+      return window.isRealProduct({
+        title: d.title, category: d.category, room: d.room,
+        vendor: d.vendor, manufacturer: d.manufacturer || '', sku: d.sku || '',
+        cost: d.cost, clientPrice: d.clientPrice || d.sellingPrice,
+        imageUrl: d.imageUrl, image: d.image,
+        libraryItemKind: d.libraryItemKind, itemKind: d.itemKind
+      });
+    }
+    return true;
+  }
+
   function clipCategoryOptions() {
     var s = new Set();
     dbEditor.clips.forEach(function(c) {
-      var cat = String((c.data && c.data.category) || '').trim();
+      var d = c.data || {};
+      if (!dbClipIsFurnishingProduct(d)) return;
+      var cat = String(d.category || '').trim();
       if (cat) s.add(cat);
     });
     return ['All'].concat(Array.from(s).sort(function(a, b) { return a.localeCompare(b, undefined, { sensitivity: 'base' }); }));
@@ -923,7 +959,13 @@
   };
 
   function clipRoomOptions() {
-    return ['All'].concat(dbEditor.projectRooms || []);
+    var rooms = (dbEditor.projectRooms || []).slice();
+    var boardRm = String((dbEditor.boardData && dbEditor.boardData.room) || '').trim();
+    if (boardRm && !rooms.some(function(r) { return String(r).toLowerCase() === boardRm.toLowerCase(); })) {
+      rooms.push(boardRm);
+      rooms.sort(function(a, b) { return a.localeCompare(b, undefined, { sensitivity: 'base' }); });
+    }
+    return ['All'].concat(rooms);
   }
 
   function populateClipRoomSelect() {
@@ -931,13 +973,19 @@
     if (!sel) return;
     var rooms = clipRoomOptions();
     var cur = dbEditor.clipRoom || 'All';
+    var curLow = String(cur).toLowerCase();
     sel.innerHTML = rooms.map(function(r) {
-      return '<option value="' + escAttr(r) + '"' + (cur === r ? ' selected' : '') + '>' + esc(r === 'All' ? 'All rooms' : r) + '</option>';
+      var selOn = (r === 'All' && cur === 'All') || (r !== 'All' && String(r).toLowerCase() === curLow);
+      return '<option value="' + escAttr(r) + '"' + (selOn ? ' selected' : '') + '>' + esc(r === 'All' ? 'All rooms' : r) + '</option>';
     }).join('');
   }
 
   window.setBoardClipRoom = function(val) {
     dbEditor.clipRoom = val || 'All';
+    if (val && val !== 'All') {
+      dbEditor.boardData.room = val;
+      dbEditor.dirty = true;
+    }
     var inp = document.getElementById('dbClipFilterInput');
     renderClipsList(inp ? inp.value : '');
   };
@@ -1007,6 +1055,7 @@
       var items = [];
       dbEditor.clips.forEach(function(clip) {
         var d = clip.data;
+        if (!dbClipIsFurnishingProduct(d)) return;
         if (!clipMatchesRoom(d, roomF)) return;
         if (catF !== 'All') {
           var cc = String(d.category || '').trim();
@@ -1039,7 +1088,9 @@
         };
       });
     }
-    return (dbEditor.libItems || []).map(function(p) {
+    return (dbEditor.libItems || []).filter(function(p) {
+      return dbClipIsFurnishingProduct(p.data || p);
+    }).map(function(p) {
       var d = p.data || p;
       return {
         kind: 'library',
@@ -1231,10 +1282,10 @@
   }
 
   function resizeHandles() {
-    return '<div class="db-resize" data-dir="nw" style="left:-6px;top:-6px;cursor:nwse-resize;" onpointerdown="resizeMouseDown(event,\'nw\')"></div>' +
-      '<div class="db-resize" data-dir="ne" style="right:-6px;top:-6px;cursor:nesw-resize;" onpointerdown="resizeMouseDown(event,\'ne\')"></div>' +
-      '<div class="db-resize" data-dir="sw" style="left:-6px;bottom:-6px;cursor:nesw-resize;" onpointerdown="resizeMouseDown(event,\'sw\')"></div>' +
-      '<div class="db-resize" data-dir="se" style="right:-6px;bottom:-6px;cursor:nwse-resize;" onpointerdown="resizeMouseDown(event,\'se\')"></div>';
+    return '<div class="db-resize" data-dir="nw" style="left:-11px;top:-11px;cursor:nwse-resize;" onpointerdown="resizeMouseDown(event,\'nw\')"></div>' +
+      '<div class="db-resize" data-dir="ne" style="right:-11px;top:-11px;cursor:nesw-resize;" onpointerdown="resizeMouseDown(event,\'ne\')"></div>' +
+      '<div class="db-resize" data-dir="sw" style="left:-11px;bottom:-11px;cursor:nesw-resize;" onpointerdown="resizeMouseDown(event,\'sw\')"></div>' +
+      '<div class="db-resize" data-dir="se" style="right:-11px;bottom:-11px;cursor:nwse-resize;" onpointerdown="resizeMouseDown(event,\'se\')"></div>';
   }
 
   function dbBuildElementHtml(el, sel) {
@@ -1628,6 +1679,21 @@
     if (prop === 'title') {
       var tEl = document.getElementById('dbTitle');
       if (tEl) tEl.textContent = value;
+    }
+    if (prop === 'room') {
+      var rv = String(value || '').trim();
+      if (rv) {
+        dbEditor.clipRoom = rv;
+        var low = rv.toLowerCase();
+        if (!(dbEditor.projectRooms || []).some(function(r) { return String(r).toLowerCase() === low; })) {
+          dbEditor.projectRooms = (dbEditor.projectRooms || []).concat([rv]).sort(function(a, b) {
+            return a.localeCompare(b, undefined, { sensitivity: 'base' });
+          });
+        }
+        populateClipRoomSelect();
+        var inp = document.getElementById('dbClipFilterInput');
+        renderClipsList(inp ? inp.value : '');
+      }
     }
   };
 
@@ -2294,7 +2360,7 @@
     meta = meta || {};
     var w = meta.w || 180;
     var h = meta.h || 180;
-    var pos = dbDropPointFromCursor(w, h, mx, my);
+    var pos = dbFindFreeDropPosition(w, h, mx, my);
     pushUndo();
     var newEl = {
       id: genId(),
@@ -3025,12 +3091,10 @@
     if (!canvas) return;
     dbEditor.selectedId = null;
     if (typeof dbUpdateSelectionDom === 'function') dbUpdateSelectionDom();
-    var cw = parseFloat(canvas.style.width) || canvas.offsetWidth || 1920;
-    var ch = parseFloat(canvas.style.height) || canvas.offsetHeight || 1080;
+    var cw = parseFloat(dbEditor.boardData && dbEditor.boardData.canvasWidth) || parseFloat(canvas.style.width) || canvas.offsetWidth || 1400;
+    var ch = parseFloat(dbEditor.boardData && dbEditor.boardData.canvasHeight) || parseFloat(canvas.style.height) || canvas.offsetHeight || 1000;
     var w = window.open('', '_blank');
     if (!w) { if (typeof cchAlert === 'function') cchAlert('Allow pop-ups to print the board.', 'Print'); return; }
-    var styles = '';
-    document.querySelectorAll('style, link[rel="stylesheet"]').forEach(function(n) { styles += n.outerHTML; });
     var boardLabel = esc(_dbBoardLabel(dbEditor.boardData));
     var includeName = !!window._dbPrintIncludeBoardName;
     var clone = canvas.cloneNode(true);
@@ -3038,24 +3102,66 @@
     var hint = clone.querySelector('#dbCanvasDropHint');
     if (hint) hint.remove();
     clone.style.boxShadow = 'none';
+    clone.style.width = cw + 'px';
+    clone.style.height = ch + 'px';
     var footnote = includeName
       ? '<div class="db-print-footnote">' + boardLabel + '</div>'
       : '';
-    var html = '<html><head><title>' + boardLabel + ' — Design Board</title>' + styles +
-      '<style>@page{margin:10mm;}html,body{margin:0;padding:0;background:#fff;}' +
-      '.db-print-sheet{padding:4mm 6mm 6mm;box-sizing:border-box;}' +
-      '#dbPrintWrap{width:100%;max-width:' + cw + 'px;margin:0 auto;overflow:hidden;}' +
-      '#dbPrintInner{transform-origin:top center;width:' + cw + 'px;margin:0 auto;}' +
-      '.db-print-footnote{margin:10px auto 0;max-width:' + cw + 'px;text-align:center;font-family:Georgia,serif;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#9CA3AF;}' +
-      '.db-el-caption{font-size:14px !important;}.db-el-desc{font-size:12px !important;}.db-el-price{font-size:14px !important;}' +
-      '@media print{img{-webkit-print-color-adjust:exact;print-color-adjust:exact;} .db-print-sheet{padding:0;}}' +
-      '</style></head><body><div class="db-print-sheet"><div id="dbPrintWrap"><div id="dbPrintInner">' + clone.outerHTML + '</div></div>' + footnote + '</div>' +
-      '<script>(function(){var cw=' + cw + ',ch=' + ch + ';function fit(){var iw=Math.max(320,(window.innerWidth||960)-24);var ih=Math.max(320,(window.innerHeight||720)-40);var s=Math.min(1,iw/cw,ih/ch);var inner=document.getElementById("dbPrintInner");var wrap=document.getElementById("dbPrintWrap");if(inner){inner.style.transform="scale("+s+")";inner.style.height=(ch*s)+"px";}if(wrap){wrap.style.height=(ch*s)+"px";}}fit();window.onresize=fit;})();<\/script></body></html>';
+    var printCss =
+      '@page{size:landscape;margin:8mm;}' +
+      'html,body{margin:0;padding:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+      '.db-print-sheet{padding:0;box-sizing:border-box;}' +
+      '#dbPrintWrap{margin:0 auto;overflow:visible;page-break-inside:avoid;break-inside:avoid;}' +
+      '#dbPrintInner{transform-origin:top left;width:' + cw + 'px;height:' + ch + 'px;margin:0 auto;}' +
+      '#dbCanvas{position:relative;overflow:hidden;background:#fff;font-family:"Cormorant Garamond",Georgia,serif;}' +
+      '.db-el-product{box-sizing:border-box;}' +
+      '.db-el-media{position:relative;box-sizing:border-box;background:#fff;border:1px solid rgba(15,26,46,0.06);border-radius:2px;overflow:hidden;}' +
+      '.db-el-media img{width:100%;height:100%;object-fit:cover;object-position:center;display:block;}' +
+      '.db-el-caption{margin-top:5px;font-size:14px;font-weight:600;color:#1B3352;text-align:center;line-height:1.3;}' +
+      '.db-el-desc{margin-top:3px;font-size:12px;color:#4B5563;text-align:center;line-height:1.4;white-space:pre-wrap;}' +
+      '.db-el-price{margin-top:3px;font-size:14px;font-weight:700;color:#0A1F3D;text-align:center;font-family:ui-monospace,monospace;}' +
+      '.db-el-annotation{margin-top:4px;font-size:12px;color:#6B7280;text-align:center;font-style:italic;white-space:pre-line;line-height:1.35;}' +
+      '.db-print-footnote{margin:8px auto 0;text-align:center;font-family:Georgia,serif;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#9CA3AF;page-break-before:avoid;}' +
+      '@media print{' +
+        'html,body{width:100%;height:auto;overflow:visible;}' +
+        '.db-print-sheet{page-break-inside:avoid;break-inside:avoid;}' +
+        '#dbPrintWrap{page-break-inside:avoid;break-inside:avoid;overflow:visible!important;}' +
+        '#dbPrintInner{page-break-inside:avoid;break-inside:avoid;}' +
+        '#dbCanvas{page-break-inside:avoid;break-inside:avoid;}' +
+        'img{-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+      '}';
+    var html = '<html><head><meta charset="utf-8"><title>' + boardLabel + ' — Design Board</title>' +
+      '<style>' + printCss + '</style></head><body>' +
+      '<div class="db-print-sheet"><div id="dbPrintWrap"><div id="dbPrintInner">' + clone.outerHTML + '</div></div>' + footnote + '</div>' +
+      '<script>(function(){var cw=' + cw + ',ch=' + ch + ';' +
+      'function avail(forPrint){var pad=forPrint?16:24;' +
+      'var aw=Math.max(320,(window.innerWidth||960)-pad);' +
+      'var ah=Math.max(320,(window.innerHeight||720)-pad-(forPrint?0:0));' +
+      'return{aw:aw,ah:ah};}' +
+      'function applyScale(forPrint){var inner=document.getElementById("dbPrintInner");var wrap=document.getElementById("dbPrintWrap");if(!inner)return;' +
+      'var a=avail(!!forPrint);var s=Math.min(1,a.aw/cw,a.ah/ch);' +
+      'inner.style.transform="scale("+s+")";inner.style.transformOrigin="top left";' +
+      'inner.style.width=cw+"px";inner.style.height=ch+"px";' +
+      'if(wrap){wrap.style.width=Math.ceil(cw*s)+"px";wrap.style.height=Math.ceil(ch*s)+"px";wrap.style.margin="0 auto";}}' +
+      'applyScale(false);window.onresize=function(){applyScale(false);};' +
+      'window.onbeforeprint=function(){applyScale(true);};' +
+      'window.onafterprint=function(){applyScale(false);};' +
+      '})();<\/script></body></html>';
     w.document.write(html);
     w.document.close();
     w.focus();
     w.onafterprint = function() { try { w.close(); } catch (e) {} };
-    setTimeout(function() { try { w.print(); } catch (e) {} }, 800);
+    setTimeout(function() {
+      try {
+        if (typeof w.document.execCommand === 'function') {
+          w.document.execCommand('print', false, null);
+        } else {
+          w.print();
+        }
+      } catch (e) {
+        try { w.print(); } catch (e2) {}
+      }
+    }, 600);
   };
 
   // ==================== CSS for editor ============================
@@ -3248,6 +3354,6 @@
     };
   }
 
-  console.info('[CCH Design Board] build 20260608db29 — client-view fit + print/cost-summary polish');
+  console.info('[CCH Design Board] build 20260702db33 — drop avoids stacked tiles');
 
 })();

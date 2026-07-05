@@ -498,6 +498,15 @@
       text-align: right !important;
       font-family: 'JetBrains Mono', 'DM Mono', monospace !important;
     }
+    #proposalPrintArea .proposal-table-wrap .data-table td.amount,
+    #proposalPrintArea .proposal-table-wrap .data-table th.amount {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+      font-weight: 400 !important;
+    }
+    #proposalPrintArea .proposal-table-wrap .data-table td.prop-col-total {
+      font-weight: 600 !important;
+      color: #1B3352 !important;
+    }
 
     /* Fix: Consistent font throughout proposals/invoices — no mixing */
     #contentArea h1, #contentArea .page-title {
@@ -554,6 +563,11 @@
     .cch-doc-view-rail-balance { font-size: 14px !important; }
     .cch-doc-view-rail-actions { display: flex; flex-direction: column; gap: 4px; }
     .cch-doc-view-rail-actions .btn { width: 100%; justify-content: center; font-size: 11px; padding: 6px 10px; }
+    .cch-doc-line-totals-footer { display: flex; justify-content: flex-end; margin-top: 16px; padding-top: 14px; border-top: 2px solid #1B3352; }
+    .cch-doc-line-totals-inner { min-width: 260px; width: 100%; max-width: 320px; }
+    .cch-doc-line-totals-row { display: flex; justify-content: space-between; font-size: 13px; color: #5C6B80; margin-bottom: 4px; gap: 12px; font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; }
+    .cch-doc-line-totals-row span:last-child { color: #1B3352; font-weight: 500; }
+    .cch-doc-line-totals-grand { display: flex; justify-content: space-between; font-size: 18px; font-weight: 700; color: #1B3352; padding-top: 8px; margin-top: 6px; border-top: 1px solid rgba(27,51,82,0.12); font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; }
     .cch-po-status-rail-card { padding: 0 !important; background: transparent !important; border: none !important; }
     .cch-po-status-rail .cch-po-procurement-lane,
     .cch-po-status-rail .cch-po-bill-lane,
@@ -2754,6 +2768,35 @@
   };
 
   // ============================================================
+  // Shared line-items footer — Subtotal / Shipping / Tax / Total (all docs)
+  // ============================================================
+  window.cchDocViewLineTotalsFooterHtml = function(opts) {
+    opts = opts || {};
+    var subLabel = String(opts.subLabel || 'Subtotal');
+    var subtotal = parseFloat(opts.subtotal) || 0;
+    var shipping = parseFloat(opts.shipping) || 0;
+    var tax = parseFloat(opts.tax) || 0;
+    var taxRate = parseFloat(opts.taxRate) || 0;
+    var taxableSub = parseFloat(opts.taxableSubtotal) || 0;
+    var grand = parseFloat(opts.grandTotal);
+    if (isNaN(grand)) grand = subtotal + shipping + tax;
+    var totalLabel = String(opts.totalLabel || 'Total');
+    var taxLabel = 'Tax';
+    if (taxRate > 0 && taxableSub > 0) taxLabel = 'Tax (' + taxRate + '% on ' + formatMoney(taxableSub) + ')';
+    else if (taxRate > 0) taxLabel = 'Tax (' + taxRate + '%)';
+    function row(label, amt, grandRow) {
+      var cls = grandRow ? 'cch-doc-line-totals-grand' : 'cch-doc-line-totals-row';
+      return '<div class="' + cls + '"><span>' + esc(label) + '</span><span>' + formatMoney(amt) + '</span></div>';
+    }
+    return '<div class="cch-doc-line-totals-footer"><div class="cch-doc-line-totals-inner">' +
+      row(subLabel, subtotal) +
+      row('Shipping', shipping) +
+      row(taxLabel, tax) +
+      row(totalLabel, grand, true) +
+      '</div></div>';
+  };
+
+  // ============================================================
   // 30. INVOICE/PO VIEW MODE — Read-only view, Edit button to switch
   // ============================================================
   window.renderDocViewPage = function(type, projectId, docId, docData, items, projData) {
@@ -3008,7 +3051,9 @@
     var _showPoShippingCol = type !== 'po';
     /** Invoices: tax is footer-only (Totals rail), not per-line — no Tax column on product rows. */
     var _showPoSalesTaxCol = (type === 'proposal');
-    var _showMarkupCol = type !== 'po';
+    /** Client-facing invoice view: room per line, no markup column (Manage has markup). */
+    var _showRoomCol = (type === 'invoice');
+    var _showMarkupCol = (type !== 'po' && type !== 'invoice');
     var _poExtraCols = (_showPoLineEtaCol ? 1 : 0);
     var _invTableColspan = type === 'invoice' ? 10 : (type === 'proposal' ? 10 : (9 + _poExtraCols));
 
@@ -3018,6 +3063,7 @@
           '<th style="width:80px;padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;"></th>' +
           '<th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Item</th>' +
           (_showPoVendorCol ? '<th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Vendor</th>' : '') +
+          (_showRoomCol ? '<th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Room</th>' : '') +
           (_showLineTagCol ? '<th style="padding:8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;width:52px;" title="Optional label: fixture, fabric/trim, builder code">Tag</th>' : '') +
           (type === 'invoice' ? '<th style="padding:8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;width:64px;">Notes</th>' : '') +
           '<th style="padding:8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Qty</th>' +
@@ -3183,6 +3229,7 @@
             typeBadgeHtml +
           '</td>' +
           (_showPoVendorCol ? '<td style="padding:10px 8px;font-size:13px;color:var(--gray-500);">' + esc(item.vendor || '') + '</td>' : '') +
+          (_showRoomCol ? '<td style="padding:10px 8px;font-size:13px;color:var(--gray-500);">' + esc(String(item.room || item.roomLocation || item.projectRoom || '').trim() || '—') + '</td>' : '') +
           (_showLineTagCol ? '<td style="padding:10px 8px;text-align:center;vertical-align:middle;font-size:12px;font-weight:700;color:#1B3352;">' + esc(lineTag || '—') + '</td>' : '') +
           (type === 'invoice' ? '<td style="padding:10px 8px;text-align:center;vertical-align:middle;">' + invNoteBtnHtml + '</td>' : '') +
           '<td style="padding:10px 8px;text-align:center;font-size:14px;">' + qty + '</td>' +
@@ -3374,8 +3421,8 @@
               '<div class="cch-doc-view-rail-title" style="margin:0;">Totals</div>' + _statusInline +
             '</div>' +
             '<div class="cch-doc-view-rail-row"><span>Merchandise subtotal</span><strong>' + formatMoney(subtotal) + '</strong></div>' +
-            (tax > 0.01 ? '<div class="cch-doc-view-rail-row"><span>Sales tax' + (taxRate > 0 ? ' (' + taxRate + '%)' : '') + '</span><strong>' + formatMoney(tax) + '</strong></div>' : '') +
-            (totalShipping > 0.01 ? '<div class="cch-doc-view-rail-row"><span>Shipping</span><strong>' + formatMoney(totalShipping) + '</strong></div>' : '') +
+            '<div class="cch-doc-view-rail-row"><span>Sales tax' + (taxRate > 0 ? ' (' + taxRate + '%)' : '') + '</span><strong>' + formatMoney(tax) + '</strong></div>' +
+            '<div class="cch-doc-view-rail-row"><span>Shipping</span><strong>' + formatMoney(totalShipping) + '</strong></div>' +
             '<div class="cch-doc-view-rail-row cch-doc-view-rail-grand"><span>Total</span><strong>' + formatMoney(grandTotal) + '</strong></div>' +
             (showPaymentTotals
               ? '<div class="cch-doc-view-rail-row"><span>Paid</span><strong style="color:#2E7D32;">-' + formatMoney(totalPaid) + '</strong></div>' +
@@ -3406,6 +3453,17 @@
         _dupWarnHtml += '<div class="cch-inv-dup-warn" style="background:rgba(46,125,50,0.08);border-color:rgba(46,125,50,0.25);color:#1B5E20;">' +
           'Locked: Studio will not auto-switch duplicate invoice docs or re-sync lines from clips on open. Use <strong>Flat list</strong> to match a PDF export.</div>';
       }
+      var _invLineTotalsFooter = (items.length && typeof window.cchDocViewLineTotalsFooterHtml === 'function')
+        ? window.cchDocViewLineTotalsFooterHtml({
+            subLabel: 'Subtotal',
+            subtotal: subtotal,
+            shipping: totalShipping,
+            tax: tax,
+            taxRate: taxRate,
+            taxableSubtotal: taxableSubtotal,
+            grandTotal: grandTotal
+          })
+        : '';
       T.innerHTML =
         '<div class="cch-doc-view-page">' +
           '<div class="cch-doc-view-grid">' +
@@ -3428,7 +3486,7 @@
                   '<div class="cch-doc-view-panel-title" style="margin:0;color:#1B3352;font-weight:700;letter-spacing:1.2px;">Line items</div>' +
                   _lineItemsHdrExtra +
                 '</div>' +
-                (items.length === 0 ? '<div style="padding:12px;text-align:center;color:var(--gray-400);font-size:12px;">No items</div>' : itemsHTML) +
+                (items.length === 0 ? '<div style="padding:12px;text-align:center;color:var(--gray-400);font-size:12px;">No items</div>' : itemsHTML + _invLineTotalsFooter) +
               '</div>' +
               _tagsMemoBlock +
             '</div>' +
@@ -3719,6 +3777,220 @@
           '<button class="btn btn-secondary" style="font-size:14px;padding:10px 20px;" onclick="quickRecordPayment(\'' + projectId + '\',\'' + collection + '\',\'' + docId + '\')">💳 Record Payment</button>' +
           '<button class="btn btn-secondary" style="font-size:14px;padding:10px 20px;" onclick="duplicateInvoice(\'' + projectId + '\',\'' + docId + '\')">📋 Duplicate</button>' +
         '</div>' +
+      '</div>';
+  };
+
+  // ============================================================
+  // Invoice Manage landing — group, drag, inline room/markup (Client/Manage toggle)
+  // ============================================================
+  window.renderInvoiceManageLanding = async function(projectId, docId, docData, items, projData) {
+    var T = document.getElementById('contentArea');
+    if (!T) return;
+    items = items || [];
+    projData = projData || {};
+    docData = docData || {};
+    var projName = projData.name || projectId;
+    var docNum = docData.invoiceNum || docData.number || docId.slice(0, 8);
+    var collection = 'invoices';
+    var pid = projectId;
+    var iid = docId;
+    var pe = typeof escAttr === 'function' ? escAttr(pid) : pid;
+    var ie = typeof escAttr === 'function' ? escAttr(iid) : iid;
+
+    window._docEdit = { type: 'invoice', projectId: pid, docId: iid, collection: collection, docData: docData, items: items };
+    window._docViewInvoiceCtx = { projectId: pid, docId: iid, collection: collection, items: items, docData: docData, proj: projData };
+
+    if (typeof setBreadcrumb === 'function') {
+      setBreadcrumb([
+        { label: 'Projects', hash: '#/projects' },
+        { label: projName, hash: '#/project/' + pid + '/invoices' },
+        { label: 'Invoice ' + docNum }
+      ]);
+    }
+
+    var invVoidEarly = String(docData.status || '').toLowerCase() === 'void';
+    var qbRealId = typeof getQbId === 'function' ? getQbId(docData) : (docData.qbDocId || null);
+    var _canPushQBView = typeof userCanPushToQB === 'function' ? userCanPushToQB() : false;
+    if (typeof setTopbarActions === 'function') {
+      setTopbarActions(typeof window.cchBuildDocViewTopbar === 'function' ? window.cchBuildDocViewTopbar({
+        type: 'invoice',
+        projectId: pid,
+        docId: iid,
+        collection: collection,
+        backTab: 'invoices',
+        projName: projName,
+        docData: docData,
+        invVoidEarly: invVoidEarly,
+        qbRealId: qbRealId,
+        canPushQB: _canPushQBView
+      }) : '');
+    }
+
+    var rooms = [];
+    try {
+      if (typeof window._fetchProjectBoardRoomList === 'function') {
+        rooms = await window._fetchProjectBoardRoomList(pid);
+      }
+    } catch (eRooms) { /* */ }
+    if (!rooms.length && typeof window.docEditMergeRoomsFromItems === 'function') {
+      rooms = window.docEditMergeRoomsFromItems(['Living Room', 'Kitchen', 'Master Bedroom', 'Exterior'], items, 'invoice');
+    }
+
+    function invLineAmt(it) {
+      if (typeof window.invoiceLineAmountForTotals === 'function') {
+        return window.invoiceLineAmountForTotals(it).lineAmt;
+      }
+      return parseFloat(it.amount) || 0;
+    }
+
+    var rows = [];
+    var section = 0;
+    var sub = 0;
+    var openGroupGid = null;
+    var tableColspan = 16;
+    var idx;
+    for (idx = 0; idx < items.length; idx++) {
+      var item = items[idx];
+      if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(item)) {
+        section++;
+        sub = 0;
+        openGroupGid = item.groupId || ('grp_' + idx);
+        var gid = openGroupGid;
+        var collKey = pid + '|' + iid + '|' + gid;
+        var collapsed = !!(window._invoiceCollapsedGroups && window._invoiceCollapsedGroups[collKey]);
+        var groupDisplayHtml = typeof proposalGroupHeaderDisplayHtml === 'function'
+          ? proposalGroupHeaderDisplayHtml(item, { compact: true })
+          : esc(item.title || 'Section');
+        rows.push(
+          '<tr class="prop-group-row" data-idx="' + idx + '"' +
+          ' ondragover="event.preventDefault();this.classList.add(\'prop-drag-over\');" ondragleave="this.classList.remove(\'prop-drag-over\');"' +
+          ' ondrop="invoiceRowDropOn(\'' + pe + '\',\'' + ie + '\',' + idx + ',event)">' +
+          '<td colspan="' + tableColspan + '" style="padding:10px 12px;vertical-align:middle;">' +
+          '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+          '<button type="button" title="' + (collapsed ? 'Expand group' : 'Collapse group') + '" onclick="event.stopPropagation();toggleInvoiceGroupCollapse(\'' + pe + '\',\'' + ie + '\',\'' + (typeof escAttr === 'function' ? escAttr(gid) : gid) + '\')" style="width:30px;height:30px;margin-right:4px;border:1px solid rgba(15,26,46,0.2);background:#fff;color:var(--navy);font-size:16px;font-weight:700;cursor:pointer;vertical-align:middle;border-radius:2px;line-height:1;">' + (collapsed ? '+' : '−') + '</button>' +
+          '<span draggable="true" style="cursor:grab;color:var(--gray-500);padding:4px 8px 4px 2px;user-select:none;display:inline-block;" title="Drag here to move group" ondragstart="invoiceRowDragStart(\'' + pe + '\',\'' + ie + '\',' + idx + ')">⋮⋮</span>' +
+          '<div style="flex:1;min-width:240px;">' + groupDisplayHtml + '</div>' +
+          '<button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation();removeInvoiceCustomGroup(\'' + pe + '\',\'' + ie + '\',' + idx + ')">Ungroup</button>' +
+          '</div></td></tr>'
+        );
+        continue;
+      }
+      var numLabel;
+      if (openGroupGid && item.groupId === openGroupGid) {
+        sub++;
+        numLabel = section + '.' + sub;
+      } else {
+        openGroupGid = null;
+        section++;
+        numLabel = String(section);
+      }
+      var collKeyRow = pid + '|' + iid + '|' + (item.groupId || '');
+      var trStyle = (item.groupId && window._invoiceCollapsedGroups && window._invoiceCollapsedGroups[collKeyRow]) ? 'display:none;' : '';
+      var qty = parseFloat(item.qty) || 1;
+      var cost = parseFloat(item.cost) || 0;
+      var markupPct = parseFloat(item.markupPct) || 0;
+      var shipping = parseFloat(item.shipping) || 0;
+      var lineTotal = invLineAmt(item);
+      var curRoom = String(item.room || '').trim();
+      var roomOpts = '<option value="">— Room —</option>';
+      if (curRoom && rooms.indexOf(curRoom) < 0) {
+        roomOpts += '<option value="' + (typeof escAttr === 'function' ? escAttr(curRoom) : curRoom) + '" selected>' + esc(curRoom) + '</option>';
+      }
+      for (var ri = 0; ri < rooms.length; ri++) {
+        var r = rooms[ri];
+        roomOpts += '<option value="' + (typeof escAttr === 'function' ? escAttr(r) : r) + '"' + (r === curRoom ? ' selected' : '') + '>' + esc(r) + '</option>';
+      }
+      var lineTagTxt = typeof cchLineTagExplicit === 'function' ? cchLineTagExplicit(item) : String(item.lineTag || '').trim();
+      var clientNoteTxt = typeof cchLineExplicitNotesText === 'function' ? cchLineExplicitNotesText(item) : String(item.lineNotes || '').trim();
+      var thumbHtml = (function() {
+        var _tu = typeof getProposalLineHeroImageUrl === 'function' ? getProposalLineHeroImageUrl(item) : String(item.imageUrl || '').trim();
+        if (!_tu) {
+          return typeof cchLineIconPlaceholderHtml === 'function'
+            ? cchLineIconPlaceholderHtml(item, 48)
+            : '<div style="width:48px;height:48px;background:var(--gray-50);display:flex;align-items:center;justify-content:center;font-size:20px;">📦</div>';
+        }
+        return '<img src="' + (typeof _escImgSrcAttr === 'function' ? _escImgSrcAttr(_tu) : escAttr(_tu)) + '" style="width:48px;height:48px;object-fit:cover;vertical-align:middle;" onerror="this.outerHTML=\'<span style=font-size:20px>📦</span>\';">';
+      })();
+      var noteBtnHtml = '<button type="button" class="btn btn-sm" style="padding:4px 7px;font-size:10px;line-height:1.1;min-width:58px;color:#0F1A2E;border:1px solid rgba(15,26,46,0.12);background:#fff;" onclick="event.stopPropagation();toggleInvoiceLineNotes(' + idx + ')">' + (clientNoteTxt ? 'Notes ▾' : '+ Notes') + '</button>';
+      var noteRowHtml = '<tr id="invLineNotesRow' + idx + '" class="inv-line-notes-row" style="display:none;background:#F4F6FA;">' +
+        '<td colspan="' + tableColspan + '" style="padding:10px 12px;">' +
+        '<div style="display:grid;grid-template-columns:120px minmax(0,1fr) auto;gap:10px;align-items:start;">' +
+        '<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#5C6B80;font-weight:700;padding-top:8px;">Line notes</div>' +
+        '<textarea id="invLineNotesText' + idx + '" class="form-textarea" rows="3" placeholder="Notes under this line on client view / print." style="min-height:64px;font-size:12px;">' + esc(clientNoteTxt) + '</textarea>' +
+        '<div style="display:flex;gap:6px;"><button type="button" class="btn btn-primary btn-sm" onclick="event.stopPropagation();saveInvoiceLineNotes(\'' + pe + '\',\'' + ie + '\',' + idx + ')">Save</button>' +
+        '<button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation();toggleInvoiceLineNotes(' + idx + ')">Close</button></div>' +
+        '</div></td></tr>';
+      var isTaxable = typeof window.cchInvoiceLineIsTaxable === 'function' ? window.cchInvoiceLineIsTaxable(item) : (item.taxable !== false);
+      rows.push(
+        '<tr style="' + trStyle + '" data-idx="' + idx + '"' +
+        ' ondragover="event.preventDefault();this.classList.add(\'prop-drag-over\');" ondragleave="this.classList.remove(\'prop-drag-over\');"' +
+        ' ondrop="invoiceRowDropOn(\'' + pe + '\',\'' + ie + '\',' + idx + ',event)">' +
+        '<td draggable="true" style="text-align:center;color:var(--gray-400);cursor:grab;padding:6px;width:28px;" ondragstart="invoiceRowDragStart(\'' + pe + '\',\'' + ie + '\',' + idx + ')">⋮⋮</td>' +
+        '<td style="text-align:center;padding:4px;"><input type="checkbox" class="invBulkSelectCb" data-idx="' + idx + '" onclick="event.stopPropagation()" onchange="invBulkUpdateGroupBtnState()"></td>' +
+        '<td style="font-size:11px;font-weight:600;color:var(--gray-500);text-align:center;width:32px;">' + esc(numLabel) + '</td>' +
+        '<td style="padding:4px;width:54px;">' + thumbHtml + '</td>' +
+        '<td class="prop-item-cell"><strong style="font-size:12px;display:block;">' + esc(item.title || 'Untitled') + '</strong>' +
+          '<span style="font-size:11px;color:var(--gray-400);">' + esc((item.description || '').substring(0, 80)) + '</span></td>' +
+        '<td style="font-size:12px;padding:4px;"><input class="form-input" style="font-size:11px;padding:3px 4px;width:100%;box-sizing:border-box;" value="' + escAttr(item.vendor || '') + '" onchange="updateProposalItemField(\'' + pe + '\',\'' + ie + '\',' + idx + ',\'vendor\',this.value)"></td>' +
+        '<td style="font-size:12px;padding:4px;"><select class="form-input" style="font-size:10px;padding:2px;width:100%;box-sizing:border-box;" onchange="updateProposalItemField(\'' + pe + '\',\'' + ie + '\',' + idx + ',\'room\',this.value)">' + roomOpts + '</select></td>' +
+        '<td style="text-align:center;padding:4px;"><input class="form-input" style="font-size:11px;font-weight:700;padding:3px;width:48px;text-align:center;box-sizing:border-box;" value="' + escAttr(lineTagTxt) + '" maxlength="32" placeholder="—" onchange="updateProposalItemField(\'' + pe + '\',\'' + ie + '\',' + idx + ',\'lineTag\',this.value)"></td>' +
+        '<td style="text-align:center;padding:4px;">' + noteBtnHtml + '</td>' +
+        '<td class="amount" style="font-size:12px;padding:4px;text-align:right;"><input type="text" inputmode="decimal" class="form-input cch-no-spin" style="font-size:11px;padding:3px;width:44px;text-align:right;" value="' + qty + '" onchange="updateProposalItemField(\'' + pe + '\',\'' + ie + '\',' + idx + ',\'qty\',this.value)"></td>' +
+        '<td class="amount" style="font-size:12px;padding:4px;text-align:right;"><input type="text" inputmode="decimal" class="form-input cch-no-spin" style="font-size:11px;padding:3px;width:58px;text-align:right;" value="' + (cost > 0 ? cost.toFixed(2) : '') + '" onchange="updateProposalItemField(\'' + pe + '\',\'' + ie + '\',' + idx + ',\'cost\',this.value||0)"></td>' +
+        '<td class="amount" style="font-size:12px;padding:4px;text-align:right;"><input type="text" inputmode="decimal" class="form-input cch-no-spin" style="font-size:11px;padding:3px;width:44px;text-align:right;color:var(--green);" value="' + (markupPct || '') + '" onchange="updateProposalItemField(\'' + pe + '\',\'' + ie + '\',' + idx + ',\'markupPct\',this.value||0)"></td>' +
+        '<td class="amount" style="font-size:12px;padding:4px;text-align:right;"><input type="text" inputmode="decimal" class="form-input cch-no-spin" style="font-size:11px;padding:3px;width:52px;text-align:right;" value="' + (shipping > 0 ? shipping.toFixed(2) : '') + '" onchange="updateProposalItemField(\'' + pe + '\',\'' + ie + '\',' + idx + ',\'shipping\',this.value||0)"></td>' +
+        '<td style="text-align:center;padding:4px;">' + (isTaxable ? '<span style="color:#5FA56B;font-weight:700;">✓</span>' : '—') + '</td>' +
+        '<td class="amount prop-col-total" style="padding:4px;text-align:right;font-weight:600;">' + formatMoney(lineTotal) + '</td>' +
+        '<td class="prop-sticky-actions" style="text-align:center;white-space:nowrap;padding:6px 4px;">' +
+          '<button type="button" class="btn btn-sm" style="padding:3px 6px;font-size:11px;" onclick="event.stopPropagation();editInvoiceItem(\'' + pe + '\',\'' + ie + '\',' + idx + ')" title="Edit images &amp; details">✏️</button>' +
+        '</td></tr>' + noteRowHtml
+      );
+    }
+
+    var _invT = typeof window.invoiceViewTotals === 'function'
+      ? window.invoiceViewTotals(docData, items, projData)
+      : { subtotal: 0, totalShipping: 0, tax: 0, grandTotal: 0, taxRate: 0 };
+
+    var bulkBar = '<div style="margin-bottom:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;" onclick="event.stopPropagation()">' +
+      '<div class="inv-bulk-wrap" style="position:relative;display:inline-block;">' +
+      '<button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation();toggleInvBulkDd(this)">Bulk Actions ▾</button>' +
+      '<div class="inv-bulk-dd" style="display:none;position:absolute;left:0;top:100%;margin-top:4px;min-width:260px;background:#fff;border:1px solid rgba(15,26,46,0.12);box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:130;padding:4px 0;" onclick="event.stopPropagation()">' +
+      '<button type="button" style="display:block;width:100%;text-align:left;padding:9px 14px;border:none;background:#fff;cursor:pointer;font-size:13px;color:#0F1A2E;" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'#fff\'" onclick="invBulkCloseAll();setAllInvoiceLinesRoom(\'' + pe + '\',\'' + ie + '\')">Set room for all lines…</button>' +
+      '<div style="border-top:1px solid rgba(15,26,46,0.08);margin:4px 0;"></div>' +
+      '<button type="button" id="invBulkGroupBtn" disabled style="opacity:0.45;pointer-events:none;display:block;width:100%;text-align:left;padding:9px 14px;border:none;background:#fff;cursor:not-allowed;font-size:13px;color:#0F1A2E;" onmouseover="if(!this.disabled)this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'#fff\'" onclick="if(this.disabled)return;invBulkCloseAll();createInvoiceGroupFromSelection(\'' + pe + '\',\'' + ie + '\')">Create group from selected…</button>' +
+      '</div></div>' +
+      '<button type="button" class="btn btn-secondary btn-sm" onclick="createInvoiceGroupFromSelection(\'' + pe + '\',\'' + ie + '\')">Create group from selected rows</button>' +
+      '<span style="font-size:12px;color:var(--gray-500);">Drag <strong>⋮⋮</strong> to reorder · ✏️ opens full line editor (images, markup)</span>' +
+      '</div>' +
+      '<style>.prop-drag-over{outline:2px dashed #1B3352;outline-offset:-2px;background:rgba(27,51,82,0.04);}</style>';
+
+    var thead = '<thead><tr>' +
+      '<th style="width:24px;" title="Drag"></th><th style="width:28px;" title="Select"></th><th style="width:32px;">#</th>' +
+      '<th style="width:54px;">IMG</th><th style="min-width:18%;">ITEM</th><th>VENDOR</th><th>ROOM</th>' +
+      '<th style="width:52px;text-align:center;">Tag</th><th style="width:64px;">Notes</th>' +
+      '<th class="amount">QTY</th><th class="amount">COST</th><th class="amount">Mkup %</th><th class="amount">SHIP</th>' +
+      '<th style="width:42px;text-align:center;">TAX</th><th class="amount">TOTAL</th><th style="width:44px;"></th></tr></thead>';
+
+    var tableHtml = items.length
+      ? bulkBar + '<div id="invoiceManageArea" data-cch-invoice-manage="1" class="proposal-table-wrap proposal-landing-manage-border"><table class="data-table" style="margin-bottom:0;" ondragover="event.preventDefault()">' + thead + '<tbody>' + rows.join('') + '</tbody></table></div>'
+      : '<div style="padding:32px;text-align:center;color:var(--gray-400);">No line items. Use <strong>Edit line items</strong> to add products.</div>';
+
+    T.innerHTML =
+      '<div class="cch-doc-view-page">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;gap:10px;">' +
+          '<div><span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#9CA3AF;">Invoice · Manage</span>' +
+          '<h1 style="font-size:18px;font-weight:700;margin:4px 0 0;">' + esc(docNum) + '</h1>' +
+          '<div style="font-size:11px;color:var(--gray-400);">' + esc(projName) + '</div></div>' +
+          '<button type="button" class="btn btn-primary btn-sm" style="background:#1B3352;color:#EDE8E0;" onclick="window._forceEditMode=true;navigate(window.location.hash)">✏️ Edit line items</button>' +
+        '</div>' +
+        tableHtml +
+        '<div style="margin-top:20px;display:flex;justify-content:flex-end;">' +
+          '<div style="min-width:260px;text-align:right;">' +
+            '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--gray-500);margin-bottom:4px;"><span>Subtotal</span><span>' + formatMoney(_invT.subtotal) + '</span></div>' +
+            '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--gray-500);margin-bottom:4px;"><span>Shipping</span><span>' + formatMoney(_invT.totalShipping) + '</span></div>' +
+            '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--gray-500);margin-bottom:4px;"><span>Tax</span><span>' + formatMoney(_invT.tax) + '</span></div>' +
+            '<div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700;padding-top:8px;border-top:2px solid var(--navy);"><span>Total</span><span>' + formatMoney(_invT.grandTotal) + '</span></div>' +
+          '</div></div>' +
       '</div>';
   };
 

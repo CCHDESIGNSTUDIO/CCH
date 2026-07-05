@@ -75,7 +75,7 @@
       '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">' +
         '<div class="cch-doc-view-panel-title" style="margin:0;">Vendor communications</div>' +
         '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
-          '<button type="button" class="btn btn-primary btn-sm" style="background:#1B3352;color:#EDE8E0;" onclick="cchPoSendToVendor(\'' + escAttr(projectId) + '\',\'' + escAttr(poId) + '\')">📧 Send to vendor</button>' +
+          '<button type="button" class="btn btn-primary btn-sm" style="background:#1B3352;color:#EDE8E0;" onclick="cchPoEmailVendor(\'' + escAttr(projectId) + '\',\'' + escAttr(poId) + '\')">📧 Send to vendor</button>' +
           '<button type="button" class="btn btn-secondary btn-sm" onclick="cchPoLogVendorReply(\'' + escAttr(projectId) + '\',\'' + escAttr(poId) + '\')">↩ Log reply</button>' +
         '</div>' +
       '</div>' +
@@ -84,7 +84,9 @@
     '</div>';
   };
 
-  window.cchPoSendToVendor = async function(projectId, poId) {
+  // Mailto + thread log. Named cchPoEmailVendor — index.html emailVendorPO() and comms panel call this.
+  // Must NOT use cchPoSendToVendor (that is Send PO / mark-sent only, in cch-po-bill-variance.js).
+  window.cchPoEmailVendor = async function(projectId, poId) {
     try {
       var snap = await firebase.firestore().collection('boards').doc(projectId)
         .collection('purchaseOrders').doc(poId).get();
@@ -104,9 +106,18 @@
           if (resolved && resolved.name) contact.name = resolved.name;
         } catch (_e) {}
       }
+      if (!contact.email && typeof window.cchPrompt === 'function') {
+        var typed = await window.cchPrompt(
+          'Vendor email (for this send only — not saved to the vendor record):',
+          '',
+          'Send to vendor'
+        );
+        if (typed === null) return;
+        contact.email = String(typed || '').trim();
+      }
       if (!contact.email) {
         if (typeof window.cchAlert === 'function') {
-          await window.cchAlert('No vendor email on this PO. Add it under Edit PO or in Vendors, then try again.', 'Send to vendor');
+          await window.cchAlert('No email entered — canceling mailto.', 'Send to vendor');
         }
         return;
       }
@@ -143,7 +154,7 @@
         window.renderProjectDetail();
       }
     } catch (e) {
-      console.error('cchPoSendToVendor', e);
+      console.error('cchPoEmailVendor', e);
       if (typeof window.cchAlert === 'function') await window.cchAlert('Could not send: ' + (e.message || e), 'Send to vendor');
     }
   };

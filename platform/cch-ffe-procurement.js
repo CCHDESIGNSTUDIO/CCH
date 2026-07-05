@@ -434,4 +434,38 @@
     win.document.close();
   };
 
+  /** FFE furnishing products only — excludes design services, expenses, tax (mirrors Selections). */
+  window.cchFfeFilterProductClipsOnly = function(clips) {
+    var NON_PRODUCT_TYPES = ['service', 'shipping', 'sales_tax', 'handling', 'expense', 'discount', 'labor', 'other_expense'];
+    var BAD_CATS = ['time billing', 'time track', 'time tracking', 'service', 'services', 'expense', 'expenses',
+      'design services', 'design service', 'blended design services', 'blended design fees', 'consultation',
+      'professional services', 'uncategorized', 'taxes', 'freight', 'shipping', 'design fees', 'design fee'];
+    function badCat(s) {
+      var c = String(s || '').toLowerCase().trim();
+      return c && BAD_CATS.indexOf(c) >= 0;
+    }
+    return (clips || []).filter(function(c) {
+      if (!c) return false;
+      if (typeof window.boardClipIsTimeBillingRow === 'function' && window.boardClipIsTimeBillingRow(c)) return false;
+      var et = String(c.expenseType || '').toLowerCase();
+      if (et && NON_PRODUCT_TYPES.indexOf(et) >= 0) return false;
+      if (badCat(c.category) || badCat(c.room)) return false;
+      var titleAndDesc = (String(c.title || c.name || '') + ' ' + String(c.description || '') + ' ' + String(c.notes || '')).toLowerCase();
+      if (/\b(time billing|time track|time tracking|freight|shipping|delivery|handling|sales tax|pre\s*paid tax|prepaid tax|service fee|design fee|consultation|retainer|blended service|mood board|design concept|project meeting|client project service|reimbursable|pass\s*through)\b/.test(titleAndDesc)) return false;
+      var t = String(c.title || c.name || '').trim().toLowerCase();
+      if (t === 'expense' || t === 'expenses' || t === 'labor' || t === 'labour' || t === 'service' || t === 'services') return false;
+      if (/^cch\s+/.test(t) && /\b(service|meeting|concept|billing|mood|client project)\b/.test(titleAndDesc)) return false;
+      if (typeof window.isRealProduct === 'function') {
+        return window.isRealProduct({
+          title: c.title, category: c.category, room: c.room,
+          vendor: c.vendor, manufacturer: c.manufacturer || '', sku: c.sku || '',
+          cost: c.cost, clientPrice: c.clientPrice || c.totalSelling,
+          imageUrl: c.imageUrl, image: c.image || c.img,
+          libraryItemKind: c.libraryItemKind, itemKind: c.itemKind
+        });
+      }
+      return true;
+    });
+  };
+
 })();

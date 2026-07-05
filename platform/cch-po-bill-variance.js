@@ -5072,7 +5072,7 @@
     }
 
     var inner = footRow('Merchandise', merchandiseSubtotal);
-    if (hasBill && Math.abs(freight) >= 0.01) inner += footRow('Shipping', freight);
+    inner += footRow('Shipping', hasBill ? freight : 0);
     if (variance != null && Math.abs(variance) >= 0.01) {
       var vCol = variance > 0 ? '#B45309' : '#15803D';
       var vAmt = (variance > 0 ? '+' : '−') + fmt(Math.abs(variance));

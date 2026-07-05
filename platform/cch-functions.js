@@ -814,6 +814,38 @@ async function deleteClient(id) {
   try { await db.collection('clients').doc(id).delete(); closeModal(); renderClients(); } catch(e) { if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Delete client'); }
 }
 
+/** Canonical vendor Type values (Edit Vendor modal + filters). Legacy types still display when saved on a record. */
+var CCH_VENDOR_TYPE_OPTIONS = [
+  'Vendor / Manufacturer',
+  'Showroom',
+  'Retailer / Online',
+  'Workroom',
+  'Delivery (Receivers, installers, freight, etc.)',
+  'Contractors & Subs'
+];
+
+function cchVendorTypeSelectOptions(currentType) {
+  currentType = String(currentType || '').trim();
+  var opts = CCH_VENDOR_TYPE_OPTIONS.slice();
+  if (currentType && opts.indexOf(currentType) < 0) opts.unshift(currentType);
+  return opts.map(function(t) {
+    return '<option value="' + escAttr(t) + '"' + (currentType === t ? ' selected' : '') + '>' + esc(t) + '</option>';
+  }).join('');
+}
+
+function cchVendorTypeFilterOptions(vendors, selected) {
+  selected = String(selected || '').trim();
+  var set = {};
+  CCH_VENDOR_TYPE_OPTIONS.forEach(function(t) { set[t] = true; });
+  (vendors || []).forEach(function(v) {
+    var t = String(v.type || '').trim();
+    if (t) set[t] = true;
+  });
+  return Object.keys(set).sort(function(a, b) { return a.localeCompare(b); }).map(function(t) {
+    return '<option value="' + escAttr(t) + '"' + (selected === t ? ' selected' : '') + '>' + esc(t) + '</option>';
+  }).join('');
+}
+
 async function renderVendors() {
   setBreadcrumb([{ label: 'Vendors' }]);
   setTopbarActions('<button class="btn btn-primary" onclick="showNewVendorModal(null,\'Vendor\')">+ New Vendor</button>');
@@ -843,15 +875,11 @@ function renderVendorsView(query) {
     var searchRaw = window._vendorSearchQuery || '';
     var search = searchRaw.toLowerCase().trim();
 
-    var typeOptsSet = {};
     var catOptsSet = {};
     vendors.forEach(function(v) {
-      var t = String(v.type || '').trim();
-      if (t) typeOptsSet[t] = true;
       var c = String(v.category || 'Vendor').trim();
       if (c) catOptsSet[c] = true;
     });
-    var typeList = Object.keys(typeOptsSet).sort(function(a,b){ return a.localeCompare(b); });
     var catList = Object.keys(catOptsSet).sort(function(a,b){ return a.localeCompare(b); });
     var selType = window._vendorFilterType || '';
     var selCat = window._vendorFilterCategory || '';
@@ -866,9 +894,7 @@ function renderVendorsView(query) {
       '<label class="form-label" style="font-size:11px;color:var(--gray-400);display:block;margin-bottom:4px;">Type</label>' +
       '<select class="form-input" style="min-width:160px;padding:8px 10px;" onchange="window._vendorFilterType=this.value;renderVendorsView();">' +
       '<option value="">All types</option>' +
-      typeList.map(function(t) {
-        return '<option value="' + escAttr(t) + '"' + (selType === t ? ' selected' : '') + '>' + esc(t) + '</option>';
-      }).join('') +
+      cchVendorTypeFilterOptions(vendors, selType) +
       '</select></div>' +
       '<div>' +
       '<label class="form-label" style="font-size:11px;color:var(--gray-400);display:block;margin-bottom:4px;">Category</label>' +
@@ -946,8 +972,11 @@ async function showNewVendorModal(existingId, categoryHint) {
   } else if (v.address) {
     addrParts.line1 = String(v.address).trim();
   }
-  var typeList = ['Showroom','Upholsterer','Window Fabricator','Freight / Receiver','Stone Supplier','Lighting','Furniture','Fabric','Wallcovering','Hardware','Tile / Stone','Custom Upholstery','Workroom','Delivery','Installer'];
-  var typeOpts = typeList.map(function(x){ return '<option value="' + x + '">'; }).join('');
+  var currentType = String(v.type || '').trim();
+  if (!currentType && cat === 'Workroom') currentType = 'Workroom';
+  else if (!currentType && cat === 'Delivery / Receiver') currentType = 'Delivery (Receivers, installers, freight, etc.)';
+  else if (!currentType) currentType = 'Vendor / Manufacturer';
+  var typeSelectOpts = cchVendorTypeSelectOptions(currentType);
   var title = (existingId ? 'Edit ' : 'New ') + cat;
   var deleteBtn = existingId ? '<button class="btn btn-secondary btn-sm" style="color:var(--red);border-color:var(--red);" onclick="deleteVendor(\'' + existingId + '\',\'' + cat + '\')">Delete</button>' : '<div></div>';
   var moveOpts = '';
@@ -964,7 +993,7 @@ async function showNewVendorModal(existingId, categoryHint) {
     '<div class="modal-header"><div class="modal-title">' + title + '</div><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
     '<div class="modal-body"><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">' +
     '<div class="form-group"><label class="form-label">Name *</label><input class="form-input" id="vnName" value="' + escAttr(v.name||'') + '"></div>' +
-    '<div class="form-group"><label class="form-label">Type</label><input class="form-input" id="vnType" value="' + escAttr(v.type||'') + '" list="vnTypeList"><datalist id="vnTypeList">' + typeOpts + '</datalist></div>' +
+    '<div class="form-group"><label class="form-label">Type</label><select class="form-input" id="vnType" style="padding:8px 10px;">' + typeSelectOpts + '</select></div>' +
     '<div class="form-group"><label class="form-label">Contact</label><input class="form-input" id="vnContact" value="' + escAttr(v.contact||'') + '"></div>' +
     '<div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="vnPhone" value="' + escAttr(v.phone||'') + '"></div>' +
     '<div class="form-group"><label class="form-label">Email</label><input class="form-input" id="vnEmail" value="' + escAttr(v.email||'') + '"></div>' +
@@ -977,8 +1006,8 @@ async function showNewVendorModal(existingId, categoryHint) {
     '<div><label class="form-label">Zip</label><input class="form-input" id="vnZip" value="' + escAttr(addrParts.zip) + '"></div></div>' +
     '<div class="form-group"><label class="form-label">Lead Time</label><input class="form-input" id="vnLeadTime" value="' + escAttr(v.leadTime||'') + '"></div>' +
     '<div class="form-group"><label class="form-label">Website</label><input class="form-input" id="vnWebsite" value="' + escAttr(v.website||'') + '"></div>' +
-    '<div class="form-group"><label class="form-label">Description</label><input class="form-input" id="vnDescription" value="' + escAttr(v.description||'') + '" placeholder="e.g. Showroom, Custom Upholstery..."></div>' +
-    '<div class="form-group"><label class="form-label">Tags</label><input class="form-input" id="vnTags" value="' + escAttr(v.tags||'') + '" placeholder="e.g. Furniture, Lighting, Fabric"></div>' +
+    '<div class="form-group"><label class="form-label">Description</label><input class="form-input" id="vnDescription" value="' + escAttr(v.description||'') + '" placeholder="Notes about this contact (optional)"></div>' +
+    '<div class="form-group"><label class="form-label">Tags</label><input class="form-input" id="vnTags" value="' + escAttr(v.tags||'') + '" placeholder="e.g. trade account, preferred"></div>' +
     '</div>' +
     '<div style="height:1px;background:var(--gray-200);margin:16px 0;"></div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">' +
@@ -1524,7 +1553,11 @@ function renderWorkroomsView(query) {
 // ==================== DELIVERY / RECEIVERS ====================
 async function renderDeliveryReceivers() {
   setBreadcrumb([{ label: 'Delivery / Receivers' }]);
-  setTopbarActions('<button class="btn btn-primary" onclick="showNewVendorModal(null,\'Delivery / Receiver\')">+ New Delivery / Receiver</button>');
+  var topbar = '<button class="btn btn-primary" onclick="showNewVendorModal(null,\'Delivery / Receiver\')">+ New Delivery / Receiver</button>';
+  if (typeof window.cchAirtablePushBtnHtml === 'function') {
+    topbar = window.cchAirtablePushBtnHtml({ scope: 'firm', label: 'Push all to Airtable' }) + topbar;
+  }
+  setTopbarActions(topbar);
   var T = document.getElementById('contentArea');
   T.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Loading...</div>';
   try {

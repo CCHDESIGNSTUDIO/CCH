@@ -21,7 +21,20 @@ service firebase.storage {
       return signedIn()
         && request.resource.size < 10 * 1024 * 1024
         && (
-          request.resource.contentType.matches('image/.*')
+          request.resource.contentType == null
+          || request.resource.contentType == ''
+          || request.resource.contentType.matches('image/.*')
+          || request.resource.contentType == 'application/octet-stream'
+        );
+    }
+    /** Design board canvas uploads (images/designboards/... and projects/.../designboards/...). */
+    function allowedDesignBoardImageWrite() {
+      return signedIn()
+        && request.resource.size < 32 * 1024 * 1024
+        && (
+          request.resource.contentType == null
+          || request.resource.contentType == ''
+          || request.resource.contentType.matches('image/.*')
           || request.resource.contentType == 'application/octet-stream'
         );
     }
@@ -76,6 +89,12 @@ service firebase.storage {
     match /products/{allPaths=**} {
       allow read: if true;
       allow create, update: if allowedImageWrite();
+      allow delete: if signedIn();
+    }
+
+    match /images/designboards/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if allowedDesignBoardImageWrite();
       allow delete: if signedIn();
     }
 
