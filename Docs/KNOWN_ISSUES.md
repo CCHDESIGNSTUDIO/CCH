@@ -1,8 +1,8 @@
 # CCH Studio — Known Issues
 
-**Last updated:** June 8, 2026  
+**Last updated:** June 9, 2026  
 **Maintainer:** Cynthia Holloway  
-**Last revised by:** Cursor (CR) (Jun 8, 2026 — §4 Claude/Code Jun 5 intake synced to tracker; RB-1/RB-2/SEL-1 unchanged)
+**Last revised by:** Cursor (CR) (Jun 9, 2026 — DOC-1 SKU/finish on new doc lines; F-131 full catalog propagation deferred)
 
 Tracked regressions and open bugs. For prioritized work order see `CURRENT_PRIORITIES.md`.
 
@@ -32,6 +32,13 @@ Tracked regressions and open bugs. For prioritized work order see `CURRENT_PRIOR
 | # | Issue | Expected behavior | Notes |
 |---|--------|-------------------|-------|
 | SEL-1 | On the Selections page, editing **Category** (inline dropdown) or any field via the **Edit modal** (incl. **image**) shows a success toast but does **not** persist for **library / products / Houzz-sourced** rows; reverts on reload. Reported by Cynthia Jun 7 on Cloud-Rolling-Hills. | Edit persists (or UI clearly states where to edit). | **Root cause (grounded Jun 7):** `setSelectionItemCategory` (`15550`) and `selEditSave` (`15351`) only write when `item.source === 'boardclip' && _clipDocId`; all other sources hit a no-op `else` (in-memory only) yet still fire "✅ Item updated". The isolation pass removed the old selection→library write (`15366`) and left **no replacement**. Selections merge `source:'library'` from `productLibrary/` (`14299`) + `products/` (`14314`) — category/image live on the catalog doc. **Precedent:** `setSelectionItemRoom` (`15435`) find-or-creates a clip for library rows. **Decision pending (Cynthia):** (a) explicit library APPLY via `explicitLibraryEdit` — edits canonical product, sticks everywhere; (b) find-or-create clip — project-scoped, creates a room-board clip; (c) read-only here, edit in `#/library`. **Also seen:** category rendering as concatenated `LightingBedding & Pillows` — polluted stored value or `_selCategoryOptionsHtml` defect; investigate separately. |
+
+## Financial documents — product field propagation (June 9, 2026)
+
+| # | Issue | Expected behavior | Notes |
+|---|--------|-------------------|-------|
+| DOC-1 | **SKU / finish missing on new proposal, invoice, and PO lines** even when the same item shows full data in Project Selections (clip + library). Reported Jun 9 on Cloud-Rolling-Hills PO lines (e.g. Visual Comfort sconces). | New doc lines copy **sku** and **finish** from the room-board clip or catalog row at add time; PO inherits them from proposal/invoice source lines. | **Root cause:** doc lines are snapshots; several create paths (`generateProposalFromClips`, library→proposal, pick-from-selections, pull room board) copied pricing + ids but omitted `sku` / `finish`. Selections **edit** reads live from Firestore — data was never missing on the clip. **STATUS (Jun 9):** Partial fix in `index.html` — `cchStampLineFromProjectClip`, `generateProposalFromClips`, `createProposalFromSelectedLibrary`, `libraryRailAppendAllRoomBoardClips`, `docEditPickFromSelections`, `addDocMyItem`. **Verify on staging** before prod. Does **not** backfill existing lines. |
+| F-131 | **Full catalog payload propagation** (library → selections → proposal → invoice → PO): dimensions, materials, descriptions, spec URLs, gallery, etc. — not only sku/finish. | One product story; explicit RESOLVE for display, APPLY on user action; no backward sync into library. | **Deferred** until Product Library / `products/` cleanup (houzzId dedup, collection unification). See `CURRENT_PRIORITIES.md` item 14 + new note Jun 9. Related: isolation guards (`cch-doc-isolation.js`), RESOLVE/APPLY priority item 4. |
 
 ---
 

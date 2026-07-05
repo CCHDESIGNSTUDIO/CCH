@@ -248,6 +248,11 @@ service cloud.firestore {
         allow update: if isAuth();
         allow delete: if isAuth();
       }
+      // Project correspondence + PO vendor email thread (index.html + cch-po-vendor-comms.js)
+      match /correspondence/{docId} {
+        allow read: if isAuth();
+        allow write: if isAuth();
+      }
     }
 
     // settings/* — was public read/write; counters + rates + integrations are sensitive.

@@ -2422,11 +2422,14 @@ exports.pushBillToQB = onCall(QB_CALLABLE, async (request) => {
     }
 
     const ts = new Date().toISOString();
+    const storedDocNumber = existingResult && existingResult.bill && existingResult.bill.DocNumber
+      ? String(existingResult.bill.DocNumber)
+      : docNumber;
     const patch = {
       "bill.qbBillId": String(qbBillId),
       "bill.qbSyncedAt": ts,
       "bill.qbSyncedTotal": billTotal,
-      "bill.qbDocNumber": docNumber,
+      "bill.qbDocNumber": storedDocNumber,
       "bill.qbPushLockAt": admin.firestore.FieldValue.delete(),
       lastQbBillPushAt: admin.firestore.FieldValue.serverTimestamp()
     };
@@ -2437,7 +2440,7 @@ exports.pushBillToQB = onCall(QB_CALLABLE, async (request) => {
     return {
       success: true,
       qbBillId: String(qbBillId),
-      qbDocNumber: docNumber,
+      qbDocNumber: storedDocNumber,
       message,
       updated: wasUpdate,
       linkedExisting

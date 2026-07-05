@@ -68,9 +68,12 @@ On "RELOOK" or "GROUNDING CHECK" from Cindy: stop generating, state the search t
 ## How to Deploy
 > **The root `CLAUDE.md` DEPLOYMENT RULE governs; this file is subordinate to it.**
 
-**Staging first — always.** When a fix is ready (work from the **non-Dropbox** copy):
+**Staging first — always.** When a fix is ready:
 ```
-cd C:\dev\CCH-Platform-Deploy\cch-deploy        # Machine 1  (Lenovo: cd C:\dev\CCH)
+cd C:\dev\CCH-Platform-Deploy\cch-deploy        # Machine 1 (Lenovo: cd C:\dev\CCH)
+# or Dropbox copy:
+cd C:\Users\cindy\Dropbox\CCH-Platform-Deploy\cch-deploy
+```
 firebase deploy --only hosting:platform --project staging
 ```
 Verify on `cch-platform-staging.web.app` (Ctrl+Shift+R). **Production deploys ONLY on Cynthia's typed GO/YES**, via `DEPLOY-PRODUCTION-DANGER.bat`. **AI agents never deploy to production.** Commit/push to GitHub **only when Cynthia asks** — not automatically.

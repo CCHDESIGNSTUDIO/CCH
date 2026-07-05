@@ -12,7 +12,7 @@
  *
  * Targets:
  *   1. boards/{projectId}/clips — room board items with images
- *   2. boards/{projectId}/invoices — invoice docs with line items
+ *   2. boards/{projectId}/invoices — invoice docs with line items (safeCreateOrMergeInvoice guard)
  *   3. boards/{projectId}/proposals — proposal docs with line items
  *   4. boards/{projectId}/purchaseOrders — PO docs
  *   5. products — company product library (deduplicated)
@@ -101,6 +101,139 @@ async function createDoc(collection, docId, data) {
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function fromFirestoreValue(v) {
+  if (!v || v.nullValue) return null;
+  if (v.integerValue !== undefined) return parseInt(v.integerValue, 10);
+  if (v.doubleValue !== undefined) return v.doubleValue;
+  if (v.booleanValue !== undefined) return v.booleanValue;
+  if (v.stringValue !== undefined) return v.stringValue;
+  if (v.arrayValue) return (v.arrayValue.values || []).map(fromFirestoreValue);
+  if (v.mapValue) {
+    const o = {};
+    for (const k of Object.keys(v.mapValue.fields || {})) o[k] = fromFirestoreValue(v.mapValue.fields[k]);
+    return o;
+  }
+  return null;
+}
+
+function parseFirestoreDocument(doc) {
+  const id = (doc.name || '').split('/').pop();
+  const data = {};
+  for (const k of Object.keys(doc.fields || {})) data[k] = fromFirestoreValue(doc.fields[k]);
+  return { id, data };
+}
+
+/** List all docs in a collection path (paginated). Same REST auth as createDoc. */
+async function listCollectionDocs(collectionPath) {
+  const docs = [];
+  let pageToken = '';
+  for (;;) {
+    const qs = pageToken ? `?pageToken=${encodeURIComponent(pageToken)}` : '';
+    const res = await firestoreRequest('GET', `/${collectionPath}${qs}`, null);
+    if (res.error) throw new Error(res.error.message || JSON.stringify(res.error));
+    if (res.documents) {
+      for (const d of res.documents) docs.push(parseFirestoreDocument(d));
+    }
+    pageToken = res.nextPageToken || '';
+    if (!pageToken) break;
+  }
+  return docs;
+}
+
+/** Match firm-invoice-audit.js / firm-wide-duplicate-report.js */
+function normInvoiceCode(raw) {
+  const s = String(raw || '').trim().toUpperCase().replace(/\s+/g, '');
+  const m = s.match(/^(IN-[A-Z0-9][A-Z0-9-]*|RR-[A-Z0-9][A-Z0-9-]*)/i);
+  if (m) return m[1];
+  return s;
+}
+
+function paySum(data) {
+  const fromRows = (data.payments || []).reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+  if (fromRows > 0.001) return Math.round(fromRows * 100) / 100;
+  return Math.round((parseFloat(data.paidAmount || data.totalPaid || 0) || 0) * 100) / 100;
+}
+
+function invoiceRichnessScore(data) {
+  return (data.items?.length || 0) * 100 + paySum(data);
+}
+
+function buildInvoiceIndex(existingDocs) {
+  const byNum = new Map();
+  for (const { id, data } of existingDocs) {
+    const num = normInvoiceCode(data.invoiceNum || data.number) || normInvoiceCode(id);
+    if (!num) continue;
+    if (!byNum.has(num)) byNum.set(num, []);
+    byNum.get(num).push({ id, data });
+  }
+  return byNum;
+}
+
+/** Merge import row into existing doc without wiping richer line items or payments. */
+function mergeInvoiceData(existing, incoming) {
+  const merged = { ...existing };
+  for (const key of Object.keys(incoming)) {
+    if (key === 'items' || key === 'payments') continue;
+    const v = incoming[key];
+    if (v === undefined || v === null || v === '') continue;
+    if (typeof v === 'number' && v === 0 && (parseFloat(existing[key]) || 0) !== 0) continue;
+    merged[key] = v;
+  }
+  const exItems = existing.items || [];
+  const inItems = incoming.items || [];
+  merged.items = inItems.length >= exItems.length ? inItems : exItems;
+  const pays = [...(existing.payments || []), ...(incoming.payments || [])];
+  const seen = new Set();
+  merged.payments = pays.filter((p) => {
+    const k = `${p.date}|${p.amount}|${p.method}|${p.ref || ''}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  const incomingPaid = paySum(incoming);
+  if (incomingPaid > paySum(merged)) {
+    merged.paidAmount = incoming.paidAmount ?? incomingPaid;
+    merged.totalPaid = incoming.totalPaid ?? incomingPaid;
+  }
+  merged.houzzImport = true;
+  merged.houzzImportMergedAt = new Date().toISOString();
+  return merged;
+}
+
+/**
+ * Prevents duplicate invoice docs on re-import: match by normalized IN-/RR- code,
+ * merge into the richest existing doc (line items + payments), else create with slug id.
+ */
+async function safeCreateOrMergeInvoice(projId, preferredDocId, newData, invoiceIndex) {
+  const num = normInvoiceCode(newData.invoiceNum || newData.number || newData.code || '');
+  if (!num) {
+    return { action: 'skipped', reason: 'no-number' };
+  }
+
+  const existingDocs = invoiceIndex.get(num) || [];
+
+  if (existingDocs.length === 0) {
+    const docId = preferredDocId || slugify(num);
+    await createDoc(`boards/${projId}/invoices`, docId, newData);
+    const entry = { id: docId, data: { ...newData } };
+    if (!invoiceIndex.has(num)) invoiceIndex.set(num, []);
+    invoiceIndex.get(num).push(entry);
+    return { action: 'created', docId, num };
+  }
+
+  existingDocs.sort((a, b) => invoiceRichnessScore(b.data) - invoiceRichnessScore(a.data));
+  const best = existingDocs[0];
+  const merged = mergeInvoiceData(best.data, newData);
+  await createDoc(`boards/${projId}/invoices`, best.id, merged);
+  best.data = merged;
+  return {
+    action: 'merged',
+    docId: best.id,
+    num,
+    duplicateCount: existingDocs.length,
+  };
+}
 
 // ── SLUG HELPERS ──
 function slugify(name) {
@@ -231,7 +364,7 @@ async function main() {
   console.log('[4/4] Pushing to Firestore...');
   console.log();
 
-  let totalClips = 0, totalInvoices = 0, totalProposals = 0, totalPOs = 0, totalProducts = 0;
+  let totalClips = 0, totalInvoices = 0, totalInvoicesMerged = 0, totalProposals = 0, totalPOs = 0, totalProducts = 0;
   const productLib = new Map(); // deduplicated product library
 
   for (const projName of projectNames) {
@@ -263,7 +396,15 @@ async function main() {
       continue;
     }
 
-    // ── INVOICES ──
+    // ── INVOICES (safe create / merge — see firm-invoice-audit.js) ──
+    let invoiceIndex = new Map();
+    try {
+      const existingInvoices = await listCollectionDocs(`boards/${projId}/invoices`);
+      invoiceIndex = buildInvoiceIndex(existingInvoices);
+    } catch (e) {
+      process.stdout.write(`\n    WARN: could not list existing invoices (${e.message}); import may duplicate\n`);
+    }
+
     for (const inv of invoices) {
       const invDocId = slugify(inv.code);
       // Find matching image
@@ -331,8 +472,15 @@ async function main() {
       }
 
       try {
-        await createDoc(`boards/${projId}/invoices`, invDocId, invData);
-        totalInvoices++;
+        const r = await safeCreateOrMergeInvoice(projId, invDocId, invData, invoiceIndex);
+        if (r.action === 'created') totalInvoices++;
+        else if (r.action === 'merged') {
+          totalInvoices++;
+          totalInvoicesMerged++;
+          if (r.duplicateCount > 1) {
+            process.stdout.write(`\n    WARN: ${r.num} has ${r.duplicateCount} docs; merged into ${r.docId}\n`);
+          }
+        }
       } catch (e) {}
 
       // Add to product library
@@ -582,7 +730,7 @@ async function main() {
   console.log('╔══════════════════════════════════════╗');
   console.log('║           IMPORT COMPLETE            ║');
   console.log('╠══════════════════════════════════════╣');
-  console.log(`║  Invoices:   ${String(totalInvoices).padStart(6)}               ║`);
+  console.log(`║  Invoices:   ${String(totalInvoices).padStart(6)} (${totalInvoicesMerged} merged) ║`);
   console.log(`║  Proposals:  ${String(totalProposals).padStart(6)}               ║`);
   console.log(`║  POs:        ${String(totalPOs).padStart(6)}               ║`);
   console.log(`║  Clips:      ${String(totalClips).padStart(6)}               ║`);
