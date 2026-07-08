@@ -159,6 +159,53 @@
       spacer.style.minHeight = Math.ceil(ch * z + 40) + 'px';
     }
     if (label) label.textContent = Math.round(z * 100) + '%';
+    dbSyncBrandingFooter();
+  }
+
+  /** Lowest pixel row used by board tiles (for print trim + footer pin). */
+  function dbComputeElementsBottom() {
+    var maxB = 0;
+    (dbEditor.elements || []).forEach(function(el) {
+      if (!el || el.type === 'arrow') return;
+      var y = el.y || 0;
+      var eh = el.h || 180;
+      if (el.type === 'note') eh = el.h || 56;
+      else if (el.type === 'text' || el.type === 'heading') eh = Math.max(24, (el.fontSize || 16) * 1.6);
+      else if (el.type === 'pricetag') eh = 22;
+      var bottom = y + eh;
+      if (el.type === 'product' || el.type === 'image') {
+        bottom = y + (el.h || 180) + dbTileExtrasH(el);
+      }
+      if (bottom > maxB) maxB = bottom;
+    });
+    return Math.ceil(maxB);
+  }
+
+  /** Pin CCH branding to the true bottom edge of the board canvas. */
+  function dbSyncBrandingFooter() {
+    var branding = document.getElementById('dbBranding');
+    var canvas = document.getElementById('dbCanvas');
+    if (!branding || !canvas) return;
+    var ch = parseInt(dbEditor.boardData && dbEditor.boardData.canvasHeight, 10) || 1000;
+    canvas.style.height = ch + 'px';
+    canvas.style.minHeight = ch + 'px';
+    canvas.style.maxHeight = ch + 'px';
+    branding.style.position = 'absolute';
+    branding.style.left = '0';
+    branding.style.right = '0';
+    branding.style.bottom = '0';
+    branding.style.top = 'auto';
+    branding.style.paddingBottom = '14px';
+    branding.style.margin = '0';
+  }
+
+  /** Shorter canvas for print — trims empty white below content so footer sits under tiles. */
+  function dbPrintCanvasHeight() {
+    var ch = parseInt(dbEditor.boardData && dbEditor.boardData.canvasHeight, 10) || 1000;
+    var contentBot = dbComputeElementsBottom();
+    var trimmed = Math.ceil(contentBot + 58 + 16);
+    if (trimmed < 400) trimmed = 400;
+    return Math.min(ch, trimmed);
   }
 
   function dbFitCanvasToView(forceFitMode) {
@@ -285,11 +332,30 @@
 
   // ---- Save state for undo ----
   var _autoSaveTimer = null;
-  function autoSave() {
+  function autoSave(ms) {
     if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
     _autoSaveTimer = setTimeout(function() {
+      _autoSaveTimer = null;
       saveBoardToFirestore();
-    }, 2000); // Save 2 seconds after last change
+    }, ms == null ? 2000 : ms);
+  }
+  function flushBoardAutoSave() {
+    if (_autoSaveTimer) {
+      clearTimeout(_autoSaveTimer);
+      _autoSaveTimer = null;
+      return saveBoardToFirestore();
+    }
+    if (dbEditor.dirty) return saveBoardToFirestore();
+    return Promise.resolve();
+  }
+  if (!window._cchDbBeforeUnloadHook) {
+    window._cchDbBeforeUnloadHook = true;
+    window.addEventListener('beforeunload', function() {
+      if (dbEditor && dbEditor.dirty && _autoSaveTimer) {
+        clearTimeout(_autoSaveTimer);
+        _autoSaveTimer = null;
+      }
+    });
   }
 
   function pushUndo() {
@@ -320,9 +386,12 @@
     } catch(e) {}
 
     T.innerHTML =
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">' +
         '<div class="section-title" style="margin:0;">' + boards.length + ' Design Board' + (boards.length !== 1 ? 's' : '') + '</div>' +
-        '<button class="btn btn-primary" onclick="void createDesignBoard(\'' + proj.id + '\')">+ New Design Board</button>' +
+        '<div style="display:flex;gap:8px;">' +
+          '<button class="btn btn-secondary" onclick="showImageManager(\'' + proj.id + '\',\'' + escAttr(proj.name || '') + '\')">🖼️ Image Manager</button>' +
+          '<button class="btn btn-primary" onclick="void createDesignBoard(\'' + proj.id + '\')">+ New Design Board</button>' +
+        '</div>' +
       '</div>' +
       (boards.length === 0 ?
         '<div style="text-align:center;padding:72px 24px;border:1px solid #E2E2E2;background:#FAFBFC;border-radius:0;">' +
@@ -367,8 +436,14 @@
                   '<button class="btn btn-sm" style="padding:4px 8px;font-size:11px;background:#fee;color:var(--red);border-radius:0;" onclick="event.stopPropagation();void deleteDesignBoard(\'' + proj.id + '\',\'' + b.id + '\',\'' + escJsStr(nm) + '\')">🗑️</button>' +
                 '</div>' +
               '</div>' +
-              '<div style="display:flex;gap:6px;margin-top:8px;">' +
+              '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">' +
+                (typeof cpOpenPostDesignBoardDecisionModal === 'function'
+                  ? '<button class="btn btn-sm" style="font-size:11px;padding:4px 10px;border-radius:0;background:#C4A464;color:#0F1A2E;border:none;font-weight:600;" onclick="event.stopPropagation();cpOpenPostDesignBoardDecisionModal(\'' + proj.id + '\',\'' + b.id + '\')">📤 Post Decision</button>'
+                  : '') +
                 '<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 10px;border-radius:0;" onclick="event.stopPropagation();openDesignBoard(\'' + proj.id + '\',\'' + b.id + '\')">✏️ Edit</button>' +
+                (typeof generateTearSheetsFromDesignBoard === 'function'
+                  ? '<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 10px;border-radius:0;" onclick="event.stopPropagation();generateTearSheetsFromDesignBoard(\'' + proj.id + '\',\'' + b.id + '\')">📄 Tear Sheets</button>'
+                  : '') +
                 '<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 10px;border-radius:0;" onclick="event.stopPropagation();window.location.hash=\'#/clientboard/' + proj.id + '/' + b.id + '\'">🖤 Client View</button>' +
               '</div>' +
             '</div>' +
@@ -431,7 +506,7 @@
           '<div style="font-size:10px;padding:6px 8px;color:#5C6B80;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(p.title) + (isCurrent ? ' · current' : '') + '</div>' +
         '</button>';
       }).join('');
-      var html = '<div id="dbCoverPickerModal" style="position:fixed;inset:0;background:rgba(15,26,46,0.45);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)this.remove()">' +
+      var html = '<div id="dbCoverPickerModal" style="position:fixed;inset:0;background:rgba(15,26,46,0.45);z-index:100050;display:flex;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)this.remove()">' +
         '<div style="background:#fff;max-width:720px;width:100%;padding:24px;border-radius:4px;box-shadow:0 16px 48px rgba(0,0,0,0.2);max-height:90vh;overflow:auto;" onclick="event.stopPropagation()">' +
         '<h3 style="margin:0 0 6px;font-size:18px;">Grid cover photo</h3>' +
         '<p style="font-size:12px;color:#5C6B80;margin:0 0 16px;line-height:1.5;">Choose which image shows on the <strong>Design Boards</strong> tab for <strong>' + esc(boardTitle) + '</strong>. This does not change the board layout.</p>' +
@@ -488,10 +563,7 @@
 
   window.openDesignBoard = async function(projectId, boardId, forceReload) {
     if (!forceReload && dbEditor.boardId === boardId && dbEditor.projectId === projectId && document.getElementById('dbCanvas')) {
-      dbCancelActiveDrag();
-      dbClearAllDragTransforms();
-      dbEditor.isDragging = false;
-      dbEditor.isResizing = false;
+      dbForceEndInteraction({ resync: true });
       return;
     }
     window._cchDesignBoardEditorActive = true;
@@ -703,11 +775,11 @@
       if (!el || (el.type !== 'product' && el.type !== 'image')) return;
       if (!el.clipId || !byId[el.clipId]) return;
       var d = byId[el.clipId];
-      if ((el.cost == null || +el.cost === 0)) {
+      if (!el._boardCostEdited && (el.cost == null || +el.cost === 0)) {
         var c = parseFloat(d.cost) || 0;
         if (c > 0) { el.cost = c; changed = true; }
       }
-      if ((el.sellPrice == null || +el.sellPrice === 0)) {
+      if (!el._boardCostEdited && (el.sellPrice == null || +el.sellPrice === 0)) {
         var s = parseFloat(d.clientPrice) || parseFloat(d.sellingPrice) || 0;
         if (s > 0) { el.sellPrice = s; changed = true; }
       }
@@ -739,10 +811,11 @@
       '#dbEditorRoot.db-editor-client-view .db-resize{display:none!important;}' +
       '#dbEditorRoot.db-editor-client-view #dbCanvasWrap,#dbEditorRoot.db-editor-client-view #dbCanvas,#dbEditorRoot.db-editor-client-view #dbCanvasStage{touch-action:pan-x pan-y!important;}' +
       '#dbCanvas,#dbCanvasStage{touch-action:none;}' +
+      '#dbBranding{position:absolute;left:0;right:0;bottom:0;top:auto;padding:0 0 14px;margin:0;z-index:10;pointer-events:none;text-align:center;}' +
       '.db-el-product{box-sizing:border-box;pointer-events:auto;cursor:move;}' +
       '.db-el-media{position:relative;box-sizing:border-box;background:#fff;border:1px solid rgba(15,26,46,0.06);border-radius:2px;overflow:hidden;padding:0;pointer-events:none;}' +
       '.db-el-media img{width:100%;height:100%;object-fit:cover;object-position:center;display:block;pointer-events:none;}' +
-      '.db-el-caption{margin-top:5px;font-size:14px;font-weight:600;color:#1B3352;text-align:center;pointer-events:none;line-height:1.3;}' +
+      '.db-el-caption{margin-top:5px;font-size:14px;font-weight:600;color:#1B3352;text-align:center;pointer-events:none;line-height:1.3;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;}' +
       '.db-el-desc{margin-top:3px;font-size:12px;color:#4B5563;text-align:center;pointer-events:none;line-height:1.4;white-space:pre-wrap;}' +
       '.db-el-price{margin-top:3px;font-size:14px;font-weight:700;color:#0A1F3D;text-align:center;pointer-events:none;line-height:1.25;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}' +
       '.db-el-annotation{margin-top:4px;font-size:12px;color:#6B7280;text-align:center;font-style:italic;pointer-events:none;white-space:pre-line;line-height:1.35;}' +
@@ -776,7 +849,9 @@
         '<label class="db-toolbar-edit-only" style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" ' + (dbEditor.showPricing ? 'checked' : '') + ' onchange="toggleBoardPricing(this.checked)"> Show Pricing</label>' +
         '<button class="btn btn-secondary btn-sm" onclick="toggleClientView()" style="' + (dbEditor.clientView ? 'background:#0A1F3D;color:#fff;border-color:#0A1F3D;' : '') + '">' + (dbEditor.clientView ? '👁 Client view: ON' : '👁 Client view') + '</button>' +
         '<button class="btn btn-secondary btn-sm" onclick="openLuxuryClientView()">🖤 Share with Client</button>' +
+        '<button class="btn btn-secondary btn-sm db-toolbar-edit-only" onclick="void dbPostBoardAsDecision()">📤 Post Decision</button>' +
         '<button class="btn btn-secondary btn-sm db-toolbar-edit-only" onclick="dbUndo()">↩ Undo</button>' +
+        '<button type="button" class="btn btn-secondary btn-sm db-toolbar-edit-only" title="Auto-arrange all tiles into a clean magazine layout — captions never overlap. Undoable." onclick="void dbTidyBoard()">✨ Tidy board</button>' +
         '<button type="button" id="dbUnstickToolbarBtn" class="btn btn-secondary btn-sm db-toolbar-edit-only" title="Unstick drag, remove ghost tiles, spread stacked items — does not delete your work" onclick="void dbRepairBoard()">🔧 Repair board</button>' +
         '<span id="dbUnstickStatus" class="db-toolbar-edit-only" style="font-size:10px;color:var(--gray-500);min-width:72px;"></span>' +
         '<button class="btn btn-secondary btn-sm db-toolbar-edit-only" onclick="dbOpenPrintMenu()">🖨 Print / Export</button>' +
@@ -818,7 +893,7 @@
             '<svg id="dbArrowSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:500;"></svg>' +
             '<div id="dbElements"></div>' +
             // Branding footer
-            (bd.branding !== false ? '<div id="dbBranding" style="position:absolute;bottom:20px;left:0;right:0;text-align:center;pointer-events:none;z-index:10;">' +
+            (bd.branding !== false ? '<div id="dbBranding">' +
               '<div style="display:inline-flex;align-items:center;gap:2px;">' +
                 '<span style="font-family:\'Playfair Display\',Georgia,serif;font-size:28px;font-weight:700;color:#C4A052;letter-spacing:2px;">CCH</span>' +
               '</div>' +
@@ -850,10 +925,12 @@
     renderProps();
     dbUpdateCanvasDropHint();
     dbApplyViewZoom();
+    dbSyncBrandingFooter();
     dbSyncEditorShellHeight();
     dbApplyClientViewLayout();
     requestAnimationFrame(function() {
       requestAnimationFrame(function() {
+        dbSyncBrandingFooter();
         dbSyncEditorShellHeight();
         if (!dbEditor.clientView && dbEditor.viewZoomMode === 'fit') dbFitCanvasToView(false);
       });
@@ -861,7 +938,17 @@
     dbWireUnstickButtons();
 
     var overlapPairs = dbCountOverlappingTiles();
-    if (overlapPairs > 0) dbShowOverlapBanner(overlapPairs);
+    if (overlapPairs > 0) {
+      var autoSpread = dbSpreadStackedTiles();
+      if (autoSpread > 0) {
+        dbEditor.dirty = true;
+        dbResyncAllElementsFromModel();
+        if (typeof showToast === 'function') {
+          showToast('Spread ' + autoSpread + ' stacked tile' + (autoSpread !== 1 ? 's' : '') + ' apart — nothing deleted.', 4500);
+        }
+      }
+      dbShowOverlapBanner(dbCountOverlappingTiles());
+    }
 
     // Keyboard handler
     document.onkeydown = function(e) {
@@ -1011,11 +1098,15 @@
     var els = (dbEditor.elements || []).filter(function(e) {
       return e && (e.type === 'product' || e.type === 'image') && e.w != null && e.h != null;
     });
+    // Existing tiles occupy their TRUE height (image + caption/price); the incoming tile
+    // gets ~44px reserved for the caption+price it will render once placed.
+    var boxes = els.map(function(e) { return dbElementVisualBox(e); });
+    var hIn = h + 44;
     var x = Math.max(20, preferX - w / 2);
     var y = Math.max(20, preferY - h / 2);
     function hits(ex, ey) {
-      return els.some(function(o) {
-        return !(ex + w < o.x - 8 || ex > o.x + o.w + 8 || ey + h < o.y - 8 || ey > o.y + o.h + 8);
+      return boxes.some(function(o) {
+        return !(ex + w < o.x - 8 || ex > o.right + 8 || ey + hIn < o.y - 8 || ey > o.bottom + 8);
       });
     }
     for (var step = 0; step < 120; step++) {
@@ -1657,6 +1748,10 @@
     var el = dbEditor.elements.find(function(e) { return e.id === id; });
     if (el) {
       el[prop] = value;
+      if (prop === 'cost' || prop === 'sellPrice') {
+        el._boardCostEdited = true;
+        autoSave(600);
+      }
       if (prop === 'x' || prop === 'y' || prop === 'w' || prop === 'h') {
         dbPatchElementDom(el);
         dbSyncPropsFromSelected();
@@ -1709,6 +1804,7 @@
     }
     dbApplyViewZoom();
     if (dbEditor.viewZoomMode === 'fit') dbFitCanvasToView();
+    dbSyncBrandingFooter();
   };
 
   window.deleteEl = function(id) {
@@ -1824,6 +1920,38 @@
 
   function dbCancelActiveDrag() {
     dbForceRemoveAllDragListeners();
+  }
+
+  /** End any in-flight drag/resize and resync DOM — fixes sticky selection and ghost handles. */
+  function dbForceEndInteraction(opts) {
+    opts = opts || {};
+    if (_dbPointerGesture) {
+      dbFinishPointerGesture(_dbPointerGesture.lastEv);
+    } else if (dbEditor.isDragging || dbEditor.isResizing) {
+      dbForceRemoveAllDragListeners();
+    }
+    dbEditor.isDragging = false;
+    dbEditor.isResizing = false;
+    dbClearAllDragTransforms();
+    if (opts.resync !== false) {
+      dbResyncAllElementsFromModel();
+      dbUpdateSelectionDom();
+      if (opts.renderProps !== false) renderProps();
+    }
+  }
+
+  if (!window._dbGlobalPointerEndBound) {
+    window._dbGlobalPointerEndBound = true;
+    window.addEventListener('pointerup', function(ev) {
+      if (!window._cchDesignBoardEditorActive || !dbEditor || !dbEditor.boardId) return;
+      if (!_dbPointerGesture && !dbEditor.isDragging && !dbEditor.isResizing) return;
+      dbForceEndInteraction({ resync: true });
+    }, true);
+    window.addEventListener('pointercancel', function(ev) {
+      if (!window._cchDesignBoardEditorActive || !dbEditor || !dbEditor.boardId) return;
+      if (!_dbPointerGesture && !dbEditor.isDragging && !dbEditor.isResizing) return;
+      dbForceEndInteraction({ resync: true });
+    }, true);
   }
 
   /**
@@ -2113,6 +2241,10 @@
     e.stopPropagation();
     if (e.target.classList && e.target.classList.contains('db-resize')) return;
 
+    if (_dbPointerGesture || dbEditor.isDragging || dbEditor.isResizing) {
+      dbForceEndInteraction({ resync: true, renderProps: false });
+    }
+
     var el = dbEditor.elements.find(function(e2) { return e2.id === id; });
     if (!el) return;
 
@@ -2243,6 +2375,9 @@
   window.canvasMouseDown = function(e) {
     if (dbEditor.clientView) return;
     if (e.button != null && e.button !== 0) return;
+    if (_dbPointerGesture || dbEditor.isDragging || dbEditor.isResizing) {
+      dbForceEndInteraction({ resync: true, renderProps: false });
+    }
     if (e.target && e.target.closest && e.target.closest('.db-el')) return;
     var canvas = document.getElementById('dbCanvas');
     if (!canvas) return;
@@ -2411,10 +2546,33 @@
     return /\.(jpe?g|png|gif|webp|heic|heif|bmp|svg)$/i.test(String(f.name || ''));
   }
 
+  /** Read a local file's natural pixel size so uploads keep their aspect ratio (Canva-style). */
+  function dbReadImageNaturalSize(file) {
+    return new Promise(function(resolve) {
+      var url;
+      try {
+        url = URL.createObjectURL(file);
+      } catch (e) { resolve(null); return; }
+      var im = new Image();
+      var done = false;
+      var finish = function(out) {
+        if (done) return;
+        done = true;
+        try { URL.revokeObjectURL(url); } catch (e2) {}
+        resolve(out);
+      };
+      im.onload = function() { finish({ w: im.naturalWidth || 0, h: im.naturalHeight || 0 }); };
+      im.onerror = function() { finish(null); };
+      setTimeout(function() { finish(null); }, 4000);
+      im.src = url;
+    });
+  }
+
   async function dbUploadImageFilesToCanvas(files, mx, my) {
     var imageFiles = Array.from(files || []).filter(dbIsImageUploadFile);
     if (!imageFiles.length) return;
     if (typeof showToast === 'function') showToast('Uploading ' + imageFiles.length + ' image(s)…', 3500);
+    var useDefaultPoint = (mx == null || my == null);
     for (var fi = 0; fi < imageFiles.length; fi++) {
       var f = imageFiles[fi];
       try {
@@ -2424,14 +2582,31 @@
         var path = 'projects/' + dbEditor.projectId + '/designboards/' + dbEditor.boardId + '/' + ts + '.' + ext;
         var ref = firebase.storage().ref(path);
         var contentType = dbGuessImageContentType(f, ext);
+        // Size the tile to the photo's real aspect ratio instead of cropping to a 220px square
+        var w = 220, h = 220;
+        var nat = await dbReadImageNaturalSize(f);
+        if (nat && nat.w > 0 && nat.h > 0) {
+          var sc = 320 / Math.max(nat.w, nat.h);
+          w = Math.max(120, Math.round(nat.w * sc));
+          h = Math.max(120, Math.round(nat.h * sc));
+        }
         await ref.put(f, { contentType: contentType });
         var url = await ref.getDownloadURL();
+        var tx, ty;
+        if (useDefaultPoint) {
+          var p = dbDefaultAddPoint(w, h);   // free spot near the visible center
+          tx = p.x + w / 2;
+          ty = p.y + h / 2;
+        } else {
+          tx = mx + fi * 20;
+          ty = my + fi * 20;
+        }
         dbPlaceProductOnCanvas(url, {
           title: f.name.replace(/\.[^.]+$/, ''),
-          w: 220,
-          h: 220,
+          w: w,
+          h: h,
           showPrice: false
-        }, mx + fi * 20, my + fi * 20);
+        }, tx, ty);
       } catch (err) {
         console.warn('[design board] upload', err);
         if (typeof cchAlert === 'function') await cchAlert('Upload failed: ' + ((err && err.message) || err), 'Design board');
@@ -2464,9 +2639,11 @@
     if (wrap) wrap.style.outline = '';
     var canvas = document.getElementById('dbCanvas');
     if (!canvas || !dbEditor.projectId) return;
-    var rect = canvas.getBoundingClientRect();
-    var mx = e.clientX - rect.left;
-    var my = e.clientY - rect.top;
+    // Zoom-corrected drop point — raw clientX-rect.left is in SCREEN px; at 84% zoom every
+    // dropped file landed up-left of the cursor, stacking onto existing tiles.
+    var pt = dbCanvasPointFromEvent(e, canvas);
+    var mx = pt.mx;
+    var my = pt.my;
     var dt = e.dataTransfer;
     if (dt && dt.files && dt.files.length) {
       await dbUploadImageFilesToCanvas(dt.files, mx, my);
@@ -2512,7 +2689,9 @@
     inp.multiple = true;
     inp.onchange = async function() {
       if (!inp.files || !inp.files.length) return;
-      await dbUploadImageFilesToCanvas(inp.files, 120, 120);
+      // null point → each image finds a free spot near the visible center
+      // (the old fixed 120,120 piled every "From computer" upload into the same corner)
+      await dbUploadImageFilesToCanvas(inp.files, null, null);
       inp.value = '';
     };
     inp.click();
@@ -2554,6 +2733,41 @@
     dbUpdateSelectionDom();
     dbApplyClientViewLayout();
   };
+
+  /** Push board tile cost/sell back to linked room-board clips (design board is not a financial doc). */
+  async function syncBoardTileCostsToClips() {
+    if (!dbEditor.projectId || !dbEditor.elements || !dbEditor.elements.length) return;
+    var byClip = {};
+    (dbEditor.clips || []).forEach(function(c) {
+      if (c && c.id) byClip[c.id] = c.data || {};
+    });
+    var tasks = [];
+    dbEditor.elements.forEach(function(el) {
+      if (!el || el.type !== 'product' || !el.clipId) return;
+      var cost = parseFloat(el.cost) || 0;
+      var sell = parseFloat(el.sellPrice) || 0;
+      if (cost <= 0 && sell <= 0) return;
+      var d = byClip[el.clipId] || {};
+      var patch = {};
+      if (cost > 0 && (parseFloat(d.cost) || 0) !== cost) patch.cost = cost;
+      if (sell > 0) {
+        if ((parseFloat(d.clientPrice) || parseFloat(d.sellingPrice) || 0) !== sell) {
+          patch.clientPrice = sell;
+          patch.sellingPrice = sell;
+        }
+      }
+      if (!Object.keys(patch).length) return;
+      patch._boardCostSyncedAt = new Date().toISOString();
+      tasks.push(
+        db.collection('boards').doc(dbEditor.projectId).collection('clips').doc(el.clipId).set(patch, { merge: true })
+          .then(function() {
+            if (byClip[el.clipId]) Object.assign(byClip[el.clipId], patch);
+          })
+          .catch(function(e) { console.warn('[design board] clip cost sync', el.clipId, e); })
+      );
+    });
+    if (tasks.length) await Promise.all(tasks);
+  }
 
   /** Persist imageUrl/images on product tiles from clips so client board does not depend on a second fetch. */
   function enrichProductElementsFromClipsForSave() {
@@ -2602,6 +2816,7 @@
       if (dbEditor.boardData.coverImageUrl) patch.coverImageUrl = dbEditor.boardData.coverImageUrl;
       if (dbEditor.boardData.coverElementId) patch.coverElementId = dbEditor.boardData.coverElementId;
       await db.collection('boards').doc(dbEditor.projectId).collection('designBoards').doc(dbEditor.boardId).update(patch);
+      try { await syncBoardTileCostsToClips(); } catch (_syncErr) { console.warn('[design board] syncBoardTileCostsToClips', _syncErr); }
       dbEditor.dirty = false;
       // Flash save confirmation
       var btn = document.querySelector('[onclick="saveBoardToFirestore()"]');
@@ -2611,51 +2826,313 @@
         btn.style.background = 'var(--green)';
         setTimeout(function() { btn.textContent = orig; btn.style.background = ''; }, 1200);
       }
+      if (typeof showToast === 'function') showToast('Design board saved.', 'success', 2200);
     } catch(e) {
       console.error('Save error:', e);
+      if (typeof showToast === 'function') showToast('Could not save design board — check connection and try Save again.', 'error', 6000);
     }
   };
+  window.flushBoardAutoSave = flushBoardAutoSave;
+
+  /** Raw image URL for capture/fetch (not HTML-escaped). */
+  function dbElementImageUrl(el) {
+    var raw = String((el && (el.imageUrl || el.img)) || '').trim();
+    if (!raw) return '';
+    return (typeof window._resolveImgSrc === 'function' ? (window._resolveImgSrc(raw) || raw) : raw);
+  }
+
+  function dbGuessImageMime(url) {
+    var u = String(url || '').toLowerCase().split('?')[0];
+    if (u.endsWith('.png')) return 'image/png';
+    if (u.endsWith('.webp')) return 'image/webp';
+    if (u.endsWith('.gif')) return 'image/gif';
+    return 'image/jpeg';
+  }
+
+  function dbBytesToDataUrl(bytes, mime) {
+    mime = mime || 'image/jpeg';
+    var arr = new Uint8Array(bytes);
+    var chunks = [];
+    var step = 0x8000;
+    for (var i = 0; i < arr.length; i += step) {
+      chunks.push(String.fromCharCode.apply(null, arr.subarray(i, i + step)));
+    }
+    return 'data:' + mime + ';base64,' + btoa(chunks.join(''));
+  }
+
+  function dbBlobToDataUrl(blob) {
+    return new Promise(function(resolve, reject) {
+      var r = new FileReader();
+      r.onload = function() { resolve(r.result); };
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+  }
+
+  /** Load image bytes without html2canvas CORS re-fetch (Firebase SDK + XHR/fetch fallbacks). */
+  async function dbFetchUrlAsDataUrl(url) {
+    url = String(url || '').trim();
+    if (!url) return '';
+    if (/^data:image/i.test(url)) return url;
+    if (/^blob:/i.test(url)) {
+      try {
+        var blobRes = await fetch(url);
+        return await dbBlobToDataUrl(await blobRes.blob());
+      } catch (_blob) { return ''; }
+    }
+    if (url.indexOf('//') === 0) url = window.location.protocol + url;
+    if (url.indexOf('/') === 0 && url.indexOf('//') !== 0) url = window.location.origin + url;
+
+    if (typeof firebase !== 'undefined' && firebase.storage && /firebasestorage\.googleapis\.com/i.test(url)) {
+      try {
+        var ref = firebase.storage().refFromURL(url);
+        var bytes = await ref.getBytes(12 * 1024 * 1024);
+        if (bytes && bytes.byteLength) return dbBytesToDataUrl(bytes, dbGuessImageMime(url));
+      } catch (_fb) {}
+    }
+
+    try {
+      var xhrBuf = await new Promise(function(res, rej) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.responseType = 'arraybuffer';
+        xhr.onload = function() {
+          if (xhr.status >= 200 && xhr.status < 300 && xhr.response && xhr.response.byteLength) res(xhr.response);
+          else rej(new Error('xhr ' + xhr.status));
+        };
+        xhr.onerror = function() { rej(new Error('xhr network')); };
+        xhr.send();
+      });
+      if (xhrBuf && xhrBuf.byteLength) return dbBytesToDataUrl(xhrBuf, dbGuessImageMime(url));
+    } catch (_xhr) {}
+
+    try {
+      var resp = await fetch(url, { method: 'GET', mode: 'cors', credentials: 'omit', cache: 'force-cache' });
+      if (resp.ok) return await dbBlobToDataUrl(await resp.blob());
+    } catch (_fetch) {}
+
+    return '';
+  }
+
+  function dbLoadDrawableImage(dataUrl) {
+    return new Promise(function(resolve) {
+      if (!dataUrl) { resolve(null); return; }
+      var img = new Image();
+      img.onload = function() { resolve(img); };
+      img.onerror = function() { resolve(null); };
+      img.src = dataUrl;
+    });
+  }
+
+  function dbDrawImagePlaceholder(ctx, x, y, w, h, label) {
+    ctx.fillStyle = '#f4f4f5';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = 'rgba(15,26,46,0.08)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    label = String(label || '').trim();
+    if (!label) return;
+    ctx.fillStyle = '#6B7280';
+    ctx.font = '12px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    var words = label.split(/\s+/);
+    var line = '';
+    var lines = [];
+    var maxW = Math.max(40, w - 16);
+    for (var i = 0; i < words.length; i++) {
+      var test = line ? (line + ' ' + words[i]) : words[i];
+      if (ctx.measureText(test).width > maxW && line) {
+        lines.push(line);
+        line = words[i];
+      } else {
+        line = test;
+      }
+    }
+    if (line) lines.push(line);
+    if (lines.length > 3) lines = lines.slice(0, 3);
+    var lh = 14;
+    var startY = y + h / 2 - ((lines.length - 1) * lh) / 2;
+    lines.forEach(function(ln, idx) {
+      ctx.fillText(ln, x + w / 2, startY + idx * lh, maxW);
+    });
+  }
+
+  /** Compose board PNG from model (avoids html2canvas CORS blank tiles on vendor CDNs). */
+  async function dbCaptureBoardDataUrl() {
+    var cw = parseFloat(dbEditor.boardData && dbEditor.boardData.canvasWidth) || 1400;
+    var ch = parseFloat(dbEditor.boardData && dbEditor.boardData.canvasHeight) || 1000;
+    var out = document.createElement('canvas');
+    out.width = Math.max(1, Math.round(cw));
+    out.height = Math.max(1, Math.round(ch));
+    var ctx = out.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, out.width, out.height);
+
+    var els = (dbEditor.elements || []).slice();
+    var imageTotal = 0;
+    var imageFailed = 0;
+
+    async function drawProductOrImage(el) {
+      var ew = el.w || 180;
+      var eh = el.h || 180;
+      var x = el.x || 0;
+      var y = el.y || 0;
+      var imgUrl = dbElementImageUrl(el);
+      var drew = false;
+      if (imgUrl) {
+        imageTotal++;
+        var dataUrl = await dbFetchUrlAsDataUrl(imgUrl);
+        var img = await dbLoadDrawableImage(dataUrl);
+        if (img) {
+          ctx.drawImage(img, x, y, ew, eh);
+          drew = true;
+        } else {
+          imageFailed++;
+        }
+      }
+      if (!drew) {
+        dbDrawImagePlaceholder(ctx, x, y, ew, eh, dbBoardDisplayTitle(el.title) || 'Image');
+      }
+      var cursorY = y + eh;
+      if (!el.hideCaption) {
+        var title = dbBoardDisplayTitle(el.title);
+        if (title) {
+          cursorY += 18;
+          ctx.fillStyle = '#1B3352';
+          ctx.font = '600 14px "Cormorant Garamond", Georgia, serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'alphabetic';
+          ctx.fillText(title, x + ew / 2, cursorY, ew);
+        }
+      }
+      if (el.showDescription) {
+        var desc = dbElementDescription(el);
+        if (desc) {
+          cursorY += 16;
+          ctx.fillStyle = '#4B5563';
+          ctx.font = '12px "Cormorant Garamond", Georgia, serif';
+          ctx.fillText(desc.slice(0, 120), x + ew / 2, cursorY, ew);
+        }
+      }
+      var showPrice = dbEditor.showPricing && !dbEditor.clientView && el.showPrice !== false;
+      if (showPrice && el.sellPrice) {
+        cursorY += 16;
+        ctx.fillStyle = '#0A1F3D';
+        ctx.font = '700 14px ui-monospace, monospace';
+        ctx.fillText(fmt$(el.sellPrice), x + ew / 2, cursorY, ew);
+      }
+      if (el.annotation) {
+        cursorY += 16;
+        ctx.fillStyle = '#6B7280';
+        ctx.font = 'italic 12px Georgia, serif';
+        ctx.fillText(String(el.annotation).slice(0, 160), x + ew / 2, cursorY, ew);
+      }
+    }
+
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      if (!el || el.type === 'arrow') continue;
+      if (el.type === 'product' || el.type === 'image') {
+        await drawProductOrImage(el);
+      } else if (el.type === 'text') {
+        ctx.fillStyle = el.color || '#333333';
+        ctx.font = (el.fontWeight || 'normal') + ' ' + (el.fontSize || 13) + 'px ' + (el.fontFamily || 'inherit');
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        String(el.text || 'Text').split('\n').forEach(function(line, li) {
+          ctx.fillText(line, el.x || 0, (el.y || 0) + li * ((el.fontSize || 13) * 1.25));
+        });
+      } else if (el.type === 'heading') {
+        ctx.fillStyle = el.color || '#333333';
+        ctx.font = '700 ' + (el.fontSize || 24) + 'px "Cormorant Garamond", Georgia, serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(String(el.text || 'HEADING').toUpperCase(), el.x || 0, el.y || 0);
+      } else if (el.type === 'note') {
+        var nw = el.w || 200;
+        var nh = 56;
+        ctx.fillStyle = '#FFFDE7';
+        ctx.fillRect(el.x || 0, el.y || 0, nw, nh);
+        ctx.strokeStyle = '#FFF9C4';
+        ctx.strokeRect((el.x || 0) + 0.5, (el.y || 0) + 0.5, nw - 1, nh - 1);
+        ctx.fillStyle = '#666666';
+        ctx.font = 'italic 12px Georgia, serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(String(el.text || 'Designer notes...').slice(0, 200), (el.x || 0) + 10, (el.y || 0) + 10, nw - 20);
+      } else if (el.type === 'pricetag') {
+        var showP = dbEditor.showPricing && !dbEditor.clientView;
+        if (!showP) continue;
+        var pt = String(el.text || '');
+        if (!pt) continue;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(el.x || 0, el.y || 0, Math.max(60, ctx.measureText(pt).width + 16), 22);
+        ctx.strokeStyle = '#dddddd';
+        ctx.strokeRect((el.x || 0) + 0.5, (el.y || 0) + 0.5, Math.max(60, ctx.measureText(pt).width + 16) - 1, 21);
+        ctx.fillStyle = '#333333';
+        ctx.font = '11px Georgia, serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(pt, (el.x || 0) + 8, (el.y || 0) + 11);
+      }
+    }
+
+    els.forEach(function(el) {
+      if (!el || el.type !== 'arrow') return;
+      ctx.strokeStyle = el.color || '#333333';
+      ctx.lineWidth = el.strokeWidth || 1.5;
+      ctx.beginPath();
+      ctx.moveTo(el.x1 || 0, el.y1 || 0);
+      ctx.lineTo(el.x2 || 0, el.y2 || 0);
+      ctx.stroke();
+      var x1 = el.x1 || 0, y1 = el.y1 || 0, x2 = el.x2 || 0, y2 = el.y2 || 0;
+      var ang = Math.atan2(y2 - y1, x2 - x1);
+      var hl = 10;
+      ctx.fillStyle = el.color || '#333333';
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - hl * Math.cos(ang - 0.4), y2 - hl * Math.sin(ang - 0.4));
+      ctx.lineTo(x2 - hl * Math.cos(ang + 0.4), y2 - hl * Math.sin(ang + 0.4));
+      ctx.closePath();
+      ctx.fill();
+      if (el.label) {
+        ctx.fillStyle = '#666666';
+        ctx.font = '11px Georgia, serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(String(el.label), (x1 + x2) / 2, (y1 + y2) / 2 - 6);
+      }
+    });
+
+    return {
+      dataUrl: out.toDataURL('image/png'),
+      imageTotal: imageTotal,
+      imageFailed: imageFailed
+    };
+  }
 
   window.exportBoardPNG = async function() {
-    // Guard: html2canvas is memory-heavy with many large/cross-origin images. Prevent re-entry
-    // and confirm first so this can never run away and lock the browser/computer.
     if (window._dbExporting) return;
     var canvas = document.getElementById('dbCanvas');
     if (!canvas) return;
     if (typeof cchConfirm === 'function') {
-      var go = await cchConfirm('Create a PNG image of this board?\n\nThis can be slow and memory-heavy on boards with many large images. For a reliable copy, use "Print board" instead.', 'Download PNG', { confirmText: 'Create PNG', cancelText: 'Cancel' });
+      var go = await cchConfirm('Create a PNG image of this board?\n\nVendor-site images may show as labeled placeholders if their server blocks copying. For a pixel-perfect copy, use "Print board".', 'Download PNG', { confirmText: 'Create PNG', cancelText: 'Cancel' });
       if (!go) return;
     }
     window._dbExporting = true;
-
     dbEditor.selectedId = null;
     if (typeof dbUpdateSelectionDom === 'function') dbUpdateSelectionDom();
-
-    if (!window.html2canvas) {
-      try {
-        var script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-        document.head.appendChild(script);
-        await new Promise(function(resolve, reject) { script.onload = resolve; script.onerror = reject; });
-      } catch (eLoad) {
-        window._dbExporting = false;
-        if (typeof cchAlert === 'function') await cchAlert('Could not load the image library. Use "Print board" instead.', 'Export');
-        return;
-      }
-    }
-
     try {
-      var c = await html2canvas(canvas, {
-        scale: 1,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        logging: false
-      });
+      if (typeof showToast === 'function') showToast('Creating board image…', 2500);
+      var cap = await dbCaptureBoardDataUrl();
       var link = document.createElement('a');
       link.download = (dbEditor.boardData.title || 'design-board') + '.png';
-      link.href = c.toDataURL('image/png');
+      link.href = cap.dataUrl;
       link.click();
+      if (cap.imageFailed > 0 && typeof showToast === 'function') {
+        showToast(cap.imageFailed + ' vendor image(s) could not be embedded — use Print board for full fidelity.', 'warning', 7000);
+      }
     } catch(e) {
       if (typeof cchAlert === 'function') await cchAlert('Export error: ' + (e && e.message) + '\nTry "Print board" instead.', 'Export');
       else alert('Export error: ' + (e && e.message));
@@ -2669,6 +3146,59 @@
     // Save first
     await saveBoardToFirestore();
     window.location.hash = '#/clientboard/' + dbEditor.projectId + '/' + dbEditor.boardId;
+  };
+
+  /** Capture full board canvas PNG and open Post Decision modal (presentation → client Decisions). */
+  window.dbPostBoardAsDecision = async function() {
+    if (!dbEditor.projectId || !dbEditor.boardId) return;
+    if (typeof cpOpenPostDesignBoardDecisionModal !== 'function') {
+      if (typeof cchAlert === 'function') await cchAlert('Client portal decision posting is not available on this page.', 'Post Decision');
+      return;
+    }
+    if (window._dbExporting) return;
+    var canvas = document.getElementById('dbCanvas');
+    if (!canvas) {
+      cpOpenPostDesignBoardDecisionModal(dbEditor.projectId, dbEditor.boardId, {
+        fromEditor: true,
+        boardName: _dbBoardLabel(dbEditor.boardData)
+      });
+      return;
+    }
+    window._dbExporting = true;
+    dbEditor.selectedId = null;
+    if (typeof dbUpdateSelectionDom === 'function') dbUpdateSelectionDom();
+    try {
+      await saveBoardToFirestore();
+      if (typeof showToast === 'function') showToast('Capturing board layout…', 2500);
+      var cap = await dbCaptureBoardDataUrl();
+      var dataUrl = cap.dataUrl;
+      if (cap.imageFailed > 0 && typeof showToast === 'function') {
+        showToast(cap.imageFailed + ' vendor image(s) could not be embedded (site blocks copying). Titles shown instead.', 'warning', 6000);
+      }
+      var path = 'boards/' + dbEditor.projectId + '/clientDecisions/db-' + dbEditor.boardId + '-' + Date.now() + '.png';
+      var url = '';
+      if (typeof uploadBase64ToStorage === 'function') {
+        url = await uploadBase64ToStorage(dataUrl, path);
+      } else if (typeof uploadImageToStorage === 'function') {
+        var blob = await (await fetch(dataUrl)).blob();
+        url = await uploadImageToStorage(new File([blob], 'design-board.png', { type: 'image/png' }), path);
+      }
+      cpOpenPostDesignBoardDecisionModal(dbEditor.projectId, dbEditor.boardId, {
+        fromEditor: true,
+        boardName: _dbBoardLabel(dbEditor.boardData),
+        attachmentUrls: url ? [url] : []
+      });
+    } catch (e) {
+      if (typeof cchAlert === 'function') {
+        await cchAlert('Could not capture board image. Try Print board, or post from the Design Boards list using the cover image.\n\n' + ((e && e.message) || e), 'Post Decision');
+      }
+      cpOpenPostDesignBoardDecisionModal(dbEditor.projectId, dbEditor.boardId, {
+        fromEditor: false,
+        boardName: _dbBoardLabel(dbEditor.boardData)
+      });
+    } finally {
+      window._dbExporting = false;
+    }
   };
 
   window.addImageToBoard = async function() {
@@ -3079,7 +3609,7 @@
             '<input type="checkbox" id="dbPrintIncludeName"' + (window._dbPrintIncludeBoardName ? ' checked' : '') + ' onchange="window._dbPrintIncludeBoardName=!!this.checked">' +
             ' Include board / room name as footnote on print</label>' +
           '<div style="font-size:11px;color:#999;line-height:1.4;">Use <strong>Heading</strong> or <strong>Text</strong> on the board for titles. The footnote is optional — off by default.</div>' +
-          '<div style="font-size:11px;color:#999;line-height:1.4;">PNG download can fail when the board has images from sites that block copying. Use <strong>Print board</strong> for a reliable copy.</div>' +
+          '<div style="font-size:11px;color:#999;line-height:1.4;">PNG download may show labeled placeholders for vendor-site images that block copying. Use <strong>Print board</strong> for a pixel-perfect copy.</div>' +
         '</div>' +
         '<div style="padding:10px 18px;border-top:1px solid #eee;text-align:right;"><button class="btn btn-secondary btn-sm" onclick="' + rm + '">Close</button></div>' +
       '</div>';
@@ -3092,7 +3622,8 @@
     dbEditor.selectedId = null;
     if (typeof dbUpdateSelectionDom === 'function') dbUpdateSelectionDom();
     var cw = parseFloat(dbEditor.boardData && dbEditor.boardData.canvasWidth) || parseFloat(canvas.style.width) || canvas.offsetWidth || 1400;
-    var ch = parseFloat(dbEditor.boardData && dbEditor.boardData.canvasHeight) || parseFloat(canvas.style.height) || canvas.offsetHeight || 1000;
+    var ch = dbPrintCanvasHeight();
+    dbSyncBrandingFooter();
     var w = window.open('', '_blank');
     if (!w) { if (typeof cchAlert === 'function') cchAlert('Allow pop-ups to print the board.', 'Print'); return; }
     var boardLabel = esc(_dbBoardLabel(dbEditor.boardData));
@@ -3104,6 +3635,17 @@
     clone.style.boxShadow = 'none';
     clone.style.width = cw + 'px';
     clone.style.height = ch + 'px';
+    clone.style.minHeight = ch + 'px';
+    clone.style.maxHeight = ch + 'px';
+    var brandClone = clone.querySelector('#dbBranding');
+    if (brandClone) {
+      brandClone.style.position = 'absolute';
+      brandClone.style.left = '0';
+      brandClone.style.right = '0';
+      brandClone.style.bottom = '0';
+      brandClone.style.top = 'auto';
+      brandClone.style.paddingBottom = '14px';
+    }
     var footnote = includeName
       ? '<div class="db-print-footnote">' + boardLabel + '</div>'
       : '';
@@ -3117,7 +3659,7 @@
       '.db-el-product{box-sizing:border-box;}' +
       '.db-el-media{position:relative;box-sizing:border-box;background:#fff;border:1px solid rgba(15,26,46,0.06);border-radius:2px;overflow:hidden;}' +
       '.db-el-media img{width:100%;height:100%;object-fit:cover;object-position:center;display:block;}' +
-      '.db-el-caption{margin-top:5px;font-size:14px;font-weight:600;color:#1B3352;text-align:center;line-height:1.3;}' +
+      '.db-el-caption{margin-top:5px;font-size:14px;font-weight:600;color:#1B3352;text-align:center;line-height:1.3;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;}' +
       '.db-el-desc{margin-top:3px;font-size:12px;color:#4B5563;text-align:center;line-height:1.4;white-space:pre-wrap;}' +
       '.db-el-price{margin-top:3px;font-size:14px;font-weight:700;color:#0A1F3D;text-align:center;font-family:ui-monospace,monospace;}' +
       '.db-el-annotation{margin-top:4px;font-size:12px;color:#6B7280;text-align:center;font-style:italic;white-space:pre-line;line-height:1.35;}' +
@@ -3178,6 +3720,7 @@
 
   window._cchDesignBoardOpen = window.openDesignBoard;
   window._cchDesignBoardUseExternal = true;
+  window.__cchDbListRender = window.renderDesignBoardsTab;
 
   function dbElementBox(el) {
     var w = el.w || 180;
@@ -3192,6 +3735,57 @@
     };
   }
 
+  /**
+   * Height of the text block rendered BELOW a tile's image box (caption/desc/price/annotation).
+   * The image box is el.w × el.h, but the visible tile is taller — every overlap/placement
+   * calculation must use this or labels collide with the tile below (the classic "stuck board").
+   */
+  function dbTileExtrasH(el) {
+    if (!el || (el.type !== 'product' && el.type !== 'image')) return 0;
+    var w = Math.max(80, el.w || 180);
+    var extras = 0;
+    if (!el.hideCaption) {
+      var title = dbBoardDisplayTitle(el.title);
+      if (title) {
+        // caption: 14px/1.3 ≈ 18.2px per line; ~7.7px avg glyph width at 600 weight
+        var lines = Math.max(1, Math.min(3, Math.ceil((title.length * 7.7) / w)));
+        extras += 5 + Math.ceil(lines * 18.2);
+      }
+    }
+    if (el.showDescription && dbElementDescription(el)) {
+      var desc = dbElementDescription(el);
+      var dLines = Math.max(1, Math.min(3, Math.ceil((desc.length * 6.2) / w)));
+      extras += 3 + Math.ceil(dLines * 16.8);
+    }
+    if (dbEditor.showPricing && !dbEditor.clientView && el.showPrice !== false && el.sellPrice) extras += 3 + 18;
+    if (el.annotation) extras += 4 + 17;
+    return extras;
+  }
+
+  /** True on-screen tile height. Prefers live DOM measurement, falls back to estimate. */
+  function dbElementFootprintH(el) {
+    if (!el) return 180;
+    if (el.type === 'product' || el.type === 'image') {
+      var node = dbFindElementDomNode(el.id);
+      if (node && node.offsetHeight > 0) {
+        return Math.ceil(node.offsetHeight);
+      }
+      return (el.h || 180) + dbTileExtrasH(el);
+    }
+    return el.h || 180;
+  }
+
+  /** Element box using the tile's TRUE visual height (image + labels underneath). */
+  function dbElementVisualBox(el) {
+    var b = dbElementBox(el);
+    var fh = dbElementFootprintH(el);
+    if (fh > b.h) {
+      b.h = fh;
+      b.bottom = b.y + fh;
+    }
+    return b;
+  }
+
   function dbBoxesOverlap(a, b, pad) {
     pad = pad == null ? 8 : pad;
     return !(a.right + pad <= b.x || b.right + pad <= a.x || a.bottom + pad <= b.y || b.bottom + pad <= a.y);
@@ -3204,7 +3798,7 @@
     var n = 0;
     for (var i = 0; i < tiles.length; i++) {
       for (var j = i + 1; j < tiles.length; j++) {
-        if (dbBoxesOverlap(dbElementBox(tiles[i]), dbElementBox(tiles[j]))) n++;
+        if (dbBoxesOverlap(dbElementVisualBox(tiles[i]), dbElementVisualBox(tiles[j]))) n++;
       }
     }
     return n;
@@ -3224,15 +3818,17 @@
         for (var j = 0; j < i; j++) {
           var a = tiles[i];
           var b = tiles[j];
-          var boxA = dbElementBox(a);
-          var boxB = dbElementBox(b);
+          // Visual boxes include caption/price height — a 12px gap below the IMAGE box
+          // is instantly eaten by the label, which is why old repairs never looked repaired.
+          var boxA = dbElementVisualBox(a);
+          var boxB = dbElementVisualBox(b);
           if (!dbBoxesOverlap(boxA, boxB)) continue;
           any = true;
           moved++;
-          a.y = boxB.bottom + 12;
+          a.y = boxB.bottom + 16;
           if (a.y + boxA.h > maxH - 24) {
             a.y = boxB.y;
-            a.x = boxB.right + 12;
+            a.x = boxB.right + 16;
           }
           if (a.x + boxA.w > maxW - 24) {
             a.x = Math.max(0, (a.x || 0) + 28);
@@ -3246,6 +3842,107 @@
     return moved;
   }
 
+  // ==================== TIDY BOARD (auto-arrange) ====================
+  /**
+   * One-click magazine layout: headings centered at top, then product/image tiles in
+   * justified rows (aspect ratios preserved, equal gutters, flush edges) with room
+   * reserved under every tile for its caption + price. Text/notes/arrows are left alone.
+   * Fully undoable (single Undo step).
+   */
+  window.dbTidyBoard = function() {
+    try {
+      var bd = dbEditor.boardData || {};
+      var cw = bd.canvasWidth || 1400;
+      var margin = 48;
+      var gutter = 28;
+      var tiles = (dbEditor.elements || []).filter(function(e) {
+        return e && (e.type === 'product' || e.type === 'image');
+      });
+      if (!tiles.length) {
+        if (typeof showToast === 'function') showToast('Nothing to arrange — add items to the board first.', 3000);
+        return;
+      }
+      pushUndo();
+
+      var y = margin;
+
+      // Headings stack centered at the top
+      var headings = (dbEditor.elements || []).filter(function(e) { return e && e.type === 'heading'; });
+      headings.forEach(function(hEl) {
+        var fs = hEl.fontSize || 24;
+        var estW = Math.min(cw - margin * 2, Math.max(120, String(hEl.text || 'HEADING').length * fs * 0.72));
+        hEl.x = Math.max(margin, Math.round((cw - estW) / 2));
+        hEl.y = y;
+        y += Math.ceil(fs * 1.6) + 14;
+      });
+      if (headings.length) y += 10;
+
+      // Keep the designer's rough top-to-bottom order
+      tiles.sort(function(a, b) { return ((a.y || 0) - (b.y || 0)) || ((a.x || 0) - (b.x || 0)); });
+
+      var avail = cw - margin * 2;
+      var targetH = tiles.length <= 4 ? 340 : (tiles.length <= 8 ? 300 : 260);
+      function aspectOf(t) {
+        var ar = (t.w || 180) / Math.max(1, t.h || 180);
+        return Math.max(0.45, Math.min(2.6, ar));
+      }
+
+      var row = [];
+      var aspectSum = 0;
+      function flushRow(isLast) {
+        if (!row.length) return;
+        var gaps = gutter * (row.length - 1);
+        var h = (avail - gaps) / aspectSum;
+        if (isLast) h = Math.min(h, targetH);       // don't blow up a sparse final row
+        h = Math.max(140, Math.min(h, 460));
+        var x = margin;
+        var maxExtras = 0;
+        row.forEach(function(t) {
+          var ar = aspectOf(t);
+          t.h = Math.round(h);
+          t.w = Math.round(h * ar);
+          t.x = Math.round(x);
+          t.y = Math.round(y);
+          x += t.w + gutter;
+          var ex = dbTileExtrasH(t);
+          if (ex > maxExtras) maxExtras = ex;
+        });
+        y += Math.round(h) + maxExtras + gutter;
+        row = [];
+        aspectSum = 0;
+      }
+      tiles.forEach(function(t) {
+        row.push(t);
+        aspectSum += aspectOf(t);
+        var gaps = gutter * (row.length - 1);
+        // Flush when the row is visually full, or at 5 tiles — rows of narrow sconces
+        // otherwise cram 7-8 across and read like thumbnails, not a curated board.
+        if ((avail - gaps) / aspectSum <= targetH || row.length >= 5) flushRow(false);
+      });
+      flushRow(true);
+
+      // Fit the canvas to the new layout (footer needs ~90px), grow or trim — never below 800
+      var needed = Math.ceil(y - gutter + 100);
+      bd.canvasHeight = Math.max(800, needed);
+
+      dbEditor.dirty = true;
+      renderCanvas();
+      dbSyncBrandingFooter();
+      dbApplyViewZoom();
+      dbFitCanvasToView(true);
+      renderProps();
+      var banner = document.getElementById('dbOverlapBanner');
+      if (banner) banner.remove();
+      autoSave(800);
+      if (typeof showToast === 'function') {
+        showToast('✨ Board tidied — ' + tiles.length + ' items arranged. Undo (Ctrl+Z) restores the old layout.', 4500);
+      }
+    } catch (err) {
+      console.error('[design board] tidy failed:', err);
+      if (typeof showToast === 'function') showToast('Tidy error — nothing was lost. Try Undo.', 4000);
+    }
+  };
+
   function dbShowOverlapBanner(overlapPairs) {
     if (!overlapPairs || overlapPairs < 1) return;
     var root = document.getElementById('dbEditorRoot');
@@ -3253,9 +3950,10 @@
     var bar = document.createElement('div');
     bar.id = 'dbOverlapBanner';
     bar.style.cssText = 'padding:10px 14px;background:rgba(180,83,9,0.1);border-bottom:1px solid rgba(180,83,9,0.25);font-size:12px;color:#92400E;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;';
-    bar.innerHTML = '<span><strong>Stacked tiles detected</strong> — ' + overlapPairs + ' overlap' + (overlapPairs !== 1 ? 's' : '') + '. Your work is safe. <strong>Repair board</strong> spreads them apart without deleting anything.</span>' +
+    bar.innerHTML = '<span><strong>Stacked tiles detected</strong> — ' + overlapPairs + ' overlap' + (overlapPairs !== 1 ? 's' : '') + '. Your work is safe. <strong>✨ Tidy board</strong> lays everything out in a clean grid; <strong>Repair</strong> just nudges tiles apart.</span>' +
       '<span style="display:flex;gap:8px;flex-shrink:0;">' +
-        '<button type="button" class="btn btn-primary btn-sm" onclick="void dbRepairBoard(true)">Repair board</button>' +
+        '<button type="button" class="btn btn-primary btn-sm" onclick="void dbTidyBoard()">✨ Tidy board</button>' +
+        '<button type="button" class="btn btn-secondary btn-sm" onclick="void dbRepairBoard(true)">Repair board</button>' +
         '<button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById(\'dbOverlapBanner\').remove()">Dismiss</button>' +
       '</span>';
     var tb = document.getElementById('dbToolbar');
@@ -3265,10 +3963,7 @@
   /** Unstick gestures + purge ghosts + spread stacked tiles. Never deletes elements. */
   window.dbRepairBoard = function(fromBanner) {
     try {
-      dbForceRemoveAllDragListeners();
-      dbClearAllDragTransforms();
-      dbEditor.isDragging = false;
-      dbEditor.isResizing = false;
+      dbForceEndInteraction({ resync: false });
       dbEditor.selectedId = null;
       dbEditor.arrowStart = null;
       dbEditor.tool = 'select';
@@ -3354,6 +4049,6 @@
     };
   }
 
-  console.info('[CCH Design Board] build 20260702db33 — drop avoids stacked tiles');
+  console.info('[CCH Design Board] build 20260708db46 — footprint + ✨ Tidy board + zoom-correct uploads w/ natural aspect');
 
 })();

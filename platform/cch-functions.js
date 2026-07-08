@@ -617,7 +617,7 @@ async function showConnectedDocs(projectId, docType, docId, docNumber, anchorEl)
     var inner = document.getElementById('connDocsInner');
     if (!inner) return;
     if (linkedDocs.length === 0) {
-      inner.innerHTML = '<div style="padding:6px 14px;font-size:12px;color:var(--gray-400);line-height:1.45;">No linked documents yet.<br><span style="font-size:11px;">Use <strong>Link Documents</strong> on the project list.</span></div>';
+      inner.innerHTML = '<div style="padding:6px 14px;font-size:12px;color:var(--gray-400);line-height:1.45;">No linked documents yet.<br><span style="font-size:11px;">Proposals, invoices, and POs link automatically from matching lines.</span></div>';
       return;
     }
     inner.innerHTML = linkedDocs.map(function(d) {

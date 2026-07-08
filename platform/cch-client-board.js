@@ -204,7 +204,7 @@
         }
       }
     });
-    var brand = (bd.branding !== false) ? '<div style="position:absolute;bottom:20px;left:0;right:0;text-align:center;pointer-events:none;z-index:10;"><span style="font-family:Playfair Display,Georgia,serif;font-size:24px;font-weight:700;color:#C4A052;">CCH</span><div style="font-family:Cormorant Garamond,Georgia,serif;font-size:11px;letter-spacing:3px;color:#999;text-transform:uppercase;">Design Inc.</div></div>' : '';
+    var brand = (bd.branding !== false) ? '<div id="dbBranding" style="position:absolute;left:0;right:0;bottom:0;padding-bottom:14px;text-align:center;pointer-events:none;z-index:10;"><span style="font-family:Playfair Display,Georgia,serif;font-size:24px;font-weight:700;color:#C4A052;">CCH</span><div style="font-family:Cormorant Garamond,Georgia,serif;font-size:11px;letter-spacing:3px;color:#999;text-transform:uppercase;">Design Inc.</div></div>' : '';
     return '<div style="width:100%;overflow-x:auto;padding:0 8px 40px;background:#e8e4dc;">' +
       '<div style="position:relative;width:' + cw + 'px;height:' + ch + 'px;background:#fff;margin:16px auto;box-shadow:0 4px 24px rgba(0,0,0,0.15);overflow:hidden;">' +
       '<svg style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:500;">' + svgHtml + '</svg>' +

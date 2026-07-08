@@ -131,7 +131,7 @@
     var links = (typeof window.cchCollectLinkedProjectDocsSync === 'function')
       ? window.cchCollectLinkedProjectDocsSync(docType, docId, docData || {}, lists || {}) : [];
     if (!links.length) {
-      return '<a onclick="event.stopPropagation();linkDocModal(\'' + cchEscJsStr(projectId) + '\',\'' + collection + '\',\'' + cchEscJsStr(docId) + '\')" style="color:var(--gray-500);cursor:pointer;font-size:11px;white-space:nowrap;text-decoration:underline;" title="Link documents">Link</a>';
+      return '<span style="font-size:11px;color:var(--gray-300);">—</span>';
     }
     var jsType = docType === 'po' ? 'po' : (docType === 'invoice' ? 'invoice' : 'proposal');
     var btnLabel = links.length === 1 ? links[0].label : (links.length + ' linked');
@@ -817,7 +817,7 @@
         invBtn +
         cchPropMoreItem('Generate POs by Vendor', "generatePOsFromDoc('" + projectId + "','proposals','" + proposalId + "')") +
         cchPropMoreItem('Duplicate proposal', "duplicateProposalAsCopy('" + projectId + "','" + proposalId + "')") +
-        cchPropMoreItem('Link Documents', "linkDocModal('" + projectId + "','proposals','" + proposalId + "')") +
+        cchPropMoreItem('Attach from Files', "linkDocModal('" + projectId + "','proposals','" + proposalId + "')") +
         cchPropMoreItem('Delete proposal', "deleteProposal('" + projectId + "','" + proposalId + "')", true);
     } else {
       inner = cchPropMoreItem('Edit proposal', "navigate('#/project/" + projectId + "/proposal/" + proposalId + "/edit')") +
@@ -830,7 +830,7 @@
         invBtn +
         cchPropMoreItem('Generate POs by Vendor', "generatePOsFromDoc('" + projectId + "','proposals','" + proposalId + "')") +
         cchPropMoreItem('Duplicate proposal', "duplicateProposalAsCopy('" + projectId + "','" + proposalId + "')") +
-        cchPropMoreItem('Link Documents', "linkDocModal('" + projectId + "','proposals','" + proposalId + "')") +
+        cchPropMoreItem('Attach from Files', "linkDocModal('" + projectId + "','proposals','" + proposalId + "')") +
         cchPropMoreItem('Close legacy (hide attention)', "closeProposalAsLegacy('" + projectId + "','" + proposalId + "')") +
         cchPropMoreItem('Delete proposal', "deleteProposal('" + projectId + "','" + proposalId + "')", true);
     }
@@ -1218,8 +1218,8 @@
     if (badges.length === 0 && docType) {
       var collection = docType === 'proposal' ? 'proposals' : docType === 'invoice' ? 'invoices' : 'purchaseOrders';
       badges.push('<a class="linked-doc-badge" style="background:var(--gray-50);color:var(--gray-400);border-color:var(--gray-200);cursor:pointer;" ' +
-        'onclick="linkDocModal(\'' + projectId + '\',\'' + collection + '\',\'' + docData.id + '\')" title="Link to other documents">' +
-        '🔗 Link Documents</a>');
+        'onclick="linkDocModal(\'' + projectId + '\',\'' + collection + '\',\'' + docData.id + '\')" title="Attach a file from project Files &amp; Docs">' +
+        '📂 Attach from Files</a>');
     }
 
     return badges.length > 0 ? '<div class="linked-doc-badges-area" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">' + badges.join('') + '</div>' : '';
@@ -2546,6 +2546,11 @@
     var dj = cchEscJsStr(docId);
     var tearJs = "typeof generateTearSheetsFromDoc==='function'&&generateTearSheetsFromDoc('" + pj + "','" + collection + "','" + dj + "','" + cchEscJsStr(projName) + "')";
     var previewJs = "previewDocument('" + type + "','" + pj + "','" + dj + "')";
+    var _dsItemsTop = Array.isArray(docData.items) ? docData.items : [];
+    var _isDsInvTop = (type === 'invoice' && _dsItemsTop.length && typeof window.cchIsPureDesignServicesInvoice === 'function' && window.cchIsPureDesignServicesInvoice(_dsItemsTop));
+    var printJs = _isDsInvTop
+      ? "void cchPrintCurrentInvoice('" + pj + "','" + dj + "')"
+      : previewJs;
 
     var html = '<button class="btn btn-secondary btn-sm" onclick="navigate(\'#/project/' + pj + '/' + backTab + '\')">← Back</button>';
 
@@ -2564,7 +2569,7 @@
 
       var more = '';
       more += cchDocMoreItem('📑 Tear sheets', tearJs);
-      more += cchDocMoreItem('🖨 Print / PDF', previewJs);
+      more += cchDocMoreItem('🖨 Print / PDF', printJs);
       more += cchDocMoreDivider();
       more += cchDocMoreItem('🕐 Timeline', "toggleDocTimeline('" + pj + "','" + collection + "','" + dj + "')");
       more += cchDocMoreItem('💳 Record payment', "quickRecordPayment('" + pj + "','" + collection + "','" + dj + "')");
@@ -2601,7 +2606,7 @@
         more += cchDocMoreItem('🚫 Void (keep costs)', "voidInvoice('" + pj + "','" + dj + "')");
       }
       if (typeof linkDocModal === 'function') {
-        more += cchDocMoreItem('🔗 Link documents', "linkDocModal('" + pj + "','invoices','" + dj + "')");
+        more += cchDocMoreItem('📂 Attach from Files', "linkDocModal('" + pj + "','invoices','" + dj + "')");
       }
       more += cchDocMoreDivider();
       var pubLabel = docData.published ? '🔒 Unpublish from dashboard' : '🌐 Publish to client dashboard';
@@ -2637,7 +2642,7 @@
       var poPub = docData.published ? '🔒 Unpublish from dashboard' : '🌐 Publish to client dashboard';
       poMore += cchDocMoreItem(poPub, "togglePublished('" + pj + "','" + dj + "'," + (!docData.published ? 'true' : 'false') + ",'purchaseOrders')");
       if (typeof linkDocModal === 'function') {
-        poMore += cchDocMoreItem('🔗 Link documents', "linkDocModal('" + pj + "','purchaseOrders','" + dj + "')");
+        poMore += cchDocMoreItem('📂 Attach from Files', "linkDocModal('" + pj + "','purchaseOrders','" + dj + "')");
       }
       poMore += cchDocMoreItem('🗑️ Delete', "deletePurchaseOrder('" + pj + "','" + dj + "')", true);
       html += cchDocMoreMenuWrap(poMore);
@@ -2658,7 +2663,7 @@
         prMore += cchDocMoreItem('🧾 Convert to invoice', "convertProposalToInvoice('" + pj + "','" + dj + "')");
       }
       if (typeof linkDocModal === 'function') {
-        prMore += cchDocMoreItem('🔗 Link documents', "linkDocModal('" + pj + "','proposals','" + dj + "')");
+        prMore += cchDocMoreItem('📂 Attach from Files', "linkDocModal('" + pj + "','proposals','" + dj + "')");
       }
       prMore += cchDocMoreDivider();
       var prPub = docData.published ? '🔒 Unpublish from dashboard' : '🌐 Publish to client dashboard';
@@ -2742,7 +2747,7 @@
     }
     if (typeof linkDocModal === 'function') {
       more += cchDocMoreDivider();
-      more += cchDocMoreItem('🔗 Link documents', "linkDocModal('" + pj + "','" + collection + "','" + dj + "')");
+      more += cchDocMoreItem('📂 Attach from Files', "linkDocModal('" + pj + "','" + collection + "','" + dj + "')");
     }
     if (type === 'invoice' || type === 'po' || type === 'proposal') {
       var pubLabel = docData.published ? '🔒 Unpublish from dashboard' : '🌐 Publish to client dashboard';
@@ -3394,17 +3399,20 @@
       var _railPayCompact = (typeof window.invoiceAppliedPaymentsPanelHtml === 'function' && showPaymentTotals)
         ? window.invoiceAppliedPaymentsPanelHtml(paySummary, { compact: true, inv: docData }) : '';
       var _railAttach = '';
-      if (docAttachments.length > 0) {
-        _railAttach = '<div class="cch-doc-view-rail-card"><div class="cch-doc-view-rail-title">Attachments</div>' +
-          docAttachments.map(function(att) {
+      var _attachListHtml = docAttachments.length
+        ? docAttachments.map(function(att) {
             var nm = esc(att.name || 'File');
             var u = String(att.url || '').trim();
             if (u) {
               return '<div class="cch-doc-view-rail-row" style="align-items:center;"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + nm + '</span><a href="' + escAttr(u) + '" target="_blank" rel="noopener" style="color:var(--teal);font-weight:600;flex-shrink:0;font-size:10px;">Open</a></div>';
             }
             return '<div style="font-size:11px;color:var(--gray-500);padding:2px 0;">' + nm + '</div>';
-          }).join('') + '</div>';
-      }
+          }).join('')
+        : '<div style="font-size:11px;color:var(--gray-400);font-style:italic;padding:2px 0 6px;">No attachments yet</div>';
+      var _attachControls = (typeof window.cchDocAttachmentsControlsHtml === 'function')
+        ? window.cchDocAttachmentsControlsHtml(projectId, collection, docId) : '';
+      _railAttach = '<div class="cch-doc-view-rail-card"><div class="cch-doc-view-rail-title">Attachments</div>' +
+        _attachListHtml + _attachControls + '</div>';
       var _canQbRefresh = type === 'invoice' && _canPushQBView && typeof syncInvoiceBalanceFromQB === 'function' &&
         typeof window.invoiceCanRefreshFromQb === 'function' && window.invoiceCanRefreshFromQb(docData);
       var _railQbSyncBtn = _canQbRefresh
@@ -3489,6 +3497,9 @@
                 (items.length === 0 ? '<div style="padding:12px;text-align:center;color:var(--gray-400);font-size:12px;">No items</div>' : itemsHTML + _invLineTotalsFooter) +
               '</div>' +
               _tagsMemoBlock +
+              (typeof window.cchDocAttachmentsSectionHtml === 'function'
+                ? window.cchDocAttachmentsSectionHtml(projectId, collection, docId, docData)
+                : '') +
             '</div>' +
             invoiceRailHTML +
           '</div>' +
@@ -3799,6 +3810,11 @@
 
     window._docEdit = { type: 'invoice', projectId: pid, docId: iid, collection: collection, docData: docData, items: items };
     window._docViewInvoiceCtx = { projectId: pid, docId: iid, collection: collection, items: items, docData: docData, proj: projData };
+    var _isDsManage = items.length && typeof window.cchIsPureDesignServicesInvoice === 'function' && window.cchIsPureDesignServicesInvoice(items);
+    if (_isDsManage) {
+      window._cchInvViewCtx = { projectId: pid, docId: iid, items: items, docData: docData, proj: projData, docNum: docNum, dateStr: '' };
+      window._cchDsCtx = window._cchInvViewCtx;
+    }
 
     if (typeof setBreadcrumb === 'function') {
       setBreadcrumb([
@@ -3901,7 +3917,11 @@
         roomOpts += '<option value="' + (typeof escAttr === 'function' ? escAttr(r) : r) + '"' + (r === curRoom ? ' selected' : '') + '>' + esc(r) + '</option>';
       }
       var lineTagTxt = typeof cchLineTagExplicit === 'function' ? cchLineTagExplicit(item) : String(item.lineTag || '').trim();
-      var clientNoteTxt = typeof cchLineExplicitNotesText === 'function' ? cchLineExplicitNotesText(item) : String(item.lineNotes || '').trim();
+      var clientNoteTxt = typeof cchLineNotesBodyText === 'function'
+        ? cchLineNotesBodyText(item)
+        : (typeof cchStripDateOnlyNoteLines === 'function'
+          ? cchStripDateOnlyNoteLines(String(item.lineNotes || '').trim())
+          : String(item.lineNotes || '').trim());
       var thumbHtml = (function() {
         var _tu = typeof getProposalLineHeroImageUrl === 'function' ? getProposalLineHeroImageUrl(item) : String(item.imageUrl || '').trim();
         if (!_tu) {
@@ -3975,6 +3995,10 @@
       ? bulkBar + '<div id="invoiceManageArea" data-cch-invoice-manage="1" class="proposal-table-wrap proposal-landing-manage-border"><table class="data-table" style="margin-bottom:0;" ondragover="event.preventDefault()">' + thead + '<tbody>' + rows.join('') + '</tbody></table></div>'
       : '<div style="padding:32px;text-align:center;color:var(--gray-400);">No line items. Use <strong>Edit line items</strong> to add products.</div>';
 
+    var dsEditorHtml = (_isDsManage && typeof window.cchBuildDsEditor === 'function')
+      ? window.cchBuildDsEditor(docData, pid, iid)
+      : '';
+
     T.innerHTML =
       '<div class="cch-doc-view-page">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;gap:10px;">' +
@@ -3983,7 +4007,11 @@
           '<div style="font-size:11px;color:var(--gray-400);">' + esc(projName) + '</div></div>' +
           '<button type="button" class="btn btn-primary btn-sm" style="background:#1B3352;color:#EDE8E0;" onclick="window._forceEditMode=true;navigate(window.location.hash)">✏️ Edit line items</button>' +
         '</div>' +
+        dsEditorHtml +
         tableHtml +
+        (typeof window.cchDocAttachmentsSectionHtml === 'function'
+          ? window.cchDocAttachmentsSectionHtml(pid, collection, iid, docData)
+          : '') +
         '<div style="margin-top:20px;display:flex;justify-content:flex-end;">' +
           '<div style="min-width:260px;text-align:right;">' +
             '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--gray-500);margin-bottom:4px;"><span>Subtotal</span><span>' + formatMoney(_invT.subtotal) + '</span></div>' +
@@ -4506,11 +4534,18 @@
     /** Invoice/proposal preview/PDF: lineTag + lineNotes body (no vendor under item). */
     function _invoicePreviewTagNotesHtml(it) {
       it = it || {};
+      var isSvc = it.expenseType === 'service' || it.itemType === 'service';
       var tagLine = (typeof window.cchLineTagText === 'function') ? window.cchLineTagText(it) : '';
       var notesBody = (typeof window.cchLineNotesBodyText === 'function') ? window.cchLineNotesBodyText(it) : '';
       if (type === 'invoice' && typeof window.sanitizeInvoicePreviewLineText === 'function') {
         if (tagLine) tagLine = window.sanitizeInvoicePreviewLineText(tagLine);
         if (notesBody) notesBody = window.sanitizeInvoicePreviewLineText(notesBody);
+      }
+      if (isSvc) {
+        if (tagLine && /^\d{4}-\d{2}-\d{2}\b/.test(String(tagLine).trim())) tagLine = '';
+        if (notesBody && typeof window.cchStripDateOnlyNoteLines === 'function') {
+          notesBody = window.cchStripDateOnlyNoteLines(notesBody);
+        }
       }
       if (!tagLine && !notesBody) return '';
       var html = '';
@@ -4608,12 +4643,13 @@
         var p0 = _fmtIsoLong(ds0);
         var p1 = _fmtIsoLong(ds1);
         if (p0 && p1 && p0 !== p1) {
-          periodHtml = '<div class="item-svc-period">Service period: ' + esc(p0) + ' – ' + esc(p1) + '</div>';
+          periodHtml = '<div class="item-svc-period cch-inv-disp-dates">Service period: ' + esc(p0) + ' – ' + esc(p1) + '</div>';
         } else if (p0) {
-          periodHtml = '<div class="item-svc-period">Service date: ' + esc(p0) + '</div>';
+          periodHtml = '<div class="item-svc-period cch-inv-disp-dates">Service date: ' + esc(p0) + '</div>';
         }
       }
       var notesUnder = (type === 'invoice' || type === 'proposal') ? _invoicePreviewTagNotesHtml(it) : _lineNotesHtml(_rawNotes);
+      if (type === 'invoice' && notesUnder) notesUnder = '<div class="cch-inv-disp-notes">' + notesUnder + '</div>';
       var _poLineNote = (typeof cchLineAdditionalNotesText === 'function')
         ? cchLineAdditionalNotesText(it)
         : (String(it.additionalNotes || it.workroomNote || '').trim());
@@ -4664,13 +4700,19 @@
             (it.vendor && type !== 'po' && type !== 'invoice' ? '<div class="item-vendor">' + esc(it.vendor) + '</div>' : '') +
           '</div>' +
         '</div>';
+      var qtyCell = String(qty);
+      var priceCell = formatMoney(unitPrice);
+      if (type === 'invoice' && isSvc) {
+        qtyCell = '<span class="cch-inv-disp-hours">' + qty + '</span>';
+        priceCell = '<span class="cch-inv-disp-rate">' + formatMoney(unitPrice) + '</span>';
+      }
       itemsHtml += '<tr><td class="line-item-main">' + itemInner + '</td>' +
         (type === 'po' ? '<td class="sidemark-cell">' + (function() {
           var sm = _poVendorSidemarkText(it);
           return sm ? esc(sm) : '<span style="color:#C4C4C4;">—</span>';
         })() + '</td>' : '') +
-        '<td style="text-align:center;">' + qty + '</td>' +
-        '<td class="r">' + formatMoney(unitPrice) + '</td>' +
+        '<td style="text-align:center;">' + qtyCell + '</td>' +
+        '<td class="r">' + priceCell + '</td>' +
         '<td class="r ship">' + (ship > 0 ? formatMoney(ship) : '') + '</td>' +
         (type === 'po' || type === 'invoice' ? '' : '<td style="text-align:center;">' + (isTaxable ? '<span class="tax-yes">✓</span>' : '<span class="tax-no">—</span>') + '</td>') +
         '<td class="r total-cell">' + formatMoney(displayLineTotal) + '</td></tr>';
@@ -4861,6 +4903,18 @@
     var premiumDocDateHtml = (type === 'invoice') ? '' : (dateStr ? '<div class="doc-date">' + esc(dateStr) + '</div>' : '');
     var premiumDocTypeHtml = (type === 'invoice') ? '' : ('<div class="doc-type">' + typeLabel + '</div>');
     var premiumToolbarTitle = (type === 'invoice') ? esc(docNum) : esc(typeLabel + ' ' + docNum);
+    var premiumIsTimeInv = (type === 'invoice' && (
+      String(docData.source || '') === 'time-tracker' ||
+      (Array.isArray(docData.timeEntryIds) && docData.timeEntryIds.length > 0) ||
+      (items.length && typeof window.cchIsPureDesignServicesInvoice === 'function' && window.cchIsPureDesignServicesInvoice(items))
+    ));
+    var premiumDispToolbarHtml = premiumIsTimeInv
+      ? '<span class="toolbar-sep"></span>' +
+        '<label class="toolbar-check"><input type="checkbox" id="cchPremDispDates" checked onchange="cchPremInvDispToggle(\'dates\',this.checked)"> Show dates</label>' +
+        '<label class="toolbar-check"><input type="checkbox" id="cchPremDispHours" onchange="cchPremInvDispToggle(\'hours\',this.checked)"> Show hours</label>' +
+        '<label class="toolbar-check"><input type="checkbox" id="cchPremDispRate" onchange="cchPremInvDispToggle(\'rate\',this.checked)"> Show rate</label>' +
+        '<label class="toolbar-check"><input type="checkbox" id="cchPremDispNotes" checked onchange="cchPremInvDispToggle(\'notes\',this.checked)"> Show notes</label>'
+      : '';
     var poPrintBodyClass = type === 'po' ? ' class="cch-po-vendor-print"' : '';
     var poPrintHint = type === 'po'
       ? 'Print dialog opens automatically. Turn off <strong>Headers and footers</strong> in print settings for a clean PDF.'
@@ -4883,7 +4937,10 @@
       '.toolbar-left { flex:1;min-width:0; }' +
       '.toolbar-title { color:#C4A464;font-size:13px;font-weight:600;letter-spacing:0.5px; }' +
       '.print-hint-screen { font-size:10px;color:rgba(196,164,100,0.88);margin-top:6px;line-height:1.4;font-weight:400;max-width:520px; }' +
-      '.toolbar-actions { display:flex;gap:8px;flex-shrink:0;padding-top:2px; }' +
+      '.toolbar-actions { display:flex;gap:8px;flex-shrink:0;padding-top:2px;flex-wrap:wrap;align-items:center; }' +
+      '.toolbar-sep { width:1px;height:20px;background:rgba(196,164,100,0.35);margin:0 4px; }' +
+      '.toolbar-check { display:inline-flex;align-items:center;gap:5px;color:#C8B99A;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap; }' +
+      '.toolbar-check input { accent-color:#C4A464;cursor:pointer; }' +
       '.tb-btn { background:transparent;color:#C4A464;border:1px solid #C4A464;padding:7px 14px;font-size:11px;font-weight:600;cursor:pointer;font-family:"DM Sans";transition:all 0.15s; }' +
       '.tb-btn:hover { background:rgba(196,164,100,0.12);color:#1B3352; }' +
       '.tb-btn-primary { background:#C4A464;color:#FFFFFF;border-color:#C4A464; }' +
@@ -5025,6 +5082,7 @@
             ? '<button class="tb-btn" onclick="window.close()">Close</button>' +
               '<button class="tb-btn tb-btn-primary" onclick="window.print()">🖨️ Print / PDF</button>'
             : '<button class="tb-btn" onclick="window.print()">🖨️ Print / PDF</button>' +
+              premiumDispToolbarHtml +
               '<button class="tb-btn" id="tsToggle" onclick="toggleTearSheets()">📑 Include Tear Sheets</button>') +
         '</div>' +
       '</div>' +
@@ -5114,7 +5172,9 @@
         '</div>');
     });
     win.document.write('</div>');
-    win.document.write('<script>var _tsVisible=false; function toggleTearSheets(){ _tsVisible=!_tsVisible; document.getElementById("tearSheetPages").style.display=_tsVisible?"block":"none"; document.getElementById("tsToggle").style.background=_tsVisible?"#C8B99A":"transparent"; document.getElementById("tsToggle").style.color=_tsVisible?"#1B3352":"#C8B99A"; document.getElementById("tsToggle").textContent=_tsVisible?"📑 Tear Sheets Included":"📑 Include Tear Sheets"; }<\/script>');
+    win.document.write('<script>var _tsVisible=false; function toggleTearSheets(){ _tsVisible=!_tsVisible; document.getElementById("tearSheetPages").style.display=_tsVisible?"block":"none"; document.getElementById("tsToggle").style.background=_tsVisible?"#C8B99A":"transparent"; document.getElementById("tsToggle").style.color=_tsVisible?"#1B3352":"#C8B99A"; document.getElementById("tsToggle").textContent=_tsVisible?"📑 Tear Sheets Included":"📑 Include Tear Sheets"; }' +
+      (premiumIsTimeInv ? ' var _cchPremDisp={dates:true,hours:false,rate:false,notes:true}; function cchPremInvDispToggle(k,on){_cchPremDisp[k]=!!on;var sel={dates:".cch-inv-disp-dates",hours:".cch-inv-disp-hours",rate:".cch-inv-disp-rate",notes:".cch-inv-disp-notes"}[k];if(sel)document.querySelectorAll(sel).forEach(function(el){el.style.display=on?"":"none";});try{localStorage.setItem("cchPremInvDisplay",JSON.stringify(_cchPremDisp));}catch(_e){}} (function(){try{var s=localStorage.getItem("cchPremInvDisplay");if(s)_cchPremDisp=JSON.parse(s);}catch(_e2){} ["dates","hours","rate","notes"].forEach(function(k){cchPremInvDispToggle(k,!!_cchPremDisp[k]);var el=document.getElementById("cchPremDisp"+k.charAt(0).toUpperCase()+k.slice(1));if(el)el.checked=!!_cchPremDisp[k];});})();' : '') +
+      '<\/script>');
     }
 
     win.document.write('</body></html>');

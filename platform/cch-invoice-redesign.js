@@ -440,13 +440,101 @@
     try { w.focus(); w.print(); } catch (_eP) {}
   };
 
+  /** Preview popup for design-services invoices — toolbar with date/hours/rate toggles + Print. */
+  global.cchWriteDesignServicesPreviewWindow = function (win, docData, items, proj, projectId, docId) {
+    if (!win) return;
+    docData = docData || {};
+    items = items || [];
+    proj = proj || {};
+    var docNum = docData.invoiceNum || docData.number || docId.slice(0, 8);
+    var dateRaw = docData.date || docData.createdAt || '';
+    var dateStr = dateRaw && typeof global.formatDate === 'function' ? global.formatDate(dateRaw) : String(dateRaw || '').slice(0, 10);
+    global._cchInvViewCtx = { projectId: projectId, docId: docId, items: items, docData: docData, proj: proj, docNum: docNum, dateStr: dateStr };
+    global._cchDsCtx = global._cchInvViewCtx;
+    var disp = _defaultDsDisplay();
+    try {
+      var saved = JSON.parse(localStorage.getItem('cchDsClientDisplay') || '{}');
+      if (saved && typeof saved === 'object') {
+        disp.dates = !!saved.dates;
+        disp.hours = !!saved.hours;
+        disp.rate = !!saved.rate;
+      }
+    } catch (_eLs) {}
+    global._cchDsDisplay = disp;
+    var c = _ctx(docData, items, proj, projectId, docNum, dateStr);
+    function chk(k, text, on) {
+      return '<label style="font-size:12px;color:#EDE8E0;display:inline-flex;gap:5px;align-items:center;cursor:pointer;margin-left:8px;white-space:nowrap;">' +
+        '<input type="checkbox" data-cch-ds="' + k + '"' + (on ? ' checked' : '') + ' onchange="cchDsPrevToggle(\'' + k + '\',this.checked)"> ' + text + '</label>';
+    }
+    var toggles = chk('dates', 'Show date', disp.dates) + chk('hours', 'Show hours', disp.hours) + chk('rate', 'Show rate', disp.rate);
+    win.document.open();
+    win.document.write(
+      '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice ' + esc(c.docNum) + '</title>' +
+      '<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">' +
+      '<style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:"DM Sans",sans-serif;background:#E9E6DF;-webkit-font-smoothing:antialiased;}' +
+      '.toolbar{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:10px 20px;background:#1B3352;color:#EDE8E0;box-shadow:0 2px 12px rgba(0,0,0,0.2);}' +
+      '.toolbar-title{font-size:14px;font-weight:600;color:#C4A464;} .toolbar-actions{display:flex;align-items:center;flex-wrap:wrap;gap:4px;}' +
+      '.tb-btn{background:transparent;border:1px solid rgba(200,185,154,0.5);color:#C8B99A;padding:7px 14px;font-size:12px;cursor:pointer;border-radius:3px;font-family:inherit;}' +
+      '.tb-btn:hover{background:rgba(200,185,154,0.15);} .tb-btn-primary{background:#C4A464;color:#1B3352;border-color:#C4A464;font-weight:600;}' +
+      '.preview-body{padding:56px 16px 28px;} .sheet{max-width:820px;margin:0 auto;box-shadow:0 14px 44px rgba(15,31,56,0.14);background:#FFFFFF;}' +
+      _css('#cchInvClientLanding ') +
+      '@media print{.toolbar{display:none!important;}body{background:#fff;}.preview-body{padding:0;}.sheet{box-shadow:none;margin:0;max-width:100%;}}</style></head><body>' +
+      '<div class="toolbar"><div class="toolbar-title">Invoice ' + esc(c.docNum) + '</div>' +
+      '<div class="toolbar-actions">' + toggles +
+      '<button class="tb-btn tb-btn-primary" onclick="window.print()">🖨️ Print / PDF</button></div></div>' +
+      '<div class="preview-body"><div id="cchInvClientLanding">' + _sheet(c) + '</div></div>' +
+      '<script>var _cchDsDisp=' + JSON.stringify(disp) + ';' +
+      'function cchDsPrevToggle(k,on){_cchDsDisp[k]=!!on;try{localStorage.setItem("cchDsClientDisplay",JSON.stringify(_cchDsDisp));}catch(e){}' +
+      '["dates","hours","rate"].forEach(function(key){var show=!!_cchDsDisp[key];document.querySelectorAll(".ds-"+key).forEach(function(el){el.style.display=show?(el.tagName==="SPAN"?"inline":"block"):"none";});});' +
+      'document.querySelectorAll("[data-cch-ds]").forEach(function(cb){cb.checked=!!_cchDsDisp[cb.getAttribute("data-cch-ds")];});}' +
+      '["dates","hours","rate"].forEach(function(k){if(_cchDsDisp[k])cchDsPrevToggle(k,true);});<\/script></body></html>'
+    );
+    win.document.close();
+    try { win.focus(); } catch (_eF) {}
+  };
+
   function _noteLinesFor(items) {
     var lines = [];
     (items || []).forEach(function (it) {
       if (!_isServiceLine(it)) return;
-      var blob = String(it.description || '') + '\n' + String(it.lineNotes || it.notes || '');
-      blob.split(/\r?\n/).forEach(function (l) { l = l.trim(); if (l) lines.push(l); });
+      var body = typeof global.cchLineNotesBodyText === 'function'
+        ? global.cchLineNotesBodyText(it)
+        : String(it.lineNotes || it.notes || '').trim();
+      if (typeof global.cchStripDateOnlyNoteLines === 'function') {
+        body = global.cchStripDateOnlyNoteLines(body);
+      }
+      if (body) {
+        body.split(/\r?\n/).forEach(function (l) {
+          l = l.trim();
+          if (l) lines.push(l);
+        });
+      }
+      var desc = String(it.description || '').trim();
+      if (desc && !/^\d{4}-\d{2}-\d{2}\b/.test(desc) && lines.indexOf(desc) < 0) {
+        lines.push(desc);
+      }
     });
+    return lines;
+  }
+
+  async function _noteLinesForInvoice(ctx) {
+    ctx = ctx || {};
+    var lines = _noteLinesFor(ctx.items || []);
+    if (lines.length) return lines;
+    var ids = ctx.docData && ctx.docData.timeEntryIds;
+    if (Array.isArray(ids) && ids.length && typeof db !== 'undefined' && db) {
+      try {
+        var snaps = await Promise.all(ids.map(function (id) {
+          return db.collection('timeEntries').doc(String(id)).get();
+        }));
+        snaps.forEach(function (s) {
+          if (!s.exists) return;
+          var t = s.data() || {};
+          var n = String(t.notes || t.note || t.description || '').trim();
+          if (n && lines.indexOf(n) < 0) lines.push(n);
+        });
+      } catch (e) { console.warn('[cchDsDraftWithAI] time entry notes', e); }
+    }
     return lines;
   }
 
@@ -510,17 +598,33 @@
   };
 
   global.cchDsDraftWithAI = function (projectId, docId) {
-    var x = global._cchDsCtx || {}; var notes = _noteLinesFor(x.items || []);
-    if (!notes.length) { if (typeof showToast === 'function') showToast('No ledger notes on this invoice to summarize'); return; }
+    var x = global._cchDsCtx || {};
     if (typeof showToast === 'function') showToast('Drafting summary with AI...', 2000);
-    var fn; try { fn = firebase.app().functions('us-central1').httpsCallable('draftInvoiceSummary'); } catch (e) { if (typeof showToast === 'function') showToast('AI not available'); return; }
-    fn({ notes: notes, projectName: (x.proj && x.proj.name) || '', period: global.cchServicePeriodLabel(x.items || [], x.docData || {}) }).then(function (res) {
-      var d = (res && res.data) || {};
-      var s = document.getElementById('cchDsSummary'); if (s) s.value = String(d.summary || '');
-      var c = document.getElementById('cchDsOutcomes');
-      if (c && Array.isArray(d.outcomes)) { c.innerHTML = ''; d.outcomes.forEach(function (o) { var w = document.createElement('div'); w.innerHTML = _dsOutcomeRow(o); c.appendChild(w.firstChild); }); }
-      if (typeof showToast === 'function') showToast('AI draft ready - review, then Save', 3500);
-    }).catch(function (e) { if (typeof showToast === 'function') showToast('AI draft failed: ' + ((e && e.message) || e), 4000); });
+    _noteLinesForInvoice(x).then(function (notes) {
+      if (!notes.length) {
+        if (typeof showToast === 'function') {
+          showToast('Add line notes (not just dates) or time-entry descriptions, then try again.', 5000);
+        }
+        return;
+      }
+      var fn;
+      try { fn = firebase.app().functions('us-central1').httpsCallable('draftInvoiceSummary'); } catch (e) {
+        if (typeof showToast === 'function') showToast('AI not available');
+        return;
+      }
+      fn({ notes: notes, projectName: (x.proj && x.proj.name) || '', period: global.cchServicePeriodLabel(x.items || [], x.docData || {}) }).then(function (res) {
+        var d = (res && res.data) || {};
+        var s = document.getElementById('cchDsSummary'); if (s) s.value = String(d.summary || '');
+        var c = document.getElementById('cchDsOutcomes');
+        if (c && Array.isArray(d.outcomes)) { c.innerHTML = ''; d.outcomes.forEach(function (o) { var w = document.createElement('div'); w.innerHTML = _dsOutcomeRow(o); c.appendChild(w.firstChild); }); }
+        if (typeof showToast === 'function') showToast('AI draft ready - review, then Save', 3500);
+      }).catch(function (e) {
+        var msg = (e && e.message) || String(e);
+        if (e && e.details) msg = String(e.details);
+        console.error('[cchDsDraftWithAI]', e);
+        if (typeof showToast === 'function') showToast('AI draft failed: ' + msg, 5000);
+      });
+    });
   };
 
   try { console.info('[cch-invoice-redesign] loaded (inline client view)'); } catch (e) {}

@@ -47,6 +47,20 @@ service cloud.firestore {
              .hasOnly(['status', 'reviewedAt', 'updatedAt']);
     }
 
+    /** Client portal decision responses (Approve / Request Changes / I've Reviewed). */
+    function portalClientDecisionReviewUpdate() {
+      return !isAuth()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'clientResponse', 'updatedAt']);
+    }
+
+    /** Client portal task input responses (needs_input flag). */
+    function portalClientTaskResponseUpdate() {
+      return !isAuth()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['clientResponse', 'updatedAt']);
+    }
+
     function portalActivityCreate() {
       return !isAuth()
         && request.resource.data.user == 'Client'
@@ -201,7 +215,8 @@ service cloud.firestore {
       }
       match /tasks/{docId} {
         allow read: if true;
-        allow write: if isAuth();
+        allow create, delete: if isAuth();
+        allow update: if isAuth() || portalClientTaskResponseUpdate();
       }
       match /messages/{docId} {
         allow read: if true;
@@ -232,6 +247,12 @@ service cloud.firestore {
         allow read: if true;
         allow create: if isAuth();
         allow update: if isAuth() || portalClientDocumentReviewUpdate();
+        allow delete: if isAuth();
+      }
+      match /clientDecisions/{docId} {
+        allow read: if true;
+        allow create: if isAuth();
+        allow update: if isAuth() || portalClientDecisionReviewUpdate();
         allow delete: if isAuth();
       }
       match /whatsNew/{docId} {
