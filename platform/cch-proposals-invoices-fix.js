@@ -2547,7 +2547,8 @@
     var tearJs = "typeof generateTearSheetsFromDoc==='function'&&generateTearSheetsFromDoc('" + pj + "','" + collection + "','" + dj + "','" + cchEscJsStr(projName) + "')";
     var previewJs = "previewDocument('" + type + "','" + pj + "','" + dj + "')";
     var _dsItemsTop = Array.isArray(docData.items) ? docData.items : [];
-    var _isDsInvTop = (type === 'invoice' && _dsItemsTop.length && typeof window.cchIsPureDesignServicesInvoice === 'function' && window.cchIsPureDesignServicesInvoice(_dsItemsTop));
+    var _isDsInvTop = (type === 'invoice' && typeof window.cchInvoiceUsesDesignServicesLayout === 'function' &&
+      window.cchInvoiceUsesDesignServicesLayout(docData, _dsItemsTop));
     var printJs = _isDsInvTop
       ? "void cchPrintCurrentInvoice('" + pj + "','" + dj + "')"
       : previewJs;
@@ -2558,7 +2559,7 @@
       var invVoidEarly = !!opts.invVoidEarly;
       var qbRealId = opts.qbRealId;
       var canPushQB = !!opts.canPushQB;
-      html += '<button class="btn btn-secondary btn-sm" onclick="' + previewJs + '" title="Preview — print or save as PDF">👁 Preview</button>';
+      html += '<button class="btn btn-secondary btn-sm" onclick="' + previewJs + '" title="' + (_isDsInvTop ? 'Print or save as PDF — same layout as Manage' : 'Preview — print or save as PDF') + '">' + (_isDsInvTop ? '🖨 Print / PDF' : '👁 Preview') + '</button>';
       html += '<button class="btn btn-secondary btn-sm" onclick="sendInvoiceToClient(\'' + pj + '\',\'' + dj + '\')">📧 Send</button>';
       var _isTimeDraft = (docData.source === 'time-tracker' || (Array.isArray(docData.timeEntryIds) && docData.timeEntryIds.length > 0));
       var _stLow = String(docData.status || 'draft').toLowerCase();
@@ -3810,9 +3811,12 @@
 
     window._docEdit = { type: 'invoice', projectId: pid, docId: iid, collection: collection, docData: docData, items: items };
     window._docViewInvoiceCtx = { projectId: pid, docId: iid, collection: collection, items: items, docData: docData, proj: projData };
-    var _isDsManage = items.length && typeof window.cchIsPureDesignServicesInvoice === 'function' && window.cchIsPureDesignServicesInvoice(items);
+    var _isDsManage = typeof window.cchInvoiceUsesDesignServicesLayout === 'function' &&
+      window.cchInvoiceUsesDesignServicesLayout(docData, items);
     if (_isDsManage) {
-      window._cchInvViewCtx = { projectId: pid, docId: iid, items: items, docData: docData, proj: projData, docNum: docNum, dateStr: '' };
+      var _dsDateRaw = docData.date || docData.createdAt || '';
+      var _dsDateStr = _dsDateRaw && typeof formatDate === 'function' ? formatDate(_dsDateRaw) : String(_dsDateRaw || '').slice(0, 10);
+      window._cchInvViewCtx = { projectId: pid, docId: iid, items: items, docData: docData, proj: projData, docNum: docNum, dateStr: _dsDateStr };
       window._cchDsCtx = window._cchInvViewCtx;
     }
 
@@ -3999,6 +4003,28 @@
       ? window.cchBuildDsEditor(docData, pid, iid)
       : '';
 
+    var dsDisplayBarHtml = '';
+    var dsPreviewHtml = '';
+    if (_isDsManage) {
+      var invDateRawDs = docData.date || docData.createdAt || '';
+      var invDateStrDs = invDateRawDs && typeof formatDate === 'function' ? formatDate(invDateRawDs) : String(invDateRawDs || '').slice(0, 10);
+      if (typeof window.cchBuildDsDisplayToggleHtml === 'function') {
+        dsDisplayBarHtml =
+          '<div class="cch-ds-manage-disp" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px;padding:10px 14px;background:#fff;border:1px solid rgba(27,51,82,0.1);border-radius:6px;">' +
+            '<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#5C6B80;white-space:nowrap;">Client display</span>' +
+            window.cchBuildDsDisplayToggleHtml(true) +
+            '<span style="font-size:11px;color:#9CA3AF;">Toggles update preview below &amp; print</span>' +
+            '<button type="button" class="btn btn-secondary btn-sm" style="margin-left:auto;" onclick="cchPrintCurrentDesignInvoice()">🖨 Print / PDF</button>' +
+          '</div>';
+      }
+      if (typeof window.cchBuildDesignServicesInvoiceInner === 'function') {
+        dsPreviewHtml =
+          '<div id="cchInvClientLanding" class="cch-ds-manage-preview" style="margin-bottom:18px;">' +
+            window.cchBuildDesignServicesInvoiceInner(docData, items, projData, pid, docNum, invDateStrDs) +
+          '</div>';
+      }
+    }
+
     T.innerHTML =
       '<div class="cch-doc-view-page">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;gap:10px;">' +
@@ -4008,7 +4034,9 @@
           '<button type="button" class="btn btn-primary btn-sm" style="background:#1B3352;color:#EDE8E0;" onclick="window._forceEditMode=true;navigate(window.location.hash)">✏️ Edit line items</button>' +
         '</div>' +
         dsEditorHtml +
-        tableHtml +
+        dsDisplayBarHtml +
+        dsPreviewHtml +
+        (_isDsManage ? '' : tableHtml) +
         (typeof window.cchDocAttachmentsSectionHtml === 'function'
           ? window.cchDocAttachmentsSectionHtml(pid, collection, iid, docData)
           : '') +
@@ -4020,6 +4048,10 @@
             '<div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700;padding-top:8px;border-top:2px solid var(--navy);"><span>Total</span><span>' + formatMoney(_invT.grandTotal) + '</span></div>' +
           '</div></div>' +
       '</div>';
+
+    if (_isDsManage && typeof window.cchInitDsDisplayToggles === 'function') {
+      try { window.cchInitDsDisplayToggles(); } catch (_eDsTog) { /* */ }
+    }
   };
 
   // ============================================================
@@ -4383,6 +4415,13 @@
     var proj = {};
     try { var pd = await db.collection('boards').doc(projectId).get(); if (pd.exists) proj = pd.data(); } catch(e) {}
 
+    if (type === 'invoice' && typeof window.cchWriteDesignServicesPreviewWindow === 'function' &&
+        typeof window.cchInvoiceUsesDesignServicesLayout === 'function' &&
+        window.cchInvoiceUsesDesignServicesLayout(docData, items)) {
+      window.cchWriteDesignServicesPreviewWindow(previewWin, docData, items, proj, projectId, docId);
+      return;
+    }
+
     var crm = null;
     if (proj.clientId) {
       try {
@@ -4535,7 +4574,12 @@
     function _invoicePreviewTagNotesHtml(it) {
       it = it || {};
       var isSvc = it.expenseType === 'service' || it.itemType === 'service';
-      var tagLine = (typeof window.cchLineTagText === 'function') ? window.cchLineTagText(it) : '';
+      if (type === 'invoice' && typeof window.cchInvoiceLineUseServiceStyleInView === 'function' && window.cchInvoiceLineUseServiceStyleInView(it)) {
+        isSvc = true;
+      }
+      var tagLine = isSvc
+        ? ((typeof window.cchLineTagExplicit === 'function') ? window.cchLineTagExplicit(it) : String(it.lineTag || '').trim())
+        : ((typeof window.cchLineTagText === 'function') ? window.cchLineTagText(it) : '');
       var notesBody = (typeof window.cchLineNotesBodyText === 'function') ? window.cchLineNotesBodyText(it) : '';
       if (type === 'invoice' && typeof window.sanitizeInvoicePreviewLineText === 'function') {
         if (tagLine) tagLine = window.sanitizeInvoicePreviewLineText(tagLine);
@@ -4546,6 +4590,12 @@
         if (notesBody && typeof window.cchStripDateOnlyNoteLines === 'function') {
           notesBody = window.cchStripDateOnlyNoteLines(notesBody);
         }
+        if (!notesBody) return '';
+        var svcLines = String(notesBody).split(/\r?\n/).map(function(l) { return l.trim(); }).filter(Boolean);
+        if (svcLines.length === 1) {
+          return '<div class="item-desc item-desc-multiline line-notes" style="margin-top:6px;">' + esc(svcLines[0]) + '</div>';
+        }
+        return '<ul class="line-notes-ul" style="margin-top:6px;">' + svcLines.map(function(l) { return '<li>' + esc(l) + '</li>'; }).join('') + '</ul>';
       }
       if (!tagLine && !notesBody) return '';
       var html = '';

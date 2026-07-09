@@ -20,7 +20,7 @@ const { defineSecret } = require("firebase-functions/params");
 const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
 
 const REGION = "us-central1";
-const MODEL = "claude-3-5-sonnet-20241022";
+const MODEL = "claude-sonnet-4-6";
 
 const SYSTEM_PROMPT = [
   "You are the billing voice of CCH Design Inc., a luxury residential and yacht interior design firm.",

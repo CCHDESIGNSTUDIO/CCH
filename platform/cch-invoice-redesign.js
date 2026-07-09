@@ -61,6 +61,17 @@
     return hasService;
   };
 
+  /** Time / design-services invoices use the luxury client sheet (not navy product table). */
+  global.cchInvoiceUsesDesignServicesLayout = function (docData, items) {
+    docData = docData || {};
+    items = items || [];
+    if (!items.length) return false;
+    if (global.cchIsPureDesignServicesInvoice(items)) return true;
+    if (String(docData.source || '') === 'time-tracker') return true;
+    if (Array.isArray(docData.timeEntryIds) && docData.timeEntryIds.length > 0) return true;
+    return false;
+  };
+
   function _fmtDate(s) {
     s = String(s || '').trim(); if (!s) return '';
     if (s.indexOf('T') >= 0) s = s.slice(0, 10);
@@ -403,15 +414,20 @@
     var x = global._cchInvViewCtx || global._cchDsCtx || {};
     var sameDoc = String(x.projectId || '') === String(projectId || '') && String(x.docId || '') === String(docId || '');
     var items = sameDoc ? (x.items || []) : null;
+    var docData = sameDoc ? (x.docData || {}) : {};
     if (!items && typeof global.db !== 'undefined' && global.db) {
       try {
         var snap = await global.db.collection('boards').doc(projectId).collection('invoices').doc(docId).get();
-        if (snap.exists) items = (snap.data() || {}).items || [];
+        if (snap.exists) {
+          docData = snap.data() || {};
+          items = docData.items || [];
+        }
       } catch (_eLd) { items = []; }
     }
-    if (items && global.cchIsPureDesignServicesInvoice(items)) {
+    if (items && typeof global.cchInvoiceUsesDesignServicesLayout === 'function' &&
+        global.cchInvoiceUsesDesignServicesLayout(docData, items)) {
       if (!sameDoc) {
-        global._cchInvViewCtx = { projectId: projectId, docId: docId, items: items, docData: {}, proj: {} };
+        global._cchInvViewCtx = { projectId: projectId, docId: docId, items: items, docData: docData, proj: {} };
       }
       global._cchDsCtx = global._cchInvViewCtx || x;
       global.cchPrintCurrentDesignInvoice();
