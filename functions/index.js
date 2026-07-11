@@ -83,6 +83,181 @@ exports.healthCheck = onCall(CALLABLE_PUBLIC, (request) => {
   return { status: "ok", timestamp: new Date().toISOString() };
 });
 
+const STUDIO_CALLABLE = { region: REGION, invoker: "public", timeoutSeconds: 60, memory: "256MiB" };
+
+function assertStudioUser(request) {
+  if (!request || !request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in to CCH Studio first.");
+  }
+}
+
+function guessImageMimeFromUrl(url) {
+  const u = String(url || "").toLowerCase().split("?")[0];
+  if (u.endsWith(".png")) return "image/png";
+  if (u.endsWith(".webp")) return "image/webp";
+  if (u.endsWith(".gif")) return "image/gif";
+  if (u.endsWith(".svg")) return "image/svg+xml";
+  return "image/jpeg";
+}
+
+function assertRemoteImageUrlAllowed(url) {
+  const raw = String(url || "").trim();
+  if (!/^https?:\/\//i.test(raw)) {
+    throw new HttpsError("invalid-argument", "imageUrl must be http(s)");
+  }
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch (e) {
+    throw new HttpsError("invalid-argument", "imageUrl is not a valid URL");
+  }
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (!host || host === "localhost" || host.endsWith(".local")) {
+    throw new HttpsError("invalid-argument", "URL host not allowed");
+  }
+  if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(host)) {
+    throw new HttpsError("invalid-argument", "URL host not allowed");
+  }
+  return raw;
+}
+
+function sniffImageMime(buf) {
+  if (!buf || buf.length < 12) return "";
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "image/jpeg";
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return "image/png";
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) return "image/gif";
+  if (buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WEBP") return "image/webp";
+  if (buf.toString("utf8", 0, 5).trim().startsWith("<svg")) return "image/svg+xml";
+  return "";
+}
+
+function resolveMaybeRelativeUrl(raw, baseUrl) {
+  let u = String(raw || "").trim();
+  if (!u) return "";
+  if (u.startsWith("//")) u = "https:" + u;
+  else if (u.startsWith("/")) {
+    try {
+      u = new URL(u, baseUrl).href;
+    } catch (e) {
+      return "";
+    }
+  }
+  return u;
+}
+
+function extractImageCandidateFromHtml(html, baseUrl) {
+  const text = String(html || "");
+  const patterns = [
+    /<meta[^>]+property=["']og:image(?::secure_url)?["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image(?::secure_url)?["']/i,
+    /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i,
+    /<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i
+  ];
+  for (const re of patterns) {
+    const m = text.match(re);
+    if (m && m[1]) {
+      const abs = resolveMaybeRelativeUrl(m[1], baseUrl);
+      if (abs) return abs;
+    }
+  }
+  const imgMatch = text.match(/<img[^>]+(?:data-src|data-lazy-src|src)=["']([^"']+\.(?:jpe?g|png|webp|gif)[^"']*)["']/i);
+  if (imgMatch && imgMatch[1]) {
+    const abs = resolveMaybeRelativeUrl(imgMatch[1], baseUrl);
+    if (abs) return abs;
+  }
+  return "";
+}
+
+async function fetchRemoteImageBuffer(url, depth) {
+  depth = depth || 0;
+  url = assertRemoteImageUrlAllowed(url);
+  let origin = "";
+  try {
+    origin = new URL(url).origin + "/";
+  } catch (e) {
+    origin = "";
+  }
+  const resp = await fetch(url, {
+    method: "GET",
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+      Referer: origin,
+      "Accept-Language": "en-US,en;q=0.9"
+    },
+    redirect: "follow"
+  });
+  if (!resp.ok) {
+    throw new HttpsError("failed-precondition", "Could not fetch image (HTTP " + resp.status + ")");
+  }
+  const ct = String(resp.headers.get("content-type") || "").toLowerCase();
+  const buf = Buffer.from(await resp.arrayBuffer());
+  if (buf.length < 32) {
+    throw new HttpsError("invalid-argument", "Image empty or too small");
+  }
+  if (buf.length > 12 * 1024 * 1024) {
+    throw new HttpsError("invalid-argument", "Image too large (max 12MB)");
+  }
+  const sniffed = sniffImageMime(buf);
+  if (sniffed) {
+    return { buf, mime: sniffed };
+  }
+  if ((ct.includes("text/html") || ct.includes("application/xhtml")) && depth < 2) {
+    const html = buf.toString("utf8");
+    const candidate = extractImageCandidateFromHtml(html, url);
+    if (candidate && candidate !== url) {
+      return fetchRemoteImageBuffer(candidate, depth + 1);
+    }
+    throw new HttpsError(
+      "invalid-argument",
+      "That looks like a product page link, not a direct image. Right-click the photo and choose Copy image address."
+    );
+  }
+  if (ct && !ct.startsWith("image/") && !ct.includes("octet-stream") && !ct.includes("svg")) {
+    throw new HttpsError(
+      "invalid-argument",
+      "URL did not return an image (got " + (ct.split(";")[0] || "unknown") + ")"
+    );
+  }
+  const mime = ct.startsWith("image/") ? ct.split(";")[0].trim() : guessImageMimeFromUrl(url);
+  return { buf, mime };
+}
+
+/** Server-side fetch for vendor image URLs (browser CORS blocks alfresco etc.). */
+exports.importDesignBoardImageFromUrl = onCall(STUDIO_CALLABLE, async (request) => {
+  assertStudioUser(request);
+  const data = request.data || {};
+  const projectId = String(data.projectId || "").trim();
+  const boardId = String(data.boardId || "").trim();
+  const imageUrl = String(data.imageUrl || "").trim();
+  if (!projectId || !boardId || !imageUrl) {
+    throw new HttpsError("invalid-argument", "projectId, boardId, and imageUrl are required");
+  }
+  const { buf, mime } = await fetchRemoteImageBuffer(imageUrl);
+  let ext = "jpeg";
+  if (mime.indexOf("png") >= 0) ext = "png";
+  else if (mime.indexOf("webp") >= 0) ext = "webp";
+  else if (mime.indexOf("gif") >= 0) ext = "gif";
+  else if (mime.indexOf("svg") >= 0) ext = "svg";
+  const ts = Date.now() + "-" + Math.random().toString(36).slice(2, 9);
+  const path = "projects/" + projectId + "/designboards/" + boardId + "/" + ts + "." + ext;
+  const bucket = admin.storage().bucket();
+  const token = require("crypto").randomUUID();
+  const file = bucket.file(path);
+  await file.save(buf, {
+    metadata: {
+      contentType: mime,
+      metadata: { firebaseStorageDownloadTokens: token }
+    }
+  });
+  const encoded = encodeURIComponent(path);
+  const downloadUrl =
+    "https://firebasestorage.googleapis.com/v0/b/" + bucket.name + "/o/" + encoded + "?alt=media&token=" + token;
+  return { downloadUrl, path, contentType: mime };
+});
+
 // Exchange Timely OAuth code for access token
 exports.timelyAuth = onRequest(HTTP_STUDIO, async (req, res) => {
   res.set("Access-Control-Allow-Origin", "https://cch-platform.web.app");
@@ -512,6 +687,13 @@ function qbStudioLineLooksLikeProduct(item) {
  */
 function qbItemRefForStudioLine(item) {
   if (!item) return qbProductItemRef();
+  const et = String(item.expenseType || item.itemType || "").toLowerCase();
+  if (et === "discount") {
+    return { name: "Discount / Credit" };
+  }
+  if (et === "retainer_credit") {
+    return { name: "Other:misc income retainer payment" };
+  }
   if (qbStudioLineLooksLikeLabor(item)) return qbLaborItemRef();
   if (qbStudioLineLooksLikeTravelExpense(item)) return qbTravelExpenseItemRef();
 
@@ -538,7 +720,6 @@ function qbItemRefForStudioLine(item) {
     return { value: QB_ITEM_IDS.subcontractor, name: "Studio Subcontractor" };
   }
 
-  const et = String(item.expenseType || item.itemType || "").toLowerCase();
   if (et === "service") return qbDesignFeeItemRef();
 
   return qbProductItemRef();
@@ -1027,6 +1208,13 @@ function qbStudioInvoiceLineAmount(item) {
   const rate = parseFloat(item.rate || item.unitPrice) || 0;
   if (!sell && rate > 0) sell = Math.round(rate * qty * 100) / 100;
   if (sell < 0) return sell;
+  const et = String(item.expenseType || item.itemType || "").toLowerCase();
+  if (et === "discount" || et === "retainer_credit") {
+    let amt = sell;
+    if (!amt) amt = parseFloat(item.cost) || 0;
+    if (et === "retainer_credit" && amt > 0) amt = -Math.abs(amt);
+    return amt;
+  }
   if (cost > 0) return Math.round(cost * qty * (1 + mkup / 100) * 100) / 100;
   return sell || 0;
 }
@@ -1035,7 +1223,7 @@ function qbStudioInvoiceLineAmount(item) {
 function qbStudioInvoiceLineTaxable(item) {
   if (!item) return false;
   const et = String(item.expenseType || item.itemType || "").toLowerCase();
-  if (et === "sales_tax" || et === "discount") return false;
+  if (et === "sales_tax" || et === "discount" || et === "retainer_credit") return false;
   const blob = [item.title, item.name, item.category, item.service, item.billingCategory, item.description]
     .map((s) => String(s || "").toLowerCase())
     .join(" ");
@@ -1569,7 +1757,7 @@ async function pullQbPaymentLinesForInvoice(accessToken, realmId, qbInv) {
       qbPaymentId: payId,
       qbInvoiceTxnId: invId,
       reference: String(paymentData.PaymentRefNum || paymentData.Id || "").trim(),
-      qbPaymentLineKey: payId + "|" + invId + "|" + String(Math.round(applied * 100))
+      qbPaymentLineKey: qbInvoicePaymentLineKey(payId, invId, applied)
     });
   }
 
@@ -1626,18 +1814,71 @@ async function pullQbPaymentLinesForInvoice(accessToken, realmId, qbInv) {
   return out;
 }
 
+/** Stable dedupe key for QB invoice payment rows (ignores dollars-vs-cents line-key drift). */
+function qbInvoicePaymentDedupeKey(row) {
+  if (!row) return "";
+  const qb = String(row.qbPaymentId || "").trim();
+  if (!qb) return "";
+  const amt = Math.round((parseFloat(row.amount) || 0) * 100) / 100;
+  const inv = String(row.qbInvoiceTxnId || "").trim();
+  const d = String(row.date || "").slice(0, 10);
+  return "qb:" + qb + ":" + (inv || "-") + ":" + amt + ":" + d;
+}
+
+/** Canonical QB line fingerprint — amount suffix is always cents. */
+function qbInvoicePaymentLineKey(payId, invId, amount) {
+  const amt = Math.round((parseFloat(amount) || 0) * 100) / 100;
+  return String(payId) + "|" + String(invId) + "|" + String(Math.round(amt * 100));
+}
+
+function dedupeInvoicePaymentRowsServer(payments) {
+  if (!Array.isArray(payments) || payments.length <= 1) return payments || [];
+  const seenQb = new Set();
+  const seenOther = new Set();
+  const out = [];
+  for (const p of payments) {
+    const qbKey = qbInvoicePaymentDedupeKey(p);
+    if (qbKey) {
+      if (seenQb.has(qbKey)) continue;
+      seenQb.add(qbKey);
+      out.push(p);
+      continue;
+    }
+    const qk = String(p.qbPaymentLineKey || "").trim();
+    const qb = String(p.qbPaymentId || "").trim();
+    const id = String(p.id || "").trim();
+    const amt = Math.round((parseFloat(p.amount) || 0) * 100) / 100;
+    const d = String(p.date || "").trim();
+    const note = String(p.note || p.reference || "").trim().slice(0, 120);
+    const key =
+      qk ||
+      (qb ? "qb:" + qb + ":" + amt + ":" + d : "") ||
+      (id ? "id:" + id : "") ||
+      "fp:" + d + "|" + amt + "|" + note;
+    if (seenOther.has(key)) continue;
+    seenOther.add(key);
+    out.push(p);
+  }
+  return out;
+}
+
 function mergeQbPaymentRowsIntoPatch(existing, patch, qbPayRows, refTotal, qbBalance) {
   if (!qbPayRows || !qbPayRows.length) return;
-  const payLines = Array.isArray(existing.payments) ? existing.payments.slice() : [];
-  const byKey = new Set(
-    payLines.map((p) => String(p.qbPaymentLineKey || p.qbPaymentId || "").trim()).filter(Boolean)
+  let payLines = Array.isArray(existing.payments) ? existing.payments.slice() : [];
+  const seenQb = new Set(payLines.map(qbInvoicePaymentDedupeKey).filter(Boolean));
+  const seenQk = new Set(
+    payLines.map((p) => String(p.qbPaymentLineKey || "").trim()).filter(Boolean)
   );
   qbPayRows.forEach((row) => {
-    const key = String(row.qbPaymentLineKey || row.qbPaymentId || "").trim();
-    if (key && byKey.has(key)) return;
-    if (key) byKey.add(key);
+    const qbKey = qbInvoicePaymentDedupeKey(row);
+    if (qbKey && seenQb.has(qbKey)) return;
+    const key = String(row.qbPaymentLineKey || "").trim();
+    if (!qbKey && key && seenQk.has(key)) return;
+    if (qbKey) seenQb.add(qbKey);
+    if (key) seenQk.add(key);
     payLines.push(row);
   });
+  payLines = dedupeInvoicePaymentRowsServer(payLines);
   const paidSum = payLines.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
   const latestDate = qbPayRows
     .map((p) => String(p.date || "").slice(0, 10))
@@ -2868,22 +3109,16 @@ async function processQbCustomerPaymentEntity(entity, accessToken, realmId) {
 
       const existing = invDoc.data();
       const payments = Array.isArray(existing.payments) ? existing.payments.slice() : [];
-      const lineFingerprint =
-        String(entity.id) +
-        "|" +
-        String(txn.TxnId) +
-        "|" +
-        String(Math.round(perInvoice * 100) / 100);
+      const lineFingerprint = qbInvoicePaymentLineKey(entity.id, txn.TxnId, perInvoice);
       if (payments.some((p) => String(p.qbPaymentLineKey || "") === lineFingerprint)) {
         continue;
       }
-      if (
-        payments.some(
-          (p) =>
-            String(p.qbPaymentId) === String(entity.id) &&
-            String(p.qbInvoiceTxnId || "") === String(txn.TxnId)
-        )
-      ) {
+      if (payments.some((p) => qbInvoicePaymentDedupeKey(p) === qbInvoicePaymentDedupeKey({
+        qbPaymentId: entity.id,
+        qbInvoiceTxnId: String(txn.TxnId),
+        amount: perInvoice,
+        date: paymentData.TxnDate
+      }))) {
         continue;
       }
 

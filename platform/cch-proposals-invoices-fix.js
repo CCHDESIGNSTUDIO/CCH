@@ -1455,7 +1455,7 @@
       var row = Object.assign({}, it);
       if (row._idx == null) row._idx = idx;
       var et = String(row.expenseType || '').toLowerCase();
-      if (type === 'invoice' && (et === 'shipping' || et === 'sales_tax' || et === 'discount' || et === 'handling')) {
+      if (type === 'invoice' && (et === 'shipping' || et === 'sales_tax' || et === 'discount' || et === 'retainer_credit' || et === 'handling')) {
         if (et === 'sales_tax' && typeof window.cchIsClientSalesTaxLine === 'function' && window.cchIsClientSalesTaxLine(row)) return;
         add('Shipping & adjustments', row);
         return;
@@ -1489,7 +1489,7 @@
     (items || []).forEach(function(it) {
       if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it)) return;
       var et = String(it.expenseType || '').toLowerCase();
-      if (type === 'invoice' && (et === 'shipping' || et === 'sales_tax' || et === 'discount' || et === 'handling')) {
+      if (type === 'invoice' && (et === 'shipping' || et === 'sales_tax' || et === 'discount' || et === 'retainer_credit' || et === 'handling')) {
         if (et === 'sales_tax' && typeof window.cchIsClientSalesTaxLine === 'function' && window.cchIsClientSalesTaxLine(it)) return;
         pushKey('Shipping & adjustments');
         return;
@@ -3009,6 +3009,8 @@
       ? window.renderLinkedDocBadges(projectId, docData, type)
       : '';
 
+    if (type === 'invoice' && typeof window.cchInvoiceRouteIs === 'function' && !window.cchInvoiceRouteIs(projectId, docId)) return;
+
     setBreadcrumb([
       { label: 'Projects', hash: '#/projects' },
       { label: projName, hash: '#/project/' + projectId + '/' + backTab },
@@ -3798,6 +3800,7 @@
   window.renderInvoiceManageLanding = async function(projectId, docId, docData, items, projData) {
     var T = document.getElementById('contentArea');
     if (!T) return;
+    if (typeof window.cchInvoiceRouteIs === 'function' && !window.cchInvoiceRouteIs(projectId, docId)) return;
     items = items || [];
     projData = projData || {};
     docData = docData || {};
@@ -3821,6 +3824,7 @@
     }
 
     if (typeof setBreadcrumb === 'function') {
+      if (typeof window.cchInvoiceRouteIs === 'function' && !window.cchInvoiceRouteIs(pid, iid)) return;
       setBreadcrumb([
         { label: 'Projects', hash: '#/projects' },
         { label: projName, hash: '#/project/' + pid + '/invoices' },
@@ -4025,6 +4029,7 @@
       }
     }
 
+    if (typeof window.cchInvoiceRouteIs === 'function' && !window.cchInvoiceRouteIs(pid, iid)) return;
     T.innerHTML =
       '<div class="cch-doc-view-page">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;gap:10px;">' +
@@ -4046,6 +4051,14 @@
             '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--gray-500);margin-bottom:4px;"><span>Shipping</span><span>' + formatMoney(_invT.totalShipping) + '</span></div>' +
             '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--gray-500);margin-bottom:4px;"><span>Tax</span><span>' + formatMoney(_invT.tax) + '</span></div>' +
             '<div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700;padding-top:8px;border-top:2px solid var(--navy);"><span>Total</span><span>' + formatMoney(_invT.grandTotal) + '</span></div>' +
+            (function() {
+              if (invVoidEarly || typeof window.invoiceDocPaymentSummary !== 'function') return '';
+              var ps = window.invoiceDocPaymentSummary(docData, _invT.grandTotal, 'invoice');
+              if (!ps || ps.totalPaid <= 0.01) return '';
+              var bal = ps.balance != null ? ps.balance : Math.max(0, _invT.grandTotal - ps.totalPaid);
+              return '<div style="display:flex;justify-content:space-between;font-size:13px;color:#2E7D32;margin-top:6px;padding-top:6px;border-top:1px solid rgba(27,51,82,0.08);"><span>Paid</span><span style="font-family:var(--font-mono);">-' + formatMoney(ps.totalPaid) + '</span></div>' +
+                '<div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;color:' + (bal <= 0.01 ? '#2E7D32' : 'var(--gold)') + ';margin-top:4px;"><span>Balance</span><span style="font-family:var(--font-mono);">' + formatMoney(bal) + '</span></div>';
+            })() +
           '</div></div>' +
       '</div>';
 
@@ -4183,7 +4196,7 @@
     }
     function _invIsFeeOrAdjustmentLine(it) {
       var et = (it.expenseType || '').toLowerCase();
-      return et === 'shipping' || et === 'sales_tax' || et === 'discount' || et === 'handling';
+      return et === 'shipping' || et === 'sales_tax' || et === 'discount' || et === 'retainer_credit' || et === 'handling';
     }
     function _invIsLaborLikeLine(it) {
       if (!it) return false;
