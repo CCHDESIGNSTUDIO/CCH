@@ -18,6 +18,8 @@
     projectRooms: [],
     sourceTab: 'room', // room | ideabook | library
     ibImages: [],
+    ideabooks: [], // { id, name } for Inspiration board picker
+    ibBoardId: 'All',
     libItems: [],
     libItemsLoaded: false,
     libItemsLoading: false,
@@ -31,6 +33,8 @@
     viewZoomMode: 'fit', // fit | manual
     showPricing: true,
     clientView: false,
+    hideClips: false,
+    hideProps: false,
     undoStack: [],
     nextId: 1,
     arrowStart: null,
@@ -39,7 +43,50 @@
   window.dbEditor = dbEditor;
 
   // ---- Utility ----
-  function genId() { return 'el_' + (dbEditor.nextId++); }
+  function dbElIdNum(id) {
+    var m = /^el_(\d+)$/.exec(String(id || ''));
+    return m ? (parseInt(m[1], 10) || 0) : 0;
+  }
+  /** Seed nextId from highest existing el_N (never from elements.length — deletes cause collisions). */
+  function dbSeedNextIdFromElements() {
+    var max = 0;
+    (dbEditor.elements || []).forEach(function(el) {
+      var n = dbElIdNum(el && el.id);
+      if (n > max) max = n;
+    });
+    dbEditor.nextId = max + 1;
+  }
+  function genId() {
+    var used = {};
+    (dbEditor.elements || []).forEach(function(el) {
+      if (el && el.id) used[String(el.id)] = true;
+    });
+    var id;
+    var guard = 0;
+    do {
+      id = 'el_' + (dbEditor.nextId++);
+      guard++;
+    } while (used[id] && guard < 10000);
+    return id;
+  }
+  /** Reassign duplicate / missing el ids on load. Content/positions untouched. Returns count healed. */
+  function dbHealDuplicateElementIds() {
+    var seen = {};
+    var healed = 0;
+    (dbEditor.elements || []).forEach(function(el) {
+      if (!el) return;
+      var id = el.id != null ? String(el.id) : '';
+      if (!id || seen[id]) {
+        var old = id || '(missing)';
+        el.id = genId();
+        healed++;
+        console.info('[design board] healed duplicate/missing id', old, '->', el.id);
+      } else {
+        seen[id] = true;
+      }
+    });
+    return healed;
+  }
   function esc(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
   function escAttr(s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/'/g, '&#39;');
@@ -141,18 +188,54 @@
     wrap.scrollTop = Math.max(0, y - wrap.clientHeight / 2 + h / 2);
   }
 
+  var DB_ZOOM_MIN = 0.15;
+  var DB_ZOOM_MAX = 4;
+
+  function dbClampZoom(z) {
+    z = Number(z);
+    if (!isFinite(z) || z <= 0) return 1;
+    return Math.max(DB_ZOOM_MIN, Math.min(DB_ZOOM_MAX, z));
+  }
+
+  /** Zoom while keeping a screen point (clientX/Y) anchored — Canva-style. */
+  function dbZoomAtClientPoint(nextScale, clientX, clientY) {
+    var wrap = document.getElementById('dbCanvasWrap');
+    var oldZ = dbEditor.canvasScale || 1;
+    var z = dbClampZoom(nextScale);
+    if (Math.abs(z - oldZ) < 0.0001) {
+      dbEditor.viewZoomMode = 'manual';
+      dbApplyViewZoom();
+      return;
+    }
+    dbEditor.viewZoomMode = 'manual';
+    if (wrap && clientX != null && clientY != null) {
+      var rect = wrap.getBoundingClientRect();
+      var ox = (wrap.scrollLeft + (clientX - rect.left)) / oldZ;
+      var oy = (wrap.scrollTop + (clientY - rect.top)) / oldZ;
+      dbEditor.canvasScale = z;
+      dbApplyViewZoom();
+      wrap.scrollLeft = Math.max(0, ox * z - (clientX - rect.left));
+      wrap.scrollTop = Math.max(0, oy * z - (clientY - rect.top));
+      return;
+    }
+    dbEditor.canvasScale = z;
+    dbApplyViewZoom();
+  }
+
   function dbApplyViewZoom() {
     var stage = document.getElementById('dbCanvasStage');
     var spacer = document.getElementById('dbCanvasSpacer');
     var label = document.getElementById('dbZoomLabel');
     var cw = dbEditor.boardData.canvasWidth || 1400;
     var ch = dbEditor.boardData.canvasHeight || 1000;
-    var z = dbEditor.canvasScale || 1;
+    var z = dbClampZoom(dbEditor.canvasScale || 1);
+    dbEditor.canvasScale = z;
     if (stage) {
       stage.style.transform = 'scale(' + z + ')';
       stage.style.transformOrigin = 'top left';
       stage.style.width = cw + 'px';
       stage.style.height = ch + 'px';
+      stage.style.setProperty('--db-zoom', String(z));
     }
     if (spacer) {
       spacer.style.width = Math.ceil(cw * z + 40) + 'px';
@@ -218,7 +301,7 @@
     var zH = (wrap.clientHeight - pad) / ch;
     var z = Math.min(zW, zH, 1);
     if (forceFitMode !== false) dbEditor.viewZoomMode = 'fit';
-    dbEditor.canvasScale = Math.max(0.2, z);
+    dbEditor.canvasScale = dbClampZoom(Math.max(0.2, z));
     dbApplyViewZoom();
   }
 
@@ -232,14 +315,97 @@
     root.style.maxHeight = h + 'px';
   }
 
+  function dbLoadPanelPrefsIntoEditor() {
+    try {
+      dbEditor.hideClips = localStorage.getItem('cchDbHideClips') === '1';
+      dbEditor.hideProps = localStorage.getItem('cchDbHideProps') === '1';
+    } catch (e) {
+      dbEditor.hideClips = false;
+      dbEditor.hideProps = false;
+    }
+  }
+
+  function dbPersistPanelPrefs() {
+    try {
+      localStorage.setItem('cchDbHideClips', dbEditor.hideClips ? '1' : '0');
+      localStorage.setItem('cchDbHideProps', dbEditor.hideProps ? '1' : '0');
+    } catch (e) {}
+  }
+
+  /** True when the side panel is actually taking layout space (not localStorage). */
+  function dbPanelIsVisiblyOpen(el) {
+    if (!el || el.hidden) return false;
+    if (el.classList.contains('db-side-panel-collapsed')) return false;
+    if (el.style.display === 'none') return false;
+    try {
+      return el.getBoundingClientRect().width > 8;
+    } catch (e2) {
+      return false;
+    }
+  }
+
+  function dbSetPanelCollapsed(el, collapse, showDisplay) {
+    if (!el) return;
+    el.hidden = !!collapse;
+    el.classList.toggle('db-side-panel-collapsed', !!collapse);
+    el.setAttribute('aria-hidden', collapse ? 'true' : 'false');
+    if (collapse) {
+      el.style.cssText = 'display:none!important;width:0!important;min-width:0!important;max-width:0!important;padding:0!important;margin:0!important;border:none!important;overflow:hidden!important;flex:0 0 0!important;box-sizing:border-box;';
+    } else {
+      el.style.cssText = 'width:240px;min-width:240px;max-width:240px;flex:0 0 240px;box-sizing:border-box;overflow-y:auto;background:#fafaf8;' +
+        (showDisplay === 'flex'
+          ? 'display:flex;flex-direction:column;padding:0;border-right:1px solid var(--gray-200);'
+          : 'display:block;padding:12px;border-left:1px solid var(--gray-200);');
+    }
+  }
+
+  /** Apply Library / Properties visibility (client view always hides both). */
+  function dbApplySidePanels() {
+    var cv = !!dbEditor.clientView;
+    var hideLeft = cv || !!dbEditor.hideClips;
+    var hideRight = cv || !!dbEditor.hideProps;
+    dbSetPanelCollapsed(document.getElementById('dbClipsPanel'), hideLeft, 'flex');
+    dbSetPanelCollapsed(document.getElementById('dbPropsPanel'), hideRight, 'block');
+    var clipsBtn = document.getElementById('dbToggleClipsBtn');
+    var propsBtn = document.getElementById('dbTogglePropsBtn');
+    if (clipsBtn) {
+      clipsBtn.textContent = dbEditor.hideClips ? '📚 Show Library' : '📚 Hide Library';
+      clipsBtn.setAttribute('aria-pressed', dbEditor.hideClips ? 'true' : 'false');
+      clipsBtn.title = dbEditor.hideClips ? 'Show Room / Inspiration / Library panel' : 'Hide left panel for a larger board';
+    }
+    if (propsBtn) {
+      propsBtn.textContent = dbEditor.hideProps ? '⚙ Show Properties' : '⚙ Hide Properties';
+      propsBtn.setAttribute('aria-pressed', dbEditor.hideProps ? 'true' : 'false');
+      propsBtn.title = dbEditor.hideProps ? 'Show Properties panel' : 'Hide Properties for a larger board';
+    }
+  }
+
+  window.dbToggleClipsPanel = function(ev) {
+    if (ev) { try { ev.preventDefault(); ev.stopPropagation(); } catch (e0) {} }
+    if (dbEditor.clientView) return;
+    // Drive from DOM (not localStorage) — storage desync caused "click twice to hide".
+    var cp = document.getElementById('dbClipsPanel');
+    dbEditor.hideClips = dbPanelIsVisiblyOpen(cp);
+    dbPersistPanelPrefs();
+    dbApplySidePanels();
+    dbSyncEditorShellHeight();
+  };
+
+  window.dbTogglePropsPanel = function(ev) {
+    if (ev) { try { ev.preventDefault(); ev.stopPropagation(); } catch (e0) {} }
+    if (dbEditor.clientView) return;
+    var pp = document.getElementById('dbPropsPanel');
+    dbEditor.hideProps = dbPanelIsVisiblyOpen(pp);
+    dbPersistPanelPrefs();
+    dbApplySidePanels();
+    dbSyncEditorShellHeight();
+  };
+
   function dbApplyClientViewLayout() {
     var cv = !!dbEditor.clientView;
-    var cp = document.getElementById('dbClipsPanel');
-    var pp = document.getElementById('dbPropsPanel');
     var root = document.getElementById('dbEditorRoot');
-    if (cp) cp.style.display = cv ? 'none' : 'flex';
-    if (pp) pp.style.display = cv ? 'none' : 'block';
     if (root) root.classList.toggle('db-editor-client-view', cv);
+    dbApplySidePanels();
     var cvBtn = document.querySelector('#dbToolbar button[onclick="toggleClientView()"]');
     if (cvBtn) {
       cvBtn.textContent = cv ? '👁 Client view: ON' : '👁 Client view';
@@ -261,27 +427,94 @@
     });
   }
 
-  window.dbSetViewZoom = function(z) {
-    dbEditor.viewZoomMode = 'manual';
-    dbEditor.canvasScale = Math.max(0.2, Math.min(2, z));
-    dbApplyViewZoom();
+  window.dbSetViewZoom = function(z, clientX, clientY) {
+    dbZoomAtClientPoint(z, clientX, clientY);
   };
   window.dbZoomFit = function() { dbFitCanvasToView(); };
   window.dbZoom100 = function() { window.dbSetViewZoom(1); };
-  window.dbZoomIn = function() { window.dbSetViewZoom((dbEditor.canvasScale || 1) + 0.1); };
-  window.dbZoomOut = function() { window.dbSetViewZoom((dbEditor.canvasScale || 1) - 0.1); };
+  window.dbZoomIn = function(ev) {
+    var cur = dbEditor.canvasScale || 1;
+    var next = dbClampZoom(cur * 1.25);
+    var cx = ev && ev.clientX != null ? ev.clientX : null;
+    var cy = ev && ev.clientY != null ? ev.clientY : null;
+    if (cx == null) {
+      var wrap = document.getElementById('dbCanvasWrap');
+      if (wrap) {
+        var r = wrap.getBoundingClientRect();
+        cx = r.left + r.width / 2;
+        cy = r.top + r.height / 2;
+      }
+    }
+    dbZoomAtClientPoint(next, cx, cy);
+  };
+  window.dbZoomOut = function(ev) {
+    var cur = dbEditor.canvasScale || 1;
+    var next = dbClampZoom(cur / 1.25);
+    var cx = ev && ev.clientX != null ? ev.clientX : null;
+    var cy = ev && ev.clientY != null ? ev.clientY : null;
+    if (cx == null) {
+      var wrap = document.getElementById('dbCanvasWrap');
+      if (wrap) {
+        var r = wrap.getBoundingClientRect();
+        cx = r.left + r.width / 2;
+        cy = r.top + r.height / 2;
+      }
+    }
+    dbZoomAtClientPoint(next, cx, cy);
+  };
+
+  window.dbZoomToSelection = function() {
+    if (!dbEditor.selectedId) {
+      if (typeof showToast === 'function') showToast('Select a tile first', 'info');
+      return;
+    }
+    var el = dbEditor.elements.find(function(e) { return e.id === dbEditor.selectedId; });
+    if (!el || el.type === 'arrow') return;
+    var wrap = document.getElementById('dbCanvasWrap');
+    if (!wrap) return;
+    var pad = 96;
+    var tileW = (el.w || 200) + pad;
+    var tileH = (el.h || 200) + pad + (el.type === 'product' || el.type === 'image' ? dbTileExtrasH(el) : 0);
+    var z = Math.min((wrap.clientWidth - pad) / tileW, (wrap.clientHeight - pad) / tileH, DB_ZOOM_MAX);
+    dbEditor.viewZoomMode = 'manual';
+    dbEditor.canvasScale = dbClampZoom(Math.max(0.25, z));
+    dbApplyViewZoom();
+    dbScrollCanvasToElement(el);
+  };
+
+  function dbWireCanvasZoomWheel() {
+    var wrap = document.getElementById('dbCanvasWrap');
+    if (!wrap || wrap._dbZoomWheelWired) return;
+    wrap._dbZoomWheelWired = true;
+    wrap.addEventListener('wheel', function(e) {
+      if (dbEditor.clientView) return;
+      // Ctrl/Cmd+wheel = zoom (trackpads often send ctrlKey with pinch)
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      var cur = dbEditor.canvasScale || 1;
+      var factor = e.deltaY < 0 ? 1.12 : (1 / 1.12);
+      dbZoomAtClientPoint(cur * factor, e.clientX, e.clientY);
+    }, { passive: false });
+  }
 
   var _dbViewResizeTimer = null;
+  var _dbLastWrapSize = { w: 0, h: 0 };
   if (!window._dbViewResizeBound) {
     window._dbViewResizeBound = true;
     window.addEventListener('resize', function() {
       if (!document.getElementById('dbCanvas')) return;
       clearTimeout(_dbViewResizeTimer);
       _dbViewResizeTimer = setTimeout(function() {
+        var wrap = document.getElementById('dbCanvasWrap');
+        var w = wrap ? wrap.clientWidth : 0;
+        var h = wrap ? wrap.clientHeight : 0;
+        // Ignore scrollbar-toggle jitter (1–2px) that can loop Fit → flash the board.
+        if (Math.abs(w - _dbLastWrapSize.w) < 3 && Math.abs(h - _dbLastWrapSize.h) < 3) return;
+        _dbLastWrapSize = { w: w, h: h };
         dbSyncEditorShellHeight();
         if (dbEditor.clientView || dbEditor.viewZoomMode === 'fit') dbFitCanvasToView(!dbEditor.clientView);
         else dbApplyViewZoom();
-      }, 120);
+      }, 160);
     });
   }
 
@@ -601,14 +834,26 @@
     if (norm.changed) dbEditor.dirty = true;
     dbEditor.showPricing = dbEditor.boardData.showPricing !== false;
     dbEditor.clientView = false;
+    dbLoadPanelPrefsIntoEditor();
     dbEditor.canvasScale = 1;
     dbEditor.viewZoomMode = 'fit';
-    dbEditor.nextId = dbEditor.elements.length + 1;
+    // WO-064: seed from max id (not count), then heal any duplicate el_* already on the board
+    dbSeedNextIdFromElements();
+    var healedIds = dbHealDuplicateElementIds();
+    if (healedIds > 0) {
+      dbEditor.dirty = true;
+      dbSeedNextIdFromElements();
+      dbEditor._healedDupIds = healedIds;
+    } else {
+      dbEditor._healedDupIds = 0;
+    }
     dbEditor.clipCategory = 'All';
     dbEditor.clipListFilter = '';
     dbEditor.projectRooms = [];
     dbEditor.sourceTab = 'room';
     dbEditor.ibImages = [];
+    dbEditor.ideabooks = [];
+    dbEditor.ibBoardId = 'All';
     dbEditor.libItems = [];
     dbEditor.libItemsLoaded = false;
     dbEditor.libItemsLoading = false;
@@ -625,7 +870,18 @@
       loads[0].forEach(function(d) { dbEditor.clips.push({ id: d.id, data: d.data() }); });
       var ideabooks = [];
       loads[1].forEach(function(d) { ideabooks.push({ id: d.id, data: d.data() }); });
+      dbEditor.ideabooks = ideabooks.map(function(ib) {
+        var d = ib.data || {};
+        return {
+          id: ib.id,
+          name: String(d.name || d.title || 'Untitled').trim() || 'Untitled'
+        };
+      }).sort(function(a, b) {
+        return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      });
       dbEditor.ibImages = dbBuildIbImageList(ideabooks);
+      if (dbEditor.ideabooks.length === 1) dbEditor.ibBoardId = dbEditor.ideabooks[0].id;
+      else dbEditor.ibBoardId = 'All';
       rmSnap = loads[2];
     } catch(e) {
       console.warn('[design board] load sources:', e);
@@ -733,6 +989,7 @@
     } finally {
       dbEditor.libItemsLoading = false;
       if (dbEditor.sourceTab === 'library') {
+        populateClipCategorySelect();
         var inp = document.getElementById('dbClipFilterInput');
         renderClipsList(inp ? inp.value : '');
       }
@@ -810,17 +1067,33 @@
       '#dbEditorRoot.db-editor-client-view .db-el-product{pointer-events:none!important;cursor:default!important;}' +
       '#dbEditorRoot.db-editor-client-view .db-resize{display:none!important;}' +
       '#dbEditorRoot.db-editor-client-view #dbCanvasWrap,#dbEditorRoot.db-editor-client-view #dbCanvas,#dbEditorRoot.db-editor-client-view #dbCanvasStage{touch-action:pan-x pan-y!important;}' +
+      '#dbClipsPanel,#dbPropsPanel{flex:0 0 240px;box-sizing:border-box;}' +
+      '#dbClipsPanel.db-side-panel-collapsed,#dbPropsPanel.db-side-panel-collapsed{display:none!important;width:0!important;min-width:0!important;max-width:0!important;padding:0!important;margin:0!important;border:none!important;overflow:hidden!important;flex:0 0 0!important;}' +
       '#dbCanvas,#dbCanvasStage{touch-action:none;}' +
       '#dbBranding{position:absolute;left:0;right:0;bottom:0;top:auto;padding:0 0 14px;margin:0;z-index:10;pointer-events:none;text-align:center;}' +
-      '.db-el-product{box-sizing:border-box;pointer-events:auto;cursor:move;}' +
+      '.db-el-product{box-sizing:border-box;pointer-events:auto;cursor:move;overflow:visible;}' +
+      '.db-el-frame{position:relative;flex-shrink:0;overflow:visible;}' +
+      '.db-el-selected .db-el-frame{box-shadow:0 0 0 2px var(--gold);}' +
+      '.db-el-handles-layer{position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none;overflow:visible;z-index:30;}' +
       '.db-el-media{position:relative;box-sizing:border-box;background:#fff;border:1px solid rgba(15,26,46,0.06);border-radius:2px;overflow:hidden;padding:0;pointer-events:none;}' +
       '.db-el-media img{width:100%;height:100%;object-fit:cover;object-position:center;display:block;pointer-events:none;}' +
       '.db-el-caption{margin-top:5px;font-size:14px;font-weight:600;color:#1B3352;text-align:center;pointer-events:none;line-height:1.3;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;}' +
       '.db-el-desc{margin-top:3px;font-size:12px;color:#4B5563;text-align:center;pointer-events:none;line-height:1.4;white-space:pre-wrap;}' +
       '.db-el-price{margin-top:3px;font-size:14px;font-weight:700;color:#0A1F3D;text-align:center;pointer-events:none;line-height:1.25;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}' +
       '.db-el-annotation{margin-top:4px;font-size:12px;color:#6B7280;text-align:center;font-style:italic;pointer-events:none;white-space:pre-line;line-height:1.35;}' +
-      '.db-resize{position:absolute;width:22px;height:22px;background:var(--gold);border:2px solid #fff;border-radius:4px;z-index:20;box-shadow:0 2px 8px rgba(0,0,0,0.28);pointer-events:auto;touch-action:none;}' +
-      '.db-resize::before{content:"";position:absolute;inset:-10px;}' +
+      '.db-resize{position:absolute;width:calc(18px / var(--db-zoom,1));height:calc(18px / var(--db-zoom,1));background:var(--gold);border:calc(2px / var(--db-zoom,1)) solid #fff;border-radius:50%;z-index:31;box-shadow:0 2px 6px rgba(0,0,0,0.28);pointer-events:auto;touch-action:none;}' +
+      '.db-resize::before{content:"";position:absolute;left:50%;top:50%;width:calc(40px / var(--db-zoom,1));height:calc(40px / var(--db-zoom,1));transform:translate(-50%,-50%);}' +
+      '.db-resize-edge{width:calc(32px / var(--db-zoom,1));height:calc(10px / var(--db-zoom,1));border-radius:calc(5px / var(--db-zoom,1));}' +
+      '.db-resize-nw{left:calc(-9px / var(--db-zoom,1));top:calc(-9px / var(--db-zoom,1));cursor:nwse-resize;}' +
+      '.db-resize-ne{right:calc(-9px / var(--db-zoom,1));top:calc(-9px / var(--db-zoom,1));cursor:nesw-resize;}' +
+      '.db-resize-sw{left:calc(-9px / var(--db-zoom,1));bottom:calc(-9px / var(--db-zoom,1));cursor:nesw-resize;}' +
+      '.db-resize-se{right:calc(-9px / var(--db-zoom,1));bottom:calc(-9px / var(--db-zoom,1));cursor:nwse-resize;}' +
+      '.db-resize-n{left:50%;top:calc(-5px / var(--db-zoom,1));transform:translateX(-50%);cursor:ns-resize;}' +
+      '.db-resize-s{left:50%;bottom:calc(-5px / var(--db-zoom,1));transform:translateX(-50%);cursor:ns-resize;}' +
+      '.db-resize-e{right:calc(-5px / var(--db-zoom,1));top:50%;transform:translateY(-50%);cursor:ew-resize;}' +
+      '.db-resize-w{left:calc(-5px / var(--db-zoom,1));top:50%;transform:translateY(-50%);cursor:ew-resize;}' +
+      '.db-el-note-wrap{position:relative;overflow:visible;}' +
+      '.db-el-selected.db-el-note-wrap{box-shadow:0 0 0 2px var(--gold);}' +
       '.db-source-tab{flex:1;padding:8px 4px;font-size:10px;font-weight:600;border:none;background:transparent;color:#6b7280;cursor:pointer;border-bottom:2px solid transparent;}' +
       '.db-source-tab:hover{color:#1B3352;}' +
       '.db-source-tab--active{color:#1B3352;border-bottom-color:#C4A464;}' +
@@ -839,11 +1112,12 @@
         '<span class="db-toolbar-hint db-toolbar-edit-only">Choose <strong>Text</strong> or <strong>Heading</strong>, then click on the board to place.</span>' +
         '<button class="btn btn-secondary btn-sm db-toolbar-edit-only" onclick="void addImageFromComputer()">📁 From computer</button>' +
         '<button class="btn btn-secondary btn-sm db-toolbar-edit-only" onclick="void addImageToBoard()" title="Paste image URL">🔗 Image URL</button>' +
-        '<div style="display:flex;align-items:center;gap:2px;padding:2px 6px;background:#eef2f7;border-radius:6px;border:1px solid rgba(27,51,82,0.1);">' +
-          '<button type="button" class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:14px;line-height:1;" onclick="dbZoomOut()" title="Zoom out">−</button>' +
-          '<span id="dbZoomLabel" style="font-size:11px;font-weight:600;min-width:38px;text-align:center;color:#1B3352;">100%</span>' +
-          '<button type="button" class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:14px;line-height:1;" onclick="dbZoomIn()" title="Zoom in">+</button>' +
-          '<button type="button" class="btn btn-secondary btn-sm" style="padding:4px 8px;font-size:10px;margin-left:2px;" onclick="dbZoomFit()" title="Fit board to window (like Canva)">Fit</button>' +
+        '<div style="display:flex;align-items:center;gap:2px;padding:2px 6px;background:#eef2f7;border-radius:6px;border:1px solid rgba(27,51,82,0.1);" title="Zoom: + / − buttons, Ctrl+scroll, or Zoom to selection">' +
+          '<button type="button" class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:14px;line-height:1;" onclick="dbZoomOut(event)" title="Zoom out (−)">−</button>' +
+          '<span id="dbZoomLabel" style="font-size:11px;font-weight:600;min-width:42px;text-align:center;color:#1B3352;">100%</span>' +
+          '<button type="button" class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:14px;line-height:1;" onclick="dbZoomIn(event)" title="Zoom in (+)">+</button>' +
+          '<button type="button" class="btn btn-secondary btn-sm" style="padding:4px 8px;font-size:10px;margin-left:2px;" onclick="dbZoom100()" title="Zoom to 100%">100%</button>' +
+          '<button type="button" class="btn btn-secondary btn-sm" style="padding:4px 8px;font-size:10px;" onclick="dbZoomFit()" title="Fit board to window">Fit</button>' +
         '</div>' +
         '<div style="flex:1;"></div>' +
         '<label class="db-toolbar-edit-only" style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" ' + (dbEditor.showPricing ? 'checked' : '') + ' onchange="toggleBoardPricing(this.checked)"> Show Pricing</label>' +
@@ -851,10 +1125,13 @@
         '<button class="btn btn-secondary btn-sm" onclick="openLuxuryClientView()">🖤 Share with Client</button>' +
         '<button class="btn btn-secondary btn-sm db-toolbar-edit-only" onclick="void dbPostBoardAsDecision()">📤 Post Decision</button>' +
         '<button class="btn btn-secondary btn-sm db-toolbar-edit-only" onclick="dbUndo()">↩ Undo</button>' +
-        '<button type="button" class="btn btn-secondary btn-sm db-toolbar-edit-only" title="Auto-arrange all tiles into a clean magazine layout — captions never overlap. Undoable." onclick="void dbTidyBoard()">✨ Tidy board</button>' +
-        '<button type="button" id="dbUnstickToolbarBtn" class="btn btn-secondary btn-sm db-toolbar-edit-only" title="Unstick drag, remove ghost tiles, spread stacked items — does not delete your work" onclick="void dbRepairBoard()">🔧 Repair board</button>' +
+        '<button type="button" class="btn btn-secondary btn-sm db-toolbar-edit-only" title="Auto-arrange tiles (does not auto-save — use Undo if needed, then Save)" onclick="void dbTidyBoard()">✨ Tidy board</button>' +
+        '<button type="button" id="dbUnstickToolbarBtn" class="btn btn-secondary btn-sm db-toolbar-edit-only" title="End stuck drag AND clear selection (gold grips) — does NOT delete tiles">🔓 Unstick</button>' +
+        '<button type="button" class="btn btn-secondary btn-sm db-toolbar-edit-only" title="Nudge overlapping tiles apart (grows board if needed — never deletes)" onclick="void dbRepairBoard()">🔧 Spread stacks</button>' +
         '<span id="dbUnstickStatus" class="db-toolbar-edit-only" style="font-size:10px;color:var(--gray-500);min-width:72px;"></span>' +
         '<button class="btn btn-secondary btn-sm db-toolbar-edit-only" onclick="dbOpenPrintMenu()">🖨 Print / Export</button>' +
+        '<button type="button" id="dbToggleClipsBtn" class="btn btn-secondary btn-sm db-toolbar-edit-only" onclick="dbToggleClipsPanel(event)">📚 Hide Library</button>' +
+        '<button type="button" id="dbTogglePropsBtn" class="btn btn-secondary btn-sm db-toolbar-edit-only" onclick="dbTogglePropsPanel(event)">⚙ Hide Properties</button>' +
         '<button class="btn btn-secondary btn-sm db-toolbar-edit-only" onclick="showBoardCostSummary()">💲 Summary</button>' +
         '<button class="btn btn-secondary btn-sm db-toolbar-edit-only" onclick="createProposalFromBoard()">📋 → Proposal</button>' +
         '<button class="btn btn-primary btn-sm db-toolbar-edit-only" onclick="saveBoardToFirestore()">💾 Save</button>' +
@@ -863,7 +1140,7 @@
       // Main layout: clips panel + canvas + props panel
       '<div style="display:flex;gap:0;flex:1;min-height:0;">' +
         // Left: Clips panel
-        '<div id="dbClipsPanel" style="width:240px;min-width:240px;border-right:1px solid var(--gray-200);overflow-y:auto;padding:0;background:#fafaf8;display:flex;flex-direction:column;">' +
+        '<div id="dbClipsPanel" style="width:240px;min-width:240px;flex:0 0 240px;border-right:1px solid var(--gray-200);overflow-y:auto;padding:0;background:#fafaf8;display:flex;flex-direction:column;box-sizing:border-box;">' +
           '<div style="display:flex;border-bottom:1px solid var(--gray-200);flex-shrink:0;">' +
             '<button type="button" class="db-source-tab' + (dbEditor.sourceTab === 'room' ? ' db-source-tab--active' : '') + '" data-tab="room" onclick="dbSwitchSourceTab(\'room\')">Room</button>' +
             '<button type="button" class="db-source-tab' + (dbEditor.sourceTab === 'ideabook' ? ' db-source-tab--active' : '') + '" data-tab="ideabook" onclick="dbSwitchSourceTab(\'ideabook\')">Inspiration</button>' +
@@ -874,8 +1151,12 @@
               '<label style="font-size:10px;color:var(--gray-500);display:block;margin-bottom:4px;">Room</label>' +
               '<select id="dbClipRoomSel" style="width:100%;padding:6px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:12px;margin-bottom:8px;background:#fff;box-sizing:border-box;" onchange="setBoardClipRoom(this.value)"></select>' +
             '</div>' +
+            '<div id="dbClipIbBoardWrap" style="display:none;">' +
+              '<label style="font-size:10px;color:var(--gray-500);display:block;margin-bottom:4px;">Inspiration board</label>' +
+              '<select id="dbClipIbBoardSel" style="width:100%;padding:6px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:12px;margin-bottom:8px;background:#fff;box-sizing:border-box;" onchange="setBoardIbBoard(this.value)"></select>' +
+            '</div>' +
             '<div id="dbClipCatWrap">' +
-              '<label style="font-size:10px;color:var(--gray-500);display:block;margin-bottom:4px;">Category</label>' +
+              '<label id="dbClipCatLabel" style="font-size:10px;color:var(--gray-500);display:block;margin-bottom:4px;">Category</label>' +
               '<select id="dbClipCatSel" style="width:100%;padding:6px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:12px;margin-bottom:8px;background:#fff;box-sizing:border-box;" onchange="setBoardClipCategory(this.value)"></select>' +
             '</div>' +
             '<input id="dbClipFilterInput" type="text" placeholder="Filter items..." style="width:100%;padding:6px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:12px;margin-bottom:8px;box-sizing:border-box;" oninput="filterBoardClips(this.value)">' +
@@ -905,10 +1186,10 @@
         '</div>' +
 
         // Right: Properties panel
-        '<div id="dbPropsPanel" style="width:240px;min-width:240px;border-left:1px solid var(--gray-200);overflow-y:auto;padding:12px;background:#fafaf8;">' +
+        '<div id="dbPropsPanel" style="width:240px;min-width:240px;flex:0 0 240px;border-left:1px solid var(--gray-200);overflow-y:auto;padding:12px;background:#fafaf8;box-sizing:border-box;">' +
           '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;">' +
             '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--gray-400);font-weight:600;">Properties</div>' +
-            '<button type="button" id="dbUnstickPropsBtn" class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:10px;line-height:1.2;" title="Unstick drag and spread stacked tiles" onclick="void dbRepairBoard()">Repair</button>' +
+            '<button type="button" id="dbUnstickPropsBtn" class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:10px;line-height:1.2;" title="End stuck drag — does not delete tiles">Unstick</button>' +
           '</div>' +
           '<div id="dbPropsContent"><div style="color:var(--gray-400);font-size:12px;padding:20px 0;text-align:center;">Select an element<br>or drag a clip onto the canvas</div></div>' +
         '</div>' +
@@ -917,6 +1198,7 @@
 
     populateClipCategorySelect();
     populateClipRoomSelect();
+    populateIbBoardSelect();
     dbUpdateSourceTabFilters();
     var _fi = document.getElementById('dbClipFilterInput');
     if (_fi) _fi.value = dbEditor.clipListFilter || '';
@@ -928,6 +1210,7 @@
     dbSyncBrandingFooter();
     dbSyncEditorShellHeight();
     dbApplyClientViewLayout();
+    dbWireCanvasZoomWheel();
     requestAnimationFrame(function() {
       requestAnimationFrame(function() {
         dbSyncBrandingFooter();
@@ -937,25 +1220,40 @@
     });
     dbWireUnstickButtons();
 
-    var overlapPairs = dbCountOverlappingTiles();
-    if (overlapPairs > 0) {
-      var autoSpread = dbSpreadStackedTiles();
-      if (autoSpread > 0) {
-        dbEditor.dirty = true;
-        dbResyncAllElementsFromModel();
-        if (typeof showToast === 'function') {
-          showToast('Spread ' + autoSpread + ' stacked tile' + (autoSpread !== 1 ? 's' : '') + ' apart — nothing deleted.', 4500);
-        }
+    // Never auto-move tiles on open — prior auto-spread shoved items past canvas
+    // edges (overflow:hidden) so they looked deleted, then Back/Save persisted it.
+    var rescued = dbRescueOffCanvasTiles();
+    if (rescued > 0) {
+      dbEditor.dirty = true;
+      renderCanvas();
+      dbSyncBrandingFooter();
+      if (typeof showToast === 'function') {
+        showToast('Recovered ' + rescued + ' item' + (rescued !== 1 ? 's' : '') + ' that were outside the board — review, then Save.', 7000);
       }
-      dbShowOverlapBanner(dbCountOverlappingTiles());
     }
+    if (dbEditor._healedDupIds > 0) {
+      renderCanvas();
+      var _healN = dbEditor._healedDupIds;
+      dbEditor._healedDupIds = 0;
+      // WO-065: persist healed ids once so the next open does not re-heal the same Firestore doc
+      void Promise.resolve(saveBoardToFirestore({ quiet: true })).then(function() {
+        if (typeof showToast === 'function') {
+          showToast('Repaired ' + _healN + ' duplicate tile ID' + (_healN !== 1 ? 's' : '') + ' and saved. Nothing was deleted.', 7000);
+        }
+      });
+    }
+    var overlapPairs = dbCountOverlappingTiles();
+    if (overlapPairs > 0) dbShowOverlapBanner(overlapPairs);
 
     // Keyboard handler
     document.onkeydown = function(e) {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.contentEditable === 'true') return;
       if (e.key === 'Delete') { deleteSelected(); e.preventDefault(); }
       if (e.key === 'z' && (e.ctrlKey || e.metaKey)) { dbUndo(); e.preventDefault(); }
-      if (e.key === 'Escape') { dbResetBoardInteraction(); e.preventDefault(); }
+      if (e.key === 'Escape') { dbUnstickBoard(); e.preventDefault(); }
+      if (!dbEditor.clientView && (e.key === '+' || e.key === '=')) { dbZoomIn(); e.preventDefault(); }
+      if (!dbEditor.clientView && (e.key === '-' || e.key === '_')) { dbZoomOut(); e.preventDefault(); }
+      if (!dbEditor.clientView && e.key === '0' && (e.ctrlKey || e.metaKey)) { dbZoomFit(); e.preventDefault(); }
     };
   }
 
@@ -1019,6 +1317,21 @@
   }
 
   function clipCategoryOptions() {
+    var tab = dbEditor.sourceTab || 'room';
+    if (tab === 'library') {
+      var master = (window.CCH_PRODUCT_CATEGORIES_MASTER || []).slice();
+      if (master.length) return ['All'].concat(master);
+      var libSet = new Set();
+      (dbEditor.libItems || []).forEach(function(p) {
+        var d = p.data || p;
+        if (!dbClipIsFurnishingProduct(d)) return;
+        var cat = String(d.category || '').trim();
+        if (cat) libSet.add(cat);
+      });
+      return ['All'].concat(Array.from(libSet).sort(function(a, b) {
+        return a.localeCompare(b, undefined, { sensitivity: 'base' });
+      }));
+    }
     var s = new Set();
     dbEditor.clips.forEach(function(c) {
       var d = c.data || {};
@@ -1034,13 +1347,34 @@
     if (!sel) return;
     var cats = clipCategoryOptions();
     var cur = dbEditor.clipCategory || 'All';
+    if (cur !== 'All' && cats.indexOf(cur) < 0) cur = 'All';
+    dbEditor.clipCategory = cur;
     sel.innerHTML = cats.map(function(c) {
       return '<option value="' + escAttr(c) + '"' + (cur === c ? ' selected' : '') + '>' + esc(c === 'All' ? 'All categories' : c) + '</option>';
     }).join('');
   }
 
+  function populateIbBoardSelect() {
+    var sel = document.getElementById('dbClipIbBoardSel');
+    if (!sel) return;
+    var boards = dbEditor.ideabooks || [];
+    var cur = dbEditor.ibBoardId || 'All';
+    if (cur !== 'All' && !boards.some(function(b) { return b.id === cur; })) cur = 'All';
+    dbEditor.ibBoardId = cur;
+    var opts = [{ id: 'All', name: 'All boards' }].concat(boards);
+    sel.innerHTML = opts.map(function(b) {
+      return '<option value="' + escAttr(b.id) + '"' + (b.id === cur ? ' selected' : '') + '>' + esc(b.name) + '</option>';
+    }).join('');
+  }
+
   window.setBoardClipCategory = function(val) {
     dbEditor.clipCategory = val || 'All';
+    var inp = document.getElementById('dbClipFilterInput');
+    renderClipsList(inp ? inp.value : '');
+  };
+
+  window.setBoardIbBoard = function(val) {
+    dbEditor.ibBoardId = val || 'All';
     var inp = document.getElementById('dbClipFilterInput');
     renderClipsList(inp ? inp.value : '');
   };
@@ -1166,21 +1500,35 @@
       return items;
     }
     if (tab === 'ideabook') {
-      return (dbEditor.ibImages || []).filter(function(img) { return img && img.imageUrl; }).map(function(img) {
+      var boardF = dbEditor.ibBoardId || 'All';
+      return (dbEditor.ibImages || []).filter(function(img) {
+        if (!img || !img.imageUrl) return false;
+        if (boardF !== 'All' && String(img.ideabookId || '') !== String(boardF)) return false;
+        return true;
+      }).map(function(img) {
+        var boardName = img.section || '';
+        var cap = String(img.caption || img.title || '').trim();
         return {
           kind: 'inspiration',
-          title: img.caption || img.title || 'Untitled',
+          title: cap || boardName || 'Inspiration',
           vendor: img.vendor || '',
           sellPrice: parseFloat(img.price || img.clientPrice) || 0,
           cost: 0,
           img: img.imageUrl,
           data: img,
-          section: img.section || ''
+          section: (cap && boardName && cap !== boardName) ? boardName : (cap ? '' : boardName)
         };
       });
     }
+    var libCatF = dbEditor.clipCategory || 'All';
     return (dbEditor.libItems || []).filter(function(p) {
-      return dbClipIsFurnishingProduct(p.data || p);
+      var d = p.data || p;
+      if (!dbClipIsFurnishingProduct(d)) return false;
+      if (libCatF !== 'All') {
+        var lc = String(d.category || '').trim();
+        if (lc.toLowerCase() !== String(libCatF).toLowerCase()) return false;
+      }
+      return true;
     }).map(function(p) {
       var d = p.data || p;
       return {
@@ -1190,7 +1538,8 @@
         sellPrice: parseFloat(d.clientPrice) || parseFloat(d.retailPrice) || 0,
         cost: parseFloat(d.cost) || 0,
         img: dbClipSidebarImg(d),
-        data: d
+        data: d,
+        section: String(d.category || '').trim()
       };
     });
   }
@@ -1198,13 +1547,18 @@
   function dbUpdateSourceTabFilters() {
     var tab = dbEditor.sourceTab || 'room';
     var rw = document.getElementById('dbClipRoomWrap');
+    var iw = document.getElementById('dbClipIbBoardWrap');
     var cw = document.getElementById('dbClipCatWrap');
     if (rw) rw.style.display = (tab === 'room') ? 'block' : 'none';
-    if (cw) cw.style.display = (tab === 'room') ? 'block' : 'none';
+    if (iw) iw.style.display = (tab === 'ideabook') ? 'block' : 'none';
+    // Category: Room clips + Library (same control Add-item users expect)
+    if (cw) cw.style.display = (tab === 'room' || tab === 'library') ? 'block' : 'none';
     document.querySelectorAll('.db-source-tab').forEach(function(btn) {
       var t = btn.getAttribute('data-tab');
       btn.classList.toggle('db-source-tab--active', t === tab);
     });
+    if (tab === 'ideabook') populateIbBoardSelect();
+    if (tab === 'room' || tab === 'library') populateClipCategorySelect();
   }
 
   window.dbSwitchSourceTab = function(tab) {
@@ -1324,9 +1678,15 @@
       if (tab === 'room' && roomF !== 'All') {
         emptyMsg = 'No clips in <strong>' + esc(roomF) + '</strong>. Try <strong>All rooms</strong>.';
       } else if (tab === 'ideabook') {
-        emptyMsg = 'No inspiration images in this project. Add images on the <strong>Inspiration</strong> tab first.';
+        var ibF = dbEditor.ibBoardId || 'All';
+        emptyMsg = ibF !== 'All'
+          ? 'No images on this Inspiration board. Pick another board or add images on the <strong>Inspiration</strong> tab.'
+          : 'No inspiration images in this project. Add images on the <strong>Inspiration</strong> tab first.';
       } else if (tab === 'library') {
-        emptyMsg = 'No products in library.';
+        var libCat = dbEditor.clipCategory || 'All';
+        emptyMsg = libCat !== 'All'
+          ? 'No library products in <strong>' + esc(libCat) + '</strong>. Try <strong>All categories</strong>.'
+          : 'No products in library.';
       }
       html = '<div style="color:var(--gray-400);font-size:12px;text-align:center;padding:12px;line-height:1.45;">' + emptyMsg + '</div>';
     }
@@ -1372,11 +1732,26 @@
     return type === 'product' || type === 'image' || type === 'note';
   }
 
-  function resizeHandles() {
-    return '<div class="db-resize" data-dir="nw" style="left:-11px;top:-11px;cursor:nwse-resize;" onpointerdown="resizeMouseDown(event,\'nw\')"></div>' +
-      '<div class="db-resize" data-dir="ne" style="right:-11px;top:-11px;cursor:nesw-resize;" onpointerdown="resizeMouseDown(event,\'ne\')"></div>' +
-      '<div class="db-resize" data-dir="sw" style="left:-11px;bottom:-11px;cursor:nesw-resize;" onpointerdown="resizeMouseDown(event,\'sw\')"></div>' +
-      '<div class="db-resize" data-dir="se" style="right:-11px;bottom:-11px;cursor:nwse-resize;" onpointerdown="resizeMouseDown(event,\'se\')"></div>';
+  function resizeHandlesHtml() {
+    return '<div class="db-resize db-resize-nw" onpointerdown="resizeMouseDown(event,\'nw\')"></div>' +
+      '<div class="db-resize db-resize-ne" onpointerdown="resizeMouseDown(event,\'ne\')"></div>' +
+      '<div class="db-resize db-resize-sw" onpointerdown="resizeMouseDown(event,\'sw\')"></div>' +
+      '<div class="db-resize db-resize-se" onpointerdown="resizeMouseDown(event,\'se\')"></div>' +
+      '<div class="db-resize db-resize-edge db-resize-n" onpointerdown="resizeMouseDown(event,\'n\')"></div>' +
+      '<div class="db-resize db-resize-edge db-resize-s" onpointerdown="resizeMouseDown(event,\'s\')"></div>' +
+      '<div class="db-resize db-resize-edge db-resize-e" onpointerdown="resizeMouseDown(event,\'e\')"></div>' +
+      '<div class="db-resize db-resize-edge db-resize-w" onpointerdown="resizeMouseDown(event,\'w\')"></div>';
+  }
+
+  function dbAttachResizeHandles(container, show) {
+    if (!container) return;
+    var layer = container.querySelector('.db-el-handles-layer');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.className = 'db-el-handles-layer';
+      container.appendChild(layer);
+    }
+    layer.innerHTML = show ? resizeHandlesHtml() : '';
   }
 
   function dbBuildElementHtml(el, sel) {
@@ -1395,7 +1770,10 @@
           ? '<div class="db-el-media-fallback" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--gray-500);font-size:11px;">Image link blocked</div>'
           : '<div class="db-el-media-fallback" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--gray-300);">📷</div>');
       return '<div class="db-el db-el-product' + selClass + '" data-id="' + el.id + '" style="position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;width:' + ew + 'px;z-index:' + (sel ? 100 : 10) + ';" onpointerdown="elMouseDown(event,\'' + el.id + '\')" ondblclick="event.stopPropagation();void dbOpenProductDetail(\'' + el.id + '\')" oncontextmenu="return dbProductContextMenu(event,\'' + el.id + '\')">' +
-        '<div class="db-el-media" style="width:' + ew + 'px;height:' + eh + 'px;">' + mediaInner + (sel ? resizeHandles() : '') + '</div>' +
+        '<div class="db-el-frame" style="width:' + ew + 'px;height:' + eh + 'px;">' +
+          '<div class="db-el-media" style="width:100%;height:100%;">' + mediaInner + '</div>' +
+          (sel ? '<div class="db-el-handles-layer">' + resizeHandlesHtml() + '</div>' : '') +
+        '</div>' +
         dbProductCaptionHtml(el) +
         dbProductPriceHtml(el) +
         (el.annotation ? '<div class="db-el-annotation">' + esc(el.annotation) + '</div>' : '') +
@@ -1410,9 +1788,10 @@
         '<div style="font-size:' + (el.fontSize || 24) + 'px;color:' + (el.color || '#333') + ';font-weight:700;letter-spacing:2px;text-transform:uppercase;pointer-events:none;">' + esc(el.text || 'HEADING') + '</div></div>';
     }
     if (el.type === 'note') {
-      return '<div class="db-el' + selClass + '" data-id="' + el.id + '" style="position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;width:' + (el.w || 200) + 'px;padding:10px 12px;background:#FFFDE7;border:1px solid #FFF9C4;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,0.08);cursor:move;z-index:' + (sel ? 100 : 15) + ';" onpointerdown="elMouseDown(event,\'' + el.id + '\')" ondblclick="void editTextEl(\'' + el.id + '\')">' +
-        '<div style="font-size:12px;color:#666;white-space:pre-wrap;pointer-events:none;font-style:italic;">' + esc(el.text || 'Designer notes...') + '</div>' +
-        (sel ? resizeHandles() : '') + '</div>';
+      return '<div class="db-el db-el-note-wrap' + selClass + '" data-id="' + el.id + '" style="position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;width:' + (el.w || 200) + 'px;padding:10px 12px;background:#FFFDE7;border:1px solid #FFF9C4;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,0.08);cursor:move;z-index:' + (sel ? 100 : 15) + ';overflow:visible;" onpointerdown="elMouseDown(event,\'' + el.id + '\')" ondblclick="void editTextEl(\'' + el.id + '\')">' +
+        '<div style="font-size:12px;color:#666;white-space:pre-wrap;pointer-events:none;font-style:italic;min-height:' + (el.h || 56) + 'px;">' + esc(el.text || 'Designer notes...') + '</div>' +
+        (sel ? '<div class="db-el-handles-layer">' + resizeHandlesHtml() + '</div>' : '') +
+      '</div>';
     }
     if (el.type === 'pricetag') {
       var showP = dbEditor.showPricing && !dbEditor.clientView;
@@ -1494,14 +1873,23 @@
   function dbPatchProductTail(el, node) {
     node = node || dbFindElementDomNode(el.id);
     if (!node) return false;
-    var media = node.querySelector('.db-el-media');
-    if (!media) return false;
-    while (media.nextSibling) node.removeChild(media.nextSibling);
+    var anchor = node.querySelector('.db-el-frame') || node.querySelector('.db-el-media');
+    if (!anchor) return false;
+    var sib = anchor.nextSibling;
+    var toRemove = [];
+    while (sib) {
+      toRemove.push(sib);
+      sib = sib.nextSibling;
+    }
+    for (var ri = 0; ri < toRemove.length; ri++) {
+      var rm = toRemove[ri];
+      if (rm.parentNode === node) node.removeChild(rm);
+    }
     var tail = dbProductCaptionHtml(el) + dbProductPriceHtml(el);
     if (el.annotation) {
       tail += '<div class="db-el-annotation">' + esc(el.annotation) + '</div>';
     }
-    if (tail) media.insertAdjacentHTML('afterend', tail);
+    if (tail) anchor.insertAdjacentHTML('afterend', tail);
     return true;
   }
 
@@ -1616,17 +2004,13 @@
       if (!el) continue;
       node.classList.toggle('db-el-selected', sel);
       node.style.zIndex = sel ? '100' : (el.type === 'product' || el.type === 'image' ? '10' : (el.type === 'note' ? '15' : '20'));
-      var media = node.querySelector('.db-el-media');
-      if (media) {
-        media.querySelectorAll('.db-resize').forEach(function(h) { h.remove(); });
-        if (sel && dbElSupportsResize(el.type)) {
-          media.insertAdjacentHTML('beforeend', resizeHandles());
-        }
-      } else if (sel && dbElSupportsResize(el.type)) {
-        node.querySelectorAll('.db-resize').forEach(function(h) { h.remove(); });
-        node.insertAdjacentHTML('beforeend', resizeHandles());
+      var frame = node.querySelector('.db-el-frame');
+      if (frame) {
+        dbAttachResizeHandles(frame, sel && dbElSupportsResize(el.type));
+      } else if (el.type === 'note') {
+        dbAttachResizeHandles(node, sel);
       } else {
-        node.querySelectorAll('.db-resize').forEach(function(h) { h.remove(); });
+        node.querySelectorAll('.db-resize, .db-el-handles-layer').forEach(function(h) { h.remove(); });
       }
     }
     var svgEl = document.getElementById('dbArrowSvg');
@@ -1670,6 +2054,10 @@
     }
     if (el.h !== undefined) {
       html += propRow('Height', '<input id="dbPropH" class="db-prop-input" type="number" value="' + Math.round(el.h) + '" onchange="updateElProp(\'' + el.id + '\',\'h\',+this.value)" style="width:60px;">');
+    }
+    if (el.w !== undefined && el.h !== undefined && dbElSupportsResize(el.type)) {
+      html += '<div style="margin:6px 0 10px;"><button type="button" class="btn btn-secondary btn-sm" style="width:100%;font-size:11px;" onclick="dbZoomToSelection()">🔍 Zoom to selection</button>' +
+        '<div style="font-size:10px;color:var(--gray-500);margin-top:4px;line-height:1.35;">Toolbar <strong>+</strong>/<strong>−</strong>, keyboard <strong>+</strong>/<strong>−</strong>, or <strong>Ctrl+scroll</strong> to zoom the board (up to 400%). Drag gold grips to resize a tile. Hold <strong>Shift</strong> for locked proportions.</div></div>';
     }
 
     if (el.type === 'product' || el.type === 'image') {
@@ -2060,7 +2448,7 @@
       btn.addEventListener('click', function(ev) {
         ev.preventDefault();
         ev.stopPropagation();
-        window.dbRepairBoard();
+        window.dbUnstickBoard();
       }, true);
     });
   }
@@ -2109,13 +2497,24 @@
     node.style.left = (el.x || 0) + 'px';
     node.style.top = (el.y || 0) + 'px';
     if (el.w != null && el.w !== undefined) node.style.width = el.w + 'px';
-    var media = node.querySelector('.db-el-media');
-    if (media) {
-      if (el.w != null && el.w !== undefined) media.style.width = el.w + 'px';
-      if (el.h != null && el.h !== undefined) media.style.height = el.h + 'px';
-    } else if (el.h != null && el.h !== undefined) {
-      node.style.height = el.h + 'px';
-      node.style.minHeight = el.h + 'px';
+    var frame = node.querySelector('.db-el-frame');
+    if (frame) {
+      if (el.w != null && el.w !== undefined) frame.style.width = el.w + 'px';
+      if (el.h != null && el.h !== undefined) frame.style.height = el.h + 'px';
+      var media = frame.querySelector('.db-el-media');
+      if (media) {
+        if (el.w != null && el.w !== undefined) media.style.width = '100%';
+        if (el.h != null && el.h !== undefined) media.style.height = '100%';
+      }
+    } else {
+      var media = node.querySelector('.db-el-media');
+      if (media) {
+        if (el.w != null && el.w !== undefined) media.style.width = el.w + 'px';
+        if (el.h != null && el.h !== undefined) media.style.height = el.h + 'px';
+      } else if (el.h != null && el.h !== undefined) {
+        node.style.height = el.h + 'px';
+        node.style.minHeight = el.h + 'px';
+      }
     }
     return true;
   }
@@ -2172,20 +2571,33 @@
     return Math.abs(ev.clientX - startX) > threshold || Math.abs(ev.clientY - startY) > threshold;
   }
 
-  function dbApplyResize(el, dir, rs, dx, dy) {
+  function dbApplyResize(el, dir, rs, dx, dy, lockAspect) {
+    var ratio = (rs.w > 0 && rs.h > 0) ? (rs.w / rs.h) : 1;
     if (dir === 'se') {
       el.w = Math.max(DB_MIN_EL_SIZE, rs.w + dx);
       el.h = Math.max(DB_MIN_EL_SIZE, rs.h + dy);
+      if (lockAspect) {
+        if (Math.abs(dx) >= Math.abs(dy)) el.h = Math.max(DB_MIN_EL_SIZE, el.w / ratio);
+        else el.w = Math.max(DB_MIN_EL_SIZE, el.h * ratio);
+      }
     } else if (dir === 'sw') {
       var nw = Math.max(DB_MIN_EL_SIZE, rs.w - dx);
       el.x = rs.x + (rs.w - nw);
       el.w = nw;
       el.h = Math.max(DB_MIN_EL_SIZE, rs.h + dy);
+      if (lockAspect) {
+        if (Math.abs(dx) >= Math.abs(dy)) el.h = Math.max(DB_MIN_EL_SIZE, el.w / ratio);
+        else { el.w = Math.max(DB_MIN_EL_SIZE, el.h * ratio); el.x = rs.x + (rs.w - el.w); }
+      }
     } else if (dir === 'ne') {
       el.w = Math.max(DB_MIN_EL_SIZE, rs.w + dx);
       var nh = Math.max(DB_MIN_EL_SIZE, rs.h - dy);
       el.y = rs.y + (rs.h - nh);
       el.h = nh;
+      if (lockAspect) {
+        if (Math.abs(dx) >= Math.abs(dy)) { el.h = Math.max(DB_MIN_EL_SIZE, el.w / ratio); el.y = rs.y + (rs.h - el.h); }
+        else el.w = Math.max(DB_MIN_EL_SIZE, el.h * ratio);
+      }
     } else if (dir === 'nw') {
       var nw2 = Math.max(DB_MIN_EL_SIZE, rs.w - dx);
       var nh2 = Math.max(DB_MIN_EL_SIZE, rs.h - dy);
@@ -2193,8 +2605,34 @@
       el.y = rs.y + (rs.h - nh2);
       el.w = nw2;
       el.h = nh2;
+      if (lockAspect) {
+        if (Math.abs(dx) >= Math.abs(dy)) {
+          el.h = Math.max(DB_MIN_EL_SIZE, el.w / ratio);
+          el.y = rs.y + (rs.h - el.h);
+        } else {
+          el.w = Math.max(DB_MIN_EL_SIZE, el.h * ratio);
+          el.x = rs.x + (rs.w - el.w);
+        }
+      }
+    } else if (dir === 'e') {
+      el.w = Math.max(DB_MIN_EL_SIZE, rs.w + dx);
+    } else if (dir === 'w') {
+      var nw3 = Math.max(DB_MIN_EL_SIZE, rs.w - dx);
+      el.x = rs.x + (rs.w - nw3);
+      el.w = nw3;
+    } else if (dir === 's') {
+      el.h = Math.max(DB_MIN_EL_SIZE, rs.h + dy);
+    } else if (dir === 'n') {
+      var nh3 = Math.max(DB_MIN_EL_SIZE, rs.h - dy);
+      el.y = rs.y + (rs.h - nh3);
+      el.h = nh3;
     }
   }
+
+  var DB_RESIZE_CURSORS = {
+    nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize',
+    n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize'
+  };
 
   window.arrowHandleDown = function(e, id, end) {
     if (dbEditor.clientView) return;
@@ -2239,6 +2677,7 @@
     if (dbEditor.clientView) return;
     if (e.button !== 0) return;
     e.stopPropagation();
+    if (e.target.closest && e.target.closest('.db-resize')) return;
     if (e.target.classList && e.target.classList.contains('db-resize')) return;
 
     if (_dbPointerGesture || dbEditor.isDragging || dbEditor.isResizing) {
@@ -2285,13 +2724,17 @@
           dbRenderArrowsOnly();
         } else if (canvas && el.type !== 'arrow') {
           var pt2 = dbCanvasPointFromEvent(ev, canvas);
-          el.x = Math.max(0, origX + pt2.mx - startPt.mx);
-          el.y = Math.max(0, origY + pt2.my - startPt.my);
+          el.x = origX + pt2.mx - startPt.mx;
+          el.y = origY + pt2.my - startPt.my;
+          dbClampElPositionOnCanvas(el);
           dbPatchElementDom(el);
         }
       },
       onUp: function() {
-        if (moved) dbEditor.dirty = true;
+        if (moved) {
+          dbClampElPositionOnCanvas(el);
+          dbEditor.dirty = true;
+        }
         dbFinishGestureDom(el, moved);
       },
       onAbort: function() {
@@ -2355,13 +2798,13 @@
           if (!dbGestureMoved(ev, startX, startY)) return;
           moved = true;
           dbEditor.isResizing = true;
-          document.body.style.cursor = 'nwse-resize';
+          document.body.style.cursor = DB_RESIZE_CURSORS[dir] || 'nwse-resize';
           document.body.style.userSelect = 'none';
           pushUndo();
         }
         if (canvas) {
           var pt = dbCanvasPointFromEvent(ev, canvas);
-          dbApplyResize(el, dir, rs, pt.mx - startPt.mx, pt.my - startPt.my);
+          dbApplyResize(el, dir, rs, pt.mx - startPt.mx, pt.my - startPt.my, !!ev.shiftKey);
         }
         dbPatchElementDom(el);
       },
@@ -2566,6 +3009,80 @@
       setTimeout(function() { finish(null); }, 4000);
       im.src = url;
     });
+  }
+
+  /** Resolve + validate a pasted image URL for design-board tiles. */
+  function dbNormalizeBoardImageUrl(raw) {
+    var url = String(raw == null ? '' : raw).trim();
+    if (!url) return '';
+    if (typeof window._resolveImgSrc === 'function') {
+      url = window._resolveImgSrc(url) || url;
+    }
+    if (!/^https?:\/\//i.test(url) && url.indexOf('//') !== 0 && !/^data:image/i.test(url)) {
+      return '';
+    }
+    return url;
+  }
+
+  /** Probe remote image dimensions (best-effort; may fail on hotlink-protected hosts). */
+  function dbReadImageNaturalSizeFromUrl(url) {
+    return new Promise(function(resolve) {
+      url = String(url || '').trim();
+      if (!url) { resolve(null); return; }
+      var im = new Image();
+      im.referrerPolicy = 'no-referrer';
+      var done = false;
+      var finish = function(out) {
+        if (done) return;
+        done = true;
+        resolve(out);
+      };
+      im.onload = function() { finish({ w: im.naturalWidth || 0, h: im.naturalHeight || 0 }); };
+      im.onerror = function() { finish(null); };
+      setTimeout(function() { finish(null); }, 8000);
+      im.src = url;
+    });
+  }
+
+  function dbBoardTileSizeFromNatural(nat, fallbackW, fallbackH) {
+    var w = fallbackW || 220;
+    var h = fallbackH || 220;
+    if (nat && nat.w > 0 && nat.h > 0) {
+      var sc = 320 / Math.max(nat.w, nat.h);
+      w = Math.max(120, Math.round(nat.w * sc));
+      h = Math.max(120, Math.round(nat.h * sc));
+    }
+    return { w: w, h: h };
+  }
+
+  /** Import vendor image via Cloud Function (no browser CORS). */
+  async function dbImportImageUrlViaCloud(url) {
+    if (!url || !dbEditor.projectId || !dbEditor.boardId) return '';
+    if (typeof firebase === 'undefined' || !firebase.app || !firebase.auth || !firebase.auth().currentUser) return '';
+    try {
+      var fn = firebase.app().functions('us-central1').httpsCallable('importDesignBoardImageFromUrl');
+      var res = await fn({
+        projectId: dbEditor.projectId,
+        boardId: dbEditor.boardId,
+        imageUrl: url
+      });
+      return (res && res.data && res.data.downloadUrl) ? String(res.data.downloadUrl) : '';
+    } catch (e) {
+      var msg = (e && e.message) ? String(e.message) : String(e || 'Import failed');
+      console.warn('[design board] cloud image import', msg);
+      window._dbLastImageImportError = msg;
+      return '';
+    }
+  }
+
+  /** Fetch remote image bytes and store on Firebase (same durability as From computer). */
+  async function dbUploadRemoteImageUrlToStorage(url, extHint) {
+    if (!url || !dbEditor.projectId || !dbEditor.boardId) return '';
+    if (/firebasestorage\.googleapis\.com|\.firebasestorage\.app/i.test(url)) return url;
+    // Vendor CDNs block browser XHR — server import first (skip client fetch to avoid CORS console noise).
+    var cloudUrl = await dbImportImageUrlViaCloud(url);
+    if (cloudUrl) return cloudUrl;
+    return '';
   }
 
   async function dbUploadImageFilesToCanvas(files, mx, my) {
@@ -2797,7 +3314,8 @@
   }
 
   // ==================== SAVE & EXPORT ====================
-  window.saveBoardToFirestore = async function() {
+  window.saveBoardToFirestore = async function(opts) {
+    opts = opts || {};
     try {
       enrichProductElementsFromClipsForSave();
       var normSave = dbNormalizeBoardElements(dbEditor.elements);
@@ -2820,13 +3338,13 @@
       dbEditor.dirty = false;
       // Flash save confirmation
       var btn = document.querySelector('[onclick="saveBoardToFirestore()"]');
-      if (btn) {
+      if (btn && !opts.quiet) {
         var orig = btn.textContent;
         btn.textContent = '✓ Saved';
         btn.style.background = 'var(--green)';
         setTimeout(function() { btn.textContent = orig; btn.style.background = ''; }, 1200);
       }
-      if (typeof showToast === 'function') showToast('Design board saved.', 'success', 2200);
+      if (!opts.quiet && typeof showToast === 'function') showToast('Design board saved.', 'success', 2200);
     } catch(e) {
       console.error('Save error:', e);
       if (typeof showToast === 'function') showToast('Could not save design board — check connection and try Save again.', 'error', 6000);
@@ -3203,18 +3721,62 @@
 
   window.addImageToBoard = async function() {
     if (typeof cchPrompt !== 'function') return;
+    if (!dbEditor.projectId || !dbEditor.boardId) {
+      if (typeof showToast === 'function') showToast('Open a saved design board first', 'warning');
+      return;
+    }
     var url = await cchPrompt('Image URL (paste from browser or right-click > copy image address):', '', 'Add image');
     if (url === null) return;
-    url = String(url || '').trim();
-    if (!url) return;
+    url = dbNormalizeBoardImageUrl(url);
+    if (!url) {
+      if (typeof showToast === 'function') {
+        showToast('That does not look like a direct image link. Right-click the image and choose Copy image address — not the page URL.', 'error', 6500);
+      } else if (typeof cchAlert === 'function') {
+        await cchAlert('That does not look like a direct image link.\n\nRight-click the image on the website and choose Copy image address — not the page URL from the address bar.', 'Add image');
+      }
+      return;
+    }
     var titleOpt = await cchPrompt('Title (optional):', '', 'Image title');
     if (titleOpt === null) return;
-    dbPlaceProductOnCanvas(url, {
+    if (typeof showToast === 'function') showToast('Importing image…', 3000);
+    var storedUrl = url;
+    var uploaded = false;
+    try {
+      var hosted = await dbUploadRemoteImageUrlToStorage(url);
+      if (hosted) {
+        storedUrl = hosted;
+        uploaded = true;
+      }
+    } catch (eUp) {
+      console.warn('[design board] url upload', eUp);
+    }
+    var nat = await dbReadImageNaturalSizeFromUrl(storedUrl);
+    if (!nat || !(nat.w > 0 && nat.h > 0)) {
+      nat = await dbReadImageNaturalSizeFromUrl(url);
+    }
+    var size = dbBoardTileSizeFromNatural(nat, 250, 250);
+    var p = dbDefaultAddPoint(size.w, size.h);
+    dbPlaceProductOnCanvas(storedUrl, {
       title: String(titleOpt || '').trim(),
-      w: 250,
-      h: 250,
+      w: size.w,
+      h: size.h,
       showPrice: false
-    }, 100, 100);
+    }, p.x + size.w / 2, p.y + size.h / 2);
+    if (typeof showToast === 'function') {
+      if (uploaded) {
+        showToast('Image added — saved to project storage. Click Save to persist.', 'success', 4000);
+      } else {
+        var errHint = String(window._dbLastImageImportError || '').trim();
+        showToast(errHint || 'Could not import that URL. Right-click the image → Copy image address, or use From computer.', 'error', 7000);
+        // Remove empty tile if hotlink also failed
+        if (!nat || !(nat.w > 0)) {
+          dbEditor.elements = (dbEditor.elements || []).filter(function(el) { return el.id !== dbEditor.selectedId; });
+          dbEditor.selectedId = null;
+          renderCanvas();
+          renderProps();
+        }
+      }
+    }
   };
 
   /** Update existing tile image in place (keeps el.id + clipId; does not create library/clip rows). */
@@ -3616,7 +4178,89 @@
     document.body.appendChild(ov);
   };
 
-  window.dbPrintBoard = function() {
+  /** Scale inline px lengths (Chrome print breaks CSS transform:scale on absolute tiles). */
+  function dbScaleInlineStylePx(node, s) {
+    if (!node || !node.style || !(s > 0) || s === 1) return;
+    var props = ['left', 'top', 'right', 'bottom', 'width', 'height', 'maxWidth', 'minWidth', 'minHeight', 'maxHeight', 'fontSize', 'letterSpacing', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'marginTop', 'marginRight', 'marginBottom', 'marginLeft'];
+    for (var i = 0; i < props.length; i++) {
+      var prop = props[i];
+      var val = node.style[prop];
+      if (!val || val.indexOf('px') < 0) continue;
+      var n = parseFloat(val);
+      if (isFinite(n)) node.style[prop] = (n * s) + 'px';
+    }
+    var pad = node.style.padding;
+    if (pad && pad.indexOf('px') >= 0) {
+      node.style.padding = pad.replace(/([\d.]+)px/g, function(_, num) {
+        return (parseFloat(num) * s) + 'px';
+      });
+    }
+  }
+
+  function dbScaleSvgNumberAttr(el, attr, s) {
+    if (!el || !el.hasAttribute(attr)) return;
+    var n = parseFloat(el.getAttribute(attr));
+    if (isFinite(n)) el.setAttribute(attr, String(n * s));
+  }
+
+  /**
+   * Fit board into landscape printable area by rewriting left/top/width/height (and SVG coords).
+   * Do NOT use transform:scale — Chrome print collapses absolute children into a pile.
+   */
+  function dbScalePrintCloneGeometry(clone, s) {
+    if (!clone || !(s > 0)) return;
+    if (s !== 1) {
+      var all = clone.querySelectorAll('*');
+      for (var i = 0; i < all.length; i++) dbScaleInlineStylePx(all[i], s);
+      dbScaleInlineStylePx(clone, s);
+      clone.querySelectorAll('line, text, circle, polygon').forEach(function(el) {
+        ['x1', 'y1', 'x2', 'y2', 'x', 'y', 'cx', 'cy', 'r', 'font-size', 'stroke-width'].forEach(function(a) {
+          dbScaleSvgNumberAttr(el, a, s);
+        });
+      });
+      clone.querySelectorAll('marker').forEach(function(m) {
+        ['markerWidth', 'markerHeight', 'refX', 'refY'].forEach(function(a) {
+          dbScaleSvgNumberAttr(m, a, s);
+        });
+      });
+    }
+  }
+
+  function dbPrintFitScale(cw, ch) {
+    // Letter landscape @ ~96dpi with 8mm margins (matches @page below)
+    var marginPx = (8 / 25.4) * 96;
+    var availW = Math.max(320, 11 * 96 - 2 * marginPx);
+    var availH = Math.max(320, 8.5 * 96 - 2 * marginPx);
+    return Math.min(1, availW / cw, availH / ch);
+  }
+
+  function dbWaitForPrintImages(doc, maxMs) {
+    return new Promise(function(resolve) {
+      var imgs = Array.prototype.slice.call(doc.querySelectorAll('img'));
+      if (!imgs.length) { resolve(); return; }
+      var left = imgs.length;
+      var settled = false;
+      var finish = function() {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+      var tick = function() {
+        left -= 1;
+        if (left <= 0) finish();
+      };
+      setTimeout(finish, maxMs || 4500);
+      imgs.forEach(function(img) {
+        if (img.complete) tick();
+        else {
+          img.addEventListener('load', tick, { once: true });
+          img.addEventListener('error', tick, { once: true });
+        }
+      });
+    });
+  }
+
+  window.dbPrintBoard = async function() {
     var canvas = document.getElementById('dbCanvas');
     if (!canvas) return;
     dbEditor.selectedId = null;
@@ -3629,14 +4273,20 @@
     var boardLabel = esc(_dbBoardLabel(dbEditor.boardData));
     var includeName = !!window._dbPrintIncludeBoardName;
     var clone = canvas.cloneNode(true);
-    clone.querySelectorAll('.db-resize').forEach(function(n) { n.remove(); });
+    clone.querySelectorAll('.db-resize, .db-el-handles-layer').forEach(function(n) { n.remove(); });
+    clone.querySelectorAll('.db-el-selected').forEach(function(n) { n.classList.remove('db-el-selected'); });
     var hint = clone.querySelector('#dbCanvasDropHint');
     if (hint) hint.remove();
+    var s = dbPrintFitScale(cw, ch);
+    var pcw = Math.max(1, Math.round(cw * s));
+    var pch = Math.max(1, Math.round(ch * s));
+    dbScalePrintCloneGeometry(clone, s);
     clone.style.boxShadow = 'none';
-    clone.style.width = cw + 'px';
-    clone.style.height = ch + 'px';
-    clone.style.minHeight = ch + 'px';
-    clone.style.maxHeight = ch + 'px';
+    clone.style.transform = 'none';
+    clone.style.width = pcw + 'px';
+    clone.style.height = pch + 'px';
+    clone.style.minHeight = pch + 'px';
+    clone.style.maxHeight = pch + 'px';
     var brandClone = clone.querySelector('#dbBranding');
     if (brandClone) {
       brandClone.style.position = 'absolute';
@@ -3644,55 +4294,49 @@
       brandClone.style.right = '0';
       brandClone.style.bottom = '0';
       brandClone.style.top = 'auto';
-      brandClone.style.paddingBottom = '14px';
+      brandClone.style.paddingBottom = Math.max(6, Math.round(14 * s)) + 'px';
     }
     var footnote = includeName
       ? '<div class="db-print-footnote">' + boardLabel + '</div>'
       : '';
+    var capFs = Math.max(9, Math.round(14 * s));
+    var descFs = Math.max(8, Math.round(12 * s));
+    var priceFs = Math.max(9, Math.round(14 * s));
     var printCss =
       '@page{size:landscape;margin:8mm;}' +
       'html,body{margin:0;padding:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
-      '.db-print-sheet{padding:0;box-sizing:border-box;}' +
-      '#dbPrintWrap{margin:0 auto;overflow:visible;page-break-inside:avoid;break-inside:avoid;}' +
-      '#dbPrintInner{transform-origin:top left;width:' + cw + 'px;height:' + ch + 'px;margin:0 auto;}' +
-      '#dbCanvas{position:relative;overflow:hidden;background:#fff;font-family:"Cormorant Garamond",Georgia,serif;}' +
+      '.db-print-sheet{padding:0;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;}' +
+      '#dbPrintWrap{margin:0 auto;overflow:visible;page-break-inside:avoid;break-inside:avoid;width:' + pcw + 'px;}' +
+      '#dbPrintInner{width:' + pcw + 'px;height:' + pch + 'px;margin:0 auto;transform:none!important;}' +
+      '#dbCanvas{position:relative;overflow:hidden;background:#fff;font-family:"Cormorant Garamond",Georgia,serif;transform:none!important;}' +
+      '.db-el{transform:none!important;}' +
       '.db-el-product{box-sizing:border-box;}' +
       '.db-el-media{position:relative;box-sizing:border-box;background:#fff;border:1px solid rgba(15,26,46,0.06);border-radius:2px;overflow:hidden;}' +
       '.db-el-media img{width:100%;height:100%;object-fit:cover;object-position:center;display:block;}' +
-      '.db-el-caption{margin-top:5px;font-size:14px;font-weight:600;color:#1B3352;text-align:center;line-height:1.3;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;}' +
-      '.db-el-desc{margin-top:3px;font-size:12px;color:#4B5563;text-align:center;line-height:1.4;white-space:pre-wrap;}' +
-      '.db-el-price{margin-top:3px;font-size:14px;font-weight:700;color:#0A1F3D;text-align:center;font-family:ui-monospace,monospace;}' +
-      '.db-el-annotation{margin-top:4px;font-size:12px;color:#6B7280;text-align:center;font-style:italic;white-space:pre-line;line-height:1.35;}' +
+      '.db-el-caption{margin-top:' + Math.max(2, Math.round(5 * s)) + 'px;font-size:' + capFs + 'px;font-weight:600;color:#1B3352;text-align:center;line-height:1.3;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;}' +
+      '.db-el-desc{margin-top:' + Math.max(1, Math.round(3 * s)) + 'px;font-size:' + descFs + 'px;color:#4B5563;text-align:center;line-height:1.4;white-space:pre-wrap;}' +
+      '.db-el-price{margin-top:' + Math.max(1, Math.round(3 * s)) + 'px;font-size:' + priceFs + 'px;font-weight:700;color:#0A1F3D;text-align:center;font-family:ui-monospace,monospace;}' +
+      '.db-el-annotation{margin-top:' + Math.max(2, Math.round(4 * s)) + 'px;font-size:' + descFs + 'px;color:#6B7280;text-align:center;font-style:italic;white-space:pre-line;line-height:1.35;}' +
       '.db-print-footnote{margin:8px auto 0;text-align:center;font-family:Georgia,serif;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#9CA3AF;page-break-before:avoid;}' +
       '@media print{' +
         'html,body{width:100%;height:auto;overflow:visible;}' +
         '.db-print-sheet{page-break-inside:avoid;break-inside:avoid;}' +
         '#dbPrintWrap{page-break-inside:avoid;break-inside:avoid;overflow:visible!important;}' +
-        '#dbPrintInner{page-break-inside:avoid;break-inside:avoid;}' +
-        '#dbCanvas{page-break-inside:avoid;break-inside:avoid;}' +
+        '#dbPrintInner{page-break-inside:avoid;break-inside:avoid;transform:none!important;}' +
+        '#dbCanvas{page-break-inside:avoid;break-inside:avoid;transform:none!important;}' +
         'img{-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
       '}';
     var html = '<html><head><meta charset="utf-8"><title>' + boardLabel + ' — Design Board</title>' +
       '<style>' + printCss + '</style></head><body>' +
       '<div class="db-print-sheet"><div id="dbPrintWrap"><div id="dbPrintInner">' + clone.outerHTML + '</div></div>' + footnote + '</div>' +
-      '<script>(function(){var cw=' + cw + ',ch=' + ch + ';' +
-      'function avail(forPrint){var pad=forPrint?16:24;' +
-      'var aw=Math.max(320,(window.innerWidth||960)-pad);' +
-      'var ah=Math.max(320,(window.innerHeight||720)-pad-(forPrint?0:0));' +
-      'return{aw:aw,ah:ah};}' +
-      'function applyScale(forPrint){var inner=document.getElementById("dbPrintInner");var wrap=document.getElementById("dbPrintWrap");if(!inner)return;' +
-      'var a=avail(!!forPrint);var s=Math.min(1,a.aw/cw,a.ah/ch);' +
-      'inner.style.transform="scale("+s+")";inner.style.transformOrigin="top left";' +
-      'inner.style.width=cw+"px";inner.style.height=ch+"px";' +
-      'if(wrap){wrap.style.width=Math.ceil(cw*s)+"px";wrap.style.height=Math.ceil(ch*s)+"px";wrap.style.margin="0 auto";}}' +
-      'applyScale(false);window.onresize=function(){applyScale(false);};' +
-      'window.onbeforeprint=function(){applyScale(true);};' +
-      'window.onafterprint=function(){applyScale(false);};' +
-      '})();<\/script></body></html>';
+      '</body></html>';
     w.document.write(html);
     w.document.close();
     w.focus();
     w.onafterprint = function() { try { w.close(); } catch (e) {} };
+    try {
+      await dbWaitForPrintImages(w.document, 4500);
+    } catch (eWait) {}
     setTimeout(function() {
       try {
         if (typeof w.document.execCommand === 'function') {
@@ -3703,7 +4347,7 @@
       } catch (e) {
         try { w.print(); } catch (e2) {}
       }
-    }, 600);
+    }, 200);
   };
 
   // ==================== CSS for editor ============================
@@ -3804,7 +4448,89 @@
     return n;
   }
 
-  /** Nudge overlapping product tiles apart — keeps every item, only moves x/y. */
+  function dbSyncCanvasDomSize() {
+    var cvs = document.getElementById('dbCanvas');
+    if (!cvs || !dbEditor.boardData) return;
+    var cw = dbEditor.boardData.canvasWidth || 1400;
+    var ch = dbEditor.boardData.canvasHeight || 1000;
+    cvs.style.width = cw + 'px';
+    cvs.style.height = ch + 'px';
+    cvs.style.minHeight = ch + 'px';
+    var spacer = document.getElementById('dbCanvasSpacer');
+    if (spacer) {
+      spacer.style.width = cw + 'px';
+      spacer.style.height = ch + 'px';
+    }
+  }
+
+  /** Keep at least ~48px of a tile on the board; grow canvas height instead of clipping off the bottom. */
+  function dbClampElPositionOnCanvas(el) {
+    if (!el || el.type === 'arrow' || !dbEditor.boardData) return false;
+    var maxW = dbEditor.boardData.canvasWidth || 1400;
+    var maxH = dbEditor.boardData.canvasHeight || 1000;
+    var w = el.w || 180;
+    var h = el.h || 180;
+    var x = el.x || 0;
+    var y = el.y || 0;
+    var minVisible = 48;
+    var nx = Math.max(0, Math.min(x, Math.max(0, maxW - Math.min(minVisible, w))));
+    var ny = Math.max(0, y);
+    var grew = false;
+    if (ny + h > maxH - 8) {
+      maxH = Math.ceil(ny + h + 64);
+      dbEditor.boardData.canvasHeight = Math.max(dbEditor.boardData.canvasHeight || 1000, maxH);
+      grew = true;
+    }
+    if (grew) dbSyncCanvasDomSize();
+    if (nx !== x || ny !== y) {
+      el.x = nx;
+      el.y = ny;
+      return true;
+    }
+    return grew;
+  }
+
+  /** Pull tiles that sit fully/mostly outside the canvas back into view (and grow height if needed). */
+  function dbRescueOffCanvasTiles() {
+    if (!dbEditor.boardData) return 0;
+    var maxW = dbEditor.boardData.canvasWidth || 1400;
+    var maxH = dbEditor.boardData.canvasHeight || 1000;
+    var rescued = 0;
+    var grewH = maxH;
+    (dbEditor.elements || []).forEach(function(el) {
+      if (!el || el.type === 'arrow') return;
+      var box = dbElementVisualBox(el);
+      var w = Math.max(24, box.w || el.w || 180);
+      var h = Math.max(24, box.h || el.h || 40);
+      var x = el.x || 0;
+      var y = el.y || 0;
+      var nx = x;
+      var ny = y;
+      if (x < 0) nx = 0;
+      if (y < 0) ny = 0;
+      if (nx >= maxW - 8) nx = Math.max(0, maxW - Math.min(w, maxW));
+      if (nx + w > maxW) nx = Math.max(0, maxW - Math.min(w, maxW));
+      if (ny >= maxH - 8) {
+        grewH = Math.max(grewH, Math.ceil(ny + h + 64));
+      } else if (ny + h > maxH) {
+        grewH = Math.max(grewH, Math.ceil(ny + h + 48));
+      }
+      if (nx !== x || ny !== y) {
+        el.x = nx;
+        el.y = ny;
+        rescued++;
+      } else if (y >= maxH - 8 || y + h > maxH + 1) {
+        rescued++;
+      }
+    });
+    if (grewH > maxH) {
+      dbEditor.boardData.canvasHeight = grewH;
+      dbSyncCanvasDomSize();
+    }
+    return rescued;
+  }
+
+  /** Nudge overlapping product tiles apart — keeps every item; grows canvas instead of shoving off-edge. */
   function dbSpreadStackedTiles() {
     var maxW = (dbEditor.boardData && dbEditor.boardData.canvasWidth) || 1400;
     var maxH = (dbEditor.boardData && dbEditor.boardData.canvasHeight) || 1000;
@@ -3826,12 +4552,13 @@
           any = true;
           moved++;
           a.y = boxB.bottom + 16;
-          if (a.y + boxA.h > maxH - 24) {
-            a.y = boxB.y;
-            a.x = boxB.right + 16;
+          a.x = a.x || 0;
+          if (a.x + boxA.w > maxW - 8) {
+            a.x = Math.max(0, maxW - Math.min(boxA.w, maxW));
           }
-          if (a.x + boxA.w > maxW - 24) {
-            a.x = Math.max(0, (a.x || 0) + 28);
+          if (a.y + boxA.h > maxH - 24) {
+            maxH = Math.ceil(a.y + boxA.h + 64);
+            if (dbEditor.boardData) dbEditor.boardData.canvasHeight = Math.max(dbEditor.boardData.canvasHeight || 1000, maxH);
           }
           a.x = Math.max(0, a.x || 0);
           a.y = Math.max(0, a.y || 0);
@@ -3839,19 +4566,29 @@
       }
       if (!any) break;
     }
+    if (dbEditor.boardData && (dbEditor.boardData.canvasHeight || 1000) > ((document.getElementById('dbCanvas') && parseFloat(document.getElementById('dbCanvas').style.height)) || 0)) {
+      var cvs = document.getElementById('dbCanvas');
+      var ch = dbEditor.boardData.canvasHeight || 1000;
+      if (cvs) {
+        cvs.style.height = ch + 'px';
+        cvs.style.minHeight = ch + 'px';
+      }
+    }
     return moved;
   }
 
   // ==================== TIDY BOARD (auto-arrange) ====================
   /**
-   * One-click magazine layout: headings centered at top, then product/image tiles in
-   * justified rows (aspect ratios preserved, equal gutters, flush edges) with room
-   * reserved under every tile for its caption + price. Text/notes/arrows are left alone.
-   * Fully undoable (single Undo step).
+   * Magazine layout for product/image tiles. Undoable. Does NOT auto-save
+   * (autosave previously persisted clipped tiles that looked deleted).
    */
   window.dbTidyBoard = function() {
     try {
-      var bd = dbEditor.boardData || {};
+      var bd = dbEditor.boardData;
+      if (!bd) {
+        if (typeof showToast === 'function') showToast('Board not ready — wait a second and try Tidy again.', 3000);
+        return;
+      }
       var cw = bd.canvasWidth || 1400;
       var margin = 48;
       var gutter = 28;
@@ -3892,21 +4629,29 @@
       function flushRow(isLast) {
         if (!row.length) return;
         var gaps = gutter * (row.length - 1);
-        var h = (avail - gaps) / aspectSum;
-        if (isLast) h = Math.min(h, targetH);       // don't blow up a sparse final row
+        var h = (avail - gaps) / Math.max(0.01, aspectSum);
+        if (isLast) h = Math.min(h, targetH);
         h = Math.max(140, Math.min(h, 460));
         var x = margin;
         var maxExtras = 0;
-        row.forEach(function(t) {
+        var i;
+        for (i = 0; i < row.length; i++) {
+          var t = row[i];
           var ar = aspectOf(t);
           t.h = Math.round(h);
-          t.w = Math.round(h * ar);
+          t.w = Math.max(80, Math.round(h * ar));
           t.x = Math.round(x);
           t.y = Math.round(y);
-          x += t.w + gutter;
+          // Keep every tile inside the white board — overflow:hidden clips look like deletes
+          if (t.x + t.w > cw - margin) {
+            t.w = Math.max(80, cw - margin - t.x);
+          }
+          if (t.x < margin) t.x = margin;
+          if (t.y < 0) t.y = 0;
+          x = t.x + t.w + gutter;
           var ex = dbTileExtrasH(t);
           if (ex > maxExtras) maxExtras = ex;
-        });
+        }
         y += Math.round(h) + maxExtras + gutter;
         row = [];
         aspectSum = 0;
@@ -3915,31 +4660,37 @@
         row.push(t);
         aspectSum += aspectOf(t);
         var gaps = gutter * (row.length - 1);
-        // Flush when the row is visually full, or at 5 tiles — rows of narrow sconces
-        // otherwise cram 7-8 across and read like thumbnails, not a curated board.
         if ((avail - gaps) / aspectSum <= targetH || row.length >= 5) flushRow(false);
       });
       flushRow(true);
 
-      // Fit the canvas to the new layout (footer needs ~90px), grow or trim — never below 800
-      var needed = Math.ceil(y - gutter + 100);
-      bd.canvasHeight = Math.max(800, needed);
+      // Authoritative height from true footprints (image + captions)
+      var contentBottom = dbComputeElementsBottom();
+      bd.canvasHeight = Math.max(800, Math.ceil(contentBottom + 100));
+      dbRescueOffCanvasTiles();
 
+      dbEditor.selectedId = null;
       dbEditor.dirty = true;
       renderCanvas();
+      dbSyncCanvasDomSize();
       dbSyncBrandingFooter();
       dbApplyViewZoom();
       dbFitCanvasToView(true);
+      var wrap = document.getElementById('dbCanvasWrap');
+      if (wrap) {
+        wrap.scrollTop = 0;
+        wrap.scrollLeft = 0;
+      }
       renderProps();
       var banner = document.getElementById('dbOverlapBanner');
       if (banner) banner.remove();
-      autoSave(800);
+      // No autoSave — autosave was locking in clipped layouts that looked deleted
       if (typeof showToast === 'function') {
-        showToast('✨ Board tidied — ' + tiles.length + ' items arranged. Undo (Ctrl+Z) restores the old layout.', 4500);
+        showToast('Board tidied — ' + tiles.length + ' items. Ctrl+Z undoes. Save when it looks right.', 5500);
       }
     } catch (err) {
       console.error('[design board] tidy failed:', err);
-      if (typeof showToast === 'function') showToast('Tidy error — nothing was lost. Try Undo.', 4000);
+      if (typeof showToast === 'function') showToast('Tidy error — nothing was lost. Try Undo (Ctrl+Z).', 4000);
     }
   };
 
@@ -3950,17 +4701,99 @@
     var bar = document.createElement('div');
     bar.id = 'dbOverlapBanner';
     bar.style.cssText = 'padding:10px 14px;background:rgba(180,83,9,0.1);border-bottom:1px solid rgba(180,83,9,0.25);font-size:12px;color:#92400E;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;';
-    bar.innerHTML = '<span><strong>Stacked tiles detected</strong> — ' + overlapPairs + ' overlap' + (overlapPairs !== 1 ? 's' : '') + '. Your work is safe. <strong>✨ Tidy board</strong> lays everything out in a clean grid; <strong>Repair</strong> just nudges tiles apart.</span>' +
+    bar.innerHTML = '<span><strong>Stacked tiles detected</strong> — ' + overlapPairs + ' overlap' + (overlapPairs !== 1 ? 's' : '') + '. Your work is safe. Nothing was moved. Use <strong>✨ Tidy</strong> or <strong>Spread stacks</strong> only if you want them rearranged.</span>' +
       '<span style="display:flex;gap:8px;flex-shrink:0;">' +
         '<button type="button" class="btn btn-primary btn-sm" onclick="void dbTidyBoard()">✨ Tidy board</button>' +
-        '<button type="button" class="btn btn-secondary btn-sm" onclick="void dbRepairBoard(true)">Repair board</button>' +
+        '<button type="button" class="btn btn-secondary btn-sm" onclick="void dbRepairBoard(true)">Spread stacks</button>' +
         '<button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById(\'dbOverlapBanner\').remove()">Dismiss</button>' +
       '</span>';
     var tb = document.getElementById('dbToolbar');
     if (tb && tb.parentNode) tb.parentNode.insertBefore(bar, tb.nextSibling);
   }
 
-  /** Unstick gestures + purge ghosts + spread stacked tiles. Never deletes elements. */
+  function dbClearBoardPointerChrome() {
+    var wrap = document.getElementById('dbCanvasWrap');
+    if (wrap) {
+      wrap.style.outline = '';
+      wrap.style.pointerEvents = '';
+      wrap.style.cursor = 'default';
+    }
+    var stage = document.getElementById('dbCanvasStage');
+    if (stage) stage.style.pointerEvents = '';
+    var cvs = document.getElementById('dbCanvas');
+    if (cvs) cvs.style.pointerEvents = '';
+    document.body.style.pointerEvents = '';
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }
+
+  /**
+   * End stuck drag AND clear selection chrome. CRITICAL: abort (revert) in-progress drag —
+   * do NOT finish/commit the stuck pointer position (that flung tiles off-canvas and looked like erase).
+   * Never purge DOM without a full model rebuild. Never deletes elements.
+   */
+  window.dbUnstickBoard = function() {
+    try {
+      // Abort restores pre-drag x/y via onAbort. Finish/onUp would keep bad stuck coords.
+      if (_dbPointerGesture) {
+        dbAbortPointerGesture();
+      } else {
+        dbForceRemoveAllDragListeners();
+        dbClearAllDragTransforms();
+      }
+      dbEditor.isDragging = false;
+      dbEditor.isResizing = false;
+      dbEditor.arrowStart = null;
+      dbEditor.tool = 'select';
+      dbEditor._propsPanelForId = null;
+      _dbSuppressSidebarDblClickUntil = 0;
+
+      // Gold grips / selected outline — Unstick used to leave these on (looked "still sticky")
+      dbEditor.selectedId = null;
+
+      var coverModal = document.getElementById('dbCoverPickerModal');
+      if (coverModal) coverModal.remove();
+
+      // Pull anything that still sits outside the white board back into view
+      (dbEditor.elements || []).forEach(function(el) {
+        if (el && el.type !== 'arrow') dbClampElPositionOnCanvas(el);
+      });
+
+      // Full rebuild from model — guarantees tiles reappear even if DOM was messy
+      renderCanvas();
+      dbSyncCanvasDomSize();
+      dbUpdateSelectionDom();
+      refreshDbToolbarTools();
+      renderProps();
+      dbClearBoardPointerChrome();
+
+      var tb = document.getElementById('dbUnstickToolbarBtn');
+      if (tb) {
+        tb.style.background = '#d4edda';
+        setTimeout(function() { tb.style.background = ''; }, 400);
+      }
+      var st = document.getElementById('dbUnstickStatus');
+      if (st) {
+        st.textContent = 'Unstuck ✓';
+        st.style.color = 'var(--green)';
+        setTimeout(function() { st.textContent = ''; st.style.color = 'var(--gray-500)'; }, 2500);
+      }
+      if (typeof showToast === 'function') {
+        showToast('Unstuck — selection cleared. Your tiles are still on the board.', 3500);
+      }
+    } catch (err) {
+      console.error('[design board] unstick failed:', err);
+      try {
+        dbEditor.selectedId = null;
+        renderCanvas();
+        dbUpdateSelectionDom();
+        renderProps();
+      } catch (_r) {}
+      if (typeof showToast === 'function') showToast('Unstick error — hard refresh (Ctrl+Shift+R).', 5000);
+    }
+  };
+
+  /** Explicit overlap nudge only (toolbar / banner). Never runs on Escape or open. */
   window.dbRepairBoard = function(fromBanner) {
     try {
       dbForceEndInteraction({ resync: false });
@@ -3976,43 +4809,30 @@
       var coverModal = document.getElementById('dbCoverPickerModal');
       if (coverModal) coverModal.remove();
 
+      var snapshot = JSON.stringify(dbEditor.elements);
       var spreadCount = dbSpreadStackedTiles();
-      if (spreadCount > 0) pushUndo();
+      var rescued = dbRescueOffCanvasTiles();
+      if (spreadCount > 0 || rescued > 0) {
+        dbEditor.undoStack.push(snapshot);
+        if (dbEditor.undoStack.length > 40) dbEditor.undoStack.shift();
+        dbEditor.dirty = true;
+      }
 
       dbPurgeGhostDomNodes();
       renderCanvas();
+      dbSyncCanvasDomSize();
       dbUpdateSelectionDom();
       refreshDbToolbarTools();
       renderProps();
-
-      var wrap = document.getElementById('dbCanvasWrap');
-      if (wrap) {
-        wrap.style.outline = '';
-        wrap.style.pointerEvents = '';
-        wrap.style.cursor = 'default';
-      }
-      var stage = document.getElementById('dbCanvasStage');
-      if (stage) stage.style.pointerEvents = '';
-      var cvs = document.getElementById('dbCanvas');
-      if (cvs) cvs.style.pointerEvents = '';
-      document.body.style.pointerEvents = '';
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
+      dbClearBoardPointerChrome();
 
       var banner = document.getElementById('dbOverlapBanner');
       if (banner) banner.remove();
 
-      if (spreadCount > 0) dbEditor.dirty = true;
-
-      var tb = document.getElementById('dbUnstickToolbarBtn');
-      if (tb) {
-        tb.style.background = '#d4edda';
-        setTimeout(function() { tb.style.background = ''; }, 400);
-      }
       var st = document.getElementById('dbUnstickStatus');
       var msg = spreadCount > 0
-        ? ('Repaired — ' + spreadCount + ' stack' + (spreadCount !== 1 ? 's' : '') + ' spread')
-        : 'Repaired ✓';
+        ? ('Spread ' + spreadCount + ' stack' + (spreadCount !== 1 ? 's' : ''))
+        : (rescued > 0 ? ('Pulled ' + rescued + ' back on board') : 'No stacks to spread');
       if (st) {
         st.textContent = msg;
         st.style.color = 'var(--green)';
@@ -4020,18 +4840,35 @@
       }
       if (typeof showToast === 'function') {
         showToast(spreadCount > 0
-          ? ('Board repaired — ' + spreadCount + ' overlapping tiles spread apart. Nothing deleted.')
-          : 'Board repaired — drag and selection reset.', 4000);
+          ? ('Spread ' + spreadCount + ' overlapping tiles apart. Nothing deleted.')
+          : 'No overlapping stacks to spread — drag is free.', 4000);
       }
     } catch (err) {
-      console.error('[design board] repair failed:', err);
-      if (typeof showToast === 'function') showToast('Repair error — hard refresh (Ctrl+Shift+R).', 5000);
+      console.error('[design board] spread failed:', err);
+      if (typeof showToast === 'function') showToast('Spread error — hard refresh (Ctrl+Shift+R).', 5000);
     }
   };
 
   window.dbResetBoardInteraction = function() {
-    window.dbRepairBoard();
+    window.dbUnstickBoard();
   };
+
+  if (!window._dbUnstickOnBlurBound) {
+    window._dbUnstickOnBlurBound = true;
+    window.addEventListener('blur', function() {
+      if (!window._cchDesignBoardEditorActive || !dbEditor || !dbEditor.boardId) return;
+      if (_dbPointerGesture || dbEditor.isDragging || dbEditor.isResizing) {
+        dbForceEndInteraction({ resync: true });
+      }
+    });
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState !== 'hidden') return;
+      if (!window._cchDesignBoardEditorActive || !dbEditor || !dbEditor.boardId) return;
+      if (_dbPointerGesture || dbEditor.isDragging || dbEditor.isResizing) {
+        dbForceEndInteraction({ resync: true });
+      }
+    });
+  }
 
   /** Stop background renderProjectDetail() from reloading the board mid-edit (Firestore refresh storms). */
   if (typeof renderProjectDetail === 'function' && !window._cchDbRenderProjectDetailPatched) {
@@ -4049,6 +4886,6 @@
     };
   }
 
-  console.info('[CCH Design Board] build 20260708db46 — footprint + ✨ Tidy board + zoom-correct uploads w/ natural aspect');
+  console.info('[CCH Design Board] build 20260725db61 — panel hide: DOM-driven toggle (fix click-twice) + no auto-fit');
 
 })();
