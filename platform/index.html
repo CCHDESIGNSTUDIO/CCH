@@ -94,13 +94,13 @@
     [data-theme="classic"] .sidebar-logo-text { color: var(--gold); }
     [data-theme="classic"] .sidebar-logo-sub { color: rgba(255,255,255,0.45); }
     [data-theme="classic"] .sidebar-footer { border-top: 1px solid rgba(255,255,255,0.1); }
-    [data-theme="classic"] .nav-item { color: rgba(255,255,255,0.62); }
+    [data-theme="classic"] .nav-item { color: rgba(255,255,255,0.88); }
     [data-theme="classic"] .nav-item:hover { color: #FFFFFF; background: rgba(255,255,255,0.06); }
     [data-theme="classic"] .nav-item.active { color: var(--gold); background: var(--gold-light); border-right-color: var(--gold); }
     [data-theme="classic"] .sidebar-user { color: rgba(255,255,255,0.4); }
     [data-theme="classic"] .sidebar-logout { color: rgba(255,255,255,0.35); }
     [data-theme="classic"] .sidebar-logout:hover { color: var(--gold); }
-    [data-theme="classic"] .sidebar .nav-icon { color: rgba(255,255,255,0.45); }
+    [data-theme="classic"] .sidebar .nav-icon { color: rgba(255,255,255,0.78); }
     [data-theme="classic"] .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); }
     [data-theme="classic"] .topbar { border-bottom: 1px solid var(--border); }
     [data-theme="classic"] .breadcrumb-link { color: var(--text-secondary); }
@@ -1003,10 +1003,11 @@
     .sidebar-nav { flex: 1; padding: 8px 0; overflow-y: auto; }
     .sidebar-nav::-webkit-scrollbar { width: 3px; }
     .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+    /* WO-070 — sidebar readability (brand gold #C4A464 / var(--gold); ≥4.5:1 labels) */
     .nav-item {
       display: flex; align-items: center; gap: 8px;
-      padding: 5px 12px; color: rgba(255,255,255,0.62);
-      text-decoration: none; font-size: 11px; font-weight: 500;
+      padding: 5px 12px; color: rgba(255,255,255,0.88);
+      text-decoration: none; font-size: 12.5px; font-weight: 500;
       cursor: pointer; transition: all 0.2s; border: none; background: none; width: 100%; text-align: left;
       letter-spacing: 0.2px;
     }
@@ -1014,13 +1015,18 @@
     .nav-item.active { color: var(--gold); background: var(--gold-light); border-right: 2px solid var(--gold); }
     tr.row-billable { background: rgba(95,165,107,0.05); }
     tr.row-nonbillable { opacity: 0.5; }
-    .nav-icon { font-size: 13px; width: 18px; text-align: center; opacity: 0.7; }
+    .nav-icon { font-size: 13px; width: 18px; text-align: center; opacity: 0.78; }
     .nav-item.active .nav-icon { opacity: 1; }
     .nav-label { letter-spacing: 0.2px; }
+    /* Pinterest / Style Library: accent on border + icon only; label matches other nav items */
+    .sidebar .nav-item[data-page="pinterest"] .nav-label,
+    .sidebar .nav-item[data-page="designerlibrary"] .nav-label { color: inherit !important; }
+    .sidebar .nav-item[data-page="pinterest"].active .nav-label,
+    .sidebar .nav-item[data-page="designerlibrary"].active .nav-label { color: var(--gold) !important; }
 
     .sidebar-nav-section {
-      font-size: 9px;
-      color: rgba(196, 164, 100, 0.82);
+      font-size: 10px;
+      color: rgba(196, 164, 100, 0.95);
       letter-spacing: 0.14em;
       text-transform: uppercase;
       padding: 10px 16px 4px;
@@ -2686,8 +2692,16 @@
       padding: 14px; border-radius:0; background: var(--gray-50);
       border-left: 3px solid var(--gold); margin-bottom: 10px;
     }
-    .note-date { font-size: 11px; color: var(--gray-400); margin-bottom: 4px; }
-    .note-text { font-size: 13px; line-height: 1.6; }
+    .note-date { font-size: 11px; color: var(--gray-400); margin-bottom: 8px; }
+    .note-text { font-size: 13px; line-height: 1.6; color: #0A1F3D; }
+    .note-text .note-md-h { margin: 16px 0 8px; font-weight: 700; color: #0A1F3D; }
+    .note-text h2.note-md-h { font-size: 18px; font-family: 'Playfair Display', Georgia, serif; margin-top: 4px; }
+    .note-text h3.note-md-h { font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; color: #A8792F; }
+    .note-text h4.note-md-h { font-size: 13px; }
+    .note-text .note-md-p { margin: 0 0 8px; white-space: pre-wrap; }
+    .note-text .note-md-ul, .note-text .note-md-ol { margin: 0 0 12px 1.25em; padding: 0; }
+    .note-text .note-md-ul li, .note-text .note-md-ol li { margin: 0 0 5px; }
+    .note-text .note-md-ul ul, .note-text .note-md-ol ol, .note-text .note-md-ul ol, .note-text .note-md-ol ul { margin: 6px 0 4px 1em; }
 
     /* Ideabook detail (legacy compat) */
     .ideabook-images {
@@ -2945,10 +2959,13 @@
     .af-item.af-type-email::before { border-color:#EC4899; background:#FCE7F3; }
     .af-item.af-type-note::before { border-color:var(--gray-400); background:var(--gray-100); }
     .af-item.af-type-milestone::before { border-color:var(--gold); background:var(--gold); }
+    .af-item.af-type-builder::before { border-color:#0A1F3D; background:rgba(10,31,61,0.08); }
+    .af-item.af-type-board_update::before { border-color:var(--gold); background:var(--gold-light); }
     .af-card { background:var(--white); border:1px solid var(--gray-200); border-radius:0; padding:14px 18px; transition:box-shadow 0.2s; }
     .af-item.af-type-inspiration .af-card,
     .af-item.af-type-client_first_visit .af-card,
     .af-item.af-type-client_portal .af-card { border-left:3px solid var(--gold); }
+    .af-item.af-type-builder .af-card { border-left:3px solid #0A1F3D; }
     .af-card:hover { box-shadow:var(--shadow); }
     .af-meta { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
     .af-type-badge { font-size:10px; text-transform:uppercase; letter-spacing:0.08em; font-weight:700; padding:2px 8px; border-radius:0; }
@@ -2963,6 +2980,8 @@
     .af-type-badge.email { background:#FCE7F3; color:#DB2777; }
     .af-type-badge.note { background:var(--gray-100); color:var(--gray-500); }
     .af-type-badge.milestone { background:var(--gold); color:var(--text-primary); }
+    .af-type-badge.builder { background:rgba(10,31,61,0.08); color:#0A1F3D; }
+    .af-type-badge.board_update { background:var(--gold-light); color:var(--gold-dark); }
     .af-time { font-size:11px; color:var(--gray-400); }
     .af-desc { font-size:13px; color:var(--black); line-height:1.5; }
     .af-desc strong { font-weight:600; }
@@ -3367,8 +3386,8 @@
         <div class="sidebar-logo-sub">Studio</div>
       </div>
       <div class="sidebar-nav">
-        <button type="button" class="nav-item" onclick="event.preventDefault();event.stopPropagation();if(typeof openGlobalSearch==='function')openGlobalSearch();return false;" style="background:rgba(15,26,46,0.02);border-radius:0;margin:4px 12px 10px;border:1px solid rgba(15,26,46,0.08);padding:8px 16px;">
-          <span class="nav-icon" style="font-size:14px;opacity:0.5;">🔍</span><span class="nav-label" style="color:rgba(15,26,46,0.3);font-size:11px;">Search... ⌘K</span>
+        <button type="button" class="nav-item" data-page="search" onclick="event.preventDefault();event.stopPropagation();if(typeof openGlobalSearch==='function')openGlobalSearch();return false;" style="background:rgba(255,255,255,0.04);border-radius:0;margin:4px 12px 10px;border:1px solid rgba(255,255,255,0.12);padding:8px 16px;">
+          <span class="nav-icon" style="font-size:14px;opacity:0.7;">🔍</span><span class="nav-label" style="color:rgba(255,255,255,0.72);font-size:12px;">Search... ⌘K</span>
         </button>
         <button class="nav-item" data-page="dashboard">
           <span class="nav-icon">◈</span><span class="nav-label">Dashboard</span>
@@ -3379,11 +3398,11 @@
         <button class="nav-item" data-page="ideabooks" onclick="event.stopImmediatePropagation();navigate('#/ideabooks')">
           <span class="nav-icon">◇</span><span class="nav-label">Inspiration</span>
         </button>
-        <button class="nav-item admin-only-nav" data-page="designerlibrary" onclick="event.stopImmediatePropagation();navigate('#/project/_lib_designer/ideabooks')" style="background:linear-gradient(90deg,rgba(201,169,110,0.08),transparent);border-left:2px solid #C9A96E;" title="Style Library — reference boards, Niice topics, Pinterest styles. Internal only; copy into a project&#39;s Inspiration when ready.">
-          <span class="nav-icon" style="color:#C9A96E;">&#128218;</span><span class="nav-label" style="color:#C9A96E;">Style Library</span>
+        <button class="nav-item admin-only-nav" data-page="designerlibrary" onclick="event.stopImmediatePropagation();navigate('#/project/_lib_designer/ideabooks')" style="background:linear-gradient(90deg,rgba(196,164,100,0.08),transparent);border-left:2px solid #C4A464;" title="Style Library — reference boards, Niice topics, Pinterest styles. Internal only; copy into a project&#39;s Inspiration when ready.">
+          <span class="nav-icon" style="color:#C4A464;">&#128218;</span><span class="nav-label">Style Library</span>
         </button>
         <button class="nav-item admin-only-nav" data-page="pinterest" onclick="event.stopImmediatePropagation();_pinterestOpenDrawer()" style="background:linear-gradient(90deg,rgba(230,0,35,0.06),transparent);border-left:2px solid #E60023;" title="Open the live Pinterest panel">
-          <span class="nav-icon" style="color:#E60023;">📌</span><span class="nav-label" style="color:#E60023;">Pinterest</span>
+          <span class="nav-icon" style="color:#E60023;">📌</span><span class="nav-label">Pinterest</span>
         </button>
         <button class="nav-item" data-page="projects">
           <span class="nav-icon">◻</span><span class="nav-label">Projects</span>
@@ -4179,7 +4198,7 @@
     window.buildFinancialHealthBarHtml = buildFinancialHealthBarHtml;
 
     // -- Platform Version --
-    const CCH_BUILD = { version: '9.9.78', date: '2026-08-02', tag: 'print-tighten-fffd-restore-2026-08-02' };
+    const CCH_BUILD = { version: '9.9.106', date: '2026-08-06', tag: 'client-pepper-header-2026-08-06' };
     window.CCH_BUILD = CCH_BUILD;
 
     /** ASCII-safe UI glyphs — always \u escapes so Windows re-encodes cannot turn them into '?'. */
@@ -23451,7 +23470,7 @@ async function renderBoardsTab(T, proj) {
         var boardActionsHtml = clientIbReadOnly ? '' :
           '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">' +
           '<button type="button" class="btn ' + (_ibPub ? 'btn-secondary' : 'btn-primary') + ' btn-sm" onclick="ibToggleClientPublish(\'' + pidEsc + '\',\'' + escJsStr(activeSec.id) + '\')" title="' + (_ibPub ? 'Visible to the client — click to unpublish' : 'Not visible to the client yet — click to publish') + '">' + (_ibPub ? '🔒 Unpublish' : '🌐 Publish to client') + '</button>' +
-          '<button type="button" class="btn btn-secondary btn-sm" onclick="ibShareBoardClientLink(\'' + pidEsc + '\',\'' + escJsStr(activeSec.id) + '\',' + JSON.stringify(String(activeSec.name || 'Inspiration board')) + ',' + (_ibPub ? 'true' : 'false') + ')" title="Copy a client portal link to this board">Link to client</button>' +
+          '<button type="button" class="btn btn-secondary btn-sm" onclick="ibShareBoardClientLink(\'' + pidEsc + '\',\'' + escJsStr(activeSec.id) + '\',\'' + escJsStr(activeSec.name || 'Inspiration board') + '\',' + (_ibPub ? 'true' : 'false') + ')" title="Copy a client portal link to this board">Link to client</button>' +
           '<button type="button" class="btn btn-sm" style="background:#C4A464;color:#0F1A2E;border:none;font-weight:600;" onclick="void cpOpenPostIdeabookDecisionModal(\'' + pidEsc + '\',\'' + escJsStr(activeSec.id) + '\')" title="Post to client Decisions with cover + Open board link">\u25C7 Post Decision</button>' +
           '<span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap;' + (_ibPub ? 'background:rgba(95,165,107,0.14);color:#5FA56B;' : 'background:rgba(15,26,46,0.06);color:var(--gray-500);') + '">' + (_ibPub ? '● Live to client' : '○ Draft — not shared') + '</span>' +
           '<button type="button" class="btn btn-secondary btn-sm" onclick="ibRenameSection(\'' + pidEsc + '\',\'' + escJsStr(activeSec.id) + '\',\'' + escAttr(activeSec.name || '') + '\')">Rename board</button>' +
@@ -23690,7 +23709,7 @@ async function renderBoardsTab(T, proj) {
               <button onclick="ibToggleNavVisibility('${projectId}','${section.id}')">${section.hiddenInNav ? 'Show in board list' : 'Hide from board list'}</button>
               <div class="divider"></div>
               <button onclick="ibToggleClientPublish('${projectId}','${section.id}')">${section.clientPublished === true ? '🔒 Unpublish from client' : '🌐 Publish to client'}</button>
-              <button onclick="ibShareBoardClientLink('${projectId}','${section.id}',${JSON.stringify(String(section.name || 'Inspiration board'))},${section.clientPublished === true})">🔗 Link to client</button>
+              <button onclick="ibShareBoardClientLink('${projectId}','${section.id}','${escJsStr(section.name || 'Inspiration board')}',${section.clientPublished === true})">🔗 Link to client</button>
               <div class="divider"></div>
               <button onclick="ibSetSectionShowVendor('${projectId}','${section.id}',${_ibShowVendor ? 0 : 1})">${_ibShowVendor ? 'Hide vendor &amp; source' : 'Show vendor &amp; source'}</button>
               <div class="divider"></div>
@@ -28778,16 +28797,22 @@ async function renderBoardsTab(T, proj) {
       var totalShipping = lineShipping + docShipping;
       var taxRate = invoiceEffectiveTaxRate(inv, projData);
       var tax = _num2(taxableSubtotal * (taxRate / 100));
+      /* WO-067 fail #3 — pure design-services / hours invoices: never client sales tax. */
+      var pureDs = (typeof window.cchIsPureDesignServicesInvoice === 'function' && window.cchIsPureDesignServicesInvoice(items));
+      if (pureDs) {
+        taxableSubtotal = 0;
+        tax = 0;
+      }
       creditTotal = _num2(creditTotal);
       var grandTotal = _num2(subtotal + totalShipping + tax + creditTotal);
-      if (storedTotal > 0.01 && grandTotal > 0.01) {
+      if (!pureDs && storedTotal > 0.01 && grandTotal > 0.01) {
         var drift = Math.abs(storedTotal - grandTotal) / Math.max(storedTotal, grandTotal);
         if (drift > 0.015 && storedTotal > grandTotal) grandTotal = storedTotal;
         else if (drift > 0.015 && grandTotal > storedTotal) {
           var paidSum = (inv.payments || []).reduce(function(s, p) { return s + (parseFloat(p.amount) || 0); }, 0);
           if (paidSum >= storedTotal - 0.02) grandTotal = storedTotal;
         }
-      } else if (storedTotal > grandTotal + 0.01) {
+      } else if (!pureDs && storedTotal > grandTotal + 0.01) {
         grandTotal = storedTotal;
       }
       return {
@@ -31448,7 +31473,13 @@ async function renderBoardsTab(T, proj) {
       }
     }
 
-    // ----- NOTES TAB -----
+    // ----- NOTES TAB (WO-068: formatted markdown + publish; renderer in cch-notes-format.js) -----
+    function _noteFmt(text) {
+      return (typeof window.cchFormatProjectNoteHtml === 'function')
+        ? window.cchFormatProjectNoteHtml(text)
+        : esc(String(text || '')).replace(/\n/g, '<br>');
+    }
+
     async function renderNotesTab(T, proj) {
       let notes = [];
       try {
@@ -31456,32 +31487,151 @@ async function renderBoardsTab(T, proj) {
         s.forEach(d => notes.push({id:d.id,...d.data()}));
       } catch(e){}
 
+      var pid = escAttr(proj.id);
       T.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:12px;flex-wrap:wrap;">
           <div class="section-title" style="margin:0;">Notes</div>
+          <div style="font-size:11px;color:var(--gray-400);max-width:420px;text-align:right;line-height:1.4;">One note. Internal by default. Publish = same note on the client portal. Copy for email → paste into Outlook.</div>
         </div>
         <div class="card card-body" style="margin-bottom: 20px;">
-          <textarea class="form-textarea" id="newNoteText" placeholder="Add a note..." rows="3"></textarea>
-          <div style="text-align: right; margin-top: 8px;">
-            <button class="btn btn-primary btn-sm" onclick="addNote('${proj.id}')">Add Note</button>
+          <textarea class="form-textarea" id="newNoteText" placeholder="Meeting notes… Use # Title, ## SECTION, - bullets, **bold**" rows="10" style="min-height:180px;font-family:ui-monospace,Consolas,monospace;font-size:13px;line-height:1.5;"></textarea>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:10px;flex-wrap:wrap;">
+            <div style="font-size:11px;color:var(--gray-400);">Saved as markdown. Never auto-published. Client only sees notes you Publish.</div>
+            <button class="btn btn-primary btn-sm" onclick="addNote('${pid}')">Add Note</button>
           </div>
         </div>
         ${notes.length === 0 ? '<div class="empty-state"><div class="empty-text">No notes yet.</div></div>' :
-          notes.map(n => `
+          notes.map(n => {
+            var pub = n.published === true;
+            var nid = escAttr(n.id);
+            return `
             <div class="note-item">
-              <div class="note-date">${n.createdAt ? new Date(n.createdAt).toLocaleDateString() + ' ' + new Date(n.createdAt).toLocaleTimeString() : ''}</div>
-              <div class="note-text">${esc(n.text)}</div>
-            </div>
-          `).join('')
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+                <div class="note-date" style="margin:0;">${n.createdAt ? new Date(n.createdAt).toLocaleDateString() + ' ' + new Date(n.createdAt).toLocaleTimeString() : ''}${n.author ? ' · ' + esc(n.author) : ''}${pub ? ' · <span style="color:#5FA56B;font-weight:600;">Published to portal</span>' : ' · <span style="color:var(--gray-400);">Internal</span>'}</div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                  <button type="button" class="btn btn-sm" style="font-size:10px;" onclick="showEditCommsItemModal('${pid}','notes','${nid}')">Edit</button>
+                  <button type="button" class="btn btn-sm" style="font-size:10px;" onclick="cchCopyProjectNoteForEmail('${pid}','${nid}')" title="Copy note text for Outlook">Copy</button>
+                  <button type="button" class="btn btn-sm" style="font-size:10px;" onclick="cchEmailProjectNote('${pid}','${nid}')" title="Open email draft to client">Email client</button>
+                  ${pub
+                    ? '<button type="button" class="btn btn-sm" style="font-size:10px;" onclick="toggleCommsPublish(\'' + pid + '\',\'notes\',\'' + nid + '\',false)">Unpublish</button>'
+                    : '<button type="button" class="btn btn-sm btn-primary" style="font-size:10px;" onclick="cchPublishProjectNote(\'' + pid + '\',\'' + nid + '\')">Publish to portal</button>'}
+                  <button type="button" class="btn btn-sm" style="font-size:10px;color:var(--red);" onclick="deleteCommsItem('${pid}','notes','${nid}')">Delete</button>
+                </div>
+              </div>
+              <div class="note-text">${_noteFmt(n.text || n.body || n.content || '')}</div>
+            </div>`;
+          }).join('')
         }
       `;
     }
+
+    window.cchPublishProjectNote = async function (projectId, noteId) {
+      if (!projectId || !noteId) return;
+      var ok = await cchConfirm(
+        'Publish this note to the client portal? The client will see it exactly as written (formatted). Do not include rates, costs, POs, margins, or internal-only detail.',
+        'Publish to portal',
+        { confirmText: 'Publish', danger: false }
+      );
+      if (!ok) return;
+      await toggleCommsPublish(projectId, 'notes', noteId, true);
+      if (typeof showToast === 'function') showToast('Note published to client portal', 2500);
+    };
+
+    window.cchCopyProjectNoteForEmail = async function (projectId, noteId) {
+      if (!projectId || !noteId || typeof db === 'undefined' || !db) return;
+      try {
+        var snap = await db.collection('boards').doc(projectId).collection('notes').doc(noteId).get();
+        if (!snap.exists) {
+          if (typeof showToast === 'function') showToast('Note not found', 'error');
+          return;
+        }
+        var data = snap.data() || {};
+        var text = String(data.text || data.body || data.content || '').trim();
+        if (!text) {
+          if (typeof showToast === 'function') showToast('Note is empty', 'error');
+          return;
+        }
+        var ok = false;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          ok = true;
+        } else {
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'fixed';
+          ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.select();
+          try { ok = document.execCommand('copy'); } catch (e2) { ok = false; }
+          document.body.removeChild(ta);
+        }
+        if (typeof showToast === 'function') {
+          showToast(ok ? 'Copied — paste into your email' : 'Could not copy — select the note text manually', ok ? 2500 : 'error');
+        }
+      } catch (e) {
+        if (typeof showToast === 'function') showToast('Copy failed: ' + ((e && e.message) || e), 'error');
+      }
+    };
+
+    window.cchEmailProjectNote = async function (projectId, noteId) {
+      if (!projectId || !noteId || typeof db === 'undefined' || !db) return;
+      try {
+        var noteSnap = await db.collection('boards').doc(projectId).collection('notes').doc(noteId).get();
+        if (!noteSnap.exists) {
+          if (typeof showToast === 'function') showToast('Note not found', 'error');
+          return;
+        }
+        var note = noteSnap.data() || {};
+        var text = String(note.text || note.body || note.content || '').trim();
+        if (!text) {
+          if (typeof showToast === 'function') showToast('Note is empty', 'error');
+          return;
+        }
+        var boardSnap = await db.collection('boards').doc(projectId).get();
+        var proj = boardSnap.exists ? (boardSnap.data() || {}) : {};
+        var to = String(proj.clientEmail || proj.email || proj.billingEmail || '').trim();
+        var projName = String(proj.name || proj.projectName || 'your project').trim();
+        var first = String(proj.clientName || '').trim().split(/\s+/)[0] || 'there';
+        var portalUrl = 'https://cch-platform.web.app/client.html#/clientview/' + encodeURIComponent(projectId) + '/notes';
+        var subj = 'CCH Design · ' + projName + ' · project note';
+        var body = 'Hi ' + first + ',\n\n' +
+          'Sharing a project note for ' + projName + ':\n\n' +
+          text + '\n\n' +
+          'You can also view notes anytime in your client portal:\n' + portalUrl + '\n\n' +
+          'Warmly,\nCindy\nCCH Design Inc.';
+        if (body.length > 1800) {
+          body = 'Hi ' + first + ',\n\n' +
+            'I have a project note ready for ' + projName + '. It was too long for this email draft, so please open your portal:\n\n' +
+            portalUrl + '\n\n' +
+            '(Tip: use Copy on the note in Studio if you want the full text in email.)\n\n' +
+            'Warmly,\nCindy\nCCH Design Inc.';
+          if (typeof showToast === 'function') showToast('Note is long — email opens with portal link; use Copy for full text', 4000);
+        }
+        var href = 'mailto:' + encodeURIComponent(to) +
+          '?subject=' + encodeURIComponent(subj) +
+          '&body=' + encodeURIComponent(body) +
+          '&bcc=' + encodeURIComponent('cindy@cchdesign.com');
+        if (!to) {
+          href = 'mailto:?subject=' + encodeURIComponent(subj) +
+            '&body=' + encodeURIComponent(body) +
+            '&bcc=' + encodeURIComponent('cindy@cchdesign.com');
+          if (typeof showToast === 'function') showToast('No client email on project — fill To in your mail app', 4000);
+        }
+        window.open(href, '_blank');
+      } catch (e) {
+        if (typeof showToast === 'function') showToast('Email draft failed: ' + ((e && e.message) || e), 'error');
+      }
+    };
 
     async function addNote(projectId) {
       const text = document.getElementById('newNoteText').value.trim();
       if (!text) return;
       await db.collection('boards').doc(projectId).collection('notes').add({
-        text, createdAt: new Date().toISOString(), author: currentUser.email
+        text: text,
+        createdAt: new Date().toISOString(),
+        author: currentUser.email,
+        published: false
       });
       document.getElementById('newNoteText').value = '';
       renderProjectDetail();
@@ -33560,7 +33710,9 @@ async function renderBoardsTab(T, proj) {
       phone = String(phone || rec.phone || rec.contactPhone || '').trim();
       var body = _shipToBodyFromRecord(rec, phone);
       var displayText = body ? (name + '\n' + body) : name;
-      var legacyAddr = _shipToContactAddrLine(name, rec.address || rec.addr || cchComposeAddressMultiline(cchAddressPartsFromRecord(rec)), phone);
+      // Prefer compose-from-parts so glued legacy `address` is not preferred over structured fields
+      var composedStreetBlock = cchComposeAddressMultiline(cchCoerceStructuredAddressParts(cchAddressPartsFromRecord(rec)));
+      var legacyAddr = _shipToContactAddrLine(name, composedStreetBlock || rec.address || rec.addr || '', phone);
       return { name: name, addr: name, displayText: displayText, legacyAddr: legacyAddr };
     }
 
@@ -36665,9 +36817,23 @@ async function renderBoardsTab(T, proj) {
     function cchAddressPartsFromRecord(rec, prefix) {
       var r = rec || {};
       var p = String(prefix || '').trim();
+      // Prefer structured street fields (incl. camelCase addressLine1 written by saveVendor).
+      // Do not let combined `address` win over addressLine1 — that re-appended city/state/zip into ADDRESS.
+      var structuredLine1 = String(
+        r[p + 'AddressLine1'] || r[p + 'Address1'] ||
+        (!p ? (r.addressLine1 || r.address1 || '') : '') ||
+        ''
+      ).trim();
+      var combinedFallback = String(
+        r[p + 'Address'] || (!p ? (r.address || r.primaryAddress || r.billingAddress || '') : '') || ''
+      ).trim();
       var out = {
-        line1: String(r[p + 'AddressLine1'] || r[p + 'Address1'] || r[p + 'Address'] || r.address || r.primaryAddress || r.billingAddress || '').trim(),
-        line2: String(r[p + 'AddressLine2'] || r[p + 'Address2'] || r.secondaryAddress || r.clientAddress2 || '').trim(),
+        line1: structuredLine1 || combinedFallback,
+        line2: String(
+          r[p + 'AddressLine2'] || r[p + 'Address2'] ||
+          (!p ? (r.addressLine2 || r.address2 || '') : '') ||
+          r.secondaryAddress || r.clientAddress2 || ''
+        ).trim(),
         city: String(r[p + 'City'] || r.city || '').trim(),
         state: String(r[p + 'State'] || r.state || '').trim(),
         zip: String(r[p + 'Zip'] || r[p + 'PostalCode'] || r.zip || r.postalCode || '').trim()
@@ -36679,6 +36845,66 @@ async function renderBoardsTab(T, proj) {
         out.line2 = parts[1] || '';
       }
       return out;
+    }
+
+    /** Exact-duplicate only: strip trailing city/state/zip from street when parts already exist (no fuzzy strip). */
+    function cchStripDuplicateCityStateZipFromStreet(street, city, state, zip) {
+      var s = String(street || '').trim();
+      city = String(city || '').trim();
+      state = String(state || '').trim();
+      zip = String(zip || '').trim();
+      if (!s || (!city && !state && !zip)) return s;
+      function escRe(t) { return String(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+      // Multiline compose: last line is city/state/zip
+      if (s.indexOf('\n') >= 0) {
+        var lines = s.split('\n').map(function(x) { return String(x || '').trim(); }).filter(Boolean);
+        if (lines.length >= 2) {
+          var last = lines[lines.length - 1];
+          var csz = [city, state].filter(Boolean).join(', ') + (zip ? ((city || state) ? ' ' : '') + zip : '');
+          if (csz && last.toLowerCase() === csz.toLowerCase()) {
+            return lines.slice(0, -1).join('\n').trim();
+          }
+        }
+      }
+      var tails = [];
+      var cityState = [city, state].filter(Boolean).join(', ');
+      if (cityState && zip) {
+        tails.push(cityState + ' ' + zip);
+        tails.push(cityState + ', ' + zip);
+      }
+      if (city && state && zip) {
+        tails.push(city + ', ' + state + ' ' + zip);
+        tails.push(city + ', ' + state + ', ' + zip);
+        tails.push(city + ' ' + state + ' ' + zip);
+      }
+      if (city && zip && !state) {
+        tails.push(city + ' ' + zip);
+        tails.push(city + ', ' + zip);
+      }
+      var i, t, before;
+      for (i = 0; i < tails.length; i++) {
+        t = tails[i];
+        if (!t || t.length > s.length) continue;
+        if (s.slice(-t.length).toLowerCase() === t.toLowerCase()) {
+          before = s.slice(0, -t.length).replace(/[\s,]+$/g, '').trim();
+          if (before.length > 0) return before;
+        }
+      }
+      // Glued legacy (e.g. "# 103Santa Ana, California 92705") — city/state/zip must match fields exactly
+      if (city) {
+        var gluedRe = new RegExp(
+          escRe(city) +
+          (state ? '(?:\\s*,\\s*|\\s+)' + escRe(state) : '') +
+          (zip ? '(?:\\s+|\\s*,\\s*)' + escRe(zip) : '') +
+          '\\s*$',
+          'i'
+        );
+        var m = s.match(gluedRe);
+        if (m && m.index > 0) {
+          return s.slice(0, m.index).replace(/[\s,]+$/g, '').trim();
+        }
+      }
+      return s;
     }
 
     function cchComposeAddressMultiline(parts) {
@@ -36724,8 +36950,14 @@ async function renderBoardsTab(T, proj) {
       p.city = String(p.city || '').trim().replace(/,\s*$/, '');
       p.state = String(p.state || '').trim();
       p.zip = String(p.zip || '').trim();
-      if (p.city || p.state || p.zip) return p;
-      var l1 = String(p.line1 || '').trim();
+      p.line1 = String(p.line1 || '').trim();
+      p.line2 = String(p.line2 || '').trim();
+      // Parts authoritative: strip exact trailing city/state/zip from street (legacy glued/combined).
+      if (p.city || p.state || p.zip) {
+        p.line1 = cchStripDuplicateCityStateZipFromStreet(p.line1, p.city, p.state, p.zip);
+        return p;
+      }
+      var l1 = p.line1;
       if (!l1) return p;
       if (l1.indexOf('\n') >= 0) {
         var lines = l1.split('\n').map(function(s) { return String(s || '').trim(); }).filter(Boolean);
@@ -36757,6 +36989,7 @@ async function renderBoardsTab(T, proj) {
     window.cchComposeAddressMultiline = cchComposeAddressMultiline;
     window.cchAddressPartsFromRecord = cchAddressPartsFromRecord;
     window.cchParseLooseAddressString = cchParseLooseAddressString;
+    window.cchStripDuplicateCityStateZipFromStreet = cchStripDuplicateCityStateZipFromStreet;
 
     /** Convert legacy "Name · street, city, state zip · phone" ship-to strings to multiline blocks. */
     function cchFormatLegacyShipToDots(s) {
@@ -47214,7 +47447,7 @@ async function renderBoardsTab(T, proj) {
       { name: 'CCH Time Entry', rate: 0 },
       { name: 'CCH Research', rate: 0 },
       { name: 'ELU', rate: 0 },
-      { name: 'T&E VH', rate: 75 },
+      { name: 'T&E', rate: 75 },
       { name: 'Non-Billable', rate: 0 }
     ];
 
@@ -47225,8 +47458,10 @@ async function renderBoardsTab(T, proj) {
       var map = window._teServiceRateOverrides;
       if (!map || typeof map !== 'object') return SERVICE_TYPES.map(function(s) { return { name: s.name, rate: s.rate }; });
       return SERVICE_TYPES.map(function(s) {
-        if (map[s.name] != null && map[s.name] !== '') {
-          var r = parseFloat(map[s.name]);
+        var override = map[s.name];
+        if ((override == null || override === '') && s.name === 'T&E') override = map['T&E VH'];
+        if (override != null && override !== '') {
+          var r = parseFloat(override);
           if (!isNaN(r)) return { name: s.name, rate: r };
         }
         return { name: s.name, rate: s.rate };
@@ -47246,6 +47481,7 @@ async function renderBoardsTab(T, proj) {
       var seen = {};
       list.forEach(function(s) { seen[s.name] = true; });
       var svc = String(entry.service || '').trim();
+      if (svc === 'T&E VH') svc = 'T&E'; // legacy label → display without VH
       var rateNum = parseFloat(entry.rate);
       if (svc && !seen[svc]) {
         list = list.concat([{ name: svc, rate: !isNaN(rateNum) ? rateNum : 0 }]);
@@ -47296,20 +47532,23 @@ async function renderBoardsTab(T, proj) {
         case 'Renderings': return 'CCH Design Services';
         case 'Floor Plans, drawings & elevations': return 'CCH Design Services';
         case 'Schedules & Specifications': return 'CCH Design Services';
-        case 'Travel, Pick up & Delivery services': return 'T&E VH';
+        case 'Travel, Pick up & Delivery services': return 'T&E';
         default: return 'CCH Design Services';
       }
     }
 
     function getLedgerRateByName(ledgerName) {
       var list = getSmartTimeServiceTypesResolved();
-      var hit = list.find(function(x) { return x.name === ledgerName; });
+      var key = String(ledgerName || '').trim();
+      if (key === 'T&E VH') key = 'T&E';
+      var hit = list.find(function(x) { return x.name === key; });
       return hit ? (parseFloat(hit.rate) || 0) : 0;
     }
 
     function isTimelyLedgerServiceName(name) {
       var v = String(name || '').trim();
       if (!v) return false;
+      if (v === 'T&E VH') v = 'T&E';
       return getSmartTimeServiceTypesResolved().some(function(x) { return x.name === v; });
     }
 
@@ -47327,7 +47566,7 @@ async function renderBoardsTab(T, proj) {
       function has(p) { return text.indexOf(p) >= 0; }
       if (has('non-bill') || has('non bill') || has('admin overhead')) return 'Non-Billable';
       if (has('blended')) return 'CCH Blended Design Services';
-      if (has('t&e') || has('travel') || has('mileage')) return 'T&E VH';
+      if (has('t&e') || has('travel') || has('mileage')) return 'T&E';
       if (has('project manag') || has(' pm ') || text.trim().indexOf('pm ') === 0) return 'CCH Project Management';
       if (has('concept')) return 'CCH Design Concept';
       if (has('client support') || (has('support') && !has('project'))) return 'CCH Client Project Support';
@@ -51628,11 +51867,15 @@ async function renderBoardsTab(T, proj) {
     }
 
     function renderTimeView() {
+      if (typeof _tlCaptureLedgerScroll === 'function') _tlCaptureLedgerScroll();
       try { _renderTimeViewInner(); } catch(e) {
         console.error('[Smart Time Render Error]', e);
         var T = window._timeViewEmbedTarget || document.getElementById('contentArea');
         if (T) T.innerHTML = '<div style="padding:40px;color:red;"><h2>Smart Time Error</h2><pre>' + e.message + '\n' + e.stack + '</pre><button class="btn btn-primary" onclick="_renderTimeViewInner()">Retry</button></div>';
       }
+      if (typeof _tlPruneSelectionToFiltered === 'function') _tlPruneSelectionToFiltered();
+      if (typeof _tlApplySelectionToDom === 'function') _tlApplySelectionToDom();
+      if (typeof _tlRestoreLedgerScroll === 'function') _tlRestoreLedgerScroll();
     }
     function _renderTimeViewInner() {
       const embedded = !!window._timeViewEmbedTarget;
@@ -52269,7 +52512,7 @@ async function renderBoardsTab(T, proj) {
             <tbody>
               ${pageRows.map(t => `
                 <tr class="${t.invoiceId ? '' : t.billable ? 'row-billable' : 'row-nonbillable'}">
-                  ${ledgerFull ? `<td><input type="checkbox" class="time-cb" data-id="${t.id}" data-invoiced="${t.invoiceId ? '1' : ''}" data-total="${parseFloat(t.total)||0}" ${(t.invoiceId && typeof isTimeAdmin === 'function' && !isTimeAdmin()) ? 'disabled' : ''} onchange="updateTimeSelectionInfo()"></td>` : ''}
+                  ${ledgerFull ? `<td><input type="checkbox" class="time-cb" data-id="${t.id}" data-invoiced="${t.invoiceId ? '1' : ''}" data-total="${parseFloat(t.total)||0}" ${(t.invoiceId && typeof isTimeAdmin === 'function' && !isTimeAdmin()) ? 'disabled' : ''} onchange="tlTimeCbChanged(this)"></td>` : ''}
                   <td ondblclick="event.stopPropagation();tlInlineProjectEdit(this,'${t.id}')" title="Double-click to change project / client"><strong>${esc(_timeLedgerEntryDisplayProject(t, window._timeLedgerBoardsCache || []))}</strong></td>
                   ${ledgerFull ? `<td>${esc(t.member || '')}</td>` : ''}
                   <td style="white-space:nowrap;">${t.date || ''}</td>
@@ -52298,12 +52541,23 @@ async function renderBoardsTab(T, proj) {
       if (window.updateTimeSelectionInfo) updateTimeSelectionInfo();
     }
 
-    // Update selection info bar when checkboxes change
+    // Update selection info bar when checkboxes change (Set is source of truth across re-renders)
     window.updateTimeSelectionInfo = function() {
-      var cbs = document.querySelectorAll('.time-cb:checked:not(:disabled)');
-      var count = cbs.length;
+      if (!window._tlSelectedEntryIds) window._tlSelectedEntryIds = new Set();
+      var set = window._tlSelectedEntryIds;
+      var count = 0;
       var total = 0;
-      cbs.forEach(function(cb) { total += parseFloat(cb.getAttribute('data-total')) || 0; });
+      if (set.size && typeof timeEntries !== 'undefined') {
+        timeEntries.forEach(function(t) {
+          if (!t || !t.id || !set.has(t.id)) return;
+          count++;
+          total += parseFloat(t.total) || 0;
+        });
+      } else {
+        var cbs = document.querySelectorAll('.time-cb:checked:not(:disabled)');
+        count = cbs.length;
+        cbs.forEach(function(cb) { total += parseFloat(cb.getAttribute('data-total')) || 0; });
+      }
       var info = document.getElementById('timeSelectedInfo');
       if (info) {
         if (count > 0) {
@@ -55456,7 +55710,7 @@ async function renderBoardsTab(T, proj) {
         'Consultation': 'CCH Design Concept',
         'Meetings / Calls': 'CCH Blended Design Services',
         'Client Communication': 'CCH Client Project Support',
-        'Site Visit': 'T&E VH',
+        'Site Visit': 'T&E',
         'Admin / Non-Billable': 'CCH Admin',
         'Research / Inspiration': 'CCH Research'
       };
@@ -57361,7 +57615,7 @@ async function renderBoardsTab(T, proj) {
               <tbody>
                 ${sortTimeLedgerEntries(monthEntries).map(t => `
                 <tr class="${t.invoiceId ? '' : t.billable ? 'row-billable' : 'row-nonbillable'}">
-                  ${ledgerFull ? `<td><input type="checkbox" class="time-cb" data-id="${t.id}" data-invoiced="${t.invoiceId ? '1' : ''}" data-total="${parseFloat(t.total)||0}" ${(t.invoiceId && typeof isTimeAdmin === 'function' && !isTimeAdmin()) ? 'disabled' : ''} onchange="updateTimeSelectionInfo()"></td>` : ''}
+                  ${ledgerFull ? `<td><input type="checkbox" class="time-cb" data-id="${t.id}" data-invoiced="${t.invoiceId ? '1' : ''}" data-total="${parseFloat(t.total)||0}" ${(t.invoiceId && typeof isTimeAdmin === 'function' && !isTimeAdmin()) ? 'disabled' : ''} onchange="tlTimeCbChanged(this)"></td>` : ''}
                   <td><strong>${esc(_timeLedgerEntryDisplayProject(t, window._timeLedgerBoardsCache || []))}</strong></td>
                   ${ledgerFull ? `<td style="font-size:12px;">${esc(t.member || '')}</td>` : ''}
                   <td style="white-space:nowrap;">${t.date || ''}</td>
@@ -57465,8 +57719,101 @@ async function renderBoardsTab(T, proj) {
       return hrs + ':' + String(mins).padStart(2, '0');
     }
 
+    // WO-082: selection survives re-render (inline +hrs / Edit modal); scroll restored after save
+    if (!window._tlSelectedEntryIds) window._tlSelectedEntryIds = new Set();
+
+    function _tlGetLedgerScrollEl() {
+      return document.querySelector('.table-wrap.time-ledger-wrap');
+    }
+    function _tlCaptureLedgerScroll() {
+      var el = _tlGetLedgerScrollEl();
+      window._tlLedgerScrollTop = el ? el.scrollTop : 0;
+      window._tlLedgerScrollLeft = el ? el.scrollLeft : 0;
+      window._tlWindowScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      var ca = document.getElementById('contentArea');
+      window._tlContentScrollTop = ca ? ca.scrollTop : 0;
+    }
+    function _tlRestoreLedgerScroll() {
+      var t = window._tlLedgerScrollTop || 0;
+      var l = window._tlLedgerScrollLeft || 0;
+      var wy = window._tlWindowScrollY || 0;
+      var ct = window._tlContentScrollTop || 0;
+      function apply() {
+        var el = _tlGetLedgerScrollEl();
+        if (el) { el.scrollTop = t; el.scrollLeft = l; }
+        var ca = document.getElementById('contentArea');
+        if (ca) ca.scrollTop = ct;
+        try { window.scrollTo(0, wy); } catch (_e) {}
+      }
+      apply();
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(apply);
+      else setTimeout(apply, 0);
+    }
+    function _tlPruneSelectionToFiltered() {
+      var set = window._tlSelectedEntryIds;
+      if (!set || !set.size) return;
+      var keep = {};
+      try {
+        getFilteredTimeEntries().forEach(function(t) { if (t && t.id) keep[t.id] = true; });
+      } catch (_e) { return; }
+      Array.from(set).forEach(function(id) {
+        if (!keep[id]) set.delete(id);
+      });
+    }
+    function _tlApplySelectionToDom() {
+      var set = window._tlSelectedEntryIds || new Set();
+      document.querySelectorAll('.time-cb').forEach(function(cb) {
+        var id = cb.dataset.id;
+        if (!id || cb.disabled) return;
+        cb.checked = set.has(id);
+      });
+      var all = document.querySelectorAll('.time-cb:not(:disabled)');
+      var checked = document.querySelectorAll('.time-cb:checked:not(:disabled)');
+      var sa = document.getElementById('timeSelectAll');
+      if (sa && all.length) sa.checked = (checked.length === all.length && all.length > 0);
+      if (window.updateTimeSelectionInfo) updateTimeSelectionInfo();
+    }
+    function tlTimeCbChanged(cb) {
+      if (!window._tlSelectedEntryIds) window._tlSelectedEntryIds = new Set();
+      var id = cb && cb.dataset ? cb.dataset.id : '';
+      if (!id) { if (window.updateTimeSelectionInfo) updateTimeSelectionInfo(); return; }
+      if (cb.checked) window._tlSelectedEntryIds.add(id);
+      else window._tlSelectedEntryIds.delete(id);
+      if (window.updateTimeSelectionInfo) updateTimeSelectionInfo();
+    }
+    window.tlTimeCbChanged = tlTimeCbChanged;
+
+    function clearTimeLedgerSelection() {
+      window._tlSelectedEntryIds = new Set();
+      document.querySelectorAll('.time-cb').forEach(function(cb) { cb.checked = false; });
+      var sa = document.getElementById('timeSelectAll');
+      if (sa) sa.checked = false;
+      if (window.updateTimeSelectionInfo) updateTimeSelectionInfo();
+    }
+    window.clearTimeLedgerSelection = clearTimeLedgerSelection;
+
+    function selectUninvoicedBillableOnPage() {
+      if (!window._tlSelectedEntryIds) window._tlSelectedEntryIds = new Set();
+      document.querySelectorAll('.time-cb:not(:disabled)').forEach(function(cb) {
+        if (cb.dataset.invoiced) return;
+        var id = cb.dataset.id;
+        var ent = (typeof timeEntries !== 'undefined' ? timeEntries : []).find(function(t) { return t.id === id; });
+        if (ent && ent.billable === false) return;
+        cb.checked = true;
+        if (id) window._tlSelectedEntryIds.add(id);
+      });
+      if (window.updateTimeSelectionInfo) updateTimeSelectionInfo();
+    }
+    window.selectUninvoicedBillableOnPage = selectUninvoicedBillableOnPage;
+
     function toggleAllTimeEntries(checked) {
-      document.querySelectorAll('.time-cb:not(:disabled)').forEach(cb => cb.checked = checked);
+      if (!window._tlSelectedEntryIds) window._tlSelectedEntryIds = new Set();
+      document.querySelectorAll('.time-cb:not(:disabled)').forEach(function(cb) {
+        cb.checked = checked;
+        if (!cb.dataset.id) return;
+        if (checked) window._tlSelectedEntryIds.add(cb.dataset.id);
+        else window._tlSelectedEntryIds.delete(cb.dataset.id);
+      });
       if (window.updateTimeSelectionInfo) updateTimeSelectionInfo();
     }
 
@@ -57944,13 +58291,19 @@ async function renderBoardsTab(T, proj) {
     }
 
     async function bulkDeleteSelectedTime() {
-      var checked = document.querySelectorAll('.time-cb:checked');
-      var ids = [];
+      var set = window._tlSelectedEntryIds;
+      var ids = (set && set.size)
+        ? Array.from(set)
+        : [];
+      if (!ids.length) {
+        document.querySelectorAll('.time-cb:checked').forEach(function(cb) {
+          if (cb.dataset.id) ids.push(cb.dataset.id);
+        });
+      }
       var invoicedSel = 0;
-      checked.forEach(function(cb) {
-        if (!cb.dataset.id) return;
-        ids.push(cb.dataset.id);
-        if (cb.dataset.invoiced) invoicedSel++;
+      ids.forEach(function(id) {
+        var ent = timeEntries.find(function(t) { return t.id === id; });
+        if (ent && ent.invoiceId) invoicedSel++;
       });
       if (ids.length === 0) { alert('Select entries using the checkboxes first.'); return; }
       var msg = 'Delete ' + ids.length + ' selected time entries? This cannot be undone.';
@@ -57960,12 +58313,14 @@ async function renderBoardsTab(T, proj) {
         var batch = db.batch();
         ids.forEach(function(id) { batch.delete(db.collection('timeEntries').doc(id)); });
         await batch.commit();
+        ids.forEach(function(id) { if (window._tlSelectedEntryIds) window._tlSelectedEntryIds.delete(id); });
         renderTimeTracker();
       } catch(e) {
         // Firestore batch limit is 500, fall back to sequential
         for (var i = 0; i < ids.length; i++) {
           try { await db.collection('timeEntries').doc(ids[i]).delete(); } catch(e2) {}
         }
+        ids.forEach(function(id) { if (window._tlSelectedEntryIds) window._tlSelectedEntryIds.delete(id); });
         renderTimeTracker();
       }
     }
@@ -58271,8 +58626,11 @@ async function renderBoardsTab(T, proj) {
 
     // --- Create Invoice from Selected Time Entries ---
     async function showCreateInvoiceFromTime() {
-      // Get checked entries or all uninvoiced billable
-      let selectedIds = [...document.querySelectorAll('.time-cb:checked:not(:disabled)')].map(cb => cb.dataset.id);
+      // Selection Set (WO-082) or DOM checkboxes; empty → all uninvoiced billable in filters
+      var set = window._tlSelectedEntryIds;
+      var selectedIds = (set && set.size)
+        ? Array.from(set)
+        : [...document.querySelectorAll('.time-cb:checked:not(:disabled)')].map(function(cb) { return cb.dataset.id; });
       let entries;
       if (selectedIds.length > 0) {
         entries = timeEntries.filter(t => selectedIds.includes(t.id) && !t.invoiceId);
@@ -60297,7 +60655,7 @@ async function renderBoardsTab(T, proj) {
 
     function librarySearchType(val) {
       libraryFilter.search = val;
-      if (!String(val || '').trim()) window._libDisplayLimit = 100;
+      window._libListPage = 1;
       clearTimeout(window._libSearchDebounce);
       window._libSearchDebounce = setTimeout(function() {
         var pos = val.length;
@@ -61996,11 +62354,13 @@ async function renderBoardsTab(T, proj) {
         <button type="button" class="${libraryViewMode==='grid'?'active':''}" onclick="libraryViewMode='grid';renderLibraryView()"><span aria-hidden="true">▦</span> Grid</button>
       </div>`;
 
-      if (!window._libDisplayLimit) window._libDisplayLimit = 100;
-      if (_libSearchActive) {
-        window._libDisplayLimit = Math.min(500, Math.max(filtered.length, 100));
+      // WO-078: filter full libraryProducts first, then client-paginate (Prev/Next).
+      var LIB_PAGE_SIZE = 100;
+      var _libSigF = [libraryFilter.search || '', libraryFilter.vendor || '', libraryFilter.category || '', libraryFilter.kind || '', libraryFilter.projectId || '', librarySortField || '', librarySortDir || '', window._libraryCatalogMode || 'active'].join('\u0001');
+      if (window._libListSigF !== _libSigF) {
+        window._libListPage = 1;
+        window._libListSigF = _libSigF;
       }
-      const DISPLAY_LIMIT = window._libDisplayLimit;
 
       // Sort filtered results
       const sortArrow = function(field) {
@@ -62027,8 +62387,21 @@ async function renderBoardsTab(T, proj) {
         });
       }
 
-      const displayItems = filtered.slice(0, DISPLAY_LIMIT);
-      const hasMore = filtered.length > DISPLAY_LIMIT;
+      var _libTotalPages = Math.max(1, Math.ceil(filtered.length / LIB_PAGE_SIZE) || 1);
+      window._libListPage = Math.max(1, Math.min(window._libListPage || 1, _libTotalPages));
+      var _libCurPage = window._libListPage;
+      var _libSliceStart = (_libCurPage - 1) * LIB_PAGE_SIZE;
+      const displayItems = filtered.slice(_libSliceStart, _libSliceStart + LIB_PAGE_SIZE);
+      var _libShowStart = filtered.length ? (_libSliceStart + 1) : 0;
+      var _libShowEnd = Math.min(_libSliceStart + LIB_PAGE_SIZE, filtered.length);
+      var _libPagerHtml = '';
+      if (filtered.length > LIB_PAGE_SIZE) {
+        _libPagerHtml = '<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;padding:14px 12px;margin-top:12px;border:1px solid var(--gray-200);background:var(--gray-50);">' +
+          '<button type="button" class="btn btn-sm" style="padding:5px 12px;" ' + (_libCurPage <= 1 ? 'disabled' : '') + ' onclick="window._libListPage=Math.max(1,(window._libListPage||1)-1);renderLibraryView()">‹ Prev</button>' +
+          '<span style="font-size:12px;color:var(--gray-600);font-weight:600;">Page ' + _libCurPage + ' of ' + _libTotalPages + ' · ' + LIB_PAGE_SIZE + ' per page</span>' +
+          '<button type="button" class="btn btn-sm" style="padding:5px 12px;" ' + (_libCurPage >= _libTotalPages ? 'disabled' : '') + ' onclick="window._libListPage=Math.min(' + _libTotalPages + ',(window._libListPage||1)+1);renderLibraryView()">Next ›</button>' +
+          '</div>';
+      }
 
       let content = '';
       if (filtered.length === 0) {
@@ -62143,28 +62516,29 @@ async function renderBoardsTab(T, proj) {
           ${_activeLibActions}
         </div>
         ${_junkBanner}
-        <p style="color:var(--gray-400);margin-bottom:8px;">${hasMore ? 'Showing ' + DISPLAY_LIMIT + ' of ' + filtered.length : filtered.length} ${_isJunkView ? 'junk item' : 'product'}${filtered.length !== 1 ? 's' : ''}${hasMore ? ' · <button class="btn btn-secondary btn-sm" onclick="window._libDisplayLimit+=100;renderLibraryView()">Load More</button> or use search to narrow down' : ''}</p>
+        <p style="color:var(--gray-400);margin-bottom:8px;">${filtered.length === 0 ? '0' : ('Showing ' + _libShowStart + '\u2013' + _libShowEnd + ' of ' + filtered.length)} ${_isJunkView ? 'junk item' : 'product'}${filtered.length !== 1 ? 's' : ''}${libraryFilter.category ? ' · ' + esc(libraryFilter.category) : ''}${_libTotalPages > 1 ? ' · Page ' + _libCurPage + ' of ' + _libTotalPages : ''}</p>
         ${_libHelp}
 
         <div style="display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap;align-items:center;">
           <input type="text" class="form-input" id="librarySearchInput" placeholder="Search · try: concretti manhattan, IN-12902, sku, vendor\u2026" value="${esc(libraryFilter.search)}"
             oninput="librarySearchType(this.value)"
             style="flex:1;min-width:200px;">
-          <select class="form-input" style="width:180px;" onchange="libraryFilter.vendor=this.value;renderLibraryView()">
+          <select class="form-input" style="width:180px;" onchange="libraryFilter.vendor=this.value;window._libListPage=1;renderLibraryView()">
             <option value="">All Vendors</option>
             ${vendors.map(v => `<option value="${escAttr(v)}" ${libraryFilter.vendor === v ? 'selected' : ''}>${esc(v)}</option>`).join('')}
           </select>
-          <select class="form-input" style="width:180px;" onchange="libraryFilter.category=this.value;renderLibraryView()">
+          <select class="form-input" style="width:180px;" onchange="libraryFilter.category=this.value;window._libListPage=1;renderLibraryView()">
             <option value="">All Categories</option>
             ${categories.map(c => `<option value="${escAttr(c)}" ${libraryFilter.category === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}
           </select>
-          <select class="form-input" style="width:200px;" onchange="libraryFilter.projectId=this.value;renderLibraryView()">
+          <select class="form-input" style="width:200px;" onchange="libraryFilter.projectId=this.value;window._libListPage=1;renderLibraryView()">
             <option value="">All projects</option>
             ${_libProjectRows.map(function(r) { return '<option value="' + escAttr(r.id) + '" ' + (libraryFilter.projectId === r.id ? 'selected' : '') + '>' + esc(r.name) + '</option>'; }).join('')}
           </select>
           ${viewToggle}
         </div>
         ${content}
+        ${_libPagerHtml}
       `;
     }
 
@@ -66137,6 +66511,7 @@ async function renderBoardsTab(T, proj) {
         state: (document.getElementById('evState').value || '').trim(),
         zip: (document.getElementById('evZip').value || '').trim()
       };
+      _evAddressParts.line1 = cchStripDuplicateCityStateZipFromStreet(_evAddressParts.line1, _evAddressParts.city, _evAddressParts.state, _evAddressParts.zip);
       var data = {
         name: vendorName,
         description: (document.getElementById('evDesc').value || '').trim(),
@@ -67570,6 +67945,9 @@ async function renderBoardsTab(T, proj) {
     let _finDataClientNamesLower = null;
     let _cacheTime = 0;
     let _cacheLoadingPromise = null;
+    let _poOnlyLoadingPromise = null;
+    /** True when `_cachedPOs` came from PO-only fast path (proposals/invoices/clips not yet loaded). */
+    window._finCacheIsPartialPOs = false;
     const CACHE_TTL = 60000; // 1 minute
 
     function invalidateSearchCache() {
@@ -67580,6 +67958,8 @@ async function renderBoardsTab(T, proj) {
       _cachedProjList = null;
       _finDataClientNamesLower = null;
       _cacheTime = 0;
+      window._finCacheIsPartialPOs = false;
+      window._poPageBgFullLoad = false;
       window._cachedPOs = null;
       window._cachedProjNames = null;
       window._cachedProjList = null;
@@ -67603,11 +67983,109 @@ async function renderBoardsTab(T, proj) {
     }
 
     async function loadFinancialData(forceRefresh) {
-      if (!forceRefresh && _cachedProjNames && Date.now() - _cacheTime < CACHE_TTL) return;
+      // Partial PO-only cache must not short-circuit the full loader (invoices/proposals still needed elsewhere)
+      if (!forceRefresh && _cachedProjNames && Date.now() - _cacheTime < CACHE_TTL && !window._finCacheIsPartialPOs) return;
       // Prevent concurrent loads — if already loading, await the same promise
       if (_cacheLoadingPromise) return _cacheLoadingPromise;
-      _cacheLoadingPromise = _doLoadFinancialData(forceRefresh).finally(() => { _cacheLoadingPromise = null; });
+      // Let PO-first paint finish, then replace with full firm-wide cache
+      if (_poOnlyLoadingPromise) {
+        try { await _poOnlyLoadingPromise; } catch (_ePo) {}
+      }
+      _cacheLoadingPromise = _doLoadFinancialData(forceRefresh).finally(function() {
+        _cacheLoadingPromise = null;
+        window._finCacheIsPartialPOs = false;
+      });
       return _cacheLoadingPromise;
+    }
+
+    /**
+     * WO-084: All POs page fast path — boards + purchaseOrders only (active Studio projects first).
+     * Does not load proposals/invoices/clips. Does not set _cacheTime (so loadFinancialData still runs).
+     */
+    async function loadPOsOnlyFast() {
+      if (_cachedProjNames && _cachedPOs && Date.now() - _cacheTime < CACHE_TTL && !window._finCacheIsPartialPOs) return;
+      if (_cacheLoadingPromise) return _cacheLoadingPromise;
+      if (_poOnlyLoadingPromise) return _poOnlyLoadingPromise;
+      _poOnlyLoadingPromise = _doLoadPOsOnlyFast().finally(function() { _poOnlyLoadingPromise = null; });
+      return _poOnlyLoadingPromise;
+    }
+
+    async function _doLoadPOsOnlyFast() {
+      const projSnap = await getCachedBoards();
+      _cachedProjNames = {}; _cachedProjList = [];
+      window._cchProjTaxRates = window._cchProjTaxRates || {};
+      projSnap.forEach(function(d) {
+        var data = d.data() || {};
+        _cachedProjNames[d.id] = data.name || d.id;
+        var cn = String(data.clientName || '').trim();
+        var cl = String(data.client || '').trim();
+        var pst = String(data.status || 'In Progress').trim() || 'In Progress';
+        _cachedProjList.push({ id: d.id, name: data.name || d.id, clientName: cn, client: cl, status: pst });
+        var _ptr = parseFloat(data.taxRate);
+        if (Number.isFinite(_ptr) && _ptr > 0) window._cchProjTaxRates[d.id] = _ptr;
+      });
+      cchIndexProjectStatusesFromBoardsSnap(projSnap);
+
+      var activePids = [];
+      var archivedPids = [];
+      _cachedProjList.forEach(function(p) {
+        if (p.status === 'Completed' || p.status === 'Archived') archivedPids.push(p.id);
+        else activePids.push(p.id);
+      });
+
+      async function fetchPosForPids(pids) {
+        var promises = pids.map(async function(pid) {
+          try {
+            var ps2 = await db.collection('boards').doc(pid).collection('purchaseOrders').get();
+            var pos = [];
+            ps2.forEach(function(d) {
+              var rawO = d.data() || {};
+              pos.push(Object.assign({}, rawO, { id: d.id, projectId: pid, projectName: _cachedProjNames[pid] }));
+            });
+            return pos;
+          } catch (e) { return []; }
+        });
+        var chunks = await Promise.all(promises);
+        var out = [];
+        chunks.forEach(function(arr) { out.push.apply(out, arr); });
+        return out;
+      }
+
+      var activePos = await fetchPosForPids(activePids);
+      _cachedPOs = dedupeGlobalCachedPOs(activePos);
+      var _projMiniById = {};
+      _cachedProjList.forEach(function(p) { _projMiniById[p.id] = p; });
+      _cachedPOs.forEach(function(po) {
+        var projMini = _projMiniById[po.projectId] || { clientName: '', client: '' };
+        po._displayVendor = typeof resolvePOVendorDisplay === 'function'
+          ? resolvePOVendorDisplay(po, projMini)
+          : (po.vendor || '');
+      });
+      window._cachedPOs = _cachedPOs;
+      window._cachedProjNames = _cachedProjNames;
+      window._cachedProjList = _cachedProjList;
+      window._finCacheIsPartialPOs = true;
+
+      // Background: pull archived/completed project POs (still no proposals/invoices) so the list fills in
+      if (archivedPids.length) {
+        fetchPosForPids(archivedPids).then(function(archPos) {
+          if (!window._finCacheIsPartialPOs) return; // full load already won
+          if (!archPos || !archPos.length) return;
+          var merged = (_cachedPOs || []).concat(archPos);
+          _cachedPOs = dedupeGlobalCachedPOs(merged);
+          _cachedPOs.forEach(function(po) {
+            var projMini = _projMiniById[po.projectId] || { clientName: '', client: '' };
+            po._displayVendor = typeof resolvePOVendorDisplay === 'function'
+              ? resolvePOVendorDisplay(po, projMini)
+              : (po.vendor || '');
+          });
+          window._cachedPOs = _cachedPOs;
+          var h = String(location.hash || '');
+          if (h.indexOf('allpos') >= 0 && typeof renderAllPOs === 'function') {
+            renderAllPOs({ silentRefresh: true });
+          }
+        }).catch(function() {});
+      }
     }
 
     async function _doLoadFinancialData(forceRefresh) {
@@ -67807,6 +68285,7 @@ async function renderBoardsTab(T, proj) {
       _finDataClientNamesLower = _clientNameBlockset;
 
       _cacheTime = Date.now();
+      window._finCacheIsPartialPOs = false;
       // Expose for cch-po-bill-variance.js (Vendor Bills page) and other modules outside this closure
       window._cachedPOs = _cachedPOs;
       window._cachedProjNames = _cachedProjNames;
@@ -67848,6 +68327,24 @@ async function renderBoardsTab(T, proj) {
     }
 
     // ==================== ALL TASKS (cross-project) ====================
+    /** WO-070 — display-only column sort (default status); persists on window._allTaskSort */
+    function allTasksSortArrow(field) {
+      var st = window._allTaskSort || { by: 'status', dir: 'asc' };
+      if (st.by !== field) return '';
+      return st.dir === 'asc' ? ' \u25B2' : ' \u25BC';
+    }
+    function allTasksSortByField(field) {
+      window._allTaskSort = window._allTaskSort || { by: 'status', dir: 'asc' };
+      if (window._allTaskSort.by === field) {
+        window._allTaskSort.dir = window._allTaskSort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        window._allTaskSort.by = field;
+        window._allTaskSort.dir = field === 'due' || field === 'priority' ? 'asc' : 'asc';
+      }
+      renderAllTasks();
+    }
+    window.allTasksSortByField = allTasksSortByField;
+
     async function renderAllTasks() {
       setBreadcrumb([{ label: 'Tasks' }]);
       setTopbarActions('');
@@ -67867,6 +68364,7 @@ async function renderBoardsTab(T, proj) {
 
       const memberName = typeof currentMemberName === 'function' ? currentMemberName() : '';
       window._allTaskFilter = window._allTaskFilter || 'active';
+      window._allTaskSort = window._allTaskSort || { by: 'status', dir: 'asc' };
       // Pepper firm-wide Tasks digest (cch-pepper.js) · snapshot of last All Tasks load.
       try {
         window._cchPepperAllTasksCache = { at: Date.now(), filter: window._allTaskFilter, tasks: allTasks.slice() };
@@ -67878,11 +68376,32 @@ async function renderBoardsTab(T, proj) {
 
       var priOrder = { 'Urgent': 0, 'High': 1, 'Medium': 2, 'Low': 3 };
       var statusOrder = typeof cchTaskStatusOrderMap === 'function' ? cchTaskStatusOrderMap() : { 'To Do': 0, 'In Progress': 1, 'Waiting': 2, 'Done': 3 };
-      filtered.sort(function(a,b) {
-        var sa = statusOrder[a.status] || 0, sb = statusOrder[b.status] || 0;
-        if (sa !== sb) return sa - sb;
-        var pa = priOrder[a.priority] || 2, pb = priOrder[b.priority] || 2;
-        if (pa !== pb) return pa - pb;
+      var sortBy = window._allTaskSort.by || 'status';
+      var sortDir = window._allTaskSort.dir === 'desc' ? -1 : 1;
+      filtered.sort(function(a, b) {
+        if (sortBy === 'project') {
+          return sortDir * String(a.projectName || '').localeCompare(String(b.projectName || ''), undefined, { sensitivity: 'base' });
+        }
+        if (sortBy === 'task') {
+          return sortDir * String(a.title || '').localeCompare(String(b.title || ''), undefined, { sensitivity: 'base' });
+        }
+        if (sortBy === 'assignee') {
+          return sortDir * String(a.assignee || '').localeCompare(String(b.assignee || ''), undefined, { sensitivity: 'base' });
+        }
+        if (sortBy === 'priority') {
+          var pa = priOrder[a.priority] != null ? priOrder[a.priority] : 2;
+          var pb = priOrder[b.priority] != null ? priOrder[b.priority] : 2;
+          return sortDir * (pa - pb);
+        }
+        if (sortBy === 'due') {
+          return sortDir * String(a.dueDate || '').localeCompare(String(b.dueDate || ''));
+        }
+        /* default / status — preserve prior status → priority → createdAt when status primary */
+        var sa = statusOrder[a.status] != null ? statusOrder[a.status] : 0;
+        var sb = statusOrder[b.status] != null ? statusOrder[b.status] : 0;
+        if (sa !== sb) return sortDir * (sa - sb);
+        var pra = priOrder[a.priority] || 2, prb = priOrder[b.priority] || 2;
+        if (pra !== prb) return pra - prb;
         return (b.createdAt || '').localeCompare(a.createdAt || '');
       });
 
@@ -67918,12 +68437,12 @@ async function renderBoardsTab(T, proj) {
           <table style="width:100%;border-collapse:collapse;">
             <thead><tr>
               <th style="text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(15,26,46,0.08);width:30px;"></th>
-              <th style="text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(15,26,46,0.08);">Task</th>
-              <th style="text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(15,26,46,0.08);">Project</th>
-              <th style="text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(15,26,46,0.08);">Assignee</th>
-              <th style="text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(15,26,46,0.08);">Priority</th>
-              <th style="text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(15,26,46,0.08);">Due</th>
-              <th style="text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(15,26,46,0.08);">Status</th>
+              <th style="text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(15,26,46,0.08);cursor:pointer;" onclick="allTasksSortByField('task')">Task${allTasksSortArrow('task')}</th>
+              <th style="text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(15,26,46,0.08);cursor:pointer;" onclick="allTasksSortByField('project')" title="Sort by project name">Project${allTasksSortArrow('project')}</th>
+              <th style="text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(15,26,46,0.08);cursor:pointer;" onclick="allTasksSortByField('assignee')">Assignee${allTasksSortArrow('assignee')}</th>
+              <th style="text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(15,26,46,0.08);cursor:pointer;" onclick="allTasksSortByField('priority')">Priority${allTasksSortArrow('priority')}</th>
+              <th style="text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(15,26,46,0.08);cursor:pointer;" onclick="allTasksSortByField('due')">Due${allTasksSortArrow('due')}</th>
+              <th style="text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);border-bottom:1px solid rgba(15,26,46,0.08);cursor:pointer;" onclick="allTasksSortByField('status')">Status${allTasksSortArrow('status')}</th>
               <th style="padding:10px 14px;font-size:10px;border-bottom:1px solid rgba(15,26,46,0.08);width:40px;"></th>
             </tr></thead>
             <tbody>
@@ -68483,22 +69002,40 @@ async function renderBoardsTab(T, proj) {
     }
 
     // ==================== GLOBAL PURCHASE ORDERS PAGE ====================
-    async function renderAllPOs() {
+    async function renderAllPOs(opts) {
+      opts = (opts && typeof opts === 'object') ? opts : {};
+      var silentRefresh = !!opts.silentRefresh;
       if (typeof isClientProjectGuestSession === 'function' && isClientProjectGuestSession()) {
         showToast('Purchase orders are not available for your account.', 'warning');
         navigate('#/projects');
         return;
       }
-      setBreadcrumb([{ label: 'Purchase Orders' }]);
-      setTopbarActions((currentUser && typeof ADMIN_EMAILS !== 'undefined' && ADMIN_EMAILS.includes((currentUser.email || '').toLowerCase())
-        ? '<button class="btn btn-secondary btn-sm" style="margin-right:8px;" onclick="showPODataAuditModal()" title="Duplicate PO #s, vendor mismatches, paid vs balance · CSV">🔎 PO audit</button>' +
-          '<button class="btn btn-secondary btn-sm" style="margin-right:8px;" onclick="showHouzzPoPaymentsFromTxnModal()" title="Merge Paid from Houzz .xlsx — All Transactions (legacy) or Outgoing / New Houzz PO reports">💵 PO payments (Houzz)</button>'
-        : '') + '<button class="btn btn-secondary" style="margin-right:8px;" onclick="bulkMarkQBSynced(\'purchaseOrders\')">Sync All QB</button><button class="btn btn-primary" onclick="showQuickPOModal()">+ New PO</button>');
+      if (!silentRefresh) {
+        setBreadcrumb([{ label: 'Purchase Orders' }]);
+        setTopbarActions((currentUser && typeof ADMIN_EMAILS !== 'undefined' && ADMIN_EMAILS.includes((currentUser.email || '').toLowerCase())
+          ? '<button class="btn btn-secondary btn-sm" style="margin-right:8px;" onclick="showPODataAuditModal()" title="Duplicate PO #s, vendor mismatches, paid vs balance · CSV">🔎 PO audit</button>' +
+            '<button class="btn btn-secondary btn-sm" style="margin-right:8px;" onclick="showHouzzPoPaymentsFromTxnModal()" title="Merge Paid from Houzz .xlsx — All Transactions (legacy) or Outgoing / New Houzz PO reports">💵 PO payments (Houzz)</button>'
+          : '') + '<button class="btn btn-secondary" style="margin-right:8px;" onclick="bulkMarkQBSynced(\'purchaseOrders\')">Sync All QB</button><button class="btn btn-primary" onclick="showQuickPOModal()">+ New PO</button>');
+      }
       const T = document.getElementById('contentArea');
-      T.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Loading purchase orders...</div>';
+      if (!silentRefresh) {
+        T.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Loading purchase orders...</div>';
+      }
       try {
-        await loadFinancialData();
-        const all = _cachedPOs;
+        // WO-084: paint from POs alone (active Studio first); full financial load fills cache + tiles in background
+        var hadFreshFull = _cachedProjNames && _cachedPOs && Date.now() - _cacheTime < CACHE_TTL && !window._finCacheIsPartialPOs;
+        var needsBackgroundFull = false;
+        if (!silentRefresh) {
+          if (hadFreshFull) {
+            /* use cache */
+          } else if (_cachedPOs && _cachedProjNames && window._finCacheIsPartialPOs) {
+            needsBackgroundFull = true;
+          } else {
+            await loadPOsOnlyFast();
+            needsBackgroundFull = !!window._finCacheIsPartialPOs;
+          }
+        }
+        const all = _cachedPOs || [];
         const projList = _cachedProjList;
         const statuses = [...new Set(all.map(p => (typeof window.cchPoProcurementStatusLabel === 'function' ? window.cchPoProcurementStatusLabel(p) : (p.status || 'Draft'))))].sort();
         const vendors = poVendorNamesForToolbar(all);
@@ -68658,6 +69195,16 @@ async function renderBoardsTab(T, proj) {
           ${paginationBar(filtered.length, posPage, 'pos')}`}
         `;
         if (typeof window.cchRestoreListSearchFocus === 'function') window.cchRestoreListSearchFocus(_finSearchFocus);
+        // Background: full shared loader (proposals + invoices + archived/clip POs) → refresh tiles/export without blocking first paint
+        if (needsBackgroundFull && !window._poPageBgFullLoad) {
+          window._poPageBgFullLoad = true;
+          loadFinancialData(false).then(function() {
+            window._poPageBgFullLoad = false;
+            window._finCacheIsPartialPOs = false;
+            var h = String(location.hash || '');
+            if (h.indexOf('allpos') >= 0) renderAllPOs({ silentRefresh: true });
+          }).catch(function() { window._poPageBgFullLoad = false; });
+        }
       } catch(e) {
         T.innerHTML = '<div class="empty-state"><div class="empty-icon">◇</div><div class="empty-text">Error: ' + esc(e.message) + '</div></div>';
       }
@@ -72312,7 +72859,8 @@ async function renderBoardsTab(T, proj) {
         '.cp-sb-badge { margin-left:auto; background:#0A1F3D; color:#fff; font-size:9px; font-weight:500; padding:2px 6px; min-width:16px; text-align:center; }' +
         '.cp-sb-foot { padding:20px 24px; border-top:1px solid #E2E2E2; font-size:11px; color:#9CA3AF; line-height:1.4; }' +
         '.cp-main-stack { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; background:#FFFFFF !important; }' +
-        '.cp-top-header { background:#0A1F3D; padding:14px 32px; min-height:48px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }' +
+        '.cp-top-header { background:#0A1F3D; padding:10px 24px; min-height:64px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; gap:16px; }' +
+        '.cp-top-header-left { display:flex; align-items:center; gap:14px; min-width:0; }' +
         '.cp-top-header-k { font-size:11px; letter-spacing:0.15em; text-transform:uppercase; color:rgba(255,255,255,0.5); font-family:"DM Sans",sans-serif; }' +
         '.cp-top-header-proj { font-size:18px; color:#FFFFFF; font-family:"Playfair Display",Georgia,serif; font-weight:600; letter-spacing:0.02em; text-align:right; }' +
         '.cp-top-header-proj .cp-proj-accent { display:block; font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:#C4A464; font-family:"DM Sans",sans-serif; font-weight:500; margin-top:3px; }' +
@@ -72721,12 +73269,12 @@ async function renderBoardsTab(T, proj) {
             : '') +
           '</div></nav>' +
           '<div class="cp-main-stack">' +
-        '<header class="cp-top-header"><div class="cp-top-header-k">CCH Studio Client Portal</div>' + _topProjRight + '</header>' +
+        '<header class="cp-top-header"><div class="cp-top-header-left"><div class="cp-top-header-k">CCH Studio Client Portal</div><div id="cchCpPepperHost"></div></div>' + _topProjRight + '</header>' +
         _topMsgBarHtml +
         '<div class="cp-scroll-body' + (activePage === 'messages' ? ' cp-scroll-body--messages' : '') + '">';
       } else {
         html += '<div class="cp-main-stack">' +
-        '<header class="cp-top-header"><div class="cp-top-header-k">CCH Studio Client Portal</div>' + _topProjRight + '</header>' +
+        '<header class="cp-top-header"><div class="cp-top-header-left"><div class="cp-top-header-k">CCH Studio Client Portal</div><div id="cchCpPepperHost"></div></div>' + _topProjRight + '</header>' +
         _topMsgBarHtml +
         '<div class="cp-scroll-body' + (activePage === 'messages' ? ' cp-scroll-body--messages' : '') + '">';
       }
@@ -73730,6 +74278,16 @@ async function renderBoardsTab(T, proj) {
         }
       }
       T.innerHTML = html;
+      // Client Pepper — docked in navy header; show for clients and staff Preview so placement is visible
+      if (typeof window.cchClientPepperMount === 'function') {
+        var _pepperIdent = (typeof cpPortalEffectiveClientIdentity === 'function' ? (cpPortalEffectiveClientIdentity() || {}) : {});
+        window.cchClientPepperMount({
+          projectId: projectId,
+          projectName: String((proj && (proj.name || proj.projectName)) || projName || projectId),
+          clientName: String(_pepperIdent.name || _pepperIdent.clientName || (isOwner ? 'Studio Preview' : 'Client')),
+          clientEmail: String(_pepperIdent.email || '')
+        });
+      }
       if (typeof cpPortalPaintPdfThumbs === 'function') void cpPortalPaintPdfThumbs(T);
       if (typeof cpPortalAttachLiveSync === 'function') cpPortalAttachLiveSync(projectId);
       if (activePage === 'decisions' && _routeState.decisionFocusId && typeof cpPortalScrollToDecisionFocus === 'function') {
@@ -74741,14 +75299,16 @@ async function renderBoardsTab(T, proj) {
       opts = opts || {};
       var h = (window.location.hash || '').replace(/^#\/?/, '');
       var url;
+      // Always share client.html deep links (not /#/clientview on index.html).
+      // Phones/clients must not download the full Studio shell; index.html only redirects as a fallback.
       if (opts.url) {
         url = String(opts.url);
       } else if (opts.sectionId) {
-        url = window.location.origin + '/#/clientview/' + projectId + '/inspirations/' + encodeURIComponent(String(opts.sectionId));
+        url = window.location.origin + '/client.html#/clientview/' + projectId + '/inspirations/' + encodeURIComponent(String(opts.sectionId));
       } else if (h.indexOf('clientview/') === 0) {
-        url = window.location.origin + '/#/' + h;
+        url = window.location.origin + '/client.html#/' + h;
       } else {
-        url = window.location.origin + '/#/clientview/' + projectId;
+        url = window.location.origin + '/client.html#/clientview/' + projectId;
       }
       var n = 0;
       try { n = await _publishDraftsOnShare(projectId); } catch (_e0) {}
@@ -79799,8 +80359,8 @@ async function renderBoardsTab(T, proj) {
       });
       allProjects.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
 
-      var typeButtons = ['all', 'client_portal', 'inspiration', 'board_update', 'invoice', 'proposal', 'po', 'clip', 'time', 'email', 'note', 'milestone', 'project'];
-      var typeLabels = { all:'All', client_portal:'Client Portal', inspiration:'Inspiration', board_update:'Board Updates', invoice:'Invoices', proposal:'Proposals', po:'POs', clip:'Clips', time:'Time', email:'Email', note:'Notes', milestone:'Milestones', project:'Projects' };
+      var typeButtons = ['all', 'client_portal', 'inspiration', 'board_update', 'builder', 'invoice', 'proposal', 'po', 'clip', 'time', 'email', 'note', 'milestone', 'project'];
+      var typeLabels = { all:'All', client_portal:'Client Portal', inspiration:'Inspiration', board_update:'Board Updates', builder:'Builder', invoice:'Invoices', proposal:'Proposals', po:'POs', clip:'Clips', time:'Time', email:'Email', note:'Notes', milestone:'Milestones', project:'Projects' };
 
       // Group by day
       var byDay = {};
@@ -79900,7 +80460,14 @@ async function renderBoardsTab(T, proj) {
         client_portal: '\uD83D\uDC64',
         client_first_visit: '\uD83D\uDC4B',
         message: '\uD83D\uDCAC',
-        board_update: '\uD83D\uDDBC'
+        board_update: '\uD83D\uDDBC',
+        builder: '\uD83D\uDCD0'
+      };
+      var typeBadgeLabels = {
+        builder: 'Builder',
+        board_update: 'Board Updates',
+        client_portal: 'Client Portal',
+        client_first_visit: 'Client Portal'
       };
       var icon = typeIcons[a.type] || '\u25C7';
       var timeStr = '';
@@ -79909,14 +80476,14 @@ async function renderBoardsTab(T, proj) {
         catch(e) { timeStr = ''; }
       }
 
-      var actionColors = { created:'var(--green)', updated:'var(--blue)', deleted:'var(--red)', published:'var(--gold)', approved:'var(--green)', sent:'var(--blue)', completed:'var(--green)' };
+      var actionColors = { created:'var(--green)', updated:'var(--blue)', deleted:'var(--red)', published:'var(--gold)', approved:'var(--green)', sent:'var(--blue)', completed:'var(--green)', revised:'var(--gold)' };
 
       return '<div class="af-item af-type-' + (a.type || 'note') + '">' +
         '<div class="af-card">' +
           '<div class="af-meta">' +
             '<div style="display:flex;align-items:center;gap:8px;">' +
               '<span>' + icon + '</span>' +
-              '<span class="af-type-badge ' + (a.type || 'note') + '">' + esc(a.type || 'note') + '</span>' +
+              '<span class="af-type-badge ' + (a.type || 'note') + '">' + esc(typeBadgeLabels[a.type] || a.type || 'note') + '</span>' +
               (a.action ? '<span style="font-size:11px;color:' + (actionColors[a.action] || 'var(--gray-500)') + ';font-weight:600;">' + esc(a.action) + '</span>' : '') +
             '</div>' +
             '<span class="af-time">' + timeStr + '</span>' +
@@ -80913,9 +81480,9 @@ async function renderBoardsTab(T, proj) {
                 (isNote ?
                   '<div class="form-group"><label class="form-label">Title</label><input class="form-input" id="commsEditTitle" value="' + escAttr(titleVal) + '"></div>' :
                   '') +
-                '<div class="form-group"><label class="form-label">' + (isNote ? 'Note' : 'Message') + '</label>' +
-                  '<textarea class="form-input" id="commsEditText" rows="6" style="resize:vertical;">' + esc(textVal) + '</textarea></div>' +
-                (data.published ? '<p style="font-size:11px;color:var(--gray-400);margin:8px 0 0;">Published on client portal — edits appear there after save.</p>' : '') +
+                '<div class="form-group"><label class="form-label">' + (isNote ? 'Note (markdown source)' : 'Message') + '</label>' +
+                  '<textarea class="form-input" id="commsEditText" rows="' + (isNote ? '14' : '6') + '" style="resize:vertical;font-family:ui-monospace,Consolas,monospace;font-size:13px;line-height:1.45;">' + esc(textVal) + '</textarea></div>' +
+                (data.published ? '<p style="font-size:11px;color:var(--gray-400);margin:8px 0 0;">Published on client portal — edits appear there after save.</p>' : '<p style="font-size:11px;color:var(--gray-400);margin:8px 0 0;">Internal until you Publish to portal.</p>') +
               '</div>' +
               '<div class="modal-footer">' +
                 '<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>' +
@@ -83318,19 +83885,21 @@ ${pages}
 
   </script>
   <script src="cch-invoice-tax-rules.js?v=20260520prod"></script>
-  <script src="cch-functions.js?v=20260723neolith1"></script>
+  <script src="cch-functions.js?v=20260806wo083"></script>
   <script src="cch-design-board.js?v=20260801db65"></script>
-  <script src="cch-client-activity.js?v=20260727ca2"></script>
-  <script src="cch-pepper.js?v=20260728ava1"></script>
-  <script src="cch-project-subpanel.js?v=20260728sp12"></script>
+  <script src="cch-client-activity.js?v=20260806ca2"></script>
+  <script src="cch-client-pepper.js?v=20260806cp090"></script>
+  <script src="cch-pepper.js?v=20260806dock1"></script>
+  <script src="cch-project-subpanel.js?v=20260806sp15"></script>
   <script src="cch-followups.js?v=20260726fu9"></script>
-  <script src="cch-staff-chat.js?v=20260727sc6"></script>
-  <script src="cch-bugs-requests.js?v=20260728ava1"></script>
+  <script src="cch-staff-chat.js?v=20260806sc089"></script>
+  <script src="cch-bugs-requests.js?v=20260806wo086"></script>
+  <script src="cch-notes-format.js?v=20260802n1"></script>
   <script src="cch-voice-profile.js?v=20260713voice1"></script>
   <script src="cch-progress-updates.js?v=20260714pu18"></script>
   <script src="cch-client-board.js?v=1774994684878"></script>
   <script src="cch-line-icons.js?v=20260709wr1"></script>
-  <script src="cch-invoice-redesign.js?v=20260730ds20"></script>
+  <script src="cch-invoice-redesign.js?v=20260803wo067b"></script>
   <script src="cch-proposals-invoices-fix.js?v=20260802print4"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
   <script src="cch-airtable-push.js?v=20260630a"></script>

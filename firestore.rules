@@ -14,6 +14,17 @@ service cloud.firestore {
       );
     }
 
+    function isFeedbackTeam() {
+      return request.auth != null && (
+        request.auth.token.email == 'cindy@cchdesign.com' ||
+        request.auth.token.email == 'cynthia@cchdesign.com' ||
+        request.auth.token.email == 'cynthiacbh@gmail.com' ||
+        request.auth.token.email == 'vanessa@cchdesign.com' ||
+        request.auth.token.email == 'vanessaholliday@cchdesign.com' ||
+        request.auth.token.email == 'vholliday@cchdesign.com'
+      );
+    }
+
     // --- Client portal (no Firebase Auth): narrow helpers ---
     // Published proposals: clients may run multi-field updates from the portal UI
     // (line approvals, totals, activityLog arrayUnion). Full field-level parity with
@@ -51,14 +62,14 @@ service cloud.firestore {
     function portalClientDecisionReviewUpdate() {
       return !isAuth()
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['status', 'clientResponse', 'updatedAt']);
+             .hasOnly(['status', 'clientResponse', 'responseHistory', 'updatedAt']);
     }
 
     /** Client portal task input responses (needs_input flag). */
     function portalClientTaskResponseUpdate() {
       return !isAuth()
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['clientResponse', 'updatedAt']);
+             .hasOnly(['clientResponse', 'responseHistory', 'updatedAt']);
     }
 
     function portalActivityCreate() {
@@ -263,6 +274,10 @@ service cloud.firestore {
         allow read: if true;
         allow write: if isAuth();
       }
+      match /progressUpdates/{docId} {
+        allow read: if resource.data.status == 'published' || isAuth();
+        allow write: if isAuth();
+      }
       match /notifications/{docId} {
         allow read: if isAuth();
         allow create: if isAuth();
@@ -271,6 +286,11 @@ service cloud.firestore {
       }
       // Project correspondence + PO vendor email thread (index.html + cch-po-vendor-comms.js)
       match /correspondence/{docId} {
+        allow read: if isAuth();
+        allow write: if isAuth();
+      }
+      // WO-058 — user cleared room from board; doc-line ensure must not re-room / re-create
+      match /clipSuppressions/{docId} {
         allow read: if isAuth();
         allow write: if isAuth();
       }
@@ -377,6 +397,10 @@ service cloud.firestore {
     match /feedbackRequests/{docId} {
       allow read: if isAuth();
       allow write: if isAuth();
+
+      match /messages/{messageId} {
+        allow read, write: if isFeedbackTeam();
+      }
     }
 
     // Studio writes productLibrary heavily; align rule with app (was admin-only write).
@@ -426,6 +450,45 @@ service cloud.firestore {
     match /briefings/{docId} {
       allow read: if isAuth();
       allow write: if isAuth();
+    }
+
+    /** WO-089: unauthenticated client Pepper → Team Chat (Cindy + Vanessa both unread). */
+    function portalClientPepperStaffChatCreate() {
+      return !isAuth()
+        && request.resource.data.fromClient == true
+        && request.resource.data.source == 'client_pepper'
+        && request.resource.data.authorRole == 'client'
+        && request.resource.data.keys().hasAll([
+          'text', 'authorRole', 'authorName', 'createdAt', 'fromClient', 'source', 'projectId', 'projectName'
+        ])
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() < 4000
+        && request.resource.data.projectId is string
+        && request.resource.data.projectName is string
+        && request.resource.data.authorName is string;
+    }
+    function portalClientPepperStaffChatRoomTouch() {
+      return !isAuth()
+        && request.resource.data.keys().hasAll(['lastMessage', 'unreadBy', 'updatedAt'])
+        && request.resource.data.unreadBy is map
+        && request.resource.data.unreadBy.owner == true
+        && request.resource.data.unreadBy.vanessa == true
+        && request.resource.data.lastMessage is map
+        && request.resource.data.lastMessage.fromClient == true;
+    }
+
+    // WO-063 / FT-018 — Studio staff chat (Cindy ↔ Vanessa). Append-only messages.
+    // WO-089 — narrow create path for client Pepper relay (no read for clients).
+    match /internal/{docId} {
+      allow read: if isFeedbackTeam() && docId == 'staffChat';
+      allow create, update: if (isFeedbackTeam() && docId == 'staffChat')
+        || (docId == 'staffChat' && portalClientPepperStaffChatRoomTouch());
+      match /messages/{messageId} {
+        allow read: if isFeedbackTeam();
+        allow create: if isFeedbackTeam() || portalClientPepperStaffChatCreate();
+        allow update, delete: if false;
+      }
     }
   }
 }

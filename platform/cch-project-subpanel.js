@@ -2,7 +2,7 @@
 // Houzz-style project sub-panel — panel #2 only. Does NOT touch the CCH Studio rail (#1).
 // Spec: Docs/NAV_SPEC_FOR_CURSOR.png + Docs/NAV_SUBPANEL_SPEC_CW_Jul11_v1.2.html
 // Feature-flagged: OFF only when localStorage cchNavPanel=0. Admin default ON all hosts.
-// Build 20260711sp5 — admin default ON staging + production (Cindy prod roll Jul 11)
+// Build 20260806sp15 — Client activity under Client (opens slide-over)
 
 (function() {
   'use strict';
@@ -12,6 +12,8 @@
 
   var PANEL_W = 216;
   var spState = { projId: null, woCount: 0, filesBadge: 0 };
+  /** Bumped on every afterRender / setNav — stale spLoadCounts must not re-open panel after Tabs. */
+  var _spRenderGen = 0;
 
   function esc(s) {
     var d = document.createElement('div');
@@ -27,6 +29,27 @@
     } catch (e) { return false; }
   }
 
+  function spIsStudioStaff() {
+    try {
+      if (typeof isCCHStudioStaffSession === 'function') return isCCHStudioStaffSession();
+      var u = (typeof currentUser !== 'undefined' && currentUser) ||
+        (typeof auth !== 'undefined' && auth && auth.currentUser);
+      if (!u || u.isAnonymous) return false;
+      var em = (u.email || '').toLowerCase();
+      if (typeof ADMIN_EMAILS !== 'undefined' && ADMIN_EMAILS.indexOf(em) >= 0) return true;
+      if (typeof VANESSA_EMAILS !== 'undefined' && VANESSA_EMAILS.indexOf(em) >= 0) return true;
+      if (em.indexOf('vanessa') >= 0 && em.indexOf('@cchdesign.com') > 0) return true;
+    } catch (e) {}
+    return false;
+  }
+
+  function spIsAdmin() {
+    try {
+      return !!(currentUser && typeof ADMIN_EMAILS !== 'undefined' &&
+        ADMIN_EMAILS.includes((currentUser.email || '').toLowerCase()));
+    } catch (e) { return false; }
+  }
+
   function spEnabled() {
     try {
       if (localStorage.getItem('cchNavPanel') === '0') return false;
@@ -35,27 +58,58 @@
         localStorage.setItem('cchNavPanel', '1');
         return true;
       }
-      // Admin: sub-panel #2 ON by default (staging + production). Opt out: cchSetNavPanel(false).
-      if (spIsAdmin()) return true;
+      // Studio staff (Cindy + Vanessa): sub-panel ON by default. Opt out: cchSetNavPanel(false) or ▤ Tabs.
+      if (spIsStudioStaff()) return true;
     } catch (e) {}
     return false;
   }
 
-  window.cchSetNavPanel = function(on) {
-    try {
-      if (on) localStorage.setItem('cchNavPanel', '1');
-      else localStorage.setItem('cchNavPanel', '0');
-    } catch (e) {}
-    if (typeof renderProjectDetail === 'function') renderProjectDetail();
-    else location.reload();
-  };
-
-  function spIsAdmin() {
-    try {
-      return !!(currentUser && typeof ADMIN_EMAILS !== 'undefined' &&
-        ADMIN_EMAILS.includes((currentUser.email || '').toLowerCase()));
-    } catch (e) { return false; }
+  function spSyncTabsHidden(hide) {
+    var tabs = document.querySelector('#contentArea .project-tabs');
+    if (!tabs) return;
+    if (hide) tabs.classList.add('cch-sp-hidden');
+    else tabs.classList.remove('cch-sp-hidden');
   }
+
+  /**
+   * Toggle left project nav ↔ horizontal tabs. Apply DOM immediately —
+   * do NOT call renderProjectDetail() (full reload felt like "nothing happens"
+   * and raced with design-board / async count hooks).
+   */
+  window.cchSetNavPanel = function(on) {
+    on = !!on;
+    _spRenderGen++;
+    try {
+      localStorage.setItem('cchNavPanel', on ? '1' : '0');
+    } catch (e) {}
+    if (!spOnProjectPage() || spIsLibraryProject() || spIsClientShell() || !spIsStudioStaff()) {
+      try { spTeardown({ removeToggle: true }); } catch (e0) { /* */ }
+      return;
+    }
+    spInjectStyles();
+    if (on) {
+      var proj = window._currentProject;
+      if (proj) {
+        spState.projId = proj.id;
+        spRenderPanel(proj);
+        var gen = _spRenderGen;
+        spLoadCounts(proj.id).then(function() {
+          if (gen !== _spRenderGen || !spEnabled()) return;
+          if (window._currentProject) spRenderPanel(window._currentProject);
+        });
+      } else {
+        // No project in memory — fall back to one reload to populate shell.
+        if (typeof window.renderProjectDetail === 'function') window.renderProjectDetail();
+        else if (typeof renderProjectDetail === 'function') renderProjectDetail();
+      }
+      spSyncTabsHidden(true);
+      spInjectToggle();
+    } else {
+      spTeardown();
+      spSyncTabsHidden(false);
+      spInjectToggle();
+    }
+  };
 
   function spIsClientShell() {
     try {
@@ -83,10 +137,17 @@
   function spCaBadges() {
     if (typeof window._cchCaGetBadgeCounts === 'function') {
       var c = window._cchCaGetBadgeCounts();
-      if (c && c.projId === spState.projId) return { decisions: c.openDecisions || 0, comms: c.unread || 0 };
+      if (c && c.projId === spState.projId && c.loadedFor === spState.projId) {
+        return { decisions: c.openDecisions || 0, comms: c.unread || 0 };
+      }
     }
     return { decisions: 0, comms: 0 };
   }
+
+  window._cchSpRefreshBadges = function(projId) {
+    if (!projId || spState.projId !== projId || !window._currentProject) return;
+    if (spEnabled() && spOnProjectPage()) spRenderPanel(window._currentProject);
+  };
 
   async function spLoadCounts(projId) {
     spState.projId = projId;
@@ -153,13 +214,14 @@
     var active = (typeof currentProjectTab !== 'undefined' && currentProjectTab === tabKey) ? ' on' : '';
     var ghost = opts.ghost ? ' ghost' : '';
     var badge = opts.badge ? spBadgeHtml(opts.badge, opts.hot, opts.mut) : '';
+    // Prefer window.* — some wraps only patch the global, not a bare lexical binding.
     var onclick = opts.ghost
       ? 'return false;'
       : (opts.external
         ? "window.open('" + escJs(opts.href || '#') + "','_blank');return false;"
         : (opts.href
-          ? "if(typeof navigate==='function')navigate('" + escJs(opts.href) + "');return false;"
-          : "if(typeof switchProjectTab==='function')switchProjectTab('" + escJs(tabKey) + "');return false;"));
+          ? "if(typeof window.navigate==='function')window.navigate('" + escJs(opts.href) + "');else if(typeof navigate==='function')navigate('" + escJs(opts.href) + "');return false;"
+          : "if(typeof window.switchProjectTab==='function')window.switchProjectTab('" + escJs(tabKey) + "');else if(typeof switchProjectTab==='function')switchProjectTab('" + escJs(tabKey) + "');return false;"));
     return '<button type="button" class="cch-sp-item' + active + ghost + '" onclick="' + onclick + '" title="' + esc(opts.title || label) + '">' +
       '<span>' + esc(label) + (opts.external ? ' ↗' : '') + '</span>' + badge + '</button>';
   }
@@ -211,6 +273,10 @@
     });
     html += spItem('Proposals', 'proposals');
     html += spItem('Communications', 'comms', { badge: ca.comms, hot: ca.comms > 0 });
+    html += '<button type="button" class="cch-sp-item" title="Client activity — portal opens, Pepper notes, decisions"' +
+      ' onclick="if(typeof window._cchCaOpenPanel===\'function\')window._cchCaOpenPanel();return false;">' +
+      '<span>Client activity</span>' + (ca.comms ? spBadgeHtml(ca.comms, true, false) : '') + '</button>';
+    html += spItem('Notes', 'notes', { title: 'Meeting notes — internal until Publish to portal' });
     html += spItem('Client Portal', 'clientportal', {
       external: false,
       href: '#/clientview/' + proj.id
@@ -227,32 +293,98 @@
     html += spItem('FFE Tracker', 'ffe');
     html += spItem('Spec Book', 'specbook');
     html += spItem('Time', 'time');
-    html += spItem('Notes', 'notes');
 
     html += '</div>';
     panel.innerHTML = html;
   }
 
-  function spInjectToggle() {
-    if (!spIsAdmin() || !spOnProjectPage() || spIsLibraryProject()) return;
+  /**
+   * Host sits beside #topbarActions (not inside it). setTopbarActions() does
+   * innerHTML=… and was wiping any button placed inside the actions div.
+   * Also: local setTopbarActions() bypasses window.setTopbarActions hooks.
+   *
+   * Layout (Aug 6): actions | Panel | Pepper+Chat — nowrap. Old flex-wrap put
+   * Panel/Pepper/Chat on a clipped first row when Overview topbar was crowded
+   * (.topbar fixed 52px + .main overflow:hidden).
+   */
+  function spLayoutTopbarCluster(cluster, actions) {
+    if (!cluster || !actions) return;
+    cluster.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:nowrap;justify-content:flex-end;min-width:0;flex:1 1 auto;';
+    actions.style.minWidth = '0';
+    actions.style.flex = '1 1 auto';
+    actions.style.justifyContent = 'flex-end';
+    actions.style.flexWrap = 'nowrap';
+    actions.style.overflowX = 'auto';
+    if (actions.parentNode !== cluster) cluster.appendChild(actions);
+    else if (cluster.firstChild !== actions) cluster.insertBefore(actions, cluster.firstChild);
+    var toggleHost = document.getElementById('cchNavPanelToggleHost');
+    var assistHost = document.getElementById('cchStudioAssistHost');
+    if (toggleHost) cluster.appendChild(toggleHost);
+    if (assistHost) cluster.appendChild(assistHost);
+  }
+
+  function spEnsureToggleHost() {
     var actions = document.getElementById('topbarActions');
-    if (!actions) return;
+    var topbar = document.querySelector('.topbar');
+    if (!actions || !topbar) return null;
+    var cluster = document.getElementById('cchTopbarRightCluster');
+    if (!cluster) {
+      cluster = document.createElement('div');
+      cluster.id = 'cchTopbarRightCluster';
+      topbar.insertBefore(cluster, actions);
+      cluster.appendChild(actions);
+    } else if (actions.parentNode !== cluster) {
+      cluster.appendChild(actions);
+    }
+    var host = document.getElementById('cchNavPanelToggleHost');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'cchNavPanelToggleHost';
+      host.style.cssText = 'display:flex;align-items:center;flex-shrink:0;';
+      cluster.appendChild(host);
+    } else {
+      host.style.flexShrink = '0';
+    }
+    spLayoutTopbarCluster(cluster, actions);
+    return host;
+  }
+
+  function spInjectToggle() {
+    if (!spIsStudioStaff() || !spOnProjectPage() || spIsLibraryProject() || spIsClientShell()) {
+      var dead = document.getElementById('cchNavPanelToggleHost');
+      if (dead) dead.innerHTML = '';
+      if (typeof window.cchStudioAssistUnmount === 'function') {
+        try { window.cchStudioAssistUnmount(); } catch (eU) { /* */ }
+      }
+      return;
+    }
+    var host = spEnsureToggleHost();
+    if (!host) return;
     var btn = document.getElementById('cchNavPanelToggle');
     if (!btn) {
       btn = document.createElement('button');
       btn.id = 'cchNavPanelToggle';
       btn.type = 'button';
       btn.className = 'btn btn-secondary btn-sm';
-      btn.style.marginRight = '6px';
-      actions.insertBefore(btn, actions.firstChild);
+      host.appendChild(btn);
+    } else if (btn.parentNode !== host) {
+      host.appendChild(btn);
     }
     var on = spEnabled();
     btn.textContent = on ? '▤ Tabs' : '☰ Panel';
     btn.title = on ? 'Switch back to horizontal tab bar' : 'Show project panel navigation (WO-004 mockup)';
-    btn.onclick = function() { window.cchSetNavPanel(!on); };
+    // Read live prefs on click — do not close over stale `on` from last inject.
+    btn.onclick = function(ev) {
+      if (ev) { try { ev.preventDefault(); ev.stopPropagation(); } catch (e0) {} }
+      window.cchSetNavPanel(!spEnabled());
+    };
+    if (typeof window.cchStudioAssistMount === 'function') {
+      try { window.cchStudioAssistMount(); } catch (eM) { /* */ }
+    }
   }
 
-  function spTeardown() {
+  /** Hide project sub-panel + show horizontal tabs. Keep the Panel/Tabs toggle unless leaving the project. */
+  function spTeardown(opts) {
     var panel = document.getElementById('cchProjSubPanel');
     if (panel) panel.style.display = 'none';
     var main = document.querySelector('.main');
@@ -260,18 +392,42 @@
     var tabs = document.querySelector('#contentArea .project-tabs');
     if (tabs) tabs.classList.remove('cch-sp-hidden');
     spState.projId = null;
-    var tgl = document.getElementById('cchNavPanelToggle');
-    if (tgl) tgl.remove();
+    // BUGFIX Jul 16: never strip the toggle while still on a project page —
+    // Tabs mode used to remove ☰ Panel so there was no UI way back.
+    var leaveProject = !!(opts && opts.removeToggle) || !spOnProjectPage();
+    if (leaveProject) {
+      var tgl = document.getElementById('cchNavPanelToggle');
+      if (tgl) tgl.remove();
+      if (typeof window.cchStudioAssistUnmount === 'function') {
+        try { window.cchStudioAssistUnmount(); } catch (eU2) { /* */ }
+      }
+    }
   }
 
   function spAfterRender(proj) {
-    spInjectToggle();
-    if (!spEnabled() || !spOnProjectPage() || spIsLibraryProject() || spIsClientShell()) {
-      spTeardown();
+    if (!spOnProjectPage() || spIsLibraryProject() || spIsClientShell() || !spIsStudioStaff()) {
+      spTeardown({ removeToggle: true });
       return;
     }
-    spLoadCounts(proj.id).then(function() { spRenderPanel(proj); });
-    if (typeof window._cchFuPrefetch === 'function') window._cchFuPrefetch(proj.id).then(function() { spRenderPanel(proj); });
+    var gen = ++_spRenderGen;
+    // Always keep Panel/Tabs control visible for staff on project pages.
+    spInjectToggle();
+    if (!spEnabled()) {
+      spTeardown(); // tabs mode — hide panel, KEEP toggle
+      spInjectToggle();
+      return;
+    }
+    var pid = proj && proj.id;
+    spLoadCounts(pid).then(function() {
+      if (gen !== _spRenderGen || !spEnabled() || !spOnProjectPage()) return;
+      if (window._currentProject) spRenderPanel(window._currentProject);
+    });
+    if (typeof window._cchFuPrefetch === 'function') {
+      window._cchFuPrefetch(pid).then(function() {
+        if (gen !== _spRenderGen || !spEnabled() || !spOnProjectPage()) return;
+        if (window._currentProject) spRenderPanel(window._currentProject);
+      });
+    }
     spRenderPanel(proj);
   }
 
@@ -282,8 +438,10 @@
     var wrapped = async function() {
       var out = await orig.apply(this, arguments);
       try {
-        if (window._currentProject && spEnabled() && spOnProjectPage()) spAfterRender(window._currentProject);
-        else spTeardown();
+        // Always run afterRender on project pages — including Tabs mode (spEnabled false).
+        // Old gate required spEnabled() so ☰ Panel was never re-injected after switching to Tabs.
+        if (window._currentProject && spOnProjectPage()) spAfterRender(window._currentProject);
+        else spTeardown({ removeToggle: true });
       } catch (e) { console.warn('[project sub-panel] hook', e); }
       return out;
     };
@@ -313,21 +471,40 @@
   function spInit() {
     spWrapRenderProjectDetail();
     spWrapSwitchProjectTab();
+    try {
+      if (typeof auth !== 'undefined' && auth && auth.onAuthStateChanged) {
+        auth.onAuthStateChanged(function(u) {
+          if (!u || !spOnProjectPage()) return;
+          setTimeout(function() {
+            try {
+              if (window._currentProject) spAfterRender(window._currentProject);
+            } catch (e) { /* */ }
+          }, 150);
+        });
+      }
+    } catch (eAuth) { /* */ }
     window.addEventListener('hashchange', function() {
       setTimeout(function() {
-        if (!spOnProjectPage()) spTeardown();
+        if (!spOnProjectPage()) spTeardown({ removeToggle: true });
+        else if (window._currentProject) spAfterRender(window._currentProject);
       }, 300);
     });
     var tries = 0;
     var wt = setInterval(function() {
       spWrapRenderProjectDetail();
       spWrapSwitchProjectTab();
-      if (++tries > 20) clearInterval(wt);
+      // Safety: keep ☰ Panel / ▤ Tabs visible even if a render path skips the hook.
+      try {
+        if (spIsStudioStaff() && spOnProjectPage() && !spIsLibraryProject() && !spIsClientShell()) {
+          if (!document.getElementById('cchNavPanelToggle')) spInjectToggle();
+        }
+      } catch (ePoll) { /* */ }
+      if (++tries > 40) clearInterval(wt);
     }, 500);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', spInit);
   else spInit();
 
-  console.info('[CCH Project Sub-Panel] build 20260711sp5');
+  console.info('[CCH Project Sub-Panel] build 20260806sp14 — topbar icons nowrap (Overview clip fix)');
 })();

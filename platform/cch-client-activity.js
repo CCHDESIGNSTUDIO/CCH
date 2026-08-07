@@ -53,10 +53,142 @@
 
   function caIsClientDoc(d) {
     if (!d) return false;
+    if (d.meta && (d.meta.staffOnly === true || d.meta.source === 'staff_chat')) return false;
+    if (String(d.type || '').toLowerCase() === 'staff_chat') return false;
     var src = d.meta && d.meta.source;
     if (src === 'client_portal') return true;
     // older client-portal writes may predate meta.source — fall back to type family
-    return d.type === 'client_portal' || d.type === 'client_first_visit';
+    var t = String(d.type || '').toLowerCase();
+    return t === 'client_portal' || t === 'client_first_visit' || t === 'inspiration' || t === 'message';
+  }
+
+  function caIsDerivedItem(it) {
+    return String((it && it.id) || '').indexOf('derived-') === 0;
+  }
+
+  function caCoerceImages(val) {
+    if (typeof _coerceImageIterable === 'function') return _coerceImageIterable(val);
+    return Array.isArray(val) ? val : [];
+  }
+
+  function caMaterializeItem(item) {
+    if (typeof _ibMaterializeItemFeedbackRead === 'function') {
+      return _ibMaterializeItemFeedbackRead(typeof item === 'string' ? { imageUrl: item } : item);
+    }
+    if (typeof item === 'string') return { imageUrl: item };
+    return item || {};
+  }
+
+  function caStarsFromItem(item) {
+    if (typeof _ibStarsListFromItem === 'function') return _ibStarsListFromItem(item);
+    var o = caMaterializeItem(item);
+    return (o.feedback && o.feedback.stars) ? o.feedback.stars.slice() : [];
+  }
+
+  /** Client favorites on inspiration images — includes legacy migrated stars (legacy@cch.studio). */
+  function caStarIsClientFavorite(st) {
+    if (!st) return false;
+    var t = String(st.authorType || 'client').toLowerCase();
+    if (t === 'client' || !st.authorType) return true;
+    if (t === 'designer' && String(st.authorEmail || '').trim().toLowerCase() === 'legacy@cch.studio') return true;
+    return false;
+  }
+
+  /** Activity query: newest first, paginated — unsorted limit(500) dropped older star events on busy projects. */
+  async function caFetchProjectActivity(database, projId) {
+    var items = [];
+    var lastDoc = null;
+    var page = 0;
+    var pageSize = 500;
+    var maxPages = 8;
+    while (page < maxPages) {
+      var snap;
+      try {
+        var q = database.collection('activity').where('projectId', '==', projId).orderBy('timestamp', 'desc').limit(pageSize);
+        if (lastDoc) q = q.startAfter(lastDoc);
+        snap = await q.get();
+      } catch (eOrder) {
+        if (page > 0) break;
+        snap = await database.collection('activity').where('projectId', '==', projId).limit(pageSize).get();
+      }
+      if (!snap || snap.empty) break;
+      snap.forEach(function(doc) {
+        var d = doc.data() || {};
+        if (caIsClientDoc(d) || CA_DECISION_ACTIONS[String(d.action || '')]) items.push({ id: doc.id, data: d });
+      });
+      if (snap.size < pageSize) break;
+      lastDoc = snap.docs[snap.docs.length - 1];
+      page++;
+    }
+    return items;
+  }
+
+  /**
+   * Stars on ideabook images are the source of truth for client favorites; the activity log can miss
+   * stars logged before instrumentation, failed writes, or rows dropped by capped unsorted queries.
+   */
+  async function caSupplementInspirationFromIdeabooks(database, projId, items) {
+    var loggedStarImages = {};
+    items.forEach(function(it) {
+      var d = it.data || {};
+      if (String(d.action || '') !== 'star_added') return;
+      if (caCategory(d) !== 'inspiration') return;
+      var m = d.meta || {};
+      if (m.sectionId != null && m.imageIndex != null) {
+        loggedStarImages[String(m.sectionId) + ':' + String(m.imageIndex)] = true;
+      }
+    });
+
+    var projName = '';
+    try {
+      var pdoc = await database.collection('boards').doc(projId).get();
+      projName = pdoc.exists ? (pdoc.data().name || projId) : projId;
+    } catch (_eP) {}
+
+    var secSnap = await database.collection('boards').doc(projId).collection('ideabooks').get();
+    secSnap.forEach(function(doc) {
+      var secData = doc.data() || {};
+      var secId = doc.id;
+      var secName = secData.name || secData.title || 'Inspiration';
+      caCoerceImages(secData.images).forEach(function(img, idx) {
+        var item = caMaterializeItem(img);
+        var caption = item.caption || item.title || 'image';
+        var starList = caStarsFromItem(item);
+        starList.forEach(function(st, si) {
+          if (!caStarIsClientFavorite(st)) return;
+          var imgKey = secId + ':' + idx;
+          if (loggedStarImages[imgKey]) return;
+          var cName = String(st.authorName || st.authorEmail || 'Client').trim();
+          var cEmail = String(st.authorEmail || '').trim().toLowerCase();
+          var ts = st.createdAt || st.date || '';
+          items.push({
+            id: 'derived-insp-star:' + secId + ':' + idx + ':' + si,
+            data: {
+              type: 'inspiration',
+              action: 'star_added',
+              description: cName + ' starred "' + caption + '" · ' + secName,
+              projectId: projId,
+              projectName: projName,
+              user: cEmail || 'Client',
+              timestamp: ts,
+              createdAt: ts,
+              read: true,
+              meta: {
+                source: 'client_portal',
+                sectionId: secId,
+                imageIndex: idx,
+                boardSectionName: secName,
+                imageUrl: item.imageUrl || '',
+                authorName: cName,
+                authorType: 'client',
+                derivedFromIdeabook: true
+              }
+            }
+          });
+          loggedStarImages[imgKey] = true;
+        });
+      });
+    });
   }
 
   var CA_DECISION_ACTIONS = { line_approved: 1, line_declined: 1, proposal_total_approved: 1 };
@@ -100,39 +232,41 @@
 
     var items = [];
     try {
-      var actSnap = await database.collection('activity').where('projectId', '==', projId).limit(500).get();
-      actSnap.forEach(function(doc) {
-        var d = doc.data() || {};
-        if (caIsClientDoc(d) || CA_DECISION_ACTIONS[String(d.action || '')]) items.push({ id: doc.id, data: d });
-      });
+      items = await caFetchProjectActivity(database, projId);
+      await caSupplementInspirationFromIdeabooks(database, projId, items);
       items.sort(function(a, b) { return caTs(b.data) - caTs(a.data); });
     } catch (e) { console.warn('[client activity] activity load', e); }
 
+    // Ignore stale responses if user switched projects mid-fetch.
+    if (caState.projId !== projId) return;
+
     caState.openDecisions = openDec;
     caState.items = items;
-    caState.unread = items.filter(function(it) { return it.data.read === false; }).length;
+    caState.unread = items.filter(function(it) { return it.data.read === false && !caIsDerivedItem(it); }).length;
     caState.loading = false;
     caState.loadedFor = projId;
     caInjectBadges();
+    if (typeof window._cchSpRefreshBadges === 'function') window._cchSpRefreshBadges(projId);
     if (caState.panelOpen) caRenderPanelList();
   }
 
   async function caMarkCommsRead(projId) {
     var database = caDb();
     if (!database || !projId) return;
-    var unreadDocs = caState.items.filter(function(it) { return it.data.read === false; });
+    var unreadDocs = caState.items.filter(function(it) { return it.data.read === false && !caIsDerivedItem(it); });
     if (!unreadDocs.length) return;
     try {
       var batch = database.batch();
       var n = 0;
       unreadDocs.forEach(function(it) {
         if (n >= 400) return;
+        if (caIsDerivedItem(it)) return;
         batch.update(database.collection('activity').doc(it.id), { read: true });
         it.data.read = true;
         n++;
       });
       await batch.commit();
-      caState.unread = caState.items.filter(function(it) { return it.data.read === false; }).length;
+      caState.unread = caState.items.filter(function(it) { return it.data.read === false && !caIsDerivedItem(it); }).length;
       caInjectBadges();
     } catch (e) { console.warn('[client activity] mark read', e); }
   }
@@ -157,10 +291,15 @@
     badge.title = title || '';
   }
 
+  function caCountsReady() {
+    return !!(caState.projId && caState.loadedFor === caState.projId && !caState.loading);
+  }
+
   function caInjectBadges() {
     if (!caState.projId) return;
-    caSetTabBadge('designboards', caState.openDecisions, 'Client decisions awaiting a response');
-    caSetTabBadge('comms', caState.unread, 'Unread client activity');
+    var ready = caCountsReady();
+    caSetTabBadge('designboards', ready ? caState.openDecisions : 0, 'Client decisions awaiting a response');
+    caSetTabBadge('comms', ready ? caState.unread : 0, 'Unread client activity');
     caInjectActivityButton();
   }
 
@@ -195,8 +334,9 @@
       hdr.style.gap = '8px';
       hdr.appendChild(btn);
     }
+    var ready = caCountsReady();
     btn.innerHTML = '<span style="font-size:12px;">👁</span> Client activity' +
-      (caState.unread ? '<span class="project-tab-badge cch-ca-badge">' + caState.unread + '</span>' : '');
+      (ready && caState.unread ? '<span class="project-tab-badge cch-ca-badge">' + caState.unread + '</span>' : '');
   }
 
   // ---------- Client activity button + slide-over panel ----------
@@ -273,7 +413,8 @@
       return;
     }
     var html = '';
-    items.slice(0, 100).forEach(function(it) {
+    var listLimit = caState.filter === 'inspiration' ? 300 : 150;
+    items.slice(0, listLimit).forEach(function(it) {
       var d = it.data;
       var cat = caCategory(d);
       html += '<div class="cch-ca-row' + (d.read === false ? ' cch-ca-unread' : '') + '">' +
@@ -295,6 +436,11 @@
       if (caState.projId && caState.loadedFor !== caState.projId) caLoadCounts(caState.projId);
     }
   }
+  /** Project left-panel "Client activity" nav — open slide-over (option A, Aug 6). */
+  window._cchCaOpenPanel = function () {
+    if (caState.projId && caState.loadedFor !== caState.projId) caLoadCounts(caState.projId);
+    caTogglePanel(true);
+  };
 
   // ---------- lifecycle hooks ----------
   function caOnProjectPage() {
@@ -302,6 +448,15 @@
     if (!projId || projId === '_lib_designer') { caTeardown(); return; }
     var isNew = projId !== caState.projId;
     caState.projId = projId;
+    if (isNew) {
+      caState.openDecisions = 0;
+      caState.unread = 0;
+      caState.items = [];
+      caState.loadedFor = null;
+      caState.loading = true;
+      caInjectBadges();
+      if (typeof window._cchSpRefreshBadges === 'function') window._cchSpRefreshBadges(projId);
+    }
     // tab bar renders async — retry injection briefly
     var tries = 0;
     if (caState.retryTimer) clearInterval(caState.retryTimer);
@@ -377,10 +532,13 @@
   else caInit();
 
   window._cchCaGetBadgeCounts = function() {
-    return { projId: caState.projId, openDecisions: caState.openDecisions, unread: caState.unread };
+    if (!caCountsReady()) {
+      return { projId: caState.projId, openDecisions: 0, unread: 0, loadedFor: caState.loadedFor };
+    }
+    return { projId: caState.projId, openDecisions: caState.openDecisions, unread: caState.unread, loadedFor: caState.loadedFor };
   };
 
-  console.info('[CCH Client Activity] build 20260711ca4 — header button is sole entry (tab-bar chip removed) + sidebar polish');
+  console.info('[CCH Client Activity] build 20260806ca2 — Client activity left-nav open + slide-over');
 })();
 
 // ==================== SIDEBAR READABILITY (added by Cowork Jul 11 2026) ====================
@@ -391,17 +549,12 @@
 // convenient, then delete this block. Build 20260711sb1.
 (function () {
   'use strict';
+  /* WO-070: keep staging-banner offset only. Brand gold = #C4A464 (not #C9A96E).
+     Nav contrast lives in index.html static CSS — do not re-inject competing colors. */
   var css =
     '.sidebar{top:var(--cch-staging-banner-h, 0px) !important;}' +
-    '.sidebar .nav-item{color:rgba(255,255,255,0.9) !important;font-size:12.5px !important;font-weight:500 !important;}' +
-    '.sidebar .nav-item .nav-icon{color:rgba(255,255,255,0.75) !important;opacity:1 !important;}' +
-    '.sidebar .nav-item:hover{color:#FFFFFF !important;}' +
-    '.sidebar .nav-item.active{color:var(--gold, #C9A96E) !important;}' +
-    // section labels (Finance / Studio / Time & Reports) are inline-styled — attribute hook until they get a class
-    '.sidebar div[style*="letter-spacing:0.2em"],.sidebar .sidebar-nav-section{color:#C9A96E !important;font-size:9.5px !important;opacity:0.95 !important;}' +
-    '.sidebar-logo-sub{color:rgba(255,255,255,0.65) !important;}' +
-    '.sidebar-user{color:rgba(255,255,255,0.65) !important;}' +
-    '.sidebar-logout{color:rgba(255,255,255,0.55) !important;}';
+    '.sidebar .nav-item.active{color:var(--gold, #C4A464) !important;}' +
+    '.sidebar .sidebar-nav-section{color:rgba(196,164,100,0.95) !important;font-size:10px !important;opacity:0.95 !important;}';
   function cchInjectSidebarPolish() {
     if (document.getElementById('cchSidebarPolish')) return;
     var st = document.createElement('style');
@@ -411,5 +564,5 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', cchInjectSidebarPolish);
   else cchInjectSidebarPolish();
-  console.info('[CCH UI] sidebar readability polish 20260711sb1');
+  console.info('[CCH UI] sidebar polish 20260803wo070 (banner offset + brand gold; contrast in index.html)');
 })();

@@ -6043,7 +6043,7 @@ function cpPortalRouteStateFromHash(projectId) {
         }
         return out;
       }
-      if (slug === 'documents' || slug === 'communications' || slug === 'messages' || slug === 'progress' || slug === 'activity' || slug === 'tasks' || slug === 'home' ||
+      if (slug === 'documents' || slug === 'communications' || slug === 'messages' || slug === 'notes' || slug === 'progress' || slug === 'activity' || slug === 'tasks' || slug === 'home' ||
           slug === 'rooms' || slug === 'concepts' || slug === 'inspiration' || slug === 'inspirations' || slug === 'designboards' ||
           slug === 'proposals' || slug === 'invoices' || slug === 'updates') {
         if (slug === 'communications') out.page = 'messages';
@@ -8256,9 +8256,16 @@ function cpPortalMessagesHtml(projectId, messages, opts) {
         if (!bodyText && cpMsgHasBlobContent(m)) {
           bodyText = 'An image attachment could not be displayed. Please ask your designer to re-send it.';
         }
-        var body = esc(bodyText);
         var msgImg = cpMsgImageUrl(m);
-        var bodyHtml = body ? '<div style="font-size:13px;line-height:1.6;font-weight:400;">' + body + '</div>' : '';
+        var bodyHtml = '';
+        if (bodyText) {
+          if (m._studioNote && typeof window.cchFormatProjectNoteHtml === 'function') {
+            bodyHtml = '<div class="cp-studio-note-body note-text" style="font-size:13px;line-height:1.6;font-weight:400;">' +
+              window.cchFormatProjectNoteHtml(bodyText) + '</div>';
+          } else {
+            bodyHtml = '<div style="font-size:13px;line-height:1.6;font-weight:400;">' + esc(bodyText) + '</div>';
+          }
+        }
         var imgHtml = msgImg ? '<img src="' + escAttr(msgImg) + '" alt="" style="display:block;max-width:100%;max-height:280px;object-fit:contain;margin-top:' + (body ? '10px' : '0') + ';border:1px solid #E2E2E2;background:#fff;" onerror="this.style.display=\'none\'">' : '';
         // Studio/team on the left; client replies on the right. Light cards for studio (readable); navy for client.
         var align = isTeam ? 'flex-start' : 'flex-end';
@@ -8666,7 +8673,8 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
         '.cp-sb-badge { margin-left:auto; background:#0A1F3D; color:#fff; font-size:9px; font-weight:500; padding:2px 6px; min-width:16px; text-align:center; }' +
         '.cp-sb-foot { padding:20px 24px; border-top:1px solid #E2E2E2; font-size:11px; color:#9CA3AF; line-height:1.4; }' +
         '.cp-main-stack { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; background:#FFFFFF !important; }' +
-        '.cp-top-header { background:#0A1F3D; padding:14px 32px; min-height:48px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }' +
+        '.cp-top-header { background:#0A1F3D; padding:10px 24px; min-height:64px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; gap:16px; }' +
+        '.cp-top-header-left { display:flex; align-items:center; gap:14px; min-width:0; }' +
         '.cp-top-header-k { font-size:11px; letter-spacing:0.15em; text-transform:uppercase; color:rgba(255,255,255,0.5); font-family:"DM Sans",sans-serif; }' +
         '.cp-top-header-proj { font-size:18px; color:#FFFFFF; font-family:"Playfair Display",Georgia,serif; font-weight:600; letter-spacing:0.02em; text-align:right; }' +
         '.cp-top-header-proj .cp-proj-accent { display:block; font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:#C4A464; font-family:"DM Sans",sans-serif; font-weight:500; margin-top:3px; }' +
@@ -8837,6 +8845,16 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
         '.cp-home-hero-kicker { font-size:11px;font-weight:500;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.82);margin-bottom:8px; }' +
         '.cp-home-hero-title { font-family:"Playfair Display",Georgia,serif;font-size:clamp(28px,4vw,32px);line-height:1.1;color:#fff; }' +
         '.cp-home-hero-sub { font-family:"Playfair Display",Georgia,serif;font-size:22px;line-height:1.2;color:rgba(255,255,255,0.92);font-style:italic;margin-top:4px; }' +
+        '.cp-studio-note-body.note-text { color:#0A1F3D;font-family:"DM Sans",sans-serif; }' +
+        '.cp-studio-note-body .note-md-h { margin:14px 0 8px;font-weight:700;color:#0A1F3D; }' +
+        '.cp-studio-note-body h2.note-md-h { font-size:18px;font-family:"Playfair Display",Georgia,serif;margin-top:0; }' +
+        '.cp-studio-note-body h3.note-md-h { font-size:11px;text-transform:uppercase;letter-spacing:0.14em;color:#A8792F; }' +
+        '.cp-studio-note-body h4.note-md-h { font-size:13px; }' +
+        '.cp-studio-note-body .note-md-p { margin:0 0 8px; }' +
+        '.cp-studio-note-body .note-md-ul,.cp-studio-note-body .note-md-ol { margin:0 0 12px 1.2em;padding:0; }' +
+        '.cp-studio-note-body .note-md-ul li,.cp-studio-note-body .note-md-ol li { margin:0 0 5px; }' +
+        '.cp-studio-note-body strong { font-weight:700;color:#0A1F3D; }' +
+        '.cp-studio-note-body em { font-style:italic; }' +
         '.cp-personal-greeting { max-width:1000px;margin:0 auto;padding:28px 40px 0;font-family:"DM Sans",sans-serif; }' +
         '.cp-personal-greeting-headline { font-family:"Playfair Display",Georgia,serif;font-size:26px;line-height:1.3;color:#0A1F3D;font-weight:400;margin:0 0 10px; }' +
         '.cp-personal-greeting-text { font-size:15px;line-height:1.55;color:#5C6B80;font-weight:400;margin:0; }' +
@@ -9038,18 +9056,28 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
         var _cpActiveTaskCount = tasks.filter(function(t) { return String(t.status || '').trim().toLowerCase() !== 'done'; }).length;
         var _isStaffPortal = typeof isCCHStudioStaffSession === 'function' && isCCHStudioStaffSession();
         var _cpIdentFoot = (!_isStaffPortal && typeof cpPortalEffectiveClientIdentity === 'function') ? cpPortalEffectiveClientIdentity() : null;
-        var _publishedMsgs = _isStaffPortal ? messages : messages.filter(function(m) { return m.published === true; });
+        var _portalMsgFeed = (typeof window.cpPortalMergePublishedNotesIntoMessages === 'function')
+          ? window.cpPortalMergePublishedNotesIntoMessages(messages, notes)
+          : messages;
+        var _publishedMsgs = _isStaffPortal
+          ? _portalMsgFeed
+          : _portalMsgFeed.filter(function(m) { return m.published === true; });
         var _msgBadgeCt = _publishedMsgs.length > 0 ? String(Math.min(_publishedMsgs.length, 9)) : '';
         var _propReviewCt = proposals.filter(function(p) { return typeof proposalNeedsClientReview === 'function' && proposalNeedsClientReview(p); }).length;
         var _propBadgeCt = _propReviewCt > 0 ? String(Math.min(_propReviewCt, 9)) : '';
         var _actBadgeCt = _cpClientSafeActivityFeed.length > 0 ? String(Math.min(_cpClientSafeActivityFeed.length, 99)) : '';
         var _taskBadgeCt = _cpActiveTaskCount > 0 ? String(Math.min(_cpActiveTaskCount, 99)) : '';
         var _decBadgeCt = _decisionsNeededCount > 0 ? String(Math.min(_decisionsNeededCount, 99)) : '';
+        var _pubNotesCt = (notes || []).filter(function (n) {
+          return n && n.published === true && String(n.text || n.body || n.content || '').trim();
+        }).length;
+        var _notesBadgeCt = _pubNotesCt > 0 ? String(Math.min(_pubNotesCt, 9)) : '';
         html += '<div class="cp-shell-row"><nav class="cp-left-sidebar" aria-label="Client portal">' +
           '<div class="cp-sb-logo"><div class="cp-sb-logo-top">CCH Design</div><div class="cp-sb-logo-sub">Client Portal</div></div>' +
           '<div class="cp-sb-nav">' +
           '<button type="button" class="cp-sb-item' + (sbAct('home') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash) + '><span class="cp-sb-icon">\u2302</span> Home</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('messages') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/messages') + '><span class="cp-sb-icon">\u2709</span> Messages' + (_msgBadgeCt ? '<span class="cp-sb-badge">' + esc(_msgBadgeCt) + '</span>' : '') + '</button>' +
+          '<button type="button" class="cp-sb-item' + (sbAct('notes') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/notes') + '><span class="cp-sb-icon">\u270E</span> Notes' + (_notesBadgeCt ? '<span class="cp-sb-badge">' + esc(_notesBadgeCt) + '</span>' : '') + '</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('updates') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/updates') + '><span class="cp-sb-icon">\u25CE</span> Updates' + (_puBadgeCt ? '<span class="cp-sb-badge">' + esc(_puBadgeCt) + '</span>' : '') + '</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('decisions') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/decisions') + '><span class="cp-sb-icon">\u25C6</span> Decisions' + (_decBadgeCt ? '<span class="cp-sb-badge">' + esc(_decBadgeCt) + '</span>' : '') + '</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('inspiration') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/inspiration') + '><span class="cp-sb-icon">\u273D</span> Inspiration Boards</button>' +
@@ -9075,12 +9103,12 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
             : '') +
           '</div></nav>' +
           '<div class="cp-main-stack">' +
-        '<header class="cp-top-header"><div class="cp-top-header-k">CCH Studio Client Portal</div>' + _topProjRight + '</header>' +
+        '<header class="cp-top-header"><div class="cp-top-header-left"><div class="cp-top-header-k">CCH Studio Client Portal</div><div id="cchCpPepperHost"></div></div>' + _topProjRight + '</header>' +
         _topMsgBarHtml +
         '<div class="cp-scroll-body' + (activePage === 'messages' ? ' cp-scroll-body--messages' : '') + '">';
       } else {
         html += '<div class="cp-main-stack">' +
-        '<header class="cp-top-header"><div class="cp-top-header-k">CCH Studio Client Portal</div>' + _topProjRight + '</header>' +
+        '<header class="cp-top-header"><div class="cp-top-header-left"><div class="cp-top-header-k">CCH Studio Client Portal</div><div id="cchCpPepperHost"></div></div>' + _topProjRight + '</header>' +
         _topMsgBarHtml +
         '<div class="cp-scroll-body' + (activePage === 'messages' ? ' cp-scroll-body--messages' : '') + '">';
       }
@@ -9140,15 +9168,32 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
         html += '<div class="cp-page-pad">' +
           '<div class="cp-sec-label-jx" style="margin-bottom:18px;">Proposal \u2014 review &amp; approve</div>' +
           cpBuildSingleProposalReviewHtml(projectId, focusP, { panelId: 'cp-proposal-panel', showBanner: true, proj: proj }) +
-          cpPortalMessagesHtml(projectId, messages, {}) +
+          (typeof window.cpPortalPublishedNotesHtml === 'function' ? window.cpPortalPublishedNotesHtml(notes) : '') +
+          cpPortalMessagesHtml(projectId, (typeof window.cpPortalMergePublishedNotesIntoMessages === 'function' ? window.cpPortalMergePublishedNotesIntoMessages(messages, notes) : messages), {}) +
           '</div>';
       } else {
       var _baseHash = '#/clientview/' + projectId;
       var _progressRange = (window._cpProgressRangeByProject && window._cpProgressRangeByProject[projectId]) || 'week';
       var _openForReview = proposals.filter(function(p) { return proposalNeedsClientReview(p); });
+      var _msgsWithNotes = (typeof window.cpPortalMergePublishedNotesIntoMessages === 'function')
+        ? window.cpPortalMergePublishedNotesIntoMessages(messages, notes)
+        : messages;
 
       if (activePage === 'messages') {
-        html += cpPortalMessagesHtml(projectId, messages, { fullPage: true, hideCompose: !!_showTopMsgBar });
+        html += cpPortalMessagesHtml(projectId, _msgsWithNotes, { fullPage: true, hideCompose: !!_showTopMsgBar });
+      } else if (activePage === 'notes') {
+        html += '<div class="cp-page-pad">' +
+          '<div class="cp-sec-label-jx" style="margin:0 0 8px;">Notes</div>' +
+          '<div style="font-size:12px;color:#6B7280;font-family:\'DM Sans\',sans-serif;margin:0 0 20px;line-height:1.55;">Updates and meeting notes from your design team.</div>';
+        var _notesPageHtml = (typeof window.cpPortalPublishedNotesHtml === 'function')
+          ? window.cpPortalPublishedNotesHtml(notes, { fullPage: true })
+          : '';
+        if (_notesPageHtml) {
+          html += _notesPageHtml;
+        } else {
+          html += '<div class="cp-card" style="padding:22px;font-size:13px;color:#6B7280;line-height:1.55;font-family:\'DM Sans\',sans-serif;">No notes shared yet.</div>';
+        }
+        html += '</div>';
       } else {
       html += '<div class="cp-page-pad">';
 
@@ -9963,6 +10008,11 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
       if (!isProposalRoute && !proposalMissing && activePage === 'home') {
       html += '<div class="cp-page-pad">';
 
+      // --- Published studio meeting notes (WO-068; only published === true) ---
+      if (typeof window.cpPortalPublishedNotesHtml === 'function') {
+        html += window.cpPortalPublishedNotesHtml(notes);
+      }
+
       // --- Recently Completed ---
       var completed = (latestUpdate && latestUpdate.completed) ? latestUpdate.completed : [];
       if (completed.length > 0) {
@@ -10084,6 +10134,16 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
         }
       }
       T.innerHTML = html;
+      // WO-089: client Pepper — docked in navy header (clients + staff Preview for placement QA)
+      if (typeof window.cchClientPepperMount === 'function') {
+        var _pepperIdent = (typeof cpPortalEffectiveClientIdentity === 'function' ? (cpPortalEffectiveClientIdentity() || {}) : {});
+        window.cchClientPepperMount({
+          projectId: projectId,
+          projectName: String((proj && (proj.name || proj.projectName)) || projName || projectId),
+          clientName: String(_pepperIdent.name || _pepperIdent.clientName || (isOwner ? 'Studio Preview' : 'Client')),
+          clientEmail: String(_pepperIdent.email || '')
+        });
+      }
       if (typeof cpPortalPaintPdfThumbs === 'function') void cpPortalPaintPdfThumbs(T);
       if (typeof cpPortalAttachLiveSync === 'function') cpPortalAttachLiveSync(projectId);
       if (activePage === 'decisions' && _routeState.decisionFocusId && typeof cpPortalScrollToDecisionFocus === 'function') {
@@ -10209,7 +10269,8 @@ window.cpPortalLatestDashboardUpdate = function(whatsNewItems, notes) {
         items.push({ source: 'whatsNew', createdAt: w.createdAt, title: 'What\'s New', text: w.text, photoUrl: w.photoUrl });
       });
       (notes || []).forEach(function(n) {
-        if (n.published === false) return;
+        // Client-safe: only explicitly published notes (undefined must NOT leak).
+        if (n.published !== true) return;
         var t = String(n.type || '').toLowerCase();
         var titleL = String(n.title || '').toLowerCase();
         var body = String(n.text || n.body || '').trim();
@@ -10220,6 +10281,58 @@ window.cpPortalLatestDashboardUpdate = function(whatsNewItems, notes) {
       });
       items.sort(function(a, b) { return String(b.createdAt || '').localeCompare(String(a.createdAt || '')); });
       return items[0] || null;
+    };
+
+/** Published studio Notes → message-shaped rows for the portal Messages feed (WO-068). */
+window.cpPortalMergePublishedNotesIntoMessages = function (messages, notes) {
+      var out = Array.isArray(messages) ? messages.slice() : [];
+      (notes || []).forEach(function (n) {
+        if (!n || n.published !== true) return;
+        var body = String(n.text || n.body || n.content || '').trim();
+        if (!body) return;
+        out.push({
+          id: n.id,
+          text: body,
+          author: n.author || 'CCH Design',
+          from: 'studio',
+          createdAt: n.createdAt || '',
+          published: true,
+          _studioNote: true
+        });
+      });
+      return out;
+    };
+
+/** Formatted published notes card (Programa .cp-). */
+window.cpPortalPublishedNotesHtml = function (notes, opts) {
+      opts = opts || {};
+      var published = (notes || []).filter(function (n) {
+        return n && n.published === true && String(n.text || n.body || n.content || '').trim();
+      });
+      if (!published.length) return '';
+      published.sort(function (a, b) {
+        return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+      });
+      var fmt = (typeof window.cchFormatProjectNoteHtml === 'function')
+        ? window.cchFormatProjectNoteHtml
+        : function (t) { return esc(String(t || '')).replace(/\n/g, '<br>'); };
+      var html = '<div class="cp-section cp-section-block" id="cp-portal-studio-notes">';
+      if (!opts.fullPage) {
+        html += '<div class="cp-section-label">Notes from your designer</div>';
+      }
+      published.forEach(function (n) {
+        var ts = '';
+        if (n.createdAt) {
+          try {
+            ts = new Date(n.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+          } catch (e) { /* */ }
+        }
+        html += '<div class="cp-card cp-studio-note" style="padding:18px 20px;margin-bottom:12px;border:1px solid #E2E2E2;background:#FFFFFF;">' +
+          (ts ? '<div style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#9CA3AF;margin-bottom:10px;font-family:\'DM Sans\',sans-serif;">' + esc(ts) + '</div>' : '') +
+          '<div class="cp-studio-note-body note-text">' + fmt(n.text || n.body || n.content || '') + '</div></div>';
+      });
+      html += '</div>';
+      return html;
     };
 
 window.cpPortalProposalIsClosed = function(p) {
@@ -10329,14 +10442,15 @@ async function copyClientLink(projectId, opts) {
       opts = opts || {};
       var h = (window.location.hash || '').replace(/^#\/?/, '');
       var url;
+      // Share client.html deep links (not /#/clientview on the Studio shell).
       if (opts.url) {
         url = String(opts.url);
       } else if (opts.sectionId) {
-        url = window.location.origin + '/#/clientview/' + projectId + '/inspirations/' + encodeURIComponent(String(opts.sectionId));
+        url = window.location.origin + '/client.html#/clientview/' + projectId + '/inspirations/' + encodeURIComponent(String(opts.sectionId));
       } else if (h.indexOf('clientview/') === 0) {
-        url = window.location.origin + '/#/' + h;
+        url = window.location.origin + '/client.html#/' + h;
       } else {
-        url = window.location.origin + '/#/clientview/' + projectId;
+        url = window.location.origin + '/client.html#/clientview/' + projectId;
       }
       var n = 0;
       try { n = await _publishDraftsOnShare(projectId); } catch (_e0) {}
@@ -11759,8 +11873,10 @@ async function logActivity(type, action, description, projectId, projectName, me
     setTimeout(_cchBootOnce, 1600); // never block clients on auth
     console.info('[CCH Client Portal] lightweight build 20260728cp-room-cover');
   </script>
+  <script src="cch-notes-format.js?v=20260802n1"></script>
   <script src="cch-voice-profile.js?v=20260713voice1"></script>
   <script src="cch-progress-updates.js?v=20260714pu18"></script>
   <script src="cch-client-board.js?v=20260710cp1"></script>
+  <script src="cch-client-pepper.js?v=20260806cp090"></script>
 </body>
 </html>
