@@ -27,8 +27,8 @@ Cindy reported three invoice bugs on prod INV-6056 (Eden): Client View showed th
 
 ## Deploy
 
-- Queued in `_DEPLOY_QUEUE.md` — **staging**, STATUS: pending  
-- **Not deployed** until #1 runs staging hosting  
+- GitHub: pushed `3080c5b` on `staging-fixes-2026-07-08` (2026-08-11 ~12:28 PT)
+- Staging hosting: **done** 2026-08-11 ~12:30 → https://cch-platform-staging.web.app
 - **Production** needs Cindy typed GO after staging verify
 
 ## Verify (staging)
@@ -40,7 +40,11 @@ Cindy reported three invoice bugs on prod INV-6056 (Eden): Client View showed th
 5. **Publish to client dashboard** → status **Published** (not Sent)
 6. **Send** → status **Sent**
 
+## Also this session
+
+- Time Ledger description hover: full note in `title` (was “Double-click to edit”) — Studio **9.9.137**
+
 ## Open
 
 - Existing invoices already marked Sent from the old Publish path stay Sent until manually corrected
-- GitHub backup still last pushed Aug 6 (local uncommitted work includes this + prior Pepper/Activity work)
+- Satellite `cch-pepper.js` etc. still uncommitted locally (index.html was pushed in 3080c5b)

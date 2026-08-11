@@ -4227,7 +4227,7 @@
     window.buildFinancialHealthBarHtml = buildFinancialHealthBarHtml;
 
     // -- Platform Version --
-    const CCH_BUILD = { version: '9.9.136', date: '2026-08-11', tag: 'inv-client-manage-more-publish-2026-08-11' };
+    const CCH_BUILD = { version: '9.9.137', date: '2026-08-11', tag: 'tl-desc-hover-2026-08-11' };
     window.CCH_BUILD = CCH_BUILD;
 
     /** ASCII-safe UI glyphs — always \u escapes so Windows re-encodes cannot turn them into '?'. */
@@ -53014,7 +53014,7 @@ async function renderBoardsTab(T, proj) {
                   ${ledgerFull ? `<td>${esc(t.member || '')}</td>` : ''}
                   <td style="white-space:nowrap;">${t.date || ''}</td>
                   <td style="font-size:12px;" ondblclick="event.stopPropagation();tlInlineEdit(this,'${t.id}','service')" title="Double-click to edit">${esc(t.service || '')}</td>
-                  <td class="time-ledger-desc" style="font-size:12px;" ondblclick="event.stopPropagation();tlInlineEdit(this,'${t.id}','description')" title="Double-click to edit">${esc(t.description || '')}</td>
+                  <td class="time-ledger-desc" style="font-size:12px;cursor:help;" ondblclick="event.stopPropagation();tlInlineEdit(this,'${t.id}','description')" title="${escAttr(t.description || '') || 'Double-click to edit'}">${esc(t.description || '')}</td>
                   <td style="font-size:11px;text-align:center;">${t.billable ? '<span style="color:#5FA56B;font-weight:600;">Billable</span>' : '<span style="color:var(--gray-400);">Non-Bill</span>'}</td>
                   ${timeLedgerHoursCellHtml(t, ledgerFull)}
                   ${ledgerFull ? `${timeLedgerAddedHrsCell(t)}
@@ -58117,7 +58117,7 @@ async function renderBoardsTab(T, proj) {
                   ${ledgerFull ? `<td style="font-size:12px;">${esc(t.member || '')}</td>` : ''}
                   <td style="white-space:nowrap;">${t.date || ''}</td>
                   <td style="font-size:12px;">${esc(t.service || '')}</td>
-                  <td class="time-ledger-desc" style="font-size:12px;">${esc(t.notes || t.note || t.description || '')}</td>
+                  <td class="time-ledger-desc" style="font-size:12px;cursor:help;" title="${escAttr(t.notes || t.note || t.description || '')}">${esc(t.notes || t.note || t.description || '')}</td>
                   <td style="font-size:11px;text-align:center;">${t.billable ? '<span style="color:#5FA56B;font-weight:600;">Yes</span>' : '<span style="color:var(--gray-400);">No</span>'}</td>
                   ${timeLedgerHoursCellHtml(t, ledgerFull)}
                   ${ledgerFull ? `${timeLedgerAddedHrsCell(t)}
