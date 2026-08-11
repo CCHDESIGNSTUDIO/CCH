@@ -4227,7 +4227,7 @@
     window.buildFinancialHealthBarHtml = buildFinancialHealthBarHtml;
 
     // -- Platform Version --
-    const CCH_BUILD = { version: '9.9.137', date: '2026-08-11', tag: 'tl-desc-hover-2026-08-11' };
+    const CCH_BUILD = { version: '9.9.138', date: '2026-08-11', tag: 'tl-inline-save-title-2026-08-11' };
     window.CCH_BUILD = CCH_BUILD;
 
     /** ASCII-safe UI glyphs — always \u escapes so Windows re-encodes cannot turn them into '?'. */
@@ -58673,13 +58673,23 @@ async function renderBoardsTab(T, proj) {
         return;
       }
       if (el.getAttribute('contenteditable') === 'true') return;
-      var currentText = el.textContent.trim();
+      /* Prefer in-memory full note — truncated CSS ellipsis cell can confuse title/hover. */
+      var memEntry = (typeof timeEntries !== 'undefined' ? timeEntries : []).find(function(t) { return t.id === entryId; });
+      var currentText = (memEntry && memEntry[field] != null && String(memEntry[field]).trim() !== '')
+        ? String(memEntry[field]).trim()
+        : el.textContent.trim();
       el.setAttribute('contenteditable', 'true');
-      el.style.background = 'rgba(15,26,46,0.04)';
+      el.style.background = '#FFFFFF';
       el.style.outline = '1px solid var(--cyan)';
-      el.style.padding = '2px 4px';
+      el.style.padding = '4px 6px';
       el.style.borderRadius = '3px';
       el.style.whiteSpace = 'normal';
+      el.style.overflow = 'visible';
+      el.style.maxWidth = 'none';
+      el.style.minWidth = '240px';
+      el.style.position = 'relative';
+      el.style.zIndex = '20';
+      el.style.boxShadow = '0 4px 16px rgba(15,26,46,0.12)';
       el.textContent = currentText;
       el.focus();
       var range = document.createRange();
@@ -58687,17 +58697,40 @@ async function renderBoardsTab(T, proj) {
       window.getSelection().removeAllRanges();
       window.getSelection().addRange(range);
       var saved = false;
-      async function save() {
-        if (saved) return;
-        saved = true;
+      var cancelled = false;
+      function clearEditStyles() {
         el.removeAttribute('contenteditable');
         el.style.background = '';
         el.style.outline = '';
         el.style.padding = '';
         el.style.borderRadius = '';
         el.style.whiteSpace = '';
+        el.style.overflow = '';
+        el.style.maxWidth = '';
+        el.style.minWidth = '';
+        el.style.position = '';
+        el.style.zIndex = '';
+        el.style.boxShadow = '';
+      }
+      function setHoverTitle(text) {
+        if (field === 'description') {
+          el.setAttribute('title', text || 'Double-click to edit');
+        }
+      }
+      async function save() {
+        if (saved) return;
+        saved = true;
+        clearEditStyles();
+        if (cancelled) {
+          el.textContent = currentText;
+          setHoverTitle(currentText);
+          return;
+        }
         var newVal = el.textContent.trim();
-        if (newVal === currentText) return;
+        if (newVal === currentText) {
+          setHoverTitle(currentText);
+          return;
+        }
         try {
           var update = {};
           update[field] = newVal;
@@ -58733,13 +58766,25 @@ async function renderBoardsTab(T, proj) {
               entry[field] = newVal;
             }
           }
-        } catch(e) { console.warn('Inline save failed:', e); el.textContent = currentText; }
+          el.textContent = newVal;
+          setHoverTitle(newVal);
+          if (typeof showToast === 'function') {
+            showToast(field === 'description' ? 'Description saved' : 'Saved', 2000);
+          }
+        } catch(e) {
+          console.warn('Inline save failed:', e);
+          el.textContent = currentText;
+          setHoverTitle(currentText);
+          if (typeof showToast === 'function') {
+            showToast('Could not save: ' + ((e && e.message) || e), 'error');
+          }
+        }
         if (field === 'added') { try { (typeof renderTimeView === 'function' ? renderTimeView : renderTimeTracker)(); } catch(_e) {} }
       }
       el.addEventListener('blur', save, { once: true });
       el.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
-        if (e.key === 'Escape') { el.textContent = currentText; el.blur(); }
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); el.blur(); }
+        if (e.key === 'Escape') { cancelled = true; el.textContent = currentText; el.blur(); }
       });
     }
 
