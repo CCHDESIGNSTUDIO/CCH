@@ -4190,6 +4190,17 @@
       ? window.cchBuildDsEditor(docData, pid, iid)
       : '';
 
+    /* Doc note block (Summary / Document Tags / Memo) — editable on Manage; was only on Edit / old view. */
+    var tagsMemoHtml = (typeof window.cchDocTagsMemoBlockHTML === 'function')
+      ? window.cchDocTagsMemoBlockHTML(docData, {
+          editable: true,
+          projectId: pid,
+          docId: iid,
+          collection: 'invoices',
+          hint: '<strong>Summary</strong> and <strong>Document Tags</strong> show on the project Invoices list &amp; email subject. <strong>Memo</strong> is internal only (doc note). Saves when you leave the field.'
+        })
+      : '';
+
     if (typeof window.cchInvoiceRouteIs === 'function' && !window.cchInvoiceRouteIs(pid, iid)) return;
     T.innerHTML =
       '<div class="cch-doc-view-page">' +
@@ -4202,6 +4213,7 @@
           '<button type="button" class="btn btn-primary btn-sm" style="background:#1B3352;color:#EDE8E0;" onclick="cchEnterDocEditMode(\'' + cchEscJsStr(pid) + '\',\'' + cchEscJsStr(iid) + '\',\'invoice\')">\u270F\uFE0F Edit line items</button>' +
         '</div>' +
         dsEditorHtml +
+        tagsMemoHtml +
         tableHtml +
         (typeof window.cchDocAttachmentsSectionHtml === 'function'
           ? window.cchDocAttachmentsSectionHtml(pid, collection, iid, docData)
