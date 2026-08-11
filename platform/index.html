@@ -4227,7 +4227,7 @@
     window.buildFinancialHealthBarHtml = buildFinancialHealthBarHtml;
 
     // -- Platform Version --
-    const CCH_BUILD = { version: '9.9.140', date: '2026-08-11', tag: 'inv-publish-visible-2026-08-11' };
+    const CCH_BUILD = { version: '9.9.141', date: '2026-08-11', tag: 'inv-sent-implies-publish-2026-08-11' };
     window.CCH_BUILD = CCH_BUILD;
 
     /** ASCII-safe UI glyphs — always \u escapes so Windows re-encodes cannot turn them into '?'. */
@@ -33552,7 +33552,11 @@ async function renderBoardsTab(T, proj) {
       }
       await db.collection('boards').doc(projectId).collection(col).doc(docId).update(patch);
       logDocActivity(projectId, col, docId, newValue ? 'published' : 'unpublished', '');
-      showToast(newValue ? 'Published to client dashboard (status → Published)' : 'Unpublished from client dashboard');
+      showToast(newValue
+        ? (col === 'invoices'
+          ? 'Published to Client Dashboard (not emailed — use Send for Sent)'
+          : 'Published to client dashboard (status → Published)')
+        : 'Unpublished from client dashboard');
       invalidateSearchCache();
       if (col === 'proposals') _refreshAfterProposalDocChange(projectId, docId);
       else navigate(window.location.hash);
@@ -44242,9 +44246,8 @@ async function renderBoardsTab(T, proj) {
           if (!data.sentDate) updates.sentDate = today;
           if (!data.sentAt) updates.sentAt = nowIso;
         } else {
-          var invSt = String(data.status || '').trim();
-          var invStLow = invSt.toLowerCase();
-          if (!invSt || invStLow === 'draft' || invStLow === 'unsent') updates.status = 'Sent';
+          /* Send/email ⇒ Sent. Sent always includes published (set above). */
+          updates.status = 'Sent';
           updates.sentDate = today;
           updates.sentAt = nowIso;
           if (clientEmail || clientName) updates.sentTo = clientEmail || clientName;
@@ -44291,7 +44294,9 @@ async function renderBoardsTab(T, proj) {
             '<div style="padding:24px;">' +
               '<div style="background:#F4F6FA;padding:16px;margin-bottom:16px;border:1px solid #E2E2E2;">' +
                 '<div style="font-size:12px;font-weight:600;color:#0A1F3D;margin-bottom:4px;">' + esc(docNum) + ' · ' + formatMoney(total) + '</div>' +
-                '<div style="font-size:12px;color:#5C6B80;">Status updated to <strong>' + (collection === 'proposals' ? 'Published' : 'Sent') + '</strong> · Published to Client Dashboard</div>' +
+                '<div style="font-size:12px;color:#5C6B80;">' + (collection === 'proposals'
+                  ? 'Status <strong>Published</strong> · on Client Dashboard'
+                  : 'Status <strong>Sent</strong> · on Client Dashboard (Sent always includes publish)') + '</div>' +
               '</div>' +
 
               '<div style="margin-bottom:16px;">' +
@@ -44312,11 +44317,14 @@ async function renderBoardsTab(T, proj) {
           '</div>';
         document.body.appendChild(overlay);
 
-        showToast(docType + ' ' + docNum + ' sent to client');
+        showToast(collection === 'invoices'
+          ? (docType + ' ' + docNum + ' marked Sent (on Client Dashboard)')
+          : (docType + ' ' + docNum + ' sent to client'));
         _cacheTime = 0;
         invalidateSearchCache();
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
+    window._sendDocToClient = _sendDocToClient;
     async function markInvoicePastDue(projectId, docId) {
       try {
         await db.collection('boards').doc(projectId).collection('invoices').doc(docId).update({ status: 'Overdue', updatedAt: new Date().toISOString() });
@@ -84750,7 +84758,7 @@ ${pages}
   <script src="cch-client-board.js?v=1774994684878"></script>
   <script src="cch-line-icons.js?v=20260709wr1"></script>
   <script src="cch-invoice-redesign.js?v=20260803wo067b"></script>
-  <script src="cch-proposals-invoices-fix.js?v=20260811invpub"></script>
+  <script src="cch-proposals-invoices-fix.js?v=20260811invsent"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
   <script src="cch-airtable-push.js?v=20260630a"></script>
   <script src="cch-po-bill-variance.js?v=20260731bill4"></script>

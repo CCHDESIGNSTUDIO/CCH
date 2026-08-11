@@ -2195,7 +2195,7 @@
       var msg = 'Send Invoice ' + invNum + ' to client?';
       if (clientName) msg += '\n\nClient: ' + clientName;
       if (clientEmail) msg += '\nEmail: ' + clientEmail;
-      msg += '\n\nThis will:\n• Mark status as "Sent"\n• Record today as the sent date';
+      msg += '\n\nThis will:\n• Mark status as "Sent"\n• Put it on the Client Dashboard (Sent always includes publish)\n• Record today as the sent date';
       if (clientEmail) msg += '\n• Copy email to clipboard for sending';
 
       if (typeof cchConfirm !== 'function') return;
@@ -2204,12 +2204,15 @@
       var now = new Date().toISOString();
       var today = now.split('T')[0];
 
-      // Update invoice
+      // Update invoice — Sent always includes published
       await db.collection('boards').doc(projectId).collection('invoices').doc(invoiceId).update({
         status: 'Sent',
+        published: true,
+        publishedAt: now,
         sentDate: today,
         sentAt: now,
-        sentTo: clientEmail || clientName || 'client'
+        sentTo: clientEmail || clientName || 'client',
+        updatedAt: now
       });
 
       // Log activity
@@ -2434,8 +2437,8 @@
 
 
   // ============================================================
-  // 25. Publish = client dashboard visibility only (do NOT set Sent)
-  // Sent is reserved for Email / Send to Client.
+  // 25. Publish = client dashboard only (NOT emailed).
+  // Sent (email) always includes published. Publish never forces Sent.
   // ============================================================
   var _origTogglePublished = window.togglePublished;
   /** Client-facing invoice/proposal PDF header — firm address only (no personal name). */
@@ -2455,6 +2458,7 @@
 
   window.togglePublished = async function(projectId, docId, newValue, collection) {
     var col = collection || 'proposals';
+    var skipEmailAsk = false;
     if (col === 'invoices') {
       try {
         if (newValue === true) {
@@ -2463,13 +2467,27 @@
           var patch = { published: true, publishedAt: new Date().toISOString() };
           var st = String(cur.status || '').trim();
           var stL = st.toLowerCase();
-          /* Publish ≠ email. Only bump Draft/Unsent → Published. Never force Sent. */
+          if (stL === 'sent') skipEmailAsk = true;
+          /* Publish ≠ email. Draft/Unsent → Published. Never force Sent. */
           if (!st || stL === 'draft' || stL === 'unsent') patch.status = 'Published';
           await db.collection('boards').doc(projectId).collection(col).doc(docId).set(patch, { merge: true });
         }
       } catch(e) { console.warn('invoice publish patch failed:', e); }
     }
-    return _origTogglePublished.call(this, projectId, docId, newValue, collection);
+    var result = await _origTogglePublished.call(this, projectId, docId, newValue, collection);
+    if (col === 'invoices' && newValue === true && !skipEmailAsk && typeof cchConfirm === 'function') {
+      try {
+        var alsoEmail = await cchConfirm(
+          'Invoice is on the Client Dashboard (Published — not emailed yet).\n\nEmail the client now?\n\nEmail marks status Sent. Sent always includes publish.',
+          'Email client?',
+          { confirmText: 'Email client', cancelText: 'Not now' }
+        );
+        if (alsoEmail && typeof window.sendInvoiceToClient === 'function') {
+          await window.sendInvoiceToClient(projectId, docId);
+        }
+      } catch (eAsk) { console.warn('publish→email prompt failed:', eAsk); }
+    }
+    return result;
   };
 
 
