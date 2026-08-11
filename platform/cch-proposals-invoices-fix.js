@@ -2615,7 +2615,12 @@
       var qbRealId = opts.qbRealId;
       var canPushQB = !!opts.canPushQB;
       html += '<button class="btn btn-secondary btn-sm" onclick="' + previewJs + '" title="' + (_isDsInvTop ? 'Print or save as PDF — same layout as Client View' : 'Preview — print or save as PDF') + '">' + (_isDsInvTop ? '🖨 Print / PDF' : '\uD83D\uDC41 Preview') + '</button>';
-      html += '<button class="btn btn-secondary btn-sm" onclick="sendInvoiceToClient(\'' + pj + '\',\'' + dj + '\')">\uD83D\uDCE7 Send</button>';
+      html += '<button class="btn btn-secondary btn-sm" onclick="sendInvoiceToClient(\'' + pj + '\',\'' + dj + '\')" title="Email / mark Sent — not the same as Publish">\uD83D\uDCE7 Send</button>';
+      var _pubTopLabel = docData.published ? '🔒 Unpublish' : '🌐 Publish';
+      var _pubTopTitle = docData.published
+        ? 'Hide from client dashboard (does not un-send email)'
+        : 'Show on client dashboard (status → Published; does not email)';
+      html += '<button type="button" class="btn btn-secondary btn-sm" style="font-weight:700;" title="' + _pubTopTitle + '" onclick="togglePublished(\'' + pj + '\',\'' + dj + '\',' + (!docData.published ? 'true' : 'false') + ',\'invoices\')">' + _pubTopLabel + '</button>';
       var _isTimeDraft = (docData.source === 'time-tracker' || (Array.isArray(docData.timeEntryIds) && docData.timeEntryIds.length > 0));
       var _stLow = String(docData.status || 'draft').toLowerCase();
       if (_isTimeDraft && (_stLow === 'draft' || _stLow === 'unsent' || !docData.status)) {
@@ -2624,6 +2629,10 @@
       html += '<button class="btn btn-primary btn-sm" onclick="cchEnterDocEditMode(\'' + pj + '\',\'' + dj + '\',\'invoice\')" style="background:#1B3352;color:#EDE8E0;">\u270F\uFE0F Edit line items</button>';
 
       var more = '';
+      var pubLabel = docData.published ? '🔒 Unpublish from dashboard' : '🌐 Publish to client dashboard';
+      more += cchDocMoreItem(pubLabel, "togglePublished('" + pj + "','" + dj + "'," + (!docData.published ? 'true' : 'false') + ",'invoices')");
+      more += cchDocMoreItem('\uD83D\uDCE7 Send / email client', "sendInvoiceToClient('" + pj + "','" + dj + "')");
+      more += cchDocMoreDivider();
       more += cchDocMoreItem('📑 Tear sheets', tearJs);
       more += cchDocMoreItem('🖨 Print / PDF', printJs);
       more += cchDocMoreDivider();
@@ -2665,8 +2674,6 @@
         more += cchDocMoreItem('📂 Attach from Files', "linkDocModal('" + pj + "','invoices','" + dj + "')");
       }
       more += cchDocMoreDivider();
-      var pubLabel = docData.published ? '🔒 Unpublish from dashboard' : '🌐 Publish to client dashboard';
-      more += cchDocMoreItem(pubLabel, "togglePublished('" + pj + "','" + dj + "'," + (!docData.published ? 'true' : 'false') + ",'invoices')");
       if (typeof archiveInvoice === 'function') {
         more += cchDocMoreItem('📥 Archive', "archiveInvoice('" + pj + "','" + dj + "')");
       }
