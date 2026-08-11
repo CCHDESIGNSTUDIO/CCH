@@ -11,7 +11,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>CCH Design Studio</title>
+  <title>CCH Studio</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect fill='%231B3352' width='32' height='32' rx='4'/><text x='50%25' y='55%25' font-family='Georgia' font-size='20' fill='%23C4A464' text-anchor='middle' dominant-baseline='middle'>C</text></svg>">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
@@ -339,6 +339,8 @@
     [data-theme="classic"] #contentArea [style*="background:var(--navy)"],
     [data-theme="classic"] #contentArea [style*="background: var(--navy)"],
     [data-theme="classic"] #contentArea [style*="background:#0F1A2E"],
+    [data-theme="classic"] #contentArea [style*="background:#0A1F3D"],
+    [data-theme="classic"] #contentArea [style*="background: #0A1F3D"],
     [data-theme="classic"] #contentArea [style*="background:#1b3352"],
     [data-theme="classic"] #contentArea [style*="background:rgba(15,26,46"],
     [data-theme="classic"] #contentArea [style*="background: rgba(15,26,46"],
@@ -887,12 +889,25 @@
     [data-theme="classic"] #contentArea [style*="background:var(--navy)"],
     [data-theme="classic"] #contentArea [style*="background: var(--navy)"],
     [data-theme="classic"] #contentArea [style*="background:#0F1A2E"],
+    [data-theme="classic"] #contentArea [style*="background:#0A1F3D"],
+    [data-theme="classic"] #contentArea [style*="background: #0A1F3D"],
     [data-theme="classic"] #contentArea [style*="background:#1b3352"],
     [data-theme="classic"] #contentArea [style*="background:rgba(15,26,46"],
     [data-theme="classic"] #contentArea [style*="background: rgba(15,26,46"],
     [data-theme="classic"] #contentArea [style*="background:#1a2744"],
-    [data-theme="classic"] #contentArea [style*="background:#192340"] {
+    [data-theme="classic"] #contentArea [style*="background:#192340"],
+    [data-theme="classic"] .modal [style*="background:#0A1F3D"],
+    [data-theme="classic"] .modal [style*="background: #0A1F3D"],
+    [data-theme="classic"] .modal [style*="background:#0F1A2E"] {
       color: white !important;
+    }
+    /* LOCK: portal count badges / nav badges — never wash to navy-on-navy */
+    .cp-count-badge,
+    .cp-sb-badge,
+    [data-theme="classic"] .cp-count-badge,
+    [data-theme="classic"] .cp-sb-badge {
+      background: #0A1F3D !important;
+      color: #FFFFFF !important;
     }
     /* Classic: muted text that was semi-transparent white → use navy at 50% */
     [data-theme="classic"] #contentArea [style*="color:rgba(255,255,255,0.3"],
@@ -1497,6 +1512,8 @@
       padding: 0 32px; flex-shrink: 0; min-width: 0;
       /* Must allow overflow visible so proposal More (?) dropdown (position:absolute) is not clipped */
       overflow: visible;
+      position: relative;
+      z-index: 400;
     }
     .topbar-breadcrumb { display: flex; align-items: center; gap: 8px; }
     .breadcrumb-link {
@@ -1506,7 +1523,7 @@
     .breadcrumb-link:hover { color: #0F1A2E; }
     .breadcrumb-sep { color: rgba(15,26,46,0.3); font-size: 11px; }
     .breadcrumb-current { font-weight: 700; font-size: 13px; color: #0F1A2E; }
-    .topbar-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items:center; }
+    .topbar-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items:center; position: relative; z-index: 401; }
     .topbar-actions .btn-primary { background: #0F1A2E; color: #FFFFFF; }
     .topbar-actions .btn-secondary { background: #FFFFFF; color: #0F1A2E; border: 1px solid rgba(15,26,46,0.15); }
     .topbar-actions .btn-secondary:hover { border-color: var(--gold); color: var(--gold); }
@@ -3567,6 +3584,18 @@
     })();
     window._cchEnv = CCH_ENV;
 
+    function cchStudioAppOrigin() {
+      if (typeof location !== 'undefined' && location.origin) return location.origin;
+      return CCH_ENV === 'staging' ? 'https://cch-platform-staging.web.app' : 'https://cch-platform.web.app';
+    }
+    function cchCloudFunctionsBase() {
+      return CCH_ENV === 'staging'
+        ? 'https://us-central1-cch-studio-staging.cloudfunctions.net'
+        : 'https://us-central1-cch-design-boards.cloudfunctions.net';
+    }
+    window.cchStudioAppOrigin = cchStudioAppOrigin;
+    window.cchCloudFunctionsBase = cchCloudFunctionsBase;
+
     const firebaseConfig = CCH_ENV === 'staging' ? {
       apiKey: "AIzaSyBIwwo7uRij6Q0FZg-qmIS1LC8t2AjXrYo",
       authDomain: "cch-studio-staging.firebaseapp.com",
@@ -4198,7 +4227,7 @@
     window.buildFinancialHealthBarHtml = buildFinancialHealthBarHtml;
 
     // -- Platform Version --
-    const CCH_BUILD = { version: '9.9.106', date: '2026-08-06', tag: 'client-pepper-header-2026-08-06' };
+    const CCH_BUILD = { version: '9.9.136', date: '2026-08-11', tag: 'inv-client-manage-more-publish-2026-08-11' };
     window.CCH_BUILD = CCH_BUILD;
 
     /** ASCII-safe UI glyphs — always \u escapes so Windows re-encodes cannot turn them into '?'. */
@@ -4657,7 +4686,7 @@
     function statusBadge(status) {
       const s = (status || 'Draft').toLowerCase();
       const classMap = {
-        'draft':'badge-draft', 'sent':'badge-sent', 'published':'badge-sent', 'in review':'badge-sent', 'approved':'badge-approved', 'declined':'badge-overdue',
+        'draft':'badge-draft', 'unsent':'badge-unsent', 'sent':'badge-sent', 'published':'badge-published', 'in review':'badge-sent', 'approved':'badge-approved', 'declined':'badge-overdue',
         'paid':'badge-paid', 'overdue':'badge-overdue', 'partial':'badge-partial', 'partially paid':'badge-partial',
         'invoiced':'badge-invoiced', 'partially invoiced':'badge-ordered', 'open':'badge-sent',
         'ordered':'badge-ordered', 'received':'badge-received', 'installed':'badge-installed',
@@ -5372,7 +5401,6 @@
     window.cchEnterDocEditMode = cchEnterDocEditMode;
 
     function navigate(hash) {
-      try { document.title = 'CCH Design Studio'; } catch (eTitle) {}
       var rawHash = String(hash || '#/projects').trim();
       if (rawHash.startsWith('#') && !rawHash.startsWith('#/')) {
         if (/^#(project|clientview|clientboard|clientportal)\//i.test(rawHash)) rawHash = '#/' + rawHash.slice(1);
@@ -5591,6 +5619,79 @@
     // Instead, CSS-only approach with comprehensive selectors is used above.
     // The global background replacements (#252525?#0F1A2E etc.) handle the source problem.
 
+    /** Timely Memories reads browser tab title — broadcast project + page (WO-096). */
+    function cchStripTitleLabel(s) {
+      return String(s || '')
+        .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+    function cchProjectTabTitleLabel(tab) {
+      var labels = {
+        overview: 'Overview', tasks: 'Tasks', selections: 'Selections', ideabooks: 'Inspiration',
+        boards: 'Room Boards', designboards: 'Design Boards', ffe: 'FFE Tracker', specbook: 'Spec Book',
+        proposals: 'Proposals', invoices: 'Invoices', pos: 'Purchase Orders', discrepancies: 'Bill variances',
+        financials: 'Financials', workorders: 'Work Orders', files: 'Files & Docs', time: 'Time',
+        comms: 'Communications', notes: 'Notes', followups: 'Follow-Ups'
+      };
+      tab = String(tab || '').toLowerCase();
+      return labels[tab] || (tab ? tab.charAt(0).toUpperCase() + tab.slice(1) : '');
+    }
+    function cchUpdateStudioWindowTitle(crumbs) {
+      crumbs = crumbs || [];
+      var titleParts = ['CCH Studio'];
+      var projectName = '';
+      var section = '';
+
+      for (var ci = 0; ci < crumbs.length; ci++) {
+        var crumbLab = cchStripTitleLabel(crumbs[ci].label);
+        if (crumbLab === 'Projects' && ci + 1 < crumbs.length) {
+          projectName = cchStripTitleLabel(crumbs[ci + 1].label);
+          if (ci + 2 < crumbs.length) section = cchStripTitleLabel(crumbs[ci + 2].label);
+          break;
+        }
+      }
+      if (!projectName && crumbs.length === 1 && cchStripTitleLabel(crumbs[0].label).indexOf('Style Library') >= 0) {
+        projectName = 'Style Library';
+      }
+
+      var hashParts = String(window.location.hash || '').replace(/^#\/?/, '').split('/').filter(Boolean);
+      if (hashParts[0] === 'project' && hashParts[1]) {
+        if (!projectName) {
+          projectName = cchStripTitleLabel((window._currentProject && window._currentProject.name) || hashParts[1]);
+          if (projectName === hashParts[1] && hashParts[1].indexOf('-') >= 0) {
+            projectName = hashParts[1].split('-').map(function(w) {
+              return w ? w.charAt(0).toUpperCase() + w.slice(1) : '';
+            }).join(' ');
+          }
+        }
+        if (!section) {
+          var routeTab = String(hashParts[2] || 'overview').toLowerCase();
+          if (routeTab === 'proposal' && hashParts[3]) section = 'Proposal';
+          else if (routeTab === 'invoice' && hashParts[3]) section = 'Invoice';
+          else if (routeTab === 'po' && hashParts[3]) section = 'Purchase Order';
+          else if (routeTab === 'designboard' && hashParts[3]) section = 'Design Board';
+          else {
+            var activeTab = (typeof currentProjectTab !== 'undefined' && currentProjectTab) ? currentProjectTab : routeTab;
+            section = cchProjectTabTitleLabel(activeTab);
+          }
+        }
+      }
+
+      if (!section && crumbs.length) {
+        section = cchStripTitleLabel(crumbs[crumbs.length - 1].label);
+        if (section === 'Projects') section = '';
+      }
+
+      if (projectName) titleParts.push(projectName);
+      if (section && section !== projectName) titleParts.push(section);
+
+      var nextTitle = titleParts.join(' · ');
+      if (nextTitle.length > 120) nextTitle = nextTitle.slice(0, 117) + '...';
+      try { document.title = nextTitle; } catch (eTitle) {}
+    }
+    window.cchUpdateStudioWindowTitle = cchUpdateStudioWindowTitle;
+
     function setBreadcrumb(crumbs) {
       const el = document.getElementById('breadcrumb');
       el.innerHTML = crumbs.map((c, i) => {
@@ -5612,6 +5713,7 @@
         }
         return `<button class="breadcrumb-link" onclick="${escAttr(click)}">${esc(c.label)}</button><span class="breadcrumb-sep">—</span>`;
       }).join('');
+      cchUpdateStudioWindowTitle(crumbs);
     }
 
     function setTopbarActions(html) {
@@ -8347,13 +8449,39 @@
     }
     window.cchParseLineQty = cchParseLineQty;
 
+    /** WO-093 — client UNIT price only: always ceil to nearest $5 (never down). Freight/tax/etc. skip. */
+    function cchRoundClientUnitPriceUp5(raw) {
+      var n = parseFloat(raw);
+      if (!isFinite(n) || n <= 0) return 0;
+      return Math.ceil(n / 5) * 5;
+    }
+    function cchLineShouldRoundClientUnit(it) {
+      if (!it) return false;
+      var et = String(it.expenseType || '').toLowerCase().trim();
+      if (['freight', 'shipping', 'handling', 'sales_tax', 'tax', 'discount', 'expense', 'other_expense', 'prepaid_tax'].indexOf(et) >= 0) return false;
+      if (typeof cchIsCreditLineType === 'function' && cchIsCreditLineType(it)) return false;
+      return true;
+    }
+    function cchClientUnitFromCostMarkup(cost, markupPct, it) {
+      var c = parseMoney(cost) || 0;
+      var m = parseFloat(markupPct) || 0;
+      if (c <= 0) return 0;
+      var unit = c * (1 + m / 100);
+      if (it && !cchLineShouldRoundClientUnit(it)) return Math.round(unit * 100) / 100;
+      return cchRoundClientUnitPriceUp5(unit);
+    }
+    window.cchRoundClientUnitPriceUp5 = cchRoundClientUnitPriceUp5;
+    window.cchClientUnitFromCostMarkup = cchClientUnitFromCostMarkup;
+
     function recalcProposalLineAmount(it) {
       var qty = cchParseLineQty(it.qty, 1);
       var cost = parseMoney(it.cost);
       var m = parseFloat(it.markupPct) || 0;
       var ship = parseMoney(it.shipping) || 0;
       if (cost > 0) {
-        it.amount = cost * qty * (1 + m / 100) + ship;
+        var unit = cchClientUnitFromCostMarkup(cost, m, it);
+        it.clientPrice = unit;
+        it.amount = unit * qty + ship;
         return;
       }
       // Cost cleared: drop stale sell-side totals so grand total does not keep old cost\u00D7markup.
@@ -8361,7 +8489,9 @@
       var isSvc = it.expenseType === 'service' || it.itemType === 'service';
       var rate = parseFloat(it.rate) || 0;
       if (isSvc && rate > 0) {
-        it.amount = Math.round(rate * qty * 100) / 100 + ship;
+        var unitR = cchLineShouldRoundClientUnit(it) ? cchRoundClientUnitPriceUp5(rate) : (Math.round(rate * 100) / 100);
+        it.clientPrice = unitR;
+        it.amount = unitR * qty + ship;
       } else {
         it.amount = 0;
         it.clientPrice = 0;
@@ -8563,8 +8693,9 @@
           var it = items[itemIdx];
           it.amount = (parseFloat(it.cost) || 0) * (parseFloat(it.qty) || 1) + (parseFloat(it.shipping) || 0);
         }
-        // After cost\u00D7markup recalc, keep per-unit clientPrice aligned with line total.
-        if (!isPO && (recalcFields[field] || field === 'amount')) {
+        // Manual TOTAL edit: sync unit from amount (do not force $5 — respect typed override).
+        // Markup/cost/qty recalc already set clientPrice inside recalcProposalLineAmount.
+        if (!isPO && field === 'amount') {
           var _line = items[itemIdx];
           var _lq = parseFloat(_line.qty) || 1;
           var _lamt = parseFloat(_line.amount) || 0;
@@ -9401,7 +9532,10 @@
                 : cchProjectDefaultProductMarkupPct(projData));
           }
           next.markupPct = mk;
-          next.amount = Math.round(cost * (1 + (mk || 0) / 100) * 100) / 100;
+          next.amount = (typeof cchClientUnitFromCostMarkup === 'function')
+            ? cchClientUnitFromCostMarkup(cost, mk || 0, next)
+            : Math.round(cost * (1 + (mk || 0) / 100) * 100) / 100;
+          next.clientPrice = next.amount;
           changed = true;
         }
         if (co === 0 && cost > 0 && !(parseFloat(next.markupPct) > 0) && sell > 0 && cost > 0) {
@@ -16633,7 +16767,7 @@
       var endDate = new Date().toISOString().slice(0, 10);
       showToast('Syncing Timely ' + startDate + ' \u2013 ' + endDate + '...');
       try {
-        var result = await cchFetchJson('https://us-central1-cch-design-boards.cloudfunctions.net/timelySyncEntries', {
+        var result = await cchFetchJson(cchCloudFunctionsBase() + '/timelySyncEntries', {
           method: 'POST', headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({ startDate: startDate, endDate: endDate })
         });
@@ -23551,8 +23685,11 @@ async function renderBoardsTab(T, proj) {
         var pubBadge = isStyleLib ? '' : (s.clientPublished === true
           ? ' · <span style="color:#5FA56B;font-weight:600;">● Live to client</span>'
           : ' ? <span style="color:var(--gray-400);font-weight:600;">○ Draft</span>');
+        var _ciBadge = (String(s.id || '') === 'client-ideas' || String(s.boardKind || '').toLowerCase() === 'clientideas')
+          ? ' <span style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#C4A464;font-weight:700;">Client Ideas</span>'
+          : '';
         return '<button type="button" class="ib-p2-card" onclick="navigate(\'#/project/' + pidEsc + '/ideabooks/' + sidEsc + '\')">' + thumb +
-          '<div class="ib-p2-card-body"><div class="ib-p2-card-title">' + esc(s.name || 'Untitled') + '</div>' + topicLine +
+          '<div class="ib-p2-card-body"><div class="ib-p2-card-title">' + esc(s.name || 'Untitled') + _ciBadge + '</div>' + topicLine +
           '<div class="ib-p2-card-meta">' + n + ' image' + (n !== 1 ? 's' : '') + ' · Updated ' + esc(updated) + pubBadge + '</div>' +
           actLine + '</div></button>';
       }
@@ -23831,12 +23968,14 @@ async function renderBoardsTab(T, proj) {
                 </div>
                 ${starCount > 0 ? '<div class="ib-item-star-badge">\u2605 ' + starCount + (_stIniIb ? ' ' + esc(_stIniIb) + (_stListIb.length > 3 ? '—' : '') : '') + '</div>' : ''}
                 ${(!_ibRo && _ibLibId) ? '<div class="ib-item-product-badge" title="' + escAttr(_ibProductBadgeTitle) + '">\u25C7</div>' : ''}
+                ${item.fromClient ? '<div class="ib-item-product-badge" style="left:8px;right:auto;background:#C4A464;color:#0A1F3D;font-size:9px;letter-spacing:0.06em;text-transform:uppercase;padding:3px 6px;width:auto;height:auto;border-radius:0;" title="' + escAttr((item.clientName || 'Client') + (item.clientEmail ? (' · ' + item.clientEmail) : '') + (item.sourceUrl ? (' · ' + item.sourceUrl) : '') + ' · from portal') + '">Client</div>' : ''}
                 <div class="ib-item-overlay"></div>
                 ${_ibRo ? '' : `<button type="button" class="ib-item-kebab" title="Image actions" aria-label="Image actions"
                   onclick="event.stopPropagation();ibToggleItemMenu(event,'${projectId}','${section.id}',${origIdx})">\u22EE</button>
                 <div class="ib-item-dropdown" id="ibItemDd-${section.id}-${origIdx}" onclick="event.stopPropagation()">
                   <button type="button" onclick="event.stopPropagation();ibCloseAllItemMenus();ibShowImageDetail('${projectId}','${section.id}',${origIdx})">View details</button>
                   ${projectId === '_lib_designer' ? '' : `<button type="button" onclick="event.stopPropagation();ibCloseAllItemMenus();void ibPromoteIdeabookToProduct('${projectId}','${section.id}',${origIdx})" style="font-weight:600;color:var(--gold,#C9A96E);">💾 Save to library &amp; selections</button>`}
+                  ${projectId === '_lib_designer' ? '' : `<button type="button" onclick="event.stopPropagation();ibCloseAllItemMenus();void ibCopyPinToStyleLibrary('${projectId}','${section.id}',${origIdx})" style="font-weight:600;">📚 Copy to Style Library</button>`}
                   ${_ibPageUrl ? `<button type="button" onclick=${cpPortalOnclickAttr('event.stopPropagation();ibCloseAllItemMenus();ibOpenIdeabookSourcePage(' + JSON.stringify(_ibPageUrl) + ')')}>🔗 Open source page</button>` : ''}
                   <button type="button" onclick="event.stopPropagation();ibCloseAllItemMenus();ibToggleShowSource(${JSON.stringify(projectId)},${JSON.stringify(section.id)},${origIdx})">${item.showSource === false ? '👁 Show source to client' : '🙈 Hide source from client'}</button>
                   <button type="button" onclick="event.stopPropagation();ibCloseAllItemMenus();ibToggleStar('${projectId}','${section.id}',${origIdx})">★ Star / unstar</button>
@@ -23869,6 +24008,7 @@ async function renderBoardsTab(T, proj) {
               <div class="ib-item-info">
                 <div class="ib-item-info-top">
                   ${_ibRo ? '<div class="ib-item-caption-bar" style="cursor:default;">' + (caption ? esc(caption) : '<span style="opacity:0.3;font-weight:400;"> </span>') + '</div>' : `<div class="ib-item-caption-bar" onclick="event.stopPropagation();ibInlineEditCaption(this,'${projectId}','${section.id}',${origIdx})" title="Click to edit caption" style="cursor:text;">${caption ? esc(caption) : '<span style="opacity:0.3;font-weight:400;">Add caption...</span>'}</div>`}
+                  ${item.fromClient ? '<div style="font-size:11px;color:#6B7280;margin-top:4px;line-height:1.35;">Shared by <strong style="color:#0A1F3D;font-weight:600;">' + esc(item.clientName || 'Client') + '</strong>' + (item.clientEmail ? ' · ' + esc(item.clientEmail) : '') + (item.sourceUrl ? ' · <a href="' + escAttr(item.sourceUrl) + '" target="_blank" rel="noopener" onclick="event.stopPropagation();" style="color:#0A1F3D;text-decoration:underline;">source</a>' : '') + '</div>' : ''}
                   ${price ? '<div class="ib-item-price-bar">' + formatMoney(parseFloat(price) || 0) + '</div>' : ''}
                 </div>
                 ${(starCount > 0 || (_ibShowVendor && vendorName)) ? '<div class="ib-item-badges">' +
@@ -23896,6 +24036,7 @@ async function renderBoardsTab(T, proj) {
           <button class="bulk-btn primary" onclick="ibBulkCopyMove('${projectId}','${section.id}','move')">Move to Section</button>
           <button class="bulk-btn" onclick="ibBulkCopyMove('${projectId}','${section.id}','newSection')">New Section from Selected</button>
           <button class="bulk-btn primary" onclick="ibBulkCopyToProjectInspiration('${projectId}','${section.id}')" style="background:var(--gold);color:#0F1A2E;border-color:var(--gold);">→ Copy to Project Inspiration</button>
+          ${projectId === '_lib_designer' ? '' : '<button class="bulk-btn primary" onclick="ibBulkCopyToStyleLibrary(\'' + projectId + '\',\'' + section.id + '\')" style="background:#0A1F3D;color:#C4A464;border-color:#0A1F3D;">📚 Copy to Style Library</button>'}
           <button class="bulk-btn danger" onclick="ibBulkDelete('${projectId}','${section.id}')">Delete Selected</button>
         </div>` : ''}
 
@@ -24606,6 +24747,11 @@ async function renderBoardsTab(T, proj) {
           roomOpts +
           '<option value="__new__">+ Create new room\u2026</option>' +
           '</select>' +
+          '<div style="margin-top:14px;padding-top:12px;border-top:1px solid #E2E2E2;">' +
+          '<div style="font-size:11px;color:#6B7280;margin-bottom:8px;line-height:1.45;">Firm Style Library (central reference boards) — separate from Product Library / Selections.</div>' +
+          '<button type="button" class="btn btn-secondary" style="width:100%;margin-bottom:6px;border-radius:0;" onclick="void ibPromoteCopyToStyleLibrary()">📚 Copy pin to Style Library</button>' +
+          '<button type="button" class="btn btn-secondary" style="width:100%;border-radius:0;" onclick="closeModal();navigate(\'#/project/_lib_designer/ideabooks\')">Open Style Library</button>' +
+          '</div>' +
           '</div>' +
           '<div class="modal-footer">' +
           '<button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>' +
@@ -24730,6 +24876,22 @@ async function renderBoardsTab(T, proj) {
         showToast((e2 && e2.message) || 'Promote failed', 'error');
       }
     }
+
+    /** From Save-to-library modal: copy this pin into Style Library (does not run Product Library save). */
+    async function ibPromoteCopyToStyleLibrary() {
+      var c = window._ibPromoteCtx;
+      if (!c || !c.item) {
+        showToast('Pin context missing — close and open Save again', 'error');
+        return;
+      }
+      var sourceLabel = '';
+      try {
+        var sDoc = await db.collection('boards').doc(c.projectId).collection('ideabooks').doc(c.sectionId).get();
+        sourceLabel = sDoc.exists ? String((sDoc.data() || {}).name || '') : '';
+      } catch (_e) {}
+      await _ibPickStyleLibraryIdeabook([c.item], sourceLabel || 'Project Inspiration');
+    }
+    window.ibPromoteCopyToStyleLibrary = ibPromoteCopyToStyleLibrary;
 
     async function ibIdeabookAddToProductLibrary(projectId, sectionId, index) {
       ibCloseAllItemMenus();
@@ -27650,6 +27812,13 @@ async function renderBoardsTab(T, proj) {
                   <button class="ib-lb-action-btn" onclick="ibLbCopyToProjectInspiration()" style="background:rgba(212,165,116,0.12);border-color:rgba(212,165,116,0.4);color:var(--gold);"><span class="icon">→</span> Send pin to a client project...</button>
                 </div>
               </div>
+              ${String((window._ibLbState && window._ibLbState.projectId) || '') !== '_lib_designer' ? `
+              <div class="ib-lb-panel-section">
+                <div class="ib-lb-label">Copy to Style Library</div>
+                <div class="ib-lb-actions">
+                  <button class="ib-lb-action-btn" onclick="ibLbCopyToStyleLibrary()" style="background:rgba(10,31,61,0.35);border-color:rgba(196,164,100,0.45);color:#C4A464;"><span class="icon">📚</span> Save pin to Style Library...</button>
+                </div>
+              </div>` : ''}
 
               <!-- Move/Copy to another section -->
               ${allSections.length > 1 ? `
@@ -28196,6 +28365,207 @@ async function renderBoardsTab(T, proj) {
         var sourceLabel = doc.exists ? (doc.data().name || '') : '';
         await _ibPickProjectAndIdeabook(picked, sourceLabel);
       } catch (e) { showToast('Error: ' + e.message, 'error'); }
+    };
+
+    /** Project Inspiration → Style Library (mirror of Style Library → project). */
+    async function _ibPickStyleLibraryIdeabook(items, sourceLabel) {
+      if (!items || items.length === 0) { showToast('Nothing to copy'); return; }
+      var libId = '_lib_designer';
+      try {
+        var libRef = db.collection('boards').doc(libId);
+        var libDoc = await libRef.get();
+        if (!libDoc.exists) {
+          await libRef.set({
+            name: 'Style Library',
+            clientName: 'Designer',
+            status: 'Active',
+            isLibrary: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+        }
+      } catch (eEnsure) {
+        showToast('Could not open Style Library: ' + ((eEnsure && eEnsure.message) || eEnsure), 'error');
+        return;
+      }
+
+      document.getElementById('modalContainer').innerHTML =
+        '<div class="modal-overlay" onclick="if(event.target===this)closeModal()" style="z-index:10002;">' +
+        '<div class="modal" style="width:480px;max-height:80vh;overflow-y:auto;">' +
+          '<div class="modal-header"><div class="modal-title">📚 Copy to Style Library</div><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+          '<div class="modal-body">' +
+            '<div style="font-size:13px;color:var(--gray-600);margin-bottom:14px;line-height:1.45;">' +
+              'Sending <strong>' + items.length + ' image' + (items.length === 1 ? '' : 's') + '</strong>' +
+              (sourceLabel ? ' from <em>' + esc(sourceLabel) + '</em>' : '') +
+              ' into the firm <strong>Style Library</strong>. Original stays on the project.' +
+            '</div>' +
+            '<div class="form-group">' +
+              '<label class="form-label">Style Library board</label>' +
+              '<select class="form-input" id="ibSlIdeabook" style="border-radius:0;"><option value="">Loading...</option></select>' +
+              '<div style="margin-top:8px;font-size:12px;">' +
+                '<label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">' +
+                  '<input type="checkbox" id="ibSlNewBoard" onchange="document.getElementById(\'ibSlNewBoardName\').style.display=this.checked?\'block\':\'none\';document.getElementById(\'ibSlIdeabook\').disabled=this.checked;">' +
+                  ' Create a new Style Library board instead' +
+                '</label>' +
+                '<input class="form-input" id="ibSlNewBoardName" placeholder="New board name (e.g. Lighting — Sconces)" style="display:none;margin-top:6px;border-radius:0;">' +
+              '</div>' +
+            '</div>' +
+            '<button type="button" class="btn btn-secondary" style="width:100%;margin-top:8px;border-radius:0;" onclick="closeModal();navigate(\'#/project/_lib_designer/ideabooks\')">Open Style Library</button>' +
+          '</div>' +
+          '<div class="modal-footer">' +
+            '<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>' +
+            '<button class="btn btn-primary" id="ibSlConfirmBtn" onclick="_ibConfirmStyleLibraryCopy()" style="background:#0A1F3D;border-color:#0A1F3D;color:#C4A464;">Copy ' + items.length + ' Image' + (items.length === 1 ? '' : 's') + '</button>' +
+          '</div>' +
+        '</div></div>';
+
+      window._ibSlPending = { items: items, sourceLabel: sourceLabel || '', libId: libId };
+      _ibLoadStyleLibraryIdeabooksForPicker();
+    }
+    window._ibPickStyleLibraryIdeabook = _ibPickStyleLibraryIdeabook;
+
+    window._ibLoadStyleLibraryIdeabooksForPicker = async function() {
+      var target = document.getElementById('ibSlIdeabook');
+      var pending = window._ibSlPending;
+      if (!target || !pending) return;
+      target.innerHTML = '<option value="">Loading...</option>';
+      try {
+        var snap = await db.collection('boards').doc(pending.libId).collection('ideabooks').get();
+        var opts = [];
+        snap.forEach(function(d) { opts.push({ id: d.id, name: d.data().name || 'Untitled', order: d.data().order || 0 }); });
+        opts.sort(function(a, b) { return a.order - b.order; });
+        if (opts.length === 0) {
+          target.innerHTML = '<option value="">— No boards yet — check "Create new" below…</option>';
+          target.disabled = true;
+          var nb = document.getElementById('ibSlNewBoard');
+          if (nb && !nb.checked) { nb.checked = true; nb.onchange(); }
+        } else {
+          target.disabled = false;
+          target.innerHTML = opts.map(function(o) {
+            return '<option value="' + escAttr(o.id) + '">' + esc(o.name) + '</option>';
+          }).join('');
+        }
+      } catch (e) {
+        target.innerHTML = '<option value="">Error loading boards</option>';
+      }
+    };
+
+    window._ibConfirmStyleLibraryCopy = async function() {
+      var pending = window._ibSlPending;
+      if (!pending || !pending.items || pending.items.length === 0) { closeModal(); return; }
+      var libId = pending.libId || '_lib_designer';
+      var sectionId = (document.getElementById('ibSlIdeabook') || {}).value || '';
+      var newBoardCheck = document.getElementById('ibSlNewBoard');
+      var creatingNew = newBoardCheck && newBoardCheck.checked;
+      var newName = creatingNew ? String((document.getElementById('ibSlNewBoardName') || {}).value || '').trim() : '';
+
+      if (creatingNew && !newName) { showToast('Enter a name for the new board'); return; }
+      if (!creatingNew && !sectionId) { showToast('Pick a Style Library board'); return; }
+
+      var btn = document.getElementById('ibSlConfirmBtn');
+      if (btn) { btn.disabled = true; btn.textContent = 'Copying...'; }
+
+      try {
+        var fresh = pending.items.map(function(it) {
+          var copy = (typeof it === 'string') ? { imageUrl: it } : JSON.parse(JSON.stringify(it));
+          copy.feedback = { stars: [], comments: [] };
+          copy.copiedFromProject = pending.sourceLabel || true;
+          copy.copiedAt = new Date().toISOString();
+          try { copy.imageKey = _ibNewImageKey(); } catch (_eKey) {}
+          delete copy.libraryProductId;
+          delete copy.roomClipId;
+          delete copy.promotedRoom;
+          delete copy.promotedCategory;
+          delete copy.productLifecycle;
+          delete copy.promotedAt;
+          return copy;
+        });
+
+        var targetName;
+        if (creatingNew) {
+          var snap = await db.collection('boards').doc(libId).collection('ideabooks').get();
+          var maxOrder = 0;
+          snap.forEach(function(d) { var o = d.data().order || 0; if (o > maxOrder) maxOrder = o; });
+          await db.collection('boards').doc(libId).collection('ideabooks').add({
+            name: newName,
+            description: 'Copied from project Inspiration · ' + fresh.length + ' image(s)',
+            images: fresh,
+            order: maxOrder + 1,
+            createdAt: new Date().toISOString(),
+            source: 'project-to-style-library'
+          });
+          targetName = newName;
+        } else {
+          var targetIdeaRef = db.collection('boards').doc(libId).collection('ideabooks').doc(sectionId);
+          var existing = await targetIdeaRef.get();
+          var existingImages = _coerceImageIterable(existing.exists ? existing.data().images : null);
+          fresh.forEach(function(f) { existingImages.push(f); });
+          await targetIdeaRef.update({ images: existingImages, updatedAt: new Date().toISOString() });
+          targetName = existing.exists ? (existing.data().name || 'Style board') : 'Style board';
+        }
+
+        closeModal();
+        try { window._ibSelectMode = false; window._ibSelectedIdxs = new Set(); } catch (_eSel) {}
+        delete window._ibSlPending;
+        showToast('📚 Copied ' + fresh.length + ' image(s) to Style Library · "' + targetName + '"');
+      } catch (e) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Copy'; }
+        await cchAlert('Copy to Style Library failed: ' + ((e && e.message) || e), 'Style Library');
+      }
+    };
+
+    window.ibCopyPinToStyleLibrary = async function(projectId, sectionId, index) {
+      if (String(projectId) === '_lib_designer') {
+        showToast('Already in Style Library', 'info');
+        return;
+      }
+      try {
+        var doc = await db.collection('boards').doc(projectId).collection('ideabooks').doc(sectionId).get();
+        var images = _coerceImageIterable(doc.exists ? doc.data().images : null);
+        var item = images[index];
+        if (!item) { showToast('No image to copy'); return; }
+        var sourceLabel = doc.exists ? (doc.data().name || '') : '';
+        await _ibPickStyleLibraryIdeabook([item], sourceLabel);
+      } catch (e) {
+        await cchAlert('Could not load image: ' + ((e && e.message) || e), 'Style Library');
+      }
+    };
+
+    window.ibLbCopyToStyleLibrary = async function() {
+      var s = window._ibLbState;
+      if (!s) return;
+      if (String(s.projectId) === '_lib_designer') {
+        showToast('Already in Style Library', 'info');
+        return;
+      }
+      try {
+        var doc = await db.collection('boards').doc(s.projectId).collection('ideabooks').doc(s.sectionId).get();
+        var images = _coerceImageIterable(doc.exists ? doc.data().images : null);
+        var item = images[s.index];
+        if (!item) { showToast('No image to copy'); return; }
+        var sourceLabel = doc.exists ? (doc.data().name || '') : '';
+        ibCloseLightbox();
+        await _ibPickStyleLibraryIdeabook([item], sourceLabel);
+      } catch (e) {
+        await cchAlert('Could not load image: ' + ((e && e.message) || e), 'Style Library');
+      }
+    };
+
+    window.ibBulkCopyToStyleLibrary = async function(projectId, sectionId) {
+      if (String(projectId) === '_lib_designer') {
+        showToast('Already in Style Library', 'info');
+        return;
+      }
+      var selected = Array.from(window._ibSelectedIdxs || []).sort(function(a, b) { return a - b; });
+      if (selected.length === 0) { showToast('Select images first'); return; }
+      try {
+        var doc = await db.collection('boards').doc(projectId).collection('ideabooks').doc(sectionId).get();
+        var images = _coerceImageIterable(doc.exists ? doc.data().images : null);
+        var picked = selected.map(function(i) { return images[i]; }).filter(Boolean);
+        var sourceLabel = doc.exists ? (doc.data().name || '') : '';
+        await _ibPickStyleLibraryIdeabook(picked, sourceLabel);
+      } catch (e) {
+        showToast('Error: ' + ((e && e.message) || e), 'error');
+      }
     };
 
     // ==================== END CROSS-PROJECT INSPIRATION COPY ====================
@@ -32180,7 +32550,18 @@ async function renderBoardsTab(T, proj) {
         var sell = (typeof clipSellingLineTotal === 'function') ? clipSellingLineTotal(c) : parseMoney(c.clientPrice);
         if (!sell && cost > 0) sell = cost;
         var mkup = cchProductLineMarkupPct(cost, sell, qty, _projForMk, c);
-        if (sell <= 0 && cost > 0) sell = Math.round(cost * qty * (1 + mkup / 100) * 100) / 100;
+        var unitGen = 0;
+        if (sell <= 0 && cost > 0) {
+          unitGen = (typeof cchClientUnitFromCostMarkup === 'function')
+            ? cchClientUnitFromCostMarkup(cost, mkup, c)
+            : Math.round(cost * (1 + mkup / 100) * 100) / 100;
+          sell = unitGen * qty;
+        } else if (sell > 0 && qty > 0 && typeof cchRoundClientUnitPriceUp5 === 'function' && cchLineShouldRoundClientUnit(c)) {
+          unitGen = cchRoundClientUnitPriceUp5(sell / qty);
+          sell = unitGen * qty;
+        } else if (sell > 0 && qty > 0) {
+          unitGen = sell / qty;
+        }
         var row = {
           title: c.title || 'Untitled',
           description: c.description || c.clientDescription || '',
@@ -32191,6 +32572,7 @@ async function renderBoardsTab(T, proj) {
           markupPct: mkup,
           shipping: parseFloat(c.shipping) || 0,
           amount: sell,
+          clientPrice: unitGen || (qty > 0 ? sell / qty : sell),
           vendor: c.vendor || '',
           sku: String(c.sku || c.model || c.itemCode || '').trim(),
           finish: String(c.finish || c.color || c.finishColor || '').trim(),
@@ -38867,8 +39249,12 @@ async function renderBoardsTab(T, proj) {
           }
           if (calcs[0]) calcs[0].value = item.amount.toFixed(2);
         } else if (cost !== 0) {
-          const total = (cost * qty * (1 + mkup / 100)) + ship;
-          const mkupDollar = cost * qty * (mkup / 100);
+          const unitSell = (typeof cchClientUnitFromCostMarkup === 'function')
+            ? cchClientUnitFromCostMarkup(cost, mkup, item)
+            : (cost * (1 + mkup / 100));
+          const total = unitSell * qty + ship;
+          const mkupDollar = Math.max(0, unitSell * qty - cost * qty);
+          item.clientPrice = unitSell;
           item.amount = total;
           if (calcs[0]) calcs[0].value = mkupDollar.toFixed(2);
           if (calcs[1]) calcs[1].value = total.toFixed(2);
@@ -38889,8 +39275,13 @@ async function renderBoardsTab(T, proj) {
         if (unitEl) {
           var unitSell = isPO
             ? (qty > 0 ? ((cost * qty) + ship) / qty : cost)
-            : ((cost !== 0) ? (cost * (1 + mkup / 100)) : ((parseFloat(item.amount) || 0) / (qty || 1)));
-          if (isInv && isSvc && cost <= 0 && rate > 0) unitSell = rate;
+            : ((cost !== 0)
+              ? ((typeof cchClientUnitFromCostMarkup === 'function') ? cchClientUnitFromCostMarkup(cost, mkup, item) : (cost * (1 + mkup / 100)))
+              : ((parseFloat(item.amount) || 0) / (qty || 1)));
+          if (isInv && isSvc && cost <= 0 && rate > 0) {
+            unitSell = (typeof cchRoundClientUnitPriceUp5 === 'function' && cchLineShouldRoundClientUnit(item))
+              ? cchRoundClientUnitPriceUp5(rate) : rate;
+          }
           unitEl.value = unitSell.toFixed(2);
         }
       }
@@ -39248,9 +39639,16 @@ async function renderBoardsTab(T, proj) {
             ? 0 : (parseFloat(item.markupPct) || 0);
           var isSvc = item.expenseType === 'service' || item.itemType === 'service' || item._isService === true;
           if (cost !== 0) {
-            item.amount = Math.round((cost * qty * (1 + mkup / 100) + ship) * 100) / 100;
+            var unitSave = (typeof cchClientUnitFromCostMarkup === 'function')
+              ? cchClientUnitFromCostMarkup(cost, mkup, item)
+              : (cost * (1 + mkup / 100));
+            item.clientPrice = unitSave;
+            item.amount = Math.round((unitSave * qty + ship) * 100) / 100;
           } else if (isSvc && rate > 0) {
-            item.amount = Math.round(rate * qty * 100) / 100;
+            var unitSvc = (typeof cchRoundClientUnitPriceUp5 === 'function' && cchLineShouldRoundClientUnit(item))
+              ? cchRoundClientUnitPriceUp5(rate) : rate;
+            item.clientPrice = unitSvc;
+            item.amount = Math.round(unitSvc * qty * 100) / 100;
           }
         });
       }
@@ -40992,6 +41390,72 @@ async function renderBoardsTab(T, proj) {
       return (t && v) ? (t + '|' + v) : '';
     }
 
+    /** WO-092 Part 1 — display-only catalog identity (vendor+SKU, else vendor+title+price). */
+    function _disNormCatalogToken(s) {
+      return String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    }
+    function _disCatalogIdentityKey(it) {
+      it = it || {};
+      var v = _disNormCatalogToken(it.vendor || it.manufacturer);
+      var sku = _disNormCatalogToken(it.sku || it.itemNumber || it.itemNo || it.partNumber || it.partNo);
+      var title = _disNormCatalogToken(it.title || it.name);
+      if (sku) return (v || '_') + '|sku:' + sku;
+      if (!title) return '';
+      var price = parseFloat(it.clientPrice != null ? it.clientPrice : (it.sellPrice != null ? it.sellPrice : (it.unitPrice != null ? it.unitPrice : it.price))) || 0;
+      return (v || '_') + '|title:' + title + '|p:' + (Math.round(price * 100) / 100);
+    }
+    function _disCatalogKeepScore(it) {
+      it = it || {};
+      var img = !!(it.imageUrl || it.image || (Array.isArray(it.images) && it.images[0]) || (it.gallery && it.gallery[0]));
+      var sell = parseFloat(it.clientPrice != null ? it.clientPrice : (it.sellPrice != null ? it.sellPrice : (it.unitPrice != null ? it.unitPrice : it.price))) || 0;
+      var sku = String(it.sku || it.itemNumber || it.itemNo || it.partNumber || '').trim();
+      var qb = !!(it.qbCategory || it.qbItemId || it.quickbooksCategory || it.category);
+      var ts = 0;
+      try {
+        var u = it.updatedAt || it.createdAt || '';
+        if (u && typeof u.toMillis === 'function') ts = u.toMillis();
+        else if (u && typeof u.seconds === 'number') ts = u.seconds * 1000;
+        else if (u) ts = Date.parse(String(u)) || 0;
+      } catch (_e) { ts = 0; }
+      var collBonus = String(it._catalogColl || '') === 'productLibrary' ? 50 : 0;
+      return (img ? 100000 : 0) + (sell >= 1 ? 10000 : 0) + (sku ? 1000 : 0) + (qb ? 100 : 0) + collBonus + Math.min(Math.floor(ts / 1e7), 99);
+    }
+    /**
+     * WO-092 Part 1 — Add-item Products catalog only. Collapse products/ + productLibrary/
+     * twins that share vendor+SKU (or vendor+title+price) to one row. Display-only; no Firestore writes.
+     * Project selection clips (_source === 'project') pass through unchanged.
+     */
+    function _disCollapseCatalogByVendorSku(items) {
+      var list = items || [];
+      var best = Object.create(null);
+      var order = [];
+      list.forEach(function(it, idx) {
+        if (!it || it._source === 'project') {
+          order.push({ kind: 'pass', idx: idx, it: it });
+          return;
+        }
+        var idk = _disCatalogIdentityKey(it);
+        if (!idk) {
+          order.push({ kind: 'pass', idx: idx, it: it });
+          return;
+        }
+        var score = _disCatalogKeepScore(it);
+        var prev = best[idk];
+        if (!prev) {
+          order.push({ kind: 'cat', idk: idk });
+          best[idk] = { it: it, score: score };
+        } else if (score > prev.score) {
+          best[idk] = { it: it, score: score };
+        }
+      });
+      var out = [];
+      order.forEach(function(slot) {
+        if (slot.kind === 'pass') out.push(slot.it);
+        else if (best[slot.idk]) out.push(best[slot.idk].it);
+      });
+      return out;
+    }
+
     /**
      * Add-item Project selections only. Hide a junk-priced clip when a healthy twin
      * (sell/clientPrice >= $1) shares the same product identity AND (same room, or
@@ -41236,7 +41700,13 @@ async function renderBoardsTab(T, proj) {
           var mkup = (typeof cchProductLineMarkupPct === 'function')
             ? cchProductLineMarkupPct(cost, sell > 0 ? sell : 0, 1, window._docEditProjData, c)
             : cchDeriveMarkupPct(cost, sell > 0 ? sell : 0, 1, fbMk);
-          if (sell <= 0 && cost > 0) sell = Math.round(cost * (1 + mkup / 100) * 100) / 100;
+          if (sell <= 0 && cost > 0) {
+            sell = (typeof cchClientUnitFromCostMarkup === 'function')
+              ? cchClientUnitFromCostMarkup(cost, mkup, c)
+              : Math.round(cost * (1 + mkup / 100) * 100) / 100;
+          } else if (sell > 0 && typeof cchRoundClientUnitPriceUp5 === 'function' && cchLineShouldRoundClientUnit(c)) {
+            sell = cchRoundClientUnitPriceUp5(sell);
+          }
           var pf = _cchPersistedFieldsForKind('product');
           var row = Object.assign({
             title: c.title || 'Untitled',
@@ -41502,14 +41972,14 @@ async function renderBoardsTab(T, proj) {
         }
         var items = [];
         var seen = new Set();
-        function ingestLibDoc(d, tag) {
+        function ingestLibDoc(d, tag, colName) {
           var p = d.data();
           if (!p || !p.title) return;
           // Dedupe products/ + productLibrary/ by doc id (tag only for clips).
           var k = (tag === 'l' || tag === 'g') ? ('lib:' + d.id) : (tag + ':' + d.id);
           if (seen.has(k)) return;
           seen.add(k);
-          items.push(Object.assign({ id: d.id, _source: 'library' }, p));
+          items.push(Object.assign({ id: d.id, _source: 'library', _catalogColl: colName || '' }, p));
         }
         async function ingestCatalogCollection(colName, tag, cap) {
           cap = cap || 6000;
@@ -41517,7 +41987,7 @@ async function renderBoardsTab(T, proj) {
           try {
             // Newest-first so just-added rows (Stone West soapstones, etc.) are always in Add item.
             var snapNew = await db.collection(colName).orderBy('updatedAt', 'desc').limit(cap).get();
-            snapNew.forEach(function(d) { ingestLibDoc(d, tag); });
+            snapNew.forEach(function(d) { ingestLibDoc(d, tag, colName); });
             gotOrdered = snapNew.size;
           } catch (_eOrd) {
             console.warn('[Add item] ' + colName + ' orderBy updatedAt failed · falling back', _eOrd && _eOrd.message);
@@ -41526,7 +41996,7 @@ async function renderBoardsTab(T, proj) {
           if (gotOrdered < cap) {
             try {
               var snapAll = await db.collection(colName).limit(cap).get();
-              snapAll.forEach(function(d) { ingestLibDoc(d, tag); });
+              snapAll.forEach(function(d) { ingestLibDoc(d, tag, colName); });
             } catch (_eAll) {
               console.warn('[Add item] ' + colName + ' catalog load failed', _eAll && _eAll.message);
             }
@@ -41552,15 +42022,17 @@ async function renderBoardsTab(T, proj) {
         try {
           if (projName) {
             var libByProj = await db.collection('productLibrary').where('project', '==', projName).limit(400).get();
-            libByProj.forEach(function(d) { ingestLibDoc(d, 'l'); });
+            libByProj.forEach(function(d) { ingestLibDoc(d, 'l', 'productLibrary'); });
           }
           var libByPid = await db.collection('productLibrary').where('projectId', '==', pid).limit(400).get();
-          libByPid.forEach(function(d) { ingestLibDoc(d, 'l'); });
+          libByPid.forEach(function(d) { ingestLibDoc(d, 'l', 'productLibrary'); });
         } catch (eLib) {}
         // Product Library page loads up to 6000; Add item used to stop at 500 by doc-id
         // (~first 10% of ~5k products), so newer Stone West rows never appeared in search.
         await ingestCatalogCollection('productLibrary', 'l', 6000);
         await ingestCatalogCollection('products', 'g', 6000);
+        // WO-092 Part 1 — collapse vendor+SKU / vendor+title+price twins across both collections (display only).
+        items = (typeof _disCollapseCatalogByVendorSku === 'function') ? _disCollapseCatalogByVendorSku(items) : items;
         items.sort(function(a, b) {
           if (a._source === 'project' && b._source !== 'project') return -1;
           if (b._source === 'project' && a._source !== 'project') return 1;
@@ -41981,7 +42453,13 @@ async function renderBoardsTab(T, proj) {
       var mkup = (typeof cchProductLineMarkupPct === 'function')
         ? cchProductLineMarkupPct(cost, sell > 0 ? sell : 0, 1, window._docEditProjData, item)
         : cchDeriveMarkupPct(cost, sell > 0 ? sell : 0, 1, fbMk);
-      if (sell <= 0 && cost > 0) sell = Math.round(cost * (1 + mkup / 100) * 100) / 100;
+      if (sell <= 0 && cost > 0) {
+        sell = (typeof cchClientUnitFromCostMarkup === 'function')
+          ? cchClientUnitFromCostMarkup(cost, mkup, { expenseType: 'product' })
+          : Math.round(cost * (1 + mkup / 100) * 100) / 100;
+      } else if (sell > 0 && typeof cchRoundClientUnitPriceUp5 === 'function') {
+        sell = cchRoundClientUnitPriceUp5(sell);
+      }
       var pf = _cchPersistedFieldsForKind('product');
       var _railB = window._libraryRailTarget;
       var rowRoom = (_railB && _railB.roomPrefill)
@@ -42031,7 +42509,14 @@ async function renderBoardsTab(T, proj) {
       var mkup = (typeof cchProductLineMarkupPct === 'function')
         ? cchProductLineMarkupPct(cost, sell > 0 ? sell : 0, 1, window._docEditProjData, item)
         : cchDeriveMarkupPct(cost, sell > 0 ? sell : 0, 1, fbMk);
-      if (sell <= 0 && cost > 0) sell = Math.round(cost * (1 + mkup / 100) * 100) / 100;
+      if (sell <= 0 && cost > 0) {
+        sell = (typeof cchClientUnitFromCostMarkup === 'function')
+          ? cchClientUnitFromCostMarkup(cost, mkup, item)
+          : Math.round(cost * (1 + mkup / 100) * 100) / 100;
+      } else if (sell > 0 && cost > 0 && typeof cchRoundClientUnitPriceUp5 === 'function' && cchLineShouldRoundClientUnit(item)) {
+        // Library may carry unrounded clientPrice — ceil unit for new proposal/invoice lines.
+        sell = cchRoundClientUnitPriceUp5(sell);
+      }
       var cls = _cchSidebarClassifyItem(item);
       var kindForPersist;
       var expensePreset = null;
@@ -42237,7 +42722,13 @@ async function renderBoardsTab(T, proj) {
             var cost = parseFloat(p.costPrice) || parseFloat(p.cost) || parseFloat(p.unitCost) || 0;
             var sell = parseFloat(p.sellPrice) || parseFloat(p.clientPrice) || parseFloat(p.totalSell) || 0;
             var mkup = cchProductLineMarkupPct(cost, sell > 0 ? sell : 0, 1, window._docEditProjData, p);
-            if (sell <= 0 && cost > 0) sell = Math.round(cost * (1 + mkup / 100) * 100) / 100;
+            if (sell <= 0 && cost > 0) {
+              sell = (typeof cchClientUnitFromCostMarkup === 'function')
+                ? cchClientUnitFromCostMarkup(cost, mkup, p)
+                : Math.round(cost * (1 + mkup / 100) * 100) / 100;
+            } else if (sell > 0 && typeof cchRoundClientUnitPriceUp5 === 'function' && cchLineShouldRoundClientUnit(p)) {
+              sell = cchRoundClientUnitPriceUp5(sell);
+            }
             var _imgPackLib = cchProposalLineImagesFromSource(p);
             var _rowD = {
               title: p.title || '', vendor: p.vendor || '', category: p.category || '',
@@ -45794,7 +46285,13 @@ async function renderBoardsTab(T, proj) {
         await window.renderInvoiceManageLanding(projectId, invoiceId, docData, items, projData);
       } else {
         cchClearDocEditSession();
-        renderDocViewPage('invoice', projectId, invoiceId, docData, items, projData);
+        var _isDsClient = typeof window.cchInvoiceUsesDesignServicesLayout === 'function' &&
+          window.cchInvoiceUsesDesignServicesLayout(docData, items);
+        if (_isDsClient && typeof window.renderInvoiceDesignServicesClientView === 'function') {
+          await window.renderInvoiceDesignServicesClientView(projectId, invoiceId, docData, items, projData);
+        } else {
+          renderDocViewPage('invoice', projectId, invoiceId, docData, items, projData);
+        }
       }
       } catch (eInv) {
         console.error('[renderInvoiceDetail]', eInv);
@@ -67469,9 +67966,9 @@ async function renderBoardsTab(T, proj) {
     // ==================== SETTINGS PAGE ====================
     // -- Timely OAuth Integration --
     var TIMELY_CLIENT_ID = 'X0t2mXABI8R81qN8PDzX1iSAfMybb6cdpzfUT1Z1Otc';
-    var TIMELY_REDIRECT = 'https://cch-platform.web.app';
-    var TIMELY_AUTH_FN = 'https://us-central1-cch-design-boards.cloudfunctions.net/timelyAuth';
-    var TIMELY_SYNC_FN = 'https://us-central1-cch-design-boards.cloudfunctions.net/timelySyncEntries';
+    var TIMELY_REDIRECT = cchStudioAppOrigin();
+    var TIMELY_AUTH_FN = cchCloudFunctionsBase() + '/timelyAuth';
+    var TIMELY_SYNC_FN = cchCloudFunctionsBase() + '/timelySyncEntries';
 
     function connectTimely() {
       // Open Timely OAuth in a popup
@@ -67487,7 +67984,7 @@ async function renderBoardsTab(T, proj) {
     (function checkTimelyCallback() {
       var params = new URLSearchParams(window.location.search);
       var code = params.get('code');
-      if (code && window.location.href.includes('cch-platform.web.app')) {
+      if (code && /^cch-platform(-staging)?\.web\.app$/i.test(location.hostname || '')) {
         // Remove code from URL
         window.history.replaceState({}, '', window.location.pathname + window.location.hash);
         // Exchange code for token via Cloud Function
@@ -67495,7 +67992,7 @@ async function renderBoardsTab(T, proj) {
         fetch(TIMELY_AUTH_FN, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: code })
+          body: JSON.stringify({ code: code, redirectUri: TIMELY_REDIRECT })
         }).then(function(r) { return r.json(); })
         .then(function(data) {
           if (data.error) {
@@ -72856,7 +73353,8 @@ async function renderBoardsTab(T, proj) {
         '.cp-sb-item.active { font-weight:500; color:#0A1F3D; background:#FAFAFA; border-left-color:#0A1F3D; }' +
         '.cp-sb-icon { font-size:14px; opacity:0.55; width:20px; text-align:center; flex-shrink:0; }' +
         '.cp-sb-item.active .cp-sb-icon { opacity:1; }' +
-        '.cp-sb-badge { margin-left:auto; background:#0A1F3D; color:#fff; font-size:9px; font-weight:500; padding:2px 6px; min-width:16px; text-align:center; }' +
+        '.cp-sb-badge { margin-left:auto; background:#0A1F3D !important; color:#FFFFFF !important; font-size:9px; font-weight:500; padding:2px 6px; min-width:16px; text-align:center; }' +
+        '.cp-count-badge { background:#0A1F3D !important; color:#FFFFFF !important; font-size:11px; font-weight:500; padding:3px 10px; min-width:16px; text-align:center; display:inline-block; }' +
         '.cp-sb-foot { padding:20px 24px; border-top:1px solid #E2E2E2; font-size:11px; color:#9CA3AF; line-height:1.4; }' +
         '.cp-main-stack { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; background:#FFFFFF !important; }' +
         '.cp-top-header { background:#0A1F3D; padding:10px 24px; min-height:64px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; gap:16px; }' +
@@ -73605,9 +74103,12 @@ async function renderBoardsTab(T, proj) {
         }
       } else if (activePage === 'inspirations') {
         html += '<div class="cp-sec-label-jx" style="margin-bottom:20px;">Inspirations</div>' +
-          '<p style="font-size:12px;color:#6B7280;font-family:\'DM Sans\',sans-serif;line-height:1.55;margin:-8px 0 18px;max-width:720px;">Open a board, then an image to view it large. When signed in, use the star to save favorites and add comments for your designer. <strong>Design Boards</strong> in the portal are layout presentations only — starring happens here under <strong>Inspirations</strong>.</p>';
+          '<p style="font-size:13px;color:#0A1F3D;font-family:\'DM Sans\',sans-serif;line-height:1.55;margin:-8px 0 10px;max-width:720px;">If you have images to share, you can upload them to your own <strong>Client Ideas</strong> board. Use a photo from your device, or paste an image link from the web.</p>' +
+          '<p style="font-size:12px;color:#6B7280;font-family:\'DM Sans\',sans-serif;line-height:1.55;margin:0 0 18px;max-width:720px;">Open any board to view images larger, star favorites, and leave comments for your designer. Starring lives here under Inspirations (layout presentations are under Design Boards).</p>' +
+          '<div style="margin:0 0 22px;"><button type="button" class="cp-btn cp-btn-primary" style="padding:12px 20px;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;" onclick="typeof cchClientIdeasOpenShare===\'function\'&&cchClientIdeasOpenShare(\'' + escJsStr(projectId) + '\')">Share an idea</button>' +
+          '<div style="font-size:11px;color:#9CA3AF;margin-top:8px;font-family:\'DM Sans\',sans-serif;">Upload a photo or paste an image URL. Ideas stay on Client Ideas, separate from boards your designer curated.</div></div>';
         if (!inspirationIdeabooks.length) {
-          html += '<div style="font-size:13px;color:#6B7280;font-family:\'DM Sans\',sans-serif;">No inspiration boards shared yet.</div>';
+          html += '<div style="font-size:13px;color:#6B7280;font-family:\'DM Sans\',sans-serif;">No inspiration boards shared yet. You can still share an idea above.</div>';
         } else {
           html += '<div style="text-align:center;padding:24px 0 12px;"><div style="font-family:\'Playfair Display\',serif;font-size:28px;font-weight:400;color:#0A1F3D;letter-spacing:0.08em;text-transform:uppercase;">CCH Design</div></div>' +
             '<div style="text-align:center;padding:16px 0;border-top:1px solid #E2E2E2;border-bottom:1px solid #E2E2E2;margin-bottom:20px;"><span style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#6B7280;font-family:\'DM Sans\',sans-serif;">Inspirations</span></div>' +
@@ -73617,13 +74118,14 @@ async function renderBoardsTab(T, proj) {
               var iu = cpIdeabookCoverUrl(ib);
               var tit = ib.name || ib.title || 'Board';
               var _ic = cpIdeabookItemCount(ib);
+              var _isCi = String(ib.id || '') === 'client-ideas' || String(ib.boardKind || '').toLowerCase() === 'clientideas';
               var _inspCardHash = '#/clientview/' + projectId + '/inspirations/' + ib.id;
               html += '<div class="cp-board-list-item" style="cursor:pointer;" role="link" tabindex="0" onclick=' + cpPortalNavigateOnclickAttr(_inspCardHash) + '>' +
                 '<div class="cp-inspiration-card">' +
                 (iu ? '<img class="cp-inspiration-cover-img" src="' + _escImgSrcAttr(iu) + '" alt="" referrerpolicy="no-referrer" style="filter:grayscale(30%);" onerror="this.style.opacity=\'0\';this.style.visibility=\'hidden\';var fb=this.parentNode&&this.parentNode.querySelector(\'.cp-inspiration-cover-fallback\');if(fb){fb.style.display=\'flex\';}">' : '') +
                 '<div class="cp-inspiration-cover-fallback" style="display:' + (iu ? 'none' : 'flex') + ';filter:grayscale(30%);">\u273F</div>' +
                 '</div>' +
-                '<div class="cp-board-list-title">' + esc(tit) + '</div>' +
+                '<div class="cp-board-list-title">' + esc(tit) + (_isCi ? ' <span style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#C4A464;font-weight:600;">From you</span>' : '') + '</div>' +
                 '<div class="cp-board-list-count">' + _ic + ' item' + (_ic !== 1 ? 's' : '') + '</div></div>';
             } catch (eIb) {
               console.error('[renderClientPortal] inspiration card skipped:', (ib && ib.id) || ib, eIb);
@@ -74029,7 +74531,7 @@ async function renderBoardsTab(T, proj) {
         html += '<div style="border:1px solid #E2E2E2;padding:24px 28px;min-width:0;overflow:hidden;">' +
           '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">' +
           '<div style="font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:#0A1F3D;">Decisions Needed</div>' +
-          '<span style="background:#0A1F3D;color:#fff;font-size:11px;font-weight:500;padding:3px 10px;">' + _decisionsNeededCount + '</span></div>';
+          '<span class="cp-count-badge">' + _decisionsNeededCount + '</span></div>';
         if (_cpOpenDecisionItems.length) {
           _cpOpenDecisionItems.slice(0, 2).forEach(function(it, di) {
             html += typeof cpPortalHomeDecisionRowHtml === 'function'
@@ -74047,7 +74549,7 @@ async function renderBoardsTab(T, proj) {
         html += '<div style="border:1px solid #E2E2E2;padding:24px 28px;min-width:0;overflow:hidden;">' +
           '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">' +
           '<div style="font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:#0A1F3D;">Shared Documents</div>' +
-          '<span style="background:#0A1F3D;color:#fff;font-size:11px;font-weight:500;padding:3px 10px;">' + _recentSharedDocs.length + '</span></div>';
+          '<span class="cp-count-badge">' + _recentSharedDocs.length + '</span></div>';
         if (_recentSharedDocs.length) {
           _recentSharedDocs.slice(0, 2).forEach(function(d, di) {
             html += typeof cpPortalHomeDocRowHtml === 'function'
@@ -74069,7 +74571,7 @@ async function renderBoardsTab(T, proj) {
         html += '<div style="border:1px solid #E2E2E2;padding:24px 28px;">' +
           '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">' +
           '<div style="font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:#0A1F3D;">Open Invoices</div>' +
-          '<span style="background:#0A1F3D;color:#fff;font-size:11px;font-weight:500;padding:3px 10px;">' + _openInvoices.length + '</span></div>';
+          '<span class="cp-count-badge">' + _openInvoices.length + '</span></div>';
         if (_openInvoices.length) {
           _openInvoices.slice(0, 8).forEach(function(inv, ii) {
             var invTotal = parseFloat(inv.total || inv.amount) || 0;
@@ -74278,14 +74780,27 @@ async function renderBoardsTab(T, proj) {
         }
       }
       T.innerHTML = html;
-      // Client Pepper — docked in navy header; show for clients and staff Preview so placement is visible
+      // WO-089 + WO-104: client Pepper — live open-counts from same sources as portal badges
       if (typeof window.cchClientPepperMount === 'function') {
         var _pepperIdent = (typeof cpPortalEffectiveClientIdentity === 'function' ? (cpPortalEffectiveClientIdentity() || {}) : {});
+        var _pepperSnap = typeof window.cpPortalBuildPepperOpenSnapshot === 'function'
+          ? window.cpPortalBuildPepperOpenSnapshot({
+              proposals: proposals,
+              invoices: invoices,
+              clientDecisions: clientDecisions,
+              tasks: tasks,
+              whatsNewItems: whatsNewItems
+            })
+          : { openCounts: { decisions: _decisionsNeededCount, proposals: proposals.filter(function(p) { return typeof proposalNeedsClientReview === 'function' && proposalNeedsClientReview(p); }).length, invoices: _openInvoices.length, loadError: false }, proposalNudges: [], whatsNew: null };
         window.cchClientPepperMount({
           projectId: projectId,
           projectName: String((proj && (proj.name || proj.projectName)) || projName || projectId),
           clientName: String(_pepperIdent.name || _pepperIdent.clientName || (isOwner ? 'Studio Preview' : 'Client')),
-          clientEmail: String(_pepperIdent.email || '')
+          clientEmail: String(_pepperIdent.email || ''),
+          baseHash: '#/clientview/' + projectId,
+          openCounts: _pepperSnap.openCounts,
+          proposalNudges: _pepperSnap.proposalNudges,
+          whatsNew: _pepperSnap.whatsNew
         });
       }
       if (typeof cpPortalPaintPdfThumbs === 'function') void cpPortalPaintPdfThumbs(T);
@@ -75844,12 +76359,16 @@ async function renderBoardsTab(T, proj) {
       } else if (studioFid || clientRowId) {
         actions += '<button type="button" class="cp-btn cp-btn-primary" style="padding:6px 10px;font-size:11px;width:100%;" onclick=' + cpPortalOnclickAttr('void window.cpPortalOpenResolvedDoc(' + JSON.stringify(projectId) + ',' + JSON.stringify(studioFid) + ',' + JSON.stringify(clientRowId) + ')') + '>Open</button>';
       }
-      if (typeof isCCHStudioStaffSession === 'function' && isCCHStudioStaffSession() && !_cpIsStudioFileRow) {
+      if (typeof isCCHStudioStaffSession === 'function' && isCCHStudioStaffSession()) {
         actions += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;padding-top:8px;border-top:1px dashed #E2E2E2;">' +
-          '<span style="font-size:10px;color:#9CA3AF;align-self:center;">Admin</span>' +
-          '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;flex:1;" onclick=' + cpPortalOnclickAttr('void cpAdminOpenShareDocumentModal(' + JSON.stringify(projectId) + ',' + JSON.stringify(d.id) + ')') + '>Edit</button>' +
-          '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;flex:1;color:#B45309;border-color:#FCD9BD;" onclick=' + cpPortalOnclickAttr('void cpAdminDeleteClientDocument(' + JSON.stringify(projectId) + ',' + JSON.stringify(d.id) + ')') + '>Delete</button>' +
-          '</div>';
+          '<span style="font-size:10px;color:#9CA3AF;align-self:center;">CCH</span>';
+        if (_cpIsStudioFileRow && studioFid) {
+          actions += '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;flex:1;color:#B45309;border-color:#FCD9BD;" onclick=' + cpPortalOnclickAttr('void cpAdminRemoveDocFromClientPortal(' + JSON.stringify(projectId) + ',' + JSON.stringify('studioFile') + ',' + JSON.stringify(studioFid) + ')') + '>Remove from portal</button>';
+        } else if (clientRowId) {
+          actions += '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;flex:1;" onclick=' + cpPortalOnclickAttr('void cpAdminOpenShareDocumentModal(' + JSON.stringify(projectId) + ',' + JSON.stringify(d.id) + ')') + '>Edit</button>' +
+            '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;flex:1;color:#B45309;border-color:#FCD9BD;" onclick=' + cpPortalOnclickAttr('void cpAdminRemoveDocFromClientPortal(' + JSON.stringify(projectId) + ',' + JSON.stringify('clientDoc') + ',' + JSON.stringify(d.id) + ')') + '>Delete</button>';
+        }
+        actions += '</div>';
       }
       return '<div class="cp-doc-card">' +
         '<div class="cp-doc-card-thumb">' + (typeof cpPortalDocThumbHtml === 'function' ? cpPortalDocThumbHtml(d, { layout: 'card', projectId: projectId }) : '') + '</div>' +
@@ -76007,7 +76526,7 @@ async function renderBoardsTab(T, proj) {
         '</div>';
       if (kind === 'decision' && typeof isCCHStudioStaffSession === 'function' && isCCHStudioStaffSession()) {
         html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #E2E2E2;">' +
-          '<span style="font-size:10px;color:#9CA3AF;align-self:center;">Admin</span>' +
+          '<span style="font-size:10px;color:#9CA3AF;align-self:center;">CCH</span>' +
           '<textarea id="cp-staff-suggest-decision-' + escAttr(id) + '" rows="2" placeholder="Suggestion for client (saved with date)" style="width:100%;padding:5px 7px;border:1px solid #E2E2E2;font-size:10px;font-family:inherit;resize:vertical;box-sizing:border-box;"></textarea>' +
           '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:#5C6B80;width:100%;"><input id="cp-staff-suggest-email-' + escAttr(id) + '" type="checkbox" checked> Email client (opens mail draft)</label>' +
           '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;" onclick=' + cpPortalOnclickAttr('void cpAdminSuggestClientDecision(' + JSON.stringify(projectId) + ',' + JSON.stringify(id) + ',' + JSON.stringify('home') + ')') + '>Post suggestion</button>' +
@@ -76042,12 +76561,16 @@ async function renderBoardsTab(T, proj) {
           '<div style="font-size:13px;font-weight:600;color:#0A1F3D;overflow:hidden;text-overflow:ellipsis;">' + esc(typeof cpPortalDocDisplayFileName === 'function' ? cpPortalDocDisplayFileName(d) : (d.title || d.docNumber || 'Document')) + '</div>' +
           '<div style="font-size:10px;color:#9CA3AF;margin-top:2px;">' + esc(cpClientDocNormalizedFolder(d)) + '</div>' +
         '</div>' + openBtn + '</div>';
-      if (typeof isCCHStudioStaffSession === 'function' && isCCHStudioStaffSession() && cid.indexOf('studiofile:') !== 0) {
+      if (typeof isCCHStudioStaffSession === 'function' && isCCHStudioStaffSession()) {
         html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #E2E2E2;">' +
-          '<span style="font-size:10px;color:#9CA3AF;align-self:center;">Admin</span>' +
-          '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;" onclick=' + cpPortalOnclickAttr('void cpAdminOpenShareDocumentModal(' + JSON.stringify(projectId) + ',' + JSON.stringify(cid) + ')') + '>Edit</button>' +
-          '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;color:#B45309;border-color:#FCD9BD;" onclick=' + cpPortalOnclickAttr('void cpAdminDeleteClientDocument(' + JSON.stringify(projectId) + ',' + JSON.stringify(cid) + ')') + '>Delete</button>' +
-          '</div>';
+          '<span style="font-size:10px;color:#9CA3AF;align-self:center;">CCH</span>';
+        if (cid.indexOf('studiofile:') === 0 && studioFid) {
+          html += '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;color:#B45309;border-color:#FCD9BD;" onclick=' + cpPortalOnclickAttr('void cpAdminRemoveDocFromClientPortal(' + JSON.stringify(projectId) + ',' + JSON.stringify('studioFile') + ',' + JSON.stringify(studioFid) + ')') + '>Remove from portal</button>';
+        } else if (cid) {
+          html += '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;" onclick=' + cpPortalOnclickAttr('void cpAdminOpenShareDocumentModal(' + JSON.stringify(projectId) + ',' + JSON.stringify(cid) + ')') + '>Edit</button>' +
+            '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;color:#B45309;border-color:#FCD9BD;" onclick=' + cpPortalOnclickAttr('void cpAdminRemoveDocFromClientPortal(' + JSON.stringify(projectId) + ',' + JSON.stringify('clientDoc') + ',' + JSON.stringify(cid) + ')') + '>Delete</button>';
+        }
+        html += '</div>';
       }
       html += '</div>';
       return html;
@@ -76161,7 +76684,7 @@ async function renderBoardsTab(T, proj) {
       entries.forEach(function(e, ei) {
         var label = cpPortalDecisionHistoryLabel(e);
         var when = e.at ? formatDate(String(e.at).slice(0, 10)) : '';
-        var who = String(e.byName || '').trim();
+        var who = typeof cpPortalDecisionDisplayWho === 'function' ? cpPortalDecisionDisplayWho(e) : String(e.byName || '').trim();
         var border = ei < entries.length - 1 ? 'border-bottom:1px solid #EEF0F2;padding-bottom:8px;margin-bottom:8px;' : '';
         html += '<div style="font-size:11px;line-height:1.45;' + border + '">' +
           '<div style="color:#0A1F3D;"><strong>' + esc(label) + '</strong>' +
@@ -76187,6 +76710,91 @@ async function renderBoardsTab(T, proj) {
       });
       return out;
     }
+
+    /**
+     * WO-104 — live snapshot for Client Pepper. Counts MUST match portal badges:
+     * decisions = Decisions Needed badge; proposals = proposalNeedsClientReview;
+     * invoices = Home Open Invoices. Pepper must never invent these.
+     */
+    window.cpPortalBuildPepperOpenSnapshot = function(opts) {
+      opts = opts || {};
+      var proposals = Array.isArray(opts.proposals) ? opts.proposals : [];
+      var invoices = Array.isArray(opts.invoices) ? opts.invoices : [];
+      var clientDecisions = Array.isArray(opts.clientDecisions) ? opts.clientDecisions : [];
+      var tasks = Array.isArray(opts.tasks) ? opts.tasks : [];
+      var whatsNewItems = Array.isArray(opts.whatsNewItems) ? opts.whatsNewItems : [];
+      try {
+        var openDec = clientDecisions.filter(function(d) {
+          return typeof cpPortalDecisionStatusIsOpen === 'function' && cpPortalDecisionStatusIsOpen(d.status);
+        });
+        var needsInput = tasks.filter(function(t) {
+          return String(t.clientFlag || '') === 'needs_input' && !t.clientResponse;
+        });
+        var decisions = openDec.length + needsInput.length;
+        var awaiting = proposals.filter(function(p) {
+          return typeof proposalNeedsClientReview === 'function' && proposalNeedsClientReview(p);
+        });
+        var openInv = invoices.filter(function(inv) {
+          return inv.status === 'Sent' || inv.status === 'Unpaid' || inv.status === 'Due' || inv.status === 'Overdue' || inv.status === 'Partial';
+        });
+        var nudges = [];
+        awaiting.slice(0, 3).forEach(function(p) {
+          var visible = [];
+          var hg = null;
+          (p.items || []).forEach(function(it) {
+            if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it)) {
+              hg = it.hideFromClient ? it.groupId : null;
+              return;
+            }
+            if (hg && it.groupId === hg) return;
+            hg = null;
+            visible.push(it);
+          });
+          var appr = 0, decl = 0, pend = 0;
+          visible.forEach(function(it) {
+            var s = typeof getProposalLineApprovalStatus === 'function' ? getProposalLineApprovalStatus(it) : 'pending';
+            if (s === 'approved') appr++;
+            else if (s === 'declined') decl++;
+            else pend++;
+          });
+          var readyForFinal = visible.length > 0 && pend === 0 && appr >= 1 && !p.clientApprovedTotalAt && p.status !== 'Invoiced';
+          nudges.push({
+            id: p.id,
+            num: p.proposalNum || p.name || 'Proposal',
+            approved: appr,
+            declined: decl,
+            pending: pend,
+            readyForFinal: !!readyForFinal
+          });
+        });
+        var wn = null;
+        for (var wi = 0; wi < whatsNewItems.length; wi++) {
+          var w = whatsNewItems[wi];
+          if (!w) continue;
+          var wText = String(w.text || w.body || '').trim();
+          if (!wText) continue;
+          wn = {
+            id: String(w.id || ('wn' + wi)),
+            title: String(w.title || 'What\'s New').trim(),
+            text: wText.slice(0, 160),
+            speakText: wText.slice(0, 120)
+          };
+          break;
+        }
+        return {
+          openCounts: { decisions: decisions, proposals: awaiting.length, invoices: openInv.length, loadError: false },
+          proposalNudges: nudges,
+          whatsNew: wn
+        };
+      } catch (e) {
+        console.warn('[cpPortalBuildPepperOpenSnapshot]', e);
+        return {
+          openCounts: { decisions: 0, proposals: 0, invoices: 0, loadError: true },
+          proposalNudges: [],
+          whatsNew: null
+        };
+      }
+    };
 
     function cpPortalCollectOpenDecisionItems(clientDecisions, tasks) {
       var items = [];
@@ -76355,7 +76963,7 @@ async function renderBoardsTab(T, proj) {
       }
       if (kind === 'decision' && typeof isCCHStudioStaffSession === 'function' && isCCHStudioStaffSession()) {
         actions += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #E2E2E2;">' +
-          '<span style="font-size:10px;color:#9CA3AF;align-self:center;">Admin</span>' +
+          '<span style="font-size:10px;color:#9CA3AF;align-self:center;">CCH</span>' +
           '<textarea id="cp-staff-suggest-decision-' + escAttr(id) + '" rows="2" placeholder="Suggestion for client (saved with date)" style="width:100%;padding:5px 7px;border:1px solid #E2E2E2;font-size:10px;font-family:inherit;resize:vertical;box-sizing:border-box;"></textarea>' +
           '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:#5C6B80;width:100%;"><input id="cp-staff-suggest-email-' + escAttr(id) + '" type="checkbox" checked> Email client (opens mail draft)</label>' +
           '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;flex:1;" onclick=' + cpPortalOnclickAttr('void cpAdminSuggestClientDecision(' + JSON.stringify(projectId) + ',' + JSON.stringify(id) + ')') + '>Post suggestion</button>';
@@ -76518,11 +77126,19 @@ async function renderBoardsTab(T, proj) {
       }
     };
 
+    /** Client-facing staff attribution on decisions — always "CCH", never Admin / email. */
     function cpPortalStaffActorName() {
-      if (typeof currentUser !== 'undefined' && currentUser) {
-        return String(currentUser.displayName || currentUser.email || 'Studio').trim() || 'Studio';
-      }
-      return 'Studio';
+      return 'CCH';
+    }
+
+    function cpPortalDecisionDisplayWho(entry) {
+      entry = entry || {};
+      var role = String(entry.byRole || '').toLowerCase();
+      var who = String(entry.byName || entry.respondedByName || '').trim();
+      if (role === 'staff' || role === 'studio' || role === 'designer') return 'CCH';
+      if (/^admin$/i.test(who) || /^studio$/i.test(who)) return 'CCH';
+      if (who.indexOf('@') >= 0 && /cchdesign\.com$/i.test(who.split('@')[1] || '')) return 'CCH';
+      return who;
     }
 
     window.cpAdminSuggestClientDecision = async function(projectId, decisionId, returnPage) {
@@ -77508,22 +78124,71 @@ async function renderBoardsTab(T, proj) {
     }
     window.cpAdminSaveSharedDocument = cpAdminSaveSharedDocument;
 
-    async function cpAdminDeleteClientDocument(projectId, docId) {
+    function cpPortalStaffRerenderAfterDocChange(projectId) {
+      var hash = String(window.location.hash || '');
+      var page = 'documents';
+      if (hash.indexOf('/clientview/') >= 0) {
+        if (/\/documents(?:\/|$|\?)/.test(hash)) page = 'documents';
+        else if (/\/home(?:\/|$|\?)/.test(hash) || /#\/clientview\/[^/]+\/?$/.test(hash)) page = 'home';
+        else page = 'home';
+      }
+      if (hash.indexOf('/clientview/' + projectId) >= 0 && typeof renderClientPortal === 'function') {
+        return renderClientPortal(projectId, null, page);
+      }
+      if (typeof renderProjectDetail === 'function') renderProjectDetail();
+      return Promise.resolve();
+    }
+
+    /** Remove from client portal: delete +Share doc, or hide Studio file from portal (keeps Files copy). */
+    async function cpAdminRemoveDocFromClientPortal(projectId, kindLabel, docId) {
       projectId = String(projectId || '').trim();
       docId = String(docId || '').trim();
+      var isStudio = String(kindLabel || '').toLowerCase() === 'studiofile';
       if (!projectId || !docId) return;
-      if (!(await cchConfirm('Delete this shared document? The client will no longer see it.', 'Delete Document', { confirmText: 'Delete', danger: true }))) return;
+      var ok = await cchConfirm(
+        isStudio
+          ? 'Remove this file from the client portal? It stays in Studio Files (hidden from the client).'
+          : 'Delete this shared document? The client will no longer see it.',
+        isStudio ? 'Remove from portal' : 'Delete Document',
+        { confirmText: isStudio ? 'Remove' : 'Delete', danger: true }
+      );
+      if (!ok) return;
       try {
-        await db.collection('boards').doc(projectId).collection('clientDocuments').doc(docId).delete();
-        showToast('Document deleted');
-        if (String(window.location.hash || '').indexOf('/clientview/' + projectId) >= 0 && typeof renderClientPortal === 'function') {
-          await renderClientPortal(projectId, null, 'documents');
-        } else if (typeof renderProjectDetail === 'function') {
-          renderProjectDetail();
+        if (isStudio) {
+          await db.collection('boards').doc(projectId).collection('files').doc(docId).set({
+            hideFromClient: true,
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+          try {
+            var _bSnap = await db.collection('boards').doc(projectId).get();
+            var _arr = (_bSnap.exists && Array.isArray((_bSnap.data() || {}).clientPortalDesignStory))
+              ? (_bSnap.data().clientPortalDesignStory || []).slice() : [];
+            _arr = _arr.filter(function(r) {
+              if (!r || r.id == null) return true;
+              var rk = String(r.kind || 'clientDoc').toLowerCase();
+              if (rk === 'file') rk = 'studiofile';
+              return !(rk === 'studiofile' && String(r.id) === docId);
+            });
+            await db.collection('boards').doc(projectId).update({
+              clientPortalDesignStory: _arr,
+              updatedAt: new Date().toISOString()
+            });
+          } catch (_eStory) { /* */ }
+          showToast('Removed from client portal');
+        } else {
+          await db.collection('boards').doc(projectId).collection('clientDocuments').doc(docId).delete();
+          showToast('Document deleted');
         }
+        await cpPortalStaffRerenderAfterDocChange(projectId);
       } catch (e) {
-        showToast('Could not delete document', 'error');
+        console.error('cpAdminRemoveDocFromClientPortal', e);
+        showToast('Could not update document: ' + ((e && e.message) || String(e)), 'error');
       }
+    }
+    window.cpAdminRemoveDocFromClientPortal = cpAdminRemoveDocFromClientPortal;
+
+    async function cpAdminDeleteClientDocument(projectId, docId) {
+      return cpAdminRemoveDocFromClientPortal(projectId, 'clientDoc', docId);
     }
     window.cpAdminDeleteClientDocument = cpAdminDeleteClientDocument;
 
@@ -80259,22 +80924,111 @@ async function renderBoardsTab(T, proj) {
     // Fields: type, action, description, projectId, projectName, docId, user, timestamp, meta
 
     let activityCache = [];
-    let activityFilter = { type: '', project: '', dateFrom: '', dateTo: '' };
+    /** source: 'studio' (default) | 'houzz' | '' (all). person: 'cindy' | 'vanessa' | '' (All Team). WO-108. */
+    let activityFilter = { type: '', project: '', dateFrom: '', dateTo: '', source: 'studio', person: null };
     let activityLimit = 50;
+    let _activityPersonDefaulted = false;
+
+    function activitySignedInPersonKey() {
+      var em = '';
+      try { em = String((currentUser && currentUser.email) || (auth && auth.currentUser && auth.currentUser.email) || '').toLowerCase(); } catch (_e) { em = ''; }
+      var nm = '';
+      try { nm = String((typeof currentMemberName === 'function' && currentMemberName()) || '').toLowerCase(); } catch (_e2) { nm = ''; }
+      if (em.indexOf('vanessa') >= 0 || nm.indexOf('vanessa') >= 0 || nm.indexOf('holliday') >= 0) return 'vanessa';
+      if (em.indexOf('cindy') >= 0 || em.indexOf('cynthia') >= 0 || nm.indexOf('cindy') >= 0 || nm.indexOf('cynthia') >= 0 || nm.indexOf('holloway') >= 0) return 'cindy';
+      return 'cindy';
+    }
+
+    function activityEnsurePersonDefault() {
+      if (activityFilter.person === null || activityFilter.person === undefined) {
+        activityFilter.person = activitySignedInPersonKey();
+        _activityPersonDefaulted = true;
+      }
+    }
+
+    function activityPersonTokens(key) {
+      if (key === 'vanessa') {
+        return ['vanessa', 'holliday', 'vholliday', 'vanessa@cchdesign.com', 'vanessaholliday@cchdesign.com', 'vholliday@cchdesign.com'];
+      }
+      if (key === 'cindy') {
+        return ['cindy', 'cynthia', 'holloway', 'cindy@cchdesign.com', 'cynthia@cchdesign.com', 'cynthiacbh@gmail.com'];
+      }
+      return [];
+    }
+
+    function activityIsClientSourced(a) {
+      if (!a) return false;
+      var at = String((a.authorType || (a.meta && a.meta.authorType) || '')).toLowerCase();
+      if (at === 'client') return true;
+      var t = String(a.type || '').toLowerCase();
+      if (t === 'client_portal' || t === 'client_first_visit') return true;
+      if (a.meta && a.meta.clientSafe === true && t.indexOf('client') >= 0) return true;
+      return false;
+    }
+
+    /** Fingerprint match for WO-108 person filter (user / author* / member / createdBy). */
+    function activityMatchesPerson(a, personKey) {
+      if (!personKey) return true;
+      if (activityIsClientSourced(a)) return false;
+      var tokens = activityPersonTokens(personKey);
+      if (!tokens.length) return true;
+      var blob = [
+        a.user, a.authorEmail, a.authorName, a.member, a.createdBy, a.loggedBy,
+        a.meta && a.meta.authorEmail, a.meta && a.meta.authorName, a.meta && a.meta.member, a.meta && a.meta.createdBy
+      ].map(function(x) { return String(x || '').toLowerCase(); }).join(' ');
+      if (!blob.replace(/\s/g, '')) return false;
+      for (var i = 0; i < tokens.length; i++) {
+        if (tokens[i] && blob.indexOf(tokens[i]) >= 0) return true;
+      }
+      return false;
+    }
+
+    /** Heuristic: Houzz-import / legacy 400xxx activity (rebuild often lacks meta.source). */
+    function activityLooksLikeHouzz(a) {
+      if (!a) return false;
+      var src = String(a.source || (a.meta && a.meta.source) || '').toLowerCase();
+      if (src === 'houzz' || src === 'houzz-import' || src === 'houzz_import') return true;
+      if (src === 'studio') return false;
+      if (a.meta && (a.meta.houzzImport === true || String(a.meta.importedFrom || '').toLowerCase() === 'houzz')) return true;
+      var desc = String(a.description || '');
+      if (/\bhouzz\b/i.test(desc)) return true;
+      if (/\b(?:po[-\s]?)?400\d{3,}\b/i.test(desc)) return true;
+      if (/\b(?:in[- ]?)?\d+hz\b/i.test(desc) || /\b\d{4,}hz\b/i.test(desc)) return true;
+      if (typeof window.cchOmIsLegacyHouzzNumber === 'function') {
+        try {
+          if (window.cchOmIsLegacyHouzzNumber({ number: desc })) return true;
+        } catch (_e) { /* */ }
+      }
+      return false;
+    }
+    window.activityLooksLikeHouzz = activityLooksLikeHouzz;
 
     async function logActivity(type, action, description, projectId, projectName, meta) {
       try {
         var _actTs = new Date().toISOString();
+        var _meta = meta || {};
+        var _src = String(_meta.source || '').toLowerCase();
+        if (!_src) {
+          _src = activityLooksLikeHouzz({ description: description, meta: _meta, type: type }) ? 'houzz' : 'studio';
+        }
+        var _em = currentUser ? String(currentUser.email || '').toLowerCase() : '';
+        var _nm = '';
+        try { _nm = String((typeof currentMemberName === 'function' && currentMemberName()) || '').trim(); } catch (_eNm) { _nm = ''; }
+        if (!_nm && _em) _nm = _em.split('@')[0];
         await db.collection('activity').add({
           type: type,
           action: action,
           description: description,
           projectId: projectId || '',
           projectName: projectName || '',
-          user: currentUser ? currentUser.email : 'system',
+          user: _em || 'system',
+          authorEmail: _em || '',
+          authorName: _nm || '',
+          authorType: _em ? 'designer' : 'system',
           timestamp: _actTs,
           createdAt: _actTs,
-          meta: meta || {}
+          source: _src,
+          meta: Object.assign({}, _meta, { source: _meta.source || _src, authorEmail: _meta.authorEmail || _em, authorName: _meta.authorName || _nm })
         });
         // Auto-post to Teams if any webhook is configured
         if (_teamsWebhookUrl !== '' || (_teamsChannels && (_teamsChannels.teamsBugsWebhook || _teamsChannels.teamsInternalWebhook || _teamsChannels.teamsFinancialsWebhook))) {
@@ -80335,18 +81089,26 @@ async function renderBoardsTab(T, proj) {
     }
 
     function getFilteredActivity() {
+      activityEnsurePersonDefault();
       return activityCache.filter(function(a) {
         if (activityFilter.type && a.type !== activityFilter.type) return false;
         if (activityFilter.project && a.projectId !== activityFilter.project) return false;
         if (activityFilter.dateFrom && (a.timestamp || '') < activityFilter.dateFrom) return false;
         if (activityFilter.dateTo && (a.timestamp || '') > activityFilter.dateTo + 'T23:59:59') return false;
+        var src = String(activityFilter.source || '');
+        if (src === 'studio' && activityLooksLikeHouzz(a)) return false;
+        if (src === 'houzz' && !activityLooksLikeHouzz(a)) return false;
+        var personKey = String(activityFilter.person || '');
+        if (personKey && !activityMatchesPerson(a, personKey)) return false;
         return true;
       });
     }
 
     function renderActivityView() {
+      activityEnsurePersonDefault();
       var C = document.getElementById('contentArea');
       var filtered = getFilteredActivity();
+      var personLabel = activityFilter.person === 'vanessa' ? 'Vanessa' : (activityFilter.person === 'cindy' ? 'Cindy' : 'All Team');
 
       // Get unique projects and types for filters
       var allProjects = [];
@@ -80386,27 +81148,48 @@ async function renderBoardsTab(T, proj) {
       C.innerHTML =
         '<div class="page-header">' +
           '<div class="page-title">Activity Feed</div>' +
-          '<div class="page-subtitle">' + filtered.length + ' event' + (filtered.length !== 1 ? 's' : '') + (activityFilter.type || activityFilter.project ? ' (filtered)' : '') + '</div>' +
+          '<div class="page-subtitle">' + filtered.length + ' event' + (filtered.length !== 1 ? 's' : '') +
+            ' · ' + esc(personLabel) +
+            (activityFilter.source === 'studio' ? ' · Studio only' : (activityFilter.source === 'houzz' ? ' · Houzz only' : '')) +
+            (activityFilter.type || activityFilter.project || activityFilter.dateFrom || activityFilter.dateTo ? ' (filtered)' : '') + '</div>' +
         '</div>' +
 
-        // Stats row
+        // Stats row (respect filters)
         '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;">' +
           '<div class="card card-body" style="text-align:center;">' +
-            '<div style="font-size:24px;font-weight:700;color:var(--gold);">' + activityCache.length + '</div>' +
-            '<div style="font-size:11px;color:var(--gray-400);text-transform:uppercase;">Total Events</div>' +
+            '<div style="font-size:24px;font-weight:700;color:var(--gold);">' + filtered.length + '</div>' +
+            '<div style="font-size:11px;color:var(--gray-400);text-transform:uppercase;">Shown Events</div>' +
           '</div>' +
           '<div class="card card-body" style="text-align:center;">' +
-            '<div style="font-size:24px;font-weight:700;color:var(--green);">' + activityCache.filter(function(a){ return (a.timestamp||'').slice(0,10) === todayStr; }).length + '</div>' +
+            '<div style="font-size:24px;font-weight:700;color:var(--green);">' + filtered.filter(function(a){ return (a.timestamp||'').slice(0,10) === todayStr; }).length + '</div>' +
             '<div style="font-size:11px;color:var(--gray-400);text-transform:uppercase;">Today</div>' +
           '</div>' +
           '<div class="card card-body" style="text-align:center;">' +
-            '<div style="font-size:24px;font-weight:700;">' + Object.keys(projMap).length + '</div>' +
+            '<div style="font-size:24px;font-weight:700;">' + (function(){ var m={}; filtered.forEach(function(a){ if(a.projectId)m[a.projectId]=1; }); return Object.keys(m).length; })() + '</div>' +
             '<div style="font-size:11px;color:var(--gray-400);text-transform:uppercase;">Active Projects</div>' +
           '</div>' +
           '<div class="card card-body" style="text-align:center;">' +
-            '<div style="font-size:24px;font-weight:700;">' + activityCache.filter(function(a){ return a.type === 'note'; }).length + '</div>' +
+            '<div style="font-size:24px;font-weight:700;">' + filtered.filter(function(a){ return a.type === 'note'; }).length + '</div>' +
             '<div style="font-size:11px;color:var(--gray-400);text-transform:uppercase;">Notes</div>' +
           '</div>' +
+        '</div>' +
+
+        // WO-108: person filter (default = signed-in)
+        '<div class="af-filters" style="margin-bottom:10px;">' +
+          '<span style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--gray-400);align-self:center;margin-right:4px;">Person</span>' +
+          [{ k: 'cindy', l: 'Cindy' }, { k: 'vanessa', l: 'Vanessa' }, { k: '', l: 'All Team' }].map(function(opt) {
+            var isActive = String(activityFilter.person || '') === opt.k;
+            return '<button type="button" class="af-filter-btn' + (isActive ? ' active' : '') + '" onclick="activityFilter.person=\'' + opt.k + '\';renderActivityView()">' + opt.l + '</button>';
+          }).join('') +
+        '</div>' +
+
+        // Source: Studio (default) vs Houzz vs All
+        '<div class="af-filters" style="margin-bottom:10px;">' +
+          '<span style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--gray-400);align-self:center;margin-right:4px;">Source</span>' +
+          [{ k: 'studio', l: 'Studio' }, { k: 'houzz', l: 'Houzz' }, { k: '', l: 'All sources' }].map(function(opt) {
+            var isActive = String(activityFilter.source || '') === opt.k;
+            return '<button type="button" class="af-filter-btn' + (isActive ? ' active' : '') + '" onclick="activityFilter.source=\'' + opt.k + '\';renderActivityView()">' + opt.l + '</button>';
+          }).join('') +
         '</div>' +
 
         // Type filter pills
@@ -80427,14 +81210,14 @@ async function renderBoardsTab(T, proj) {
           '</select>' +
           '<input type="date" class="form-input" style="width:150px;" value="' + (activityFilter.dateFrom || '') + '" onchange="activityFilter.dateFrom=this.value;renderActivityView()" placeholder="From">' +
           '<input type="date" class="form-input" style="width:150px;" value="' + (activityFilter.dateTo || '') + '" onchange="activityFilter.dateTo=this.value;renderActivityView()" placeholder="To">' +
-          (activityFilter.type || activityFilter.project || activityFilter.dateFrom || activityFilter.dateTo ?
-            '<button class="btn btn-sm" onclick="activityFilter={type:\'\',project:\'\',dateFrom:\'\',dateTo:\'\'};renderActivityView()">Clear Filters</button>' : '') +
+          (activityFilter.type || activityFilter.project || activityFilter.dateFrom || activityFilter.dateTo || activityFilter.source !== 'studio' || activityFilter.person !== activitySignedInPersonKey() ?
+            '<button class="btn btn-sm" onclick="activityFilter={type:\'\',project:\'\',dateFrom:\'\',dateTo:\'\',source:\'studio\',person:activitySignedInPersonKey()};renderActivityView()">Clear Filters</button>' : '') +
         '</div>' +
 
         // Timeline
         '<div class="af-timeline" id="activityTimeline">' +
           (filtered.length === 0 ?
-            '<div class="empty-state" style="padding:40px;text-align:center;"><div class="empty-icon">◇</div><div class="empty-text">No activity yet</div><div style="font-size:13px;color:var(--gray-400);margin-top:8px;">Activity will appear here as you work on projects.</div><button class="btn btn-primary btn-sm" onclick="rebuildActivityFeed()" style="margin-top:16px;">🔄 Rebuild from Existing Data</button></div>' :
+            '<div class="empty-state" style="padding:40px;text-align:center;"><div class="empty-icon">◇</div><div class="empty-text">No activity for ' + esc(personLabel) + '</div><div style="font-size:13px;color:var(--gray-400);margin-top:8px;max-width:420px;margin-left:auto;margin-right:auto;line-height:1.45;">Try <strong>All Team</strong>, widen dates, or note that older rebuilt events often say <code>system</code> (capture gap — WO-085). New work is stamped to you going forward.</div><button class="btn btn-primary btn-sm" onclick="activityFilter.person=\'\';renderActivityView()" style="margin-top:16px;">Show All Team</button></div>' :
             dayKeys.map(function(day) {
               return '<div class="af-day-header">' + dayLabel(day) + '</div>' +
                 byDay[day].map(function(a) { return renderActivityItem(a); }).join('');
@@ -80508,17 +81291,38 @@ async function renderBoardsTab(T, proj) {
           // Proposals
           try {
             var props = await db.collection('boards').doc(pid).collection('proposals').get();
-            for (var p of props.docs) { var d = p.data(); var _tsp = d.createdAt||d.date||new Date().toISOString(); await db.collection('activity').add({ type:'proposal', action:'created', description:(d.name||d.proposalNum||'Proposal')+' · '+projName, projectId:pid, projectName:projName, user:'system', timestamp:_tsp, createdAt:_tsp, meta:{} }); count++; }
+            for (var p of props.docs) {
+              var d = p.data();
+              var _tsp = d.createdAt||d.date||new Date().toISOString();
+              var _prSrc = (String(d.importedFrom || d.source || '').toLowerCase().indexOf('houzz') >= 0) ? 'houzz' : 'studio';
+              await db.collection('activity').add({ type:'proposal', action:'created', description:(d.name||d.proposalNum||'Proposal')+' · '+projName, projectId:pid, projectName:projName, user:'system', timestamp:_tsp, createdAt:_tsp, source:_prSrc, meta:{ source:_prSrc } });
+              count++;
+            }
           } catch(e){}
           // Invoices
           try {
             var invs = await db.collection('boards').doc(pid).collection('invoices').get();
-            for (var i of invs.docs) { var d = i.data(); var _tsi = d.createdAt||d.date||new Date().toISOString(); await db.collection('activity').add({ type:'invoice', action:'created', description:(d.invoiceNum||d.name||'Invoice')+' · '+projName+' · '+(d.total?'$'+parseFloat(d.total).toFixed(2):''), projectId:pid, projectName:projName, user:'system', timestamp:_tsi, createdAt:_tsi, meta:{} }); count++; }
+            for (var i of invs.docs) {
+              var d = i.data();
+              var _tsi = d.createdAt||d.date||new Date().toISOString();
+              var _invNum = String(d.invoiceNum || d.name || '');
+              var _invSrc = (String(d.importedFrom || d.source || '').toLowerCase().indexOf('houzz') >= 0 || /\d+hz\b/i.test(_invNum)) ? 'houzz' : 'studio';
+              await db.collection('activity').add({ type:'invoice', action:'created', description:_invNum+' · '+projName+' · '+(d.total?'$'+parseFloat(d.total).toFixed(2):''), projectId:pid, projectName:projName, user:'system', timestamp:_tsi, createdAt:_tsi, source:_invSrc, meta:{ source:_invSrc } });
+              count++;
+            }
           } catch(e){}
           // POs
           try {
             var pos = await db.collection('boards').doc(pid).collection('purchaseOrders').get();
-            for (var o of pos.docs) { var d = o.data(); var _tso = d.createdAt||d.orderDate||d.date||new Date().toISOString(); await db.collection('activity').add({ type:'po', action:'created', description:(d.number||d.num||'PO')+' · '+projName+' · '+(d.vendor||''), projectId:pid, projectName:projName, user:'system', timestamp:_tso, createdAt:_tso, meta:{} }); count++; }
+            for (var o of pos.docs) {
+              var d = o.data();
+              var _tso = d.createdAt||d.orderDate||d.date||new Date().toISOString();
+              var _poHouzz = (typeof window.cchOmIsHouzzSourcePo === 'function' && window.cchOmIsHouzzSourcePo(d)) ||
+                (typeof window.cchOmIsLegacyHouzzNumber === 'function' && window.cchOmIsLegacyHouzzNumber(d));
+              var _poSrc = _poHouzz ? 'houzz' : 'studio';
+              await db.collection('activity').add({ type:'po', action:'created', description:(d.number||d.num||'PO')+' · '+projName+' · '+(d.vendor||''), projectId:pid, projectName:projName, user:'system', timestamp:_tso, createdAt:_tso, source:_poSrc, meta:{ source:_poSrc, houzzImport: !!_poHouzz } });
+              count++;
+            }
           } catch(e){}
         }
         showToast('✅ Rebuilt activity feed · ' + count + ' events created');
@@ -83888,8 +84692,9 @@ ${pages}
   <script src="cch-functions.js?v=20260806wo083"></script>
   <script src="cch-design-board.js?v=20260801db65"></script>
   <script src="cch-client-activity.js?v=20260806ca2"></script>
-  <script src="cch-client-pepper.js?v=20260806cp090"></script>
-  <script src="cch-pepper.js?v=20260806dock1"></script>
+  <script src="cch-client-pepper.js?v=20260809cp104d"></script>
+  <script src="cch-client-ideas.js?v=20260807ci091b"></script>
+  <script src="cch-pepper.js?v=20260810wo105g"></script>
   <script src="cch-project-subpanel.js?v=20260806sp15"></script>
   <script src="cch-followups.js?v=20260726fu9"></script>
   <script src="cch-staff-chat.js?v=20260806sc089"></script>
@@ -83900,7 +84705,7 @@ ${pages}
   <script src="cch-client-board.js?v=1774994684878"></script>
   <script src="cch-line-icons.js?v=20260709wr1"></script>
   <script src="cch-invoice-redesign.js?v=20260803wo067b"></script>
-  <script src="cch-proposals-invoices-fix.js?v=20260802print4"></script>
+  <script src="cch-proposals-invoices-fix.js?v=20260811invfix"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
   <script src="cch-airtable-push.js?v=20260630a"></script>
   <script src="cch-po-bill-variance.js?v=20260731bill4"></script>

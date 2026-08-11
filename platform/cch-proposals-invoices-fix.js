@@ -2435,6 +2435,7 @@
 
   // ============================================================
   // 25. Publish = client dashboard visibility only (do NOT set Sent)
+  // Sent is reserved for Email / Send to Client.
   // ============================================================
   var _origTogglePublished = window.togglePublished;
   /** Client-facing invoice/proposal PDF header — firm address only (no personal name). */
@@ -2447,7 +2448,7 @@
     var st = String((docData && docData.status) || '').trim() || 'Draft';
     if (docData && docData.published) {
       var sl = st.toLowerCase();
-      if (!sl || sl === 'draft') return 'Published';
+      if (!sl || sl === 'draft' || sl === 'unsent') return 'Published';
     }
     return st;
   }
@@ -2462,8 +2463,8 @@
           var patch = { published: true, publishedAt: new Date().toISOString() };
           var st = String(cur.status || '').trim();
           var stL = st.toLowerCase();
-          if (!st || stL === 'draft' || stL === 'unsent') patch.status = 'Sent';
-          else if (stL === 'published') patch.status = 'Sent';
+          /* Publish ≠ email. Only bump Draft/Unsent → Published. Never force Sent. */
+          if (!st || stL === 'draft' || stL === 'unsent') patch.status = 'Published';
           await db.collection('boards').doc(projectId).collection(col).doc(docId).set(patch, { merge: true });
         }
       } catch(e) { console.warn('invoice publish patch failed:', e); }
@@ -2517,10 +2518,57 @@
   // ============================================================
   function cchCloseDocMoreDd() {
     document.querySelectorAll('.cch-doc-more-dd').forEach(function(d) {
-      if (d.style.display === 'block') d.style.display = 'none';
+      d.style.display = 'none';
+      d.style.top = '';
+      d.style.right = '';
+      d.style.left = '';
+      d.style.position = '';
+      d.style.zIndex = '';
+      if (d._cchDdPlaceholder && d._cchDdPlaceholder.parentNode && d.parentNode === document.body) {
+        d._cchDdPlaceholder.parentNode.insertBefore(d, d._cchDdPlaceholder);
+      }
     });
   }
   window.cchCloseDocMoreDd = cchCloseDocMoreDd;
+
+  window.cchToggleDocMoreDd = function(btn) {
+    try { if (typeof event !== 'undefined' && event && event.stopPropagation) event.stopPropagation(); } catch (_e) {}
+    if (!btn) return;
+    var wrap = btn.closest('.cch-doc-more-wrap');
+    if (!wrap) return;
+    var dropdown = wrap.querySelector('.cch-doc-more-dd') || wrap._cchCachedDd;
+    if (!dropdown) return;
+    wrap._cchCachedDd = dropdown;
+    var wasOpen = dropdown.style.display === 'block';
+    cchCloseDocMoreDd();
+    if (wasOpen) return;
+    if (!dropdown._cchDdPlaceholder) {
+      dropdown._cchDdPlaceholder = document.createComment('cch-doc-more-dd');
+      dropdown.parentNode.insertBefore(dropdown._cchDdPlaceholder, dropdown);
+    }
+    document.body.appendChild(dropdown);
+    dropdown.style.display = 'block';
+    dropdown.style.position = 'fixed';
+    var rect = btn.getBoundingClientRect();
+    var menuH = dropdown.offsetHeight || 320;
+    var spaceBelow = window.innerHeight - rect.bottom;
+    if (spaceBelow < menuH && rect.top > menuH) {
+      dropdown.style.top = Math.max(8, rect.top - menuH) + 'px';
+    } else {
+      dropdown.style.top = (rect.bottom + 6) + 'px';
+    }
+    dropdown.style.right = Math.max(8, window.innerWidth - rect.right) + 'px';
+    dropdown.style.left = 'auto';
+    dropdown.style.zIndex = '100050';
+  };
+
+  if (!window._cchDocMoreDdOutside) {
+    window._cchDocMoreDdOutside = true;
+    document.addEventListener('click', function(e) {
+      if (e.target && e.target.closest && (e.target.closest('.cch-doc-more-wrap') || e.target.closest('.cch-doc-more-dd'))) return;
+      cchCloseDocMoreDd();
+    });
+  }
 
   function cchDocMoreItem(label, js, danger) {
     var col = danger ? '#B91C1C' : '#1B3352';
@@ -2534,8 +2582,8 @@
 
   function cchDocMoreMenuWrap(innerHtml) {
     return '<div class="cch-doc-more-wrap" style="position:relative;display:inline-block;margin-left:2px;vertical-align:middle;">' +
-      '<button type="button" class="btn btn-secondary btn-sm" style="font-weight:600;" onclick="event.stopPropagation();var w=this.closest(\'.cch-doc-more-wrap\');var m=w&&w.querySelector(\'.cch-doc-more-dd\');if(m)m.style.display=m.style.display===\'block\'?\'none\':\'block\';">More ▾</button>' +
-      '<div class="cch-doc-more-dd" onclick="event.stopPropagation()" style="display:none;position:absolute;right:0;top:100%;margin-top:6px;min-width:248px;max-height:min(70vh,520px);overflow-y:auto;background:#fff;border:1px solid rgba(27,51,82,0.12);border-radius:8px;box-shadow:0 12px 32px rgba(27,51,82,0.14);z-index:600;padding:4px 0;">' +
+      '<button type="button" class="btn btn-secondary btn-sm" style="font-weight:600;" onclick="event.stopPropagation();cchToggleDocMoreDd(this)">More ▾</button>' +
+      '<div class="cch-doc-more-dd" onclick="event.stopPropagation()" style="display:none;min-width:248px;max-height:min(70vh,520px);overflow-y:auto;background:#fff;border:1px solid rgba(27,51,82,0.12);border-radius:8px;box-shadow:0 12px 32px rgba(27,51,82,0.14);padding:4px 0;">' +
       innerHtml + '</div></div>';
   }
 
@@ -2566,7 +2614,7 @@
       var invVoidEarly = !!opts.invVoidEarly;
       var qbRealId = opts.qbRealId;
       var canPushQB = !!opts.canPushQB;
-      html += '<button class="btn btn-secondary btn-sm" onclick="' + previewJs + '" title="' + (_isDsInvTop ? 'Print or save as PDF — same layout as Manage' : 'Preview — print or save as PDF') + '">' + (_isDsInvTop ? '🖨 Print / PDF' : '\uD83D\uDC41 Preview') + '</button>';
+      html += '<button class="btn btn-secondary btn-sm" onclick="' + previewJs + '" title="' + (_isDsInvTop ? 'Print or save as PDF — same layout as Client View' : 'Preview — print or save as PDF') + '">' + (_isDsInvTop ? '🖨 Print / PDF' : '\uD83D\uDC41 Preview') + '</button>';
       html += '<button class="btn btn-secondary btn-sm" onclick="sendInvoiceToClient(\'' + pj + '\',\'' + dj + '\')">\uD83D\uDCE7 Send</button>';
       var _isTimeDraft = (docData.source === 'time-tracker' || (Array.isArray(docData.timeEntryIds) && docData.timeEntryIds.length > 0));
       var _stLow = String(docData.status || 'draft').toLowerCase();
@@ -3463,8 +3511,11 @@
         ? '<button type="button" class="btn btn-secondary btn-sm" onclick="syncInvoiceBalanceFromQB(\'' + projectId + '\',\'' + docId + '\')">\u21BB Refresh from QB</button>' : '';
       var _railQbPaidDate = (type === 'invoice' && typeof window.invoiceQbPaidDateRailHtml === 'function')
         ? window.invoiceQbPaidDateRailHtml(docData) : '';
-      var _statusInline = docData.status
-        ? '<span class="badge badge-' + (docData.status || 'draft').toLowerCase().replace(/\s+/g, '-') + '" style="font-size:10px;padding:4px 10px;">' + esc(docData.status) + '</span>'
+      var _statusLabel = (typeof cchInvoiceClientDisplayStatus === 'function')
+        ? cchInvoiceClientDisplayStatus(docData)
+        : (docData.status || 'Draft');
+      var _statusInline = _statusLabel
+        ? '<span class="badge badge-' + String(_statusLabel).toLowerCase().replace(/\s+/g, '-') + '" style="font-size:10px;padding:4px 10px;">' + esc(_statusLabel) + '</span>'
         : '';
       invoiceRailHTML =
         '<aside class="cch-doc-view-rail">' +
@@ -3848,6 +3899,85 @@
   };
 
   // ============================================================
+  // Invoice Client View (design-services) — luxury gift sheet on main page
+  // ============================================================
+  window.renderInvoiceDesignServicesClientView = async function(projectId, docId, docData, items, projData) {
+    var T = document.getElementById('contentArea');
+    if (!T) return;
+    if (typeof window.cchInvoiceRouteIs === 'function' && !window.cchInvoiceRouteIs(projectId, docId)) return;
+    items = items || [];
+    projData = projData || {};
+    docData = docData || {};
+    var projName = projData.name || projectId;
+    var docNum = docData.invoiceNum || docData.number || docId.slice(0, 8);
+    var collection = 'invoices';
+    var pid = projectId;
+    var iid = docId;
+    var invDateRaw = docData.date || docData.createdAt || '';
+    var invDateStr = invDateRaw && typeof formatDate === 'function' ? formatDate(invDateRaw) : String(invDateRaw || '').slice(0, 10);
+
+    window._docEdit = null;
+    window._docViewInvoiceCtx = { projectId: pid, docId: iid, collection: collection, items: items, docData: docData, proj: projData };
+    window._cchInvViewCtx = { projectId: pid, docId: iid, items: items, docData: docData, proj: projData, docNum: docNum, dateStr: invDateStr };
+    window._cchDsCtx = window._cchInvViewCtx;
+
+    if (typeof setBreadcrumb === 'function') {
+      if (typeof window.cchInvoiceRouteIs === 'function' && !window.cchInvoiceRouteIs(pid, iid)) return;
+      setBreadcrumb([
+        { label: 'Projects', hash: '#/projects' },
+        { label: projName, hash: '#/project/' + pid + '/invoices' },
+        { label: 'Invoice ' + docNum }
+      ]);
+    }
+
+    var invVoidEarly = String(docData.status || '').toLowerCase() === 'void';
+    var qbRealId = typeof getQbId === 'function' ? getQbId(docData) : (docData.qbDocId || null);
+    var _canPushQBView = typeof userCanPushToQB === 'function' ? userCanPushToQB() : false;
+    if (typeof setTopbarActions === 'function') {
+      setTopbarActions(typeof window.cchBuildDocViewTopbar === 'function' ? window.cchBuildDocViewTopbar({
+        type: 'invoice',
+        projectId: pid,
+        docId: iid,
+        collection: collection,
+        backTab: 'invoices',
+        projName: projName,
+        docData: docData,
+        invVoidEarly: invVoidEarly,
+        qbRealId: qbRealId,
+        canPushQB: _canPushQBView
+      }) : '');
+    }
+
+    var dispBar = (typeof window.cchBuildDsDisplayToggleHtml === 'function')
+      ? ('<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px;padding:10px 14px;background:#fff;border:1px solid rgba(27,51,82,0.1);">' +
+          '<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#5C6B80;white-space:nowrap;">Client display</span>' +
+          window.cchBuildDsDisplayToggleHtml(true) +
+          '<button type="button" class="btn btn-secondary btn-sm" style="margin-left:auto;" onclick="cchPrintCurrentDesignInvoice()">🖨 Print / PDF</button>' +
+        '</div>')
+      : '';
+
+    var sheetHtml = (typeof window.cchBuildDesignServicesInvoiceInner === 'function')
+      ? window.cchBuildDesignServicesInvoiceInner(docData, items, projData, pid, docNum, invDateStr)
+      : '<div style="padding:24px;color:#5C6B80;">Client view unavailable.</div>';
+
+    if (typeof window.cchInvoiceRouteIs === 'function' && !window.cchInvoiceRouteIs(pid, iid)) return;
+    T.innerHTML =
+      '<div class="cch-doc-view-page">' +
+        '<div style="margin-bottom:10px;">' +
+          '<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#9CA3AF;">Invoice · Client View</span>' +
+          '<h1 style="font-size:18px;font-weight:700;margin:4px 0 0;">' + esc(docNum) + '</h1>' +
+          '<div style="font-size:11px;color:var(--gray-400);">' + esc(projName) + '</div>' +
+        '</div>' +
+        dispBar +
+        '<div id="cchInvClientLanding">' + sheetHtml + '</div>' +
+      '</div>';
+
+    if (typeof window.cchInitDsDisplayToggles === 'function') {
+      try { window.cchInitDsDisplayToggles(); } catch (_eDsTog) { /* */ }
+    }
+  };
+
+  // ============================================================
   // Invoice Manage landing — group, drag, inline room/markup (Client/Manage toggle)
   // ============================================================
   window.renderInvoiceManageLanding = async function(projectId, docId, docData, items, projData) {
@@ -4060,41 +4190,19 @@
       ? window.cchBuildDsEditor(docData, pid, iid)
       : '';
 
-    var dsDisplayBarHtml = '';
-    var dsPreviewHtml = '';
-    if (_isDsManage) {
-      var invDateRawDs = docData.date || docData.createdAt || '';
-      var invDateStrDs = invDateRawDs && typeof formatDate === 'function' ? formatDate(invDateRawDs) : String(invDateRawDs || '').slice(0, 10);
-      if (typeof window.cchBuildDsDisplayToggleHtml === 'function') {
-        dsDisplayBarHtml =
-          '<div class="cch-ds-manage-disp" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px;padding:10px 14px;background:#fff;border:1px solid rgba(27,51,82,0.1);border-radius:6px;">' +
-            '<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#5C6B80;white-space:nowrap;">Client display</span>' +
-            window.cchBuildDsDisplayToggleHtml(true) +
-            '<span style="font-size:11px;color:#9CA3AF;">Toggles update preview below &amp; print</span>' +
-            '<button type="button" class="btn btn-secondary btn-sm" style="margin-left:auto;" onclick="cchPrintCurrentDesignInvoice()">🖨 Print / PDF</button>' +
-          '</div>';
-      }
-      if (typeof window.cchBuildDesignServicesInvoiceInner === 'function') {
-        dsPreviewHtml =
-          '<div id="cchInvClientLanding" class="cch-ds-manage-preview" style="margin-bottom:18px;">' +
-            window.cchBuildDesignServicesInvoiceInner(docData, items, projData, pid, docNum, invDateStrDs) +
-          '</div>';
-      }
-    }
-
     if (typeof window.cchInvoiceRouteIs === 'function' && !window.cchInvoiceRouteIs(pid, iid)) return;
     T.innerHTML =
       '<div class="cch-doc-view-page">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;gap:10px;">' +
           '<div><span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#9CA3AF;">Invoice · Manage</span>' +
           '<h1 style="font-size:18px;font-weight:700;margin:4px 0 0;">' + esc(docNum) + '</h1>' +
-          '<div style="font-size:11px;color:var(--gray-400);">' + esc(projName) + '</div></div>' +
+          '<div style="font-size:11px;color:var(--gray-400);">' + esc(projName) +
+            (_isDsManage ? ' · <span style="color:#5C6B80;">Working table + client summary editor — use <strong>Client View</strong> for the gift layout</span>' : '') +
+          '</div></div>' +
           '<button type="button" class="btn btn-primary btn-sm" style="background:#1B3352;color:#EDE8E0;" onclick="cchEnterDocEditMode(\'' + cchEscJsStr(pid) + '\',\'' + cchEscJsStr(iid) + '\',\'invoice\')">\u270F\uFE0F Edit line items</button>' +
         '</div>' +
         dsEditorHtml +
-        dsDisplayBarHtml +
-        dsPreviewHtml +
-        (_isDsManage ? '' : tableHtml) +
+        tableHtml +
         (typeof window.cchDocAttachmentsSectionHtml === 'function'
           ? window.cchDocAttachmentsSectionHtml(pid, collection, iid, docData)
           : '') +
@@ -4115,10 +4223,6 @@
             })() +
           '</div></div>' +
       '</div>';
-
-    if (_isDsManage && typeof window.cchInitDsDisplayToggles === 'function') {
-      try { window.cchInitDsDisplayToggles(); } catch (_eDsTog) { /* */ }
-    }
   };
 
   // ============================================================
