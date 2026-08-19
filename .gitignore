@@ -12,6 +12,8 @@ platform/payment_compact.json
 platform/product_library_import.json
 *.env
 .env.*
+*-pat.env
+square-pat.env
 
 # Firebase Admin SDK service account keys — NEVER commit these
 service-account.json
