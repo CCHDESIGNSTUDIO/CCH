@@ -1,0 +1,41 @@
+---
+description: Bug reports — diagnose from code with file:line before proposing or shipping fixes
+alwaysApply: true
+---
+
+# Bug diagnosis — evidence before fixes
+
+When Cindy reports a bug, regression, or "X doesn't work":
+
+## Do first (same turn, before theories)
+
+1. **Grep** UI strings, toast text, button labels, or function names from her report (exact phrases).
+2. **Read** the handler that runs on that action (click, save, drag, open sidebar).
+3. **List** what the code actually does — with **file:line** citations.
+4. Only then propose cause + fix.
+
+## Do not
+
+- Explain the bug from "typical patterns" or prior-session memory.
+- Ship a fix aimed at a guessed root cause (e.g. "probably a listener issue") without reading the save path.
+- Conflate separate bugs (regen vs persist vs UI) without grounding each in code.
+
+## Fix handoff must include
+
+| Field | Required |
+|-------|----------|
+| Symptom | What Cindy saw (her words) |
+| Grounding | file:line of the code path involved |
+| Root cause | One sentence tied to that code — not speculation |
+| Change | What you changed and why |
+| Verify | Exact prod URL, project, tab, hard refresh |
+
+Queue via `_DEPLOY_QUEUE.md` — do not commit/deploy unless you are #1.
+
+## Example (good)
+
+> Grep `rbClipDragStart` → read `index.html:18826-18893`. Drop used index-only before patch; now uses `clipId`. Drag-over image fixed at `:19217` grid capture.
+
+## Example (bad)
+
+> "Drag probably fails because listeners aren't attached to images." *(no grep, no line numbers)*

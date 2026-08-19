@@ -1,0 +1,54 @@
+---
+description: MANDATORY — no architectural claims or code edits without grep+read this turn (all agents)
+alwaysApply: true
+---
+
+# Code grounding — NO GUESSING
+
+**Canon:** `CODE_GROUNDING_PROTOCOL_MH_May13_v1.0.md` (repo root). Applies to Cursor, Claude Code, Cowork, Hermes, Grok — every agent touching CCH Studio.
+
+## Hard gate (every turn)
+
+**Memory, user description, session logs, handoff notes, and skill files are NOT evidence of current code.**
+
+Before any response that touches code state, behavior, root cause, or a fix plan:
+
+1. **Grep** — minimum **3 aliases** per feature (rename drift is real; see drift map in canon doc).
+2. **Read** — open the function/block at the hit line; grep output alone is not reading.
+3. **Trace** — follow call sites before claiming "never called," "not wired," or "dead code."
+
+If you skip a step, **delete the claim** or run the step first.
+
+## Forbidden without evidence (file:line from THIS turn)
+
+- "The platform does X" / "X doesn't exist" / "root cause is Y"
+- Phased fix tables (A/B/C), effort estimates, "start with…" / "my recommendation"
+- Editing a function you have not read in this session
+- Diagnosing a bug from Cindy's screenshot/description alone
+- Treating `_DEPLOY_QUEUE.md`, `SESSION_LOG_*.md`, or Dropbox handoffs as code truth
+
+## Required before ANY code edit
+
+1. Grep the symbol you will change + at least one caller.
+2. Read the full function body you are editing.
+3. State **file:line** of what you read in your handoff or summary.
+4. Minimal diff — do not refactor adjacent code.
+
+## When Cindy says RELOOK / GROUNDING CHECK / "did you look?"
+
+Stop recommending. State search terms → run grep → read hits → report corrected finding with **file:line**. No apology paragraph. No "you're right."
+
+## When uncertain
+
+Say what you searched and what you found: *"Grep'd X, Y, Z — found X at index.html:35057; no hit for Y."* Never paper over gaps with confident summaries.
+
+## Environment truth
+
+- **Staging** and **production** are **different Firebase projects** — different Firestore data. A bug "only on prod" is normal; do not claim staging reproduces prod without saying data differs.
+- Work from `C:\dev\CCH-Platform-Deploy\cch-deploy` only — not Dropbox.
+
+## Self-check before Send
+
+1. Does this claim or edit depend on code behavior?
+2. Did I grep + read that code **this turn**?
+3. If no → read first, or say you have not verified yet.

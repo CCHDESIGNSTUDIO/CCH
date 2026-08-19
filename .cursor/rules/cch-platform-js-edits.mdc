@@ -1,0 +1,44 @@
+---
+description: Platform JS edit checklist — cache bust, syntax check, tail verify on large CRLF files
+globs:
+  - platform/index.html
+  - platform/cch-*.js
+alwaysApply: false
+---
+
+# Platform JS edits (`index.html` + `cch-*.js`)
+
+## Before every deploy
+
+1. **Bump cache buster** on every changed `<script src="cch-*.js?v=...">` in `platform/index.html`. Browsers cache JS aggressively; unchanged `?v=` = stale code live.
+2. **Syntax check** each touched JS file:
+
+```powershell
+cd C:\dev\CCH-Platform-Deploy\cch-deploy
+```
+
+```powershell
+node --check platform\cch-your-file.js
+```
+
+3. **Verify file tail** after edits to large CRLF files (`index.html`, `cch-proposals-invoices-fix.js`, etc.). Blind writes have truncated files twice — read last ~20 lines; file must end with valid closing braces/tags.
+
+## Cache buster convention
+
+- Per-feature tags: `poc11`, `om25`, `20260628ds3`, etc.
+- Bump **every** script tag whose source file you changed, not just one.
+- After deploy, confirm live URL serves new query string (View Source or Network tab).
+
+## `index.html` rules
+
+- **Do not split** — single-file architecture is intentional (~32K lines).
+- Use exact-string Edit/replace; do not write Node patch scripts for routine edits.
+- `CCH_BUILD` near line ~3452 is the sidebar build tag — bump when shipping a user-visible release batch.
+
+## Post-edit smoke (staging)
+
+```powershell
+firebase deploy --only hosting:platform --project staging
+```
+
+Hard refresh staging → login → navigate to the page you changed → confirm no console syntax errors.

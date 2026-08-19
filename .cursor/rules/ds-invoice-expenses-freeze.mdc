@@ -1,0 +1,20 @@
+# DS invoice expenses — FROZEN (Jul 30, 2026)
+
+**Canon:** `Docs/FABLE_DECISION_ds-invoice-expenses_CW_Jul30_v1.0.md`
+
+## Before ANY edit to
+- `platform/cch-invoice-redesign.js`
+- `platform/cch-proposals-invoices-fix.js`
+- `cchInvoiceLineKind` / expense classifiers in `platform/index.html`
+
+1. Read the Fable decision STOP list.
+2. Type-only classification (`cchInvoiceLineKind`) — **no title/description regex**.
+3. Run: `node _scripts/check-ds-expense-golden_BY_CURSOR.js` — must exit 0.
+4. If golden fails, **stop**. Do not “fix forward.” Need a new Fable decision to regenerate golden.
+
+## Never without a new Fable decision
+- Fee dump under Total Due
+- Prepaid tax as a body row
+- Touching hours outcome layout
+- Unifying A/B/C renderers
+- Title-based expense/service guessing

@@ -1,0 +1,48 @@
+---
+description: Standard agent handoff — queue line format, files list, deploy target, verify steps
+alwaysApply: true
+---
+
+# Agent handoff — use `_DEPLOY_QUEUE.md`
+
+All Machine-1 sessions share one working copy. **Do not commit, push, or deploy** unless you are repo owner **#1**. See `commit-deploy-policy.mdc`.
+
+## When your work is ready
+
+Append **one line** to `_DEPLOY_QUEUE.md` (Queue section):
+
+```text
+[YYYY-MM-DD HH:MM] #<n> <session name> — <files changed> — <staging|production> — <one-line description> — STATUS: pending
+```
+
+Example:
+
+```text
+[2026-06-28 14:00] #CW Invoice redesign — cch-invoice-redesign.js, cch-proposals-invoices-fix.js, index.html — staging — Client View on main page — STATUS: pending
+```
+
+- Default target: **staging** unless Cindy gave explicit production GO.
+- Do **not** message Cindy for deploy — queue it; #1 batches hourly.
+
+## Handoff block (for Docs or chat summary)
+
+When writing a handoff doc or ending a substantive session, include:
+
+1. **Changed files** — path + one-line what changed
+2. **Deploy target** — staging / production / functions-only
+3. **Pre-deploy checks** — `node --check` files, cache buster bumps
+4. **Verify steps** — URL, hard refresh, specific page/doc to open
+5. **Guardrails** — isolation, no prod deploy, staging doc IDs if relevant
+6. **STATUS** — `pending` until #1 deploys
+
+## #1 (Deploy Master) checklist
+
+1. Read `_DEPLOY_QUEUE.md` pending lines
+2. Batch related staging items (one deploy at a time for readability)
+3. Run pre-deploy checks from handoff
+4. Deploy staging first; production only on Cindy GO
+5. Flip line to `STATUS: done (staging deploy YYYY-MM-DD HH:MM)` or prod equivalent
+
+## Session logs
+
+Substantive sessions: `Docs/SESSION_LOG_Cursor_YYYY-MM-DD.md` per `nightly-session-log.mdc`.

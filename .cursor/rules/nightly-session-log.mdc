@@ -1,0 +1,28 @@
+---
+description: Nightly 11 PM Pacific session logs — read protocol, write log at end of substantive sessions
+alwaysApply: true
+---
+
+# Nightly session log (CCH Studio)
+
+**Protocol:** `cch-deploy/Docs/PROTOCOL_NIGHTLY_SESSION_LOG_CR_Jun04_v1.0.md`
+
+## Every substantive session
+
+Before ending (or when Cynthia asks for a handoff), create or update:
+
+`cch-deploy/Docs/SESSION_LOG_Cursor_YYYY-MM-DD.md`
+
+Use the same structure as `SESSION_LOG_Cursor_2026-05-27.md` (header, overview, what changed, open items, verify commands).
+
+## Rules
+
+- One file per agent per calendar day (Pacific).
+- Log **what was not deployed** and **what needs GO/YES** for production.
+- Log Firestore script runs with script **filename** and backup path.
+- Never overwrite Cynthia's working spreadsheets — agent files use `*_BY_CLAUDE_*`.
+- **No commit** unless Cynthia asks.
+
+## Automation
+
+A Cursor Automation should run daily at **11:00 PM Pacific** to write the log if no agent wrote one. See protocol doc.

@@ -1,0 +1,29 @@
+---
+description: Financial documents are isolated — no back-sync to Product Library or clips
+globs:
+  - cch-deploy/platform/index.html
+  - cch-deploy/platform/cch-doc-isolation.js
+  - cch-deploy/platform/cch-proposals-invoices-fix.js
+---
+
+# Document isolation (proposals / invoices / POs)
+
+**Canonical guard:** `cch-deploy/platform/cch-doc-isolation.js`
+
+Once line data is on a financial document, it is a **snapshot**. Editing or saving that document must **never**:
+
+- Update `products/` or `productLibrary/`
+- Update `boards/{projectId}/clips`
+- Auto-run `scheduleLibraryAutoSync*`, `pushLibraryPricesFromLineItem`, `ensure*LinkedToRoomBoard`, or `sync*LinkOntoClips` from save/edit paths
+
+Allowed exceptions (explicit user action only):
+
+- **Apply from Library** UI → `explicitApplyFromLibrary: true`
+- **Link to Room Boards** → `docEditExplicitLinkToRoomBoards` with `explicitUserAction: true`
+- **Generate proposal from clips** → `allowProposalCreateClipLink: true`
+
+Discrepancies → `cchRecordDocVariance()` (in-memory log), not silent overwrites.
+
+`cchDocSaveAutoLinkRoomBoardEnabled()` is always **false**. Legacy `localStorage cch_docSaveAutoLinkRoomBoard` is ignored.
+
+Clip→invoice hydrate on open is off unless `window.CCH_INVOICE_OPEN_CLIP_HYDRATE === true`.

@@ -1,0 +1,52 @@
+---
+description: Staging vs production Firebase projects — separate data, URLs, deploy targets
+alwaysApply: true
+---
+
+# CCH staging vs production
+
+Staging and production are **different Firebase projects**. Invoices, POs, and all Firestore data **do not sync** between them.
+
+| Environment | Firebase project | Hosting URL |
+|-------------|------------------|-------------|
+| **Staging** | `cch-studio-staging` | https://cch-platform-staging.web.app |
+| **Production** | `cch-design-boards` | https://cch-platform.web.app |
+
+## Do NOT assume cross-env data
+
+- A doc on prod (e.g. `INV-6040`) may **not exist** on staging — and vice versa.
+- "Can't find invoice X on staging" is usually **expected**, not a bug.
+- Smoke-test with staging-native docs, or copy/create test data in staging first.
+
+## Deploy (PowerShell — one command per step)
+
+**Staging hosting** (default test path; no Cindy GO needed):
+
+```powershell
+cd C:\dev\CCH-Platform-Deploy\cch-deploy
+```
+
+```powershell
+firebase deploy --only hosting:platform --project staging
+```
+
+**Production hosting** — only on Cindy's explicit typed **GO/YES**; agents never deploy prod solo:
+
+```powershell
+firebase deploy --only hosting:platform --project cch-design-boards
+```
+
+**Functions** — always name the project:
+
+```powershell
+firebase deploy --only functions:draftInvoiceSummary --project staging
+```
+
+## Verify after deploy
+
+1. Hard refresh: **Ctrl+Shift+R**
+2. Staging: confirm orange **STAGING** banner
+3. Prod: confirm banner is absent
+4. Check sidebar build tag for expected cache buster / version
+
+See also: `commit-deploy-policy.mdc`, `_DEPLOY_QUEUE.md`, `DEPLOY-STAGING.bat`.

@@ -1,0 +1,40 @@
+---
+description: Invoice Client View lives on the main invoice page — not Preview/PDF popup only
+globs:
+  - platform/cch-invoice-redesign.js
+  - platform/cch-proposals-invoices-fix.js
+  - platform/index.html
+alwaysApply: false
+---
+
+# Invoice Client View — main page, not Preview
+
+In CCH Studio, **"Preview"** usually means the **client PDF popup** (`previewDocument`). Client-facing invoice UX must live on the **main invoice page**, not only Preview.
+
+## Correct surface
+
+| Control | Where | Purpose |
+|---------|-------|---------|
+| **Client View** | Main invoice page (default for design-services) | Value-forward client layout |
+| **Manage** | Toggle on main page | Working table + summary/outcomes editor |
+| **Print / PDF** | Main page button | Prints Client View |
+| Preview popup | Secondary | Legacy PDF preview — do **not** put redesign here alone |
+
+## Key files
+
+- `platform/cch-invoice-redesign.js` — `cchDocSetViewMode`, Client View renderer, Print, AI draft editor
+- `platform/cch-proposals-invoices-fix.js` — `renderDocViewPage` wraps design-services invoices
+- Spec: `Docs/INVOICE_REDESIGN_V2_SPEC_CW_Jun28_v2.0.md`
+- Handoff: `Docs/HANDOFF_TO_CURSOR1_invoice-redesign_CW_Jun28.md`
+
+## Isolation
+
+Respect `cch-doc-isolation.js`: `clientSummary`, `clientOutcomes`, and invoice line fields are **doc-local**. No back-sync to Product Library or room-board clips on save.
+
+## AI summary function
+
+`draftInvoiceSummary` (Gen2 callable in `functions/aiInvoiceSummary.js`) — deploy separately to staging; requires `ANTHROPIC_API_KEY` secret on that project.
+
+## Verify on staging
+
+Open a **design-services** invoice on staging → Client View default → Manage toggle → Show date & hours → Print / PDF. Use a staging-native invoice (prod docs may not exist on staging).

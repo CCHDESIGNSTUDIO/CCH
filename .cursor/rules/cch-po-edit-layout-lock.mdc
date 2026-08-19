@@ -1,0 +1,40 @@
+---
+description: LOCKED — PO Edit layout (no per-line Vendor column; Bill To is the vendor)
+globs:
+  - platform/index.html
+  - platform/cch-proposals-invoices-form.js
+  - platform/cch-po-bill-variance.js
+alwaysApply: true
+---
+
+# Purchase Order Edit layout — LOCKED (Cindy Jul 25, 2026)
+
+**Do not regress.** Edit POs look correct as of **v9.8.113 / v9.8.114**. Treat this as a hard product rule, same class as document isolation.
+
+## Locked product rules
+
+1. **Every PO is vendor-specific.** Vendor lives on the **Bill To (header)** only.
+2. **Never show a per-line Vendor column** on PO Edit (`docEditRenderItems` when `isPO`), PO Client/Manage view, or PO original preview tables.
+3. Line items may still **store** `item.vendor` in Firestore for imports/matching — that is fine. **Do not re-add UI** to edit or display it as a table column on POs.
+4. PO Edit **does** keep PO-specific columns Cindy uses: **Finish**, **Ship to** (line), Cost, Room, Shipping, Total — no Markup / Sell/ea on POs.
+5. Houzz **clip-po-*** rows must **navigate/open** (materialize via `renderPODetail`), not expand-only. Do not restore the old `clip-po` → `togglePOItems` only path on the PO # click.
+
+## Canonical code (do not “simplify” away)
+
+| Surface | Where | Locked behavior |
+|---------|--------|-----------------|
+| PO Edit table | `platform/index.html` → `docEditRenderItems` | `(isPO ? '' : '<th…Vendor')` and matching `<td>` omitted for PO |
+| PO Client/Manage | `platform/cch-proposals-invoices-form.js` | `_showPoVendorCol = type !== 'po'` |
+| PO original preview | `platform/index.html` → `buildOriginalDocPreviewProposalOrdered` | no Vendor th/td when `isPO` |
+| Houzz open | `platform/index.html` → project PO list # click | `navigate` + `encodeURIComponent(po.id)` for all POs including `clip-po-*` |
+
+## Forbidden without Cindy typed GO
+
+- Re-adding Vendor column to PO Edit “for consistency with proposals/invoices”
+- Removing Finish / Ship-to columns from PO Edit
+- Changing PO Edit back to a shared proposal-style column set without an explicit request
+- Making Houzz clip POs expand-only again
+
+## If a task seems to require violating this
+
+STOP. Write the conflict in the handoff / ledger. Do not improvise. Ask Cindy.

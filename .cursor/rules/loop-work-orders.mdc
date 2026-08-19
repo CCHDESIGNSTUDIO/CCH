@@ -1,0 +1,38 @@
+---
+description: CCH Studio improvement loop — work order queue (loop/)
+alwaysApply: true
+---
+
+# Loop work orders
+
+- At session start, if `loop/LOOP_LEDGER.md` exists, read it.
+- When asked to "work the queue" (or equivalent), take the OLDEST ledger row in state
+  OPEN whose Executor is Cursor, set it IN PROGRESS (add your session #), and execute
+  the matching `loop/WO-###_*.md`.
+- **Work the WHOLE queue, do not stop after one.** After an order reaches DONE-UNVERIFIED
+  (per below), immediately take the NEXT oldest OPEN Cursor order and continue, WITHOUT
+  waiting to be re-prompted. Keep going until no OPEN Cursor orders remain, or you hit a
+  BLOCKED-DISCUSSION, or the next step is a staging deploy / production GO you cannot
+  perform. Then post ONE summary listing every order completed, queued, or blocked this
+  run. Deploy and production stay human-gated; you only drain the BUILD step to the
+  staging queue (STATUS: pending).
+- Before editing: run your own grounding per CODE_GROUNDING_PROTOCOL_MH_May13_v1.0.md.
+  The work order's diagnosis is a lead, not evidence. Re-grep (3+ aliases), read the
+  function bodies, cite file:line in your notes.
+- Respect every constraint listed in the order. If a constraint conflicts with what you
+  find in the code, STOP: write the conflict into the ledger row Notes, set state
+  BLOCKED-DISCUSSION, do not improvise.
+- On completion:
+  1. Write `loop/WO-###_DONE_CR_[MonDD].md` (files touched with line ranges, what
+     changed, self-test performed).
+  2. Append the standard one-line handoff to `_DEPLOY_QUEUE.md` (STATUS: pending) so
+     Deploy Master #1 ships it — exactly per that file's format, staging unless Cindy
+     gave a production GO.
+  3. Set the ledger row to DONE-UNVERIFIED.
+- NEVER set a row to VERIFIED (verification belongs to the verifying agent).
+- NEVER commit, push, or deploy from the shared working copy (commit-deploy-policy.mdc
+  governs). NEVER deploy to production (STOP-READ-FIRST.md governs).
+- Max 3 attempts per order. On a returned FAILED order, read the evidence in
+  `loop/verify/` before re-attempting.
+- All other standing rules (nightly session logs, handoff-folder copies, doc isolation,
+  RESOLVE vs APPLY) remain in force.

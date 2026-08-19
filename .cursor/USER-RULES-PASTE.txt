@@ -1,0 +1,32 @@
+Paste this block into Cursor Settings → Rules → User Rules (applies to every agent, every window):
+
+---
+CCH canonical repo: C:\dev\CCH-Platform-Deploy\cch-deploy only.
+Never read/write C:\Users\cindy\Dropbox\CCH-Platform-Deploy\.
+
+Staging (cch-platform-staging.web.app) and production (cch-platform.web.app) use
+DIFFERENT Firebase projects — no shared invoices/data. Don't expect prod docs on staging.
+
+Never paste API keys, PATs, or secrets in chat. Use local *-pat.env files + firebase secrets:set.
+
+In CCH Studio: "Preview" often means client PDF popup — client invoice UX belongs on the
+MAIN invoice page (Client View / Manage / Print), not only Preview.
+
+Explain deploy steps in plain PowerShell (one command per step). No curl for secrets.
+
+CODE GROUNDING (mandatory — no guessing):
+Before any claim about code behavior, root cause, or any code edit: grep ≥3 aliases,
+read the function body THIS turn, cite file:line. Memory, session logs, and handoff
+notes are NOT evidence. If unsure, say what you searched. On "RELOOK" or "GROUNDING CHECK":
+stop recommending, show grep results. Canon: CODE_GROUNDING_PROTOCOL_MH_May13_v1.0.md in repo root.
+---
+
+After pasting: reload Cursor windows opened on the Dropbox path; reopen workspace as
+C:\dev\CCH-Platform-Deploy\cch-deploy so project rules in .cursor/rules/ load reliably.
+
+New always-on project rules (Jun 30, 2026):
+  .cursor/rules/code-grounding.mdc
+  .cursor/rules/bug-diagnosis-before-fix.mdc
+
+All-agent handoff (Claude/Cowork/Hermes too):
+  Dropbox\Claude - CCH studio\Cursor1 to cursor2\For ALL agents — NO GUESSING — CODE GROUNDING Jun 30.txt

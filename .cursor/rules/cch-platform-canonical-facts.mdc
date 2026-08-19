@@ -1,0 +1,27 @@
+---
+description: Canonical platform facts and design intention — defer to Docs/CCH_PLATFORM_RULES_AND_DESIGN_INTENT when skills or memory conflict with live behavior
+alwaysApply: true
+---
+
+# CCH Platform — canonical facts & design intention
+
+**Authoritative doc:** `Docs/CCH_PLATFORM_RULES_AND_DESIGN_INTENT_CR_Aug12_v1.0.md`
+
+Read it before stating how proposals, invoices, POs, QB, client portal, or Firestore collections work. Skills, session logs, and older memos are **not** evidence — grep + read + cite `file:line`.
+
+## Non-negotiable facts (summary)
+
+1. **Doc numbers:** PRO-3000+, INV-6000+, PO-9000+. No DOC financial series. `IN-*` = Houzz legacy.
+2. **Isolation:** Financial lines are **copied snapshots** — library/clip edits do **not** propagate to existing docs.
+3. **Partial approval:** One proposal → many invoices; subset convert is normal.
+4. **POs:** Created **after invoice payment**; PO lines lock on **send**.
+5. **QuickBooks:** **Bidirectional** (push docs + pull paid/balance) — not push-only.
+6. **Client boundary:** Clients see THEIRS (proposals, invoices, inspiration, decisions). Never POs, cost, markup, margin, DNET, or internal ledger.
+7. **Timely:** **Production only** — staging has no Timely sync.
+8. **Firestore names:** `ideabooks`, `designBoards`, top-level `timeEntries`/`activity` — not old skill names like `inspirationBoards` / `roomBoards` subcollections.
+
+## Design intention
+
+Luxury **residential** studio OS: snapshot financial docs, payment-gated ordering, one navy/gold theme, single `index.html` shell + `cch-*.js` modules, staging sandbox separate from prod.
+
+Full detail, module map, and skill-rewrite checklist → the canonical doc above.

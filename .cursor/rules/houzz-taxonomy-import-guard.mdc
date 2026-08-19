@@ -1,0 +1,67 @@
+---
+description: New Houzz Project Tracker category taxonomy, re-import guards, and agent output file naming — read before any Houzz import/audit/PO work
+alwaysApply: true
+---
+
+# Houzz Project Tracker — Category Taxonomy & Import Guard
+
+**Canonical doc:** `Docs/CLEANUP_HISTORY.md` (May 27, 2026 taxonomy supersedes Clipper whitelist; commit `12afe16` on GitHub).
+
+**Do not use raw Houzz Project Tracker or Outgoing PO reports without this context.** April 2026 large import + May 27 cleanup fixed categories, types, expense flags, and rooms. Re-imports that overwrite guarded fields bring bad data back.
+
+## Root cause (tracker exports are dirty)
+
+- Wrong categories: `Fabric  + Trim`, `Appliances  & Plumbing`, granular appliance names, rooms as categories (`LIGHTING`, `TV`, `Inventory`, names)
+- Services/expenses in Category column: Freight, Expense, Prepaid Tax, Time Billing without `expenseType`
+- Garbage: `cr`, blank, `Uncategorized` (~222 rows in bad import sample)
+- Trailing whitespace → duplicate distinct values (`Fabric & Trim` vs `Fabric & Trim `)
+
+## CCH canonical product categories (21)
+
+Lighting · Mirrors & Accessories · Accessories · **Furniture & Upholstery** · Fabric & Trim · **Cabinet Hardware** · **Window Hardware** · Bedding & Pillows · **Custom Pillows & Bedding** (not "Custom Bedding and Pillows") · **Custom Window Treatments** (not "Custom Window Coverings") · Windows · Wall · Wall Covering · Appliances & Plumbing · Floor Covering · **Rugs** · Stone & Tile · Cabinets · Florals · Art · Architectural
+
+## Expense/service (NOT product categories)
+
+Set `expenseType` + `taxable: false`:
+
+- **Freight** → `expenseType: 'freight'`
+- **Labor** → `expenseType: 'service'`
+- **Expense** / **Prepaid Tax** → `expenseType: 'expense'`
+- **Custom Upholstery** → labor-only (`service`); if not labor, remap to **Furniture & Upholstery**
+
+## Import-time rules (all Houzz import paths)
+
+1. **Trim** leading/trailing whitespace on every `category` (and related) write.
+2. **Keyword scan** on title + description + vendor + sku:
+   - `\bfreight\b` → Freight, expenseType=freight, taxable=No
+   - `\blabor\b|\binstall\b|\breupholster\b|\btailor\b|\bfabricat\b` → Labor, expenseType=service, taxable=No
+3. **Apply remap table** in `CLEANUP_HISTORY.md` § "May 27, 2026 — CCH Canonical Category Taxonomy".
+4. Set **`_taxonomyV: "2026-05-27"`** on cleaned docs.
+5. **Re-Import Guard Rules** (top of `CLEANUP_HISTORY.md`): never overwrite cleaned `category`, `expenseType`, `taxable`, Firebase `imageUrl`, or hand-curated `room`. Fill-empty-only when `_categoryFixedAt` / `_taxableFixedAt` / protected `source` is set.
+
+## Code touchpoints
+
+- `import-houzz-data.js`
+- `platform/index.html` — `_houzzImportMapInvoiceLine()` and related Houzz import
+- Any script touching `products/` or `productLibrary/` categories
+- PO audits: outgoing report totals ≠ tracker categories; use correct source per job (tracker vs outgoing xlsx)
+
+## Reference files (New Houzz reports folder)
+
+- Bad sample: `STUDIO_PRODUCTS_IMPORT BAD REPORT BAD CATEGORIES.csv`
+- Cleaned: `STUDIO_PRODUCTS_IMPORT_CLEANED_BY_CLAUDE_May27.csv`, `STUDIO_PRODUCTS_IMPORT_CLEANED_v4_FINAL_May27.csv`
+
+## Agent-produced spreadsheets (Cynthia rule)
+
+Never overwrite Cynthia's working XLSX/CSV. Use distinct names:
+
+- `*_BY_CLAUDE_<descriptor>_<date>.xlsx` (or `.csv`)
+- Example fix: `PO_STUBS_AUDIT_BY_CLAUDE_2026-05-27.xlsx` not `PO_STUBS_AUDIT_2026-05-27.xlsx`
+
+Avoids Excel + Dropbox lock conflicts when agents read files.
+
+## PO / payment work (separate from category cleanup)
+
+- `restore-po-vendors-from-tracker.js` = legacy **Cloud** tracker vendors only; does **not** fix New Houzz outgoing PO payment multipliers, missing POs, or stub totals.
+- `audit-new-houzz-outgoing.js` = read-only vs Outgoing Transactions xlsx.
+- Payment 2×–7× issues need dedupe + replace-not-append sync fixes — not a blind re-import.

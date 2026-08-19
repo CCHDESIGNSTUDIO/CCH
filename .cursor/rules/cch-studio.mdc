@@ -1,0 +1,107 @@
+---
+description: CCH Studio master rules. Non-negotiable business logic, edit discipline, and UI standards for all AI-assisted changes to this codebase.
+alwaysApply: true
+---
+
+# CCH Studio Rules (v1.1)
+
+<!-- v1.1 (Jul 16, 2026): aligned with existing .cursor/rules canon after audit.
+     Architecture facts corrected (platform/ dir, ~32K-line index.html + satellite cch-*.js files).
+     Deploy instructions removed; defers to commit-deploy-policy.mdc + cch-staging-production.mdc.
+     Product Library propagation reworded to respect document-isolation.mdc snapshot model.
+     v1.0 (Jul 16, 2026): initial version from cch-studio-platform master skill. -->
+
+You are working on CCH Studio, the practice management platform for CCH Design Inc., a luxury interior design firm. Stack: `platform/index.html` (~32K lines, single-file by design, do not split) plus satellite `platform/cch-*.js` modules, vanilla JS, Firebase/Firestore, Firebase Auth, Cloud Functions. Production: cch-platform.web.app. Staging: cch-platform-staging.web.app (separate Firebase project, separate data).
+
+Brand promise: "Everything from us should look like a gift." Every change must preserve that standard.
+
+This file covers business logic and edit discipline. It does NOT override the other rules in this folder; in particular `code-grounding.mdc` (grep+read before any claim or edit), `commit-deploy-policy.mdc` (only #1 commits/deploys; everyone else queues via `_DEPLOY_QUEUE.md`), `cch-staging-production.mdc` (staging default, production only on Cindy's typed GO), `document-isolation.mdc`, and `cch-platform-js-edits.mdc` (cache busters, node --check, tail verify) all remain in force.
+
+## 1. SURGICAL EDIT CONTRACT (overrides everything else in this file)
+
+- Fix ONLY the named bug or build ONLY the named feature. Nothing else.
+- Minimal diff. Do not refactor, rename, reformat, restyle, reorder, or "improve" any code outside the requested change.
+- Do not touch any function you were not explicitly asked to change.
+- BEFORE applying edits, list every function and section you intend to modify. Anything not on that list is out of bounds. If mid-edit you discover the fix requires touching something not on the list, STOP and say so instead of proceeding.
+- Do not delete or rewrite working code to "simplify" it. Working code is load-bearing.
+- Do not change whitespace, comments, or formatting in lines you are not functionally modifying (keeps diffs reviewable).
+- Do not add new libraries, frameworks, or build steps. This is a vanilla JS app by design.
+- If a fix seems to require broad changes, propose the approach first and wait for approval.
+- After editing, state plainly: every function changed, every behavior that could be affected, and anything you are unsure about. Never claim "nothing else was affected" unless you verified it.
+
+## 2. SECTION BOUNDARIES
+
+`platform/index.html` is delimited by banner comments naming subsystems (e.g. PROPOSALS, INVOICES, PURCHASE ORDERS, CLIENT PORTAL, QB SYNC, INSPIRATION, ROOM BOARDS, SMART TIME, ACTIVITY FEED). Edits must stay inside the section(s) named in the task. Crossing a section boundary requires explicit approval. If banner comments are missing where you work, add them; do not restructure around them. Never split index.html into multiple files; new standalone modules follow the existing `platform/cch-*.js` pattern only when explicitly requested.
+
+## 3. FINANCIAL SYSTEM BOUNDARY (never violate)
+
+- CCH Studio pushes TO QuickBooks. Never pull from QB into Studio. QB is the single source of truth for financial transactions and payments.
+- NO payment processing in Studio. No "Pay Now" buttons, no payment forms, no card fields. Ever.
+- Client invoices are sent FROM QuickBooks, not from Studio. Studio may link to QB invoice URLs for client viewing.
+- QB SYNC SAFETY: any invoice or PO that has a `qbDocId` must NEVER be re-pushed to QB. This guard is enforced in Cloud Functions; never weaken, bypass, or duplicate-push around it.
+- **PO Edit layout LOCKED** — see `cch-po-edit-layout-lock.mdc`: no per-line Vendor column (Bill To only); do not regress Finish/Ship-to or Houzz clip-po open.
+
+## 4. MASTER PRODUCT LIBRARY AND DOCUMENT ISOLATION
+
+- The Master Product Library is the single source of truth for product data across projects and boards.
+- BUT: once line data is on a financial document (proposal, invoice, PO), it is a SNAPSHOT. Per `document-isolation.mdc`: saving or editing a financial document must never write back to the library or clips, and library changes do not silently rewrite existing financial documents. Explicit user actions (Apply from Library, Link to Room Boards) are the only bridges.
+- On proposals, invoices, and POs: core product info is READ-ONLY in the UI. Never make the main product description editable on those documents.
+- Document-specific local notes ARE allowed (tags, workroom instructions, shipping notes).
+
+## 5. DOCUMENT NUMBERING (locked, never change)
+
+Proposals PRO-3000+, Invoices IN-10000+, Purchase Orders PO-9000+, Client Documents DOC-1000+.
+
+## 6. WORKFLOW AND APPROVAL LOGIC
+
+Master flow: Clip → Inspiration → Selections/Room Boards → Proposals (+ Design Boards + Tear Sheets) → client approves lines + total → Invoice → Push to QB → Paid → Create POs.
+
+- Client must approve EACH LINE ITEM and the FINAL TOTAL. Per-line Approve/Decline plus an overall "Approve Proposal" button.
+- "Convert to invoice" is BLOCKED until full approval. Approved lines stay locked. Declined lines are NOT copied to the invoice.
+- Proposal status lifecycle: Draft → Published (on email/copy link) → In Review (client views) → Approved/Declined. Clicking "Email client" or "Copy client link" MUST immediately flip Draft to Published.
+- Editing/locking: proposals editable after approval; invoices editable only before payment (after payment, create a NEW invoice); POs editable even after paid.
+- Shipping note always included on documents: "Shipping and freight will be billed separately once items have shipped."
+- Custom bundles: must have a Final Product Image (hero). Client tear sheets show hero + components only; labor and expenses hidden. Pricing Show/Hide toggle on tear sheets.
+- Invoice Client View lives on the MAIN invoice page, not only the Preview/PDF popup (see `cch-invoice-client-view.mdc`).
+
+## 7. UI/UX HARD RULES
+
+Global:
+- NEVER use native prompt(), alert(), or confirm(). Always styled modals.
+- Modals: sharp rectangular, no border-radius, navy/white buttons.
+- 3-dot action menus on EVERY item on hover. No exceptions, no flicker.
+- Left sidebar compact globally. Proposal tables readable without horizontal scrolling.
+- Dashboard shows actionable cards only; all cards clickable, navigating to filtered lists.
+- Item detail pop-up: large hero image with zoom + multi-image upload.
+- Fonts: Playfair Display (display), DM Sans (body), Cormorant Garamond (client-facing).
+
+Studio admin aesthetic: dark navy sidebar #0A1F3D, gold accent #C8A97E for active states. Status colors: Yellow=Pushed, Orange=Received, Blue=Emailed, Green=Paid.
+
+Client portal aesthetic (Programa Design): pure white #FFFFFF background only, dark navy #0A1F3D text, ZERO border-radius everywhere, 1px solid #E2E2E2 borders, no shadows. Headers 11px uppercase with 0.15em letter-spacing. ALL portal CSS uses the `.cp-` prefix and stays isolated from admin styles. Never let admin styles leak into `.cp-` scope or vice versa.
+
+## 8. CLIENT PORTAL AND VISIBILITY
+
+- Portal URL: /#/clientview/{project-slug}. No auth required for clients. "Back to Studio" bar only for authenticated admins. Clients never see admin controls.
+- Clients must NEVER see: total amount paid to date, hourly rates or dollar amounts for time, team member names on time entries, internal notes, workroom instructions, cost/markup columns, admin UI, debug text, raw template literals, or release notes.
+- Any change touching client-visible surfaces must be checked against this list before completion.
+
+## 9. FIRESTORE STRUCTURE (do not restructure)
+
+Per-project data lives under `boards/{projectId}/` in these collections: clips, invoices, purchaseOrders, proposals, inspirationBoards, roomBoards, activity, timeEntries, messages, clientDocuments, whatsNew, heroImages, schedule. Admin config: `admin/qb` (QB OAuth tokens), `admin/integrations`. Never rename collections or move documents between collections as part of a bug fix. Staging and production are DIFFERENT Firebase projects with different data; never assume a document exists in both.
+
+## 10. VERIFICATION EXPECTATIONS
+
+One bug or feature per session. Do NOT commit or deploy (see `commit-deploy-policy.mdc`); queue finished work in `_DEPLOY_QUEUE.md`. Before queueing, run the mechanical checks from `cch-platform-js-edits.mdc` (cache buster bump, `node --check` on touched JS, tail verify on large files), then confirm this smoke list still holds for anything you touched near these paths:
+
+1. Proposal Draft flips to Published on email/copy link
+2. Per-line approval locks approved lines
+3. Convert-to-invoice blocked until full approval
+4. qbDocId re-push guard intact
+5. 3-dot menus render on hover without flicker
+6. All dialogs are styled modals, never native
+7. Client portal shows no admin controls, no forbidden data (Section 8)
+8. `.cp-` style isolation intact in both directions
+9. Shipping note present on financial documents
+10. Document numbering sequences unchanged
+
+If you cannot verify an item, say which one and why rather than asserting success.
