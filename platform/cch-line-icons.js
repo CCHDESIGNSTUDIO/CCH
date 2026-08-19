@@ -97,7 +97,7 @@
     if (bartolo) {
       var bs = Math.max(14, Math.round(sizePx * 0.34));
       var fs = Math.max(8, Math.round(sizePx * 0.2));
-      badge = '<div style="position:absolute;right:0;bottom:0;width:' + bs + 'px;height:' + bs + 'px;border-radius:50%;background:#C8A97E;color:#0A1F3D;font-size:' + fs + 'px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;border:1px solid #fff;box-shadow:0 0 0 1px rgba(10,31,61,.12);" title="Bartolo">B</div>';
+      badge = '<div style="position:absolute;right:0;bottom:0;width:' + bs + 'px;height:' + bs + 'px;border-radius:50%;background:#C8A97E;color:#0A1F3D;font-size:' + fs + 'px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;border:1px solid #fff;box-shadow:0 0 0 1px rgba(10,31,61,.12);" title="Workroom quote line">W</div>';
     }
     return '<div style="width:' + sizePx + 'px;height:' + sizePx + 'px;background:var(--gray-50);border-radius:4px;border:1px solid var(--gray-100);display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0;overflow:visible;' + (extraStyle || '') + '">' +
       cchLineIconSvgHtml(kind, sizePx) + badge + '</div>';

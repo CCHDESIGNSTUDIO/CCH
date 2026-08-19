@@ -1,6 +1,7 @@
 /**
  * Pepper — floating staff assistant panel.
- * Digests: decisions, Follow-Ups, activity, unbilled time, OM firm-wide (Fable D/B + Bugletrail).
+ * Digests: decisions, Follow-Ups, activity, unbilled time, design boards, inspiration boards,
+ * OM firm-wide (Fable D/B + Bugletrail).
  * Vendor follow-up: window.cchPepperVendorFollowUp (OM/PO primary; chat preset secondary).
  * Feature G (v1.2): tap-to-talk SpeechRecognition → input only; Speak toggle (default off) → speechSynthesis.
  */
@@ -17,6 +18,15 @@
   var FIRM = 'CCH Design Inc.';
   var PEPPER_DECISION_ACTIONS = { line_approved: 1, line_declined: 1, proposal_total_approved: 1 };
 
+  var BUILD = '20260817reach1';
+
+  /** Cap digest size — huge firm digests can trip callable/gateway failures. */
+  function pepperCapDigest(text, maxChars) {
+    var s = String(text || '');
+    var max = maxChars || 48000;
+    if (s.length <= max) return s;
+    return s.slice(0, max) + '\n\n… [digest truncated for Pepper — open a project or OM tab for a tighter list]';
+  }
   function isClientRoute() { return /#\/clientview\//i.test(window.location.hash || ''); }
   function currentEmail() {
     try { return ((firebase.auth().currentUser || {}).email || '').toLowerCase().trim(); }
@@ -91,35 +101,312 @@
     var ms = Date.parse(ts);
     return isFinite(ms) ? new Date(ms).toISOString().slice(0, 10) : '';
   }
+  /** Prefer ledger `date`, then created/timestamp — for unbilled age + year window. */
+  function pepperTimeEntryMs(t) {
+    if (!t) return NaN;
+    var raw = t.date != null && t.date !== '' ? t.date : (t.timestamp || t.createdAt || '');
+    if (raw && typeof raw.toDate === 'function') {
+      try { return raw.toDate().getTime(); } catch (_e) { return NaN; }
+    }
+    if (typeof raw === 'number' && isFinite(raw)) return raw < 1e12 ? raw * 1000 : raw;
+    var s = String(raw || '').trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+      var p = Date.parse(s.slice(0, 10) + 'T12:00:00');
+      if (isFinite(p)) return p;
+    }
+    var ms = Date.parse(s);
+    return isFinite(ms) ? ms : NaN;
+  }
+  /** Cindy Aug 10: plate/unbilled = this calendar year only (no 2021 ghosts). */
+  function pepperUnbilledYearStartMs() {
+    return new Date(new Date().getFullYear(), 0, 1).getTime();
+  }
+  function pepperUnbilledYearStartStr() {
+    return String(new Date().getFullYear()) + '-01-01';
+  }
+  function pepperIsInUnbilledWindow(t) {
+    var ms = pepperTimeEntryMs(t);
+    if (!isFinite(ms)) return false;
+    return ms >= pepperUnbilledYearStartMs();
+  }
   function pepperIsBillableEntry(t) {
     if (typeof window._isBillableEntry === 'function') return window._isBillableEntry(t);
     if (t && t.billable === false) return false;
     return true;
   }
 
+  /* ── WO-105: signed-in staff agenda (login = who; Firestore fields = whose plate) ── */
+  function resolveSignedInStaff() {
+    var em = currentEmail();
+    var label = '';
+    try {
+      if (typeof window.currentMemberName === 'function') label = String(window.currentMemberName() || '').trim();
+    } catch (_e) { /* */ }
+    var lane = '';
+    if (em.indexOf('vanessa') >= 0 || /vanessa/i.test(label)) lane = 'vanessa';
+    else if (em.indexOf('cindy') >= 0 || em.indexOf('cynthia') >= 0 || /cindy|cynthia/i.test(label)) lane = 'cindy';
+    if (!lane && label) {
+      if (/holliday/i.test(label)) lane = 'vanessa';
+      else if (/holloway/i.test(label)) lane = 'cindy';
+    }
+    if (!label) {
+      if (lane === 'vanessa') label = 'Vanessa Holliday';
+      else if (lane === 'cindy') label = 'Cindy Holloway';
+      else label = em ? em.split('@')[0] : 'there';
+    }
+    var first = label.split(/\s+/)[0] || 'there';
+    var tokens = [label, first];
+    if (lane === 'vanessa') tokens = tokens.concat(['Vanessa Holliday', 'Vanessa', 'vanessa', 'vholliday']);
+    if (lane === 'cindy') tokens = tokens.concat(['Cindy Holloway', 'Cindy', 'Cynthia', 'cindy', 'cynthia']);
+    tokens = tokens.map(function (t) { return String(t || '').trim(); }).filter(Boolean);
+    return { email: em, label: label, first: first, lane: lane || 'staff', tokens: tokens };
+  }
+
+  function attributionMatchesStaff(raw, person) {
+    if (!person || !person.tokens || !person.tokens.length) return false;
+    var s = String(raw || '').toLowerCase().trim();
+    if (!s) return false;
+    for (var i = 0; i < person.tokens.length; i++) {
+      var tok = String(person.tokens[i] || '').toLowerCase();
+      if (tok && s.indexOf(tok) >= 0) return true;
+    }
+    return false;
+  }
+
+  function timeEntryMatchesStaff(t, person) {
+    if (!t || !person) return false;
+    var blob = [t.member, t.userName, t.user, t.email, t.memberEmail, t.loggedBy].join(' ');
+    return attributionMatchesStaff(blob, person);
+  }
+
+  function agendaDayKey() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function agendaAlreadySurfacedToday() {
+    try { return localStorage.getItem('cchPepperAgendaDay') === agendaDayKey(); } catch (_e) { return false; }
+  }
+
+  function markAgendaSurfacedToday() {
+    try { localStorage.setItem('cchPepperAgendaDay', agendaDayKey()); } catch (_e) { /* */ }
+  }
+
+  async function loadMyUnbilledSummary(person) {
+    var out = {
+      hours: 0, dollars: 0, entries: 0, oldest: '', loadError: false,
+      windowFrom: pepperUnbilledYearStartStr(), year: new Date().getFullYear()
+    };
+    if (!person) { out.loadError = true; return out; }
+    try {
+      var database = pepperDb();
+      var byId = {};
+      async function ingest(q) {
+        try {
+          var snap = await q;
+          (snap.docs || []).forEach(function (doc) {
+            byId[doc.id] = Object.assign({ id: doc.id }, doc.data() || {});
+          });
+        } catch (_e) { /* index / permission */ }
+      }
+      var uniqNames = [];
+      person.tokens.forEach(function (t) {
+        if (t && uniqNames.indexOf(t) < 0 && t.length > 2) uniqNames.push(t);
+      });
+      var yearStart = pepperUnbilledYearStartStr();
+      for (var i = 0; i < Math.min(uniqNames.length, 6); i++) {
+        /* Prefer this-year query so limit(800) is not wasted on 2021 rows. */
+        await ingest(database.collection('timeEntries').where('member', '==', uniqNames[i]).where('date', '>=', yearStart).limit(800).get());
+        await ingest(database.collection('timeEntries').where('member', '==', uniqNames[i]).limit(400).get());
+      }
+      if (person.email) {
+        await ingest(database.collection('timeEntries').where('email', '==', person.email).where('date', '>=', yearStart).limit(400).get());
+        await ingest(database.collection('timeEntries').where('email', '==', person.email).limit(200).get());
+      }
+      var unbilled = Object.keys(byId).map(function (k) { return byId[k]; }).filter(function (t) {
+        if (!timeEntryMatchesStaff(t, person)) return false;
+        if (!pepperIsBillableEntry(t)) return false;
+        if (t.invoiced === true || t.invoiceId) return false;
+        if ((parseFloat(t.hours) || 0) <= 0) return false;
+        return pepperIsInUnbilledWindow(t);
+      });
+      var oldestMs = Infinity;
+      unbilled.forEach(function (t) {
+        var h = parseFloat(t.hours) || 0;
+        var rate = parseFloat(t.rate || t.hourlyRate || t.billableRate) || 0;
+        out.hours += h;
+        out.dollars += h * rate;
+        out.entries += 1;
+        var ms = pepperTimeEntryMs(t);
+        var when = isFinite(ms) ? new Date(ms).toISOString().slice(0, 10) : pepperFormatWhen(t);
+        if (isFinite(ms) && ms < oldestMs) {
+          oldestMs = ms;
+          out.oldest = when;
+        }
+      });
+      out.hours = Math.round(out.hours * 10) / 10;
+      out.dollars = Math.round(out.dollars);
+    } catch (e) {
+      console.warn('[cchPepper] my unbilled', e);
+      out.loadError = true;
+    }
+    return out;
+  }
+
+  function countFromFinancialCaches(person) {
+    var invs = window._cachedInvoices || [];
+    var props = window._cachedProposals || [];
+    var draftInv = 0;
+    var openAr = 0;
+    var openAr$ = 0;
+    invs.forEach(function (inv) {
+      var st = String(inv.status || '').trim();
+      var stL = st.toLowerCase();
+      if (stL === 'draft' || stL === 'unsent') draftInv++;
+      else if (stL !== 'paid' && stL !== 'cancelled' && stL !== 'canceled' && stL !== 'void' && stL !== 'voided') {
+        var total = parseFloat(inv.total) || 0;
+        var paid = (inv.payments || []).reduce(function (s, p) { return s + (parseFloat(p.amount) || 0); }, 0);
+        if (stL === 'paid') return;
+        var bal = Math.max(0, total - paid);
+        if (bal > 0 || stL === 'sent' || stL === 'unpaid' || stL === 'partial' || stL === 'overdue' || stL === 'due') {
+          openAr++;
+          openAr$ += bal || total;
+        }
+      }
+    });
+    var propsToSend = 0;
+    props.forEach(function (p) {
+      if (!p) return;
+      if (String(p.importedFrom || '').toLowerCase() === 'houzz') return;
+      var st = String(p.status || '').toLowerCase();
+      if (st === 'invoiced' || st === 'declined' || st === 'cancelled') return;
+      if (!p.published || st === 'draft') propsToSend++;
+    });
+    var poConfirm = 0;
+    var pos = (window._omPosCache && window._omPosCache.pos) || window._cachedPOs || [];
+    if (pos.length) {
+      pos.forEach(function (po) {
+        if (typeof window.cchOmIsHouzzPo === 'function' && window.cchOmIsHouzzPo(po)) return;
+        if (typeof window.cchOmIsOpenPo === 'function' && !window.cchOmIsOpenPo(po)) return;
+        if (typeof window.cchOmNeedsConfirmation === 'function' && window.cchOmNeedsConfirmation(po)) poConfirm++;
+      });
+    }
+    return {
+      invoicesLoaded: invs.length > 0,
+      proposalsLoaded: props.length > 0,
+      draftInvoices: draftInv,
+      openArCount: openAr,
+      openArDollars: Math.round(openAr$),
+      proposalsToSend: propsToSend,
+      poNeedsConfirm: poConfirm,
+      posLoaded: pos.length > 0
+    };
+  }
+
+  async function buildMyAgendaBrief(opts) {
+    opts = opts || {};
+    var person = resolveSignedInStaff();
+    var allTeam = !!opts.allTeam;
+    var unbilled = allTeam
+      ? { hours: 0, dollars: 0, entries: 0, oldest: '', loadError: true }
+      : await loadMyUnbilledSummary(person);
+    var fin = countFromFinancialCaches(person);
+    var summaryDoc = null;
+    try {
+      var snap = await pepperDb().collection('_cache').doc('financialSummary').get();
+      if (snap.exists) summaryDoc = snap.data() || null;
+    } catch (_eS) { /* */ }
+
+    /* Spoken "you have…" = person plate only (fingerprints). Firm caches stay in digest context, not claimed as yours. */
+    var parts = [];
+    if (!allTeam) {
+      if (unbilled.loadError) {
+        parts.push('I couldn\'t pull your unbilled hours just now');
+      } else if (unbilled.entries > 0) {
+        var ub = unbilled.hours + ' unbilled hours this year';
+        if (unbilled.dollars > 0) ub += ' (about $' + unbilled.dollars.toLocaleString() + ')';
+        if (unbilled.oldest) ub += ', oldest ' + unbilled.oldest;
+        parts.push(ub);
+      }
+      if (!fin.proposalsLoaded) {
+        parts.push('proposals cache not loaded yet (open Financials once to refresh)');
+      }
+      if (fin.invoicesLoaded && fin.openArCount > 0) {
+        parts.push(fin.openArCount === 1
+          ? ('1 open invoice (~$' + fin.openArDollars.toLocaleString() + ' AR in cache)')
+          : (fin.openArCount + ' open invoices (~$' + fin.openArDollars.toLocaleString() + ' AR in cache)'));
+      }
+      if (fin.proposalsLoaded && fin.proposalsToSend > 0) {
+        parts.push(fin.proposalsToSend === 1 ? '1 proposal to send' : (fin.proposalsToSend + ' proposals to send'));
+      }
+      if (fin.posLoaded && fin.poNeedsConfirm > 0) {
+        parts.push(fin.poNeedsConfirm === 1 ? '1 PO needs vendor confirmation' : (fin.poNeedsConfirm + ' POs need vendor confirmation'));
+      }
+    }
+
+    var spoken;
+    if (!parts.length) {
+      spoken = 'Hi ' + person.first + ', it\'s Pepper. You\'re clear on the money loop I can see right now. Ask anytime: what\'s on my agenda.';
+    } else if (parts.length === 1) {
+      spoken = 'Hi ' + person.first + ', it\'s Pepper. You have ' + parts[0] + '.';
+    } else if (parts.length === 2) {
+      spoken = 'Hi ' + person.first + ', it\'s Pepper. You have ' + parts[0] + ', and ' + parts[1] + '.';
+    } else {
+      spoken = 'Hi ' + person.first + ', it\'s Pepper. You have ' + parts.slice(0, -1).join(', ') + ', and ' + parts[parts.length - 1] + '.';
+    }
+    spoken += ' Want to start with the top money item?';
+
+    var digestLines = [
+      'MY AGENDA — PERSON-SCOPED to signed-in staff: ' + person.label + ' (' + person.email + ') via currentMemberName / auth email + timeEntries.member fingerprints',
+      'Lane: ' + person.lane,
+      'RULE: Answer THIS person\'s plate. Do not describe everyone\'s work as theirs. All Team only if they asked.',
+      'Unbilled (MY fingerprints only, ' + (unbilled.windowFrom || pepperUnbilledYearStartStr()) + ' forward — prior years excluded): ' + (unbilled.loadError ? 'load error' : (unbilled.entries + ' entries, ' + unbilled.hours + 'h, ~$' + unbilled.dollars + (unbilled.oldest ? ', oldest ' + unbilled.oldest : ''))),
+      'Proposals to send (studio cache — firm list, NOT yet fingerprint-filtered; do not claim as "yours" until WO-106): ' + (fin.proposalsLoaded ? fin.proposalsToSend + ' draft/unpublished in cache' : 'cache empty — say proposals cache not loaded'),
+      'Invoices draft/AR (studio cache — firm list, NOT yet fingerprint-filtered): ' + (fin.invoicesLoaded ? (fin.draftInvoices + ' draft, ' + fin.openArCount + ' open / ~$' + fin.openArDollars) : 'cache empty'),
+      'POs needing confirmation (OM cache when warm): ' + (fin.posLoaded ? fin.poNeedsConfirm : 'cache empty — open Order Management once'),
+      summaryDoc ? ('Firm financialSummary context (NOT personal plate): openInv ' + (summaryDoc.openInvoiceCount || 0) + ' · openPO ' + (summaryDoc.openPOCount || 0) + ' · proposals total ' + (summaryDoc.proposalCount || 0) + ' · updated ' + (summaryDoc.updatedAt || '?')) : 'Firm financialSummary: not loaded',
+      '',
+      'Spoken brief (person only):',
+      spoken,
+      '',
+      'Accuracy: live where loaded; if a cache is empty Pepper says so — never invents. Draft-only.'
+    ];
+    return { person: person, spoken: spoken, digest: digestLines.join('\n'), parts: parts, unbilled: unbilled, fin: fin };
+  }
+
+  function looksLikeMyAgendaAsk(text) {
+    var t = String(text || '').toLowerCase();
+    if (!t) return false;
+    /* Do NOT match bare "open items" / "what else" — those are project email drafts (Cindy Aug 17). */
+    return /\b(what'?s on my (agenda|plate)|my agenda|my plate|what should i (tackle|do) first|what did i leave open|what needs me|what else is open|what'?s on my list)\b/.test(t);
+  }
+
+  function wantsFirmWideAsk(text) {
+    var t = String(text || '').toLowerCase();
+    return /\b(all team|firm[- ]?wide|everywhere|across (all )?projects|whole firm|all projects)\b/.test(t) ||
+      looksLikeMyAgendaAsk(t);
+  }
+
   async function pepperFetchProjectActivity(database, projId) {
     var items = [];
     var lastDoc = null;
     var page = 0;
-    while (page < 8) {
+    /* Staff Pepper: recent project activity (not client-portal-only). Cap after gather. */
+    while (page < 4) {
       var snap;
       try {
-        var q = database.collection('activity').where('projectId', '==', projId).orderBy('timestamp', 'desc').limit(500);
+        var q = database.collection('activity').where('projectId', '==', projId).orderBy('timestamp', 'desc').limit(100);
         if (lastDoc) q = q.startAfter(lastDoc);
         snap = await q.get();
       } catch (eOrder) {
         if (page > 0) break;
-        snap = await database.collection('activity').where('projectId', '==', projId).limit(500).get();
+        snap = await database.collection('activity').where('projectId', '==', projId).limit(100).get();
       }
       if (!snap || snap.empty) break;
       snap.forEach(function (doc) {
-        var d = doc.data() || {};
-        if (pepperIsClientDoc(d) || PEPPER_DECISION_ACTIONS[String(d.action || '')] ||
-            String(d.action || '').toLowerCase().indexOf('decision') >= 0) {
-          items.push({ id: doc.id, data: d });
-        }
+        items.push({ id: doc.id, data: doc.data() || {} });
       });
-      if (snap.size < 500) break;
+      if (snap.size < 100 || items.length >= 80) break;
       lastDoc = snap.docs[snap.docs.length - 1];
       page++;
     }
@@ -163,17 +450,66 @@
         ? window.caFetchProjectActivity
         : pepperFetchProjectActivity;
       var items = await fetchFn(pepperDb(), projectId);
-      if (!items.length) return 'Recent client activity: (none in filter).';
-      var lines = ['Recent client activity:'];
-      items.slice(0, 30).forEach(function (it) {
+      /* Prefer full staff feed when caFetch is still client-filtered. */
+      try {
+        var staffItems = await pepperFetchProjectActivity(pepperDb(), projectId);
+        if (staffItems && staffItems.length > (items || []).length) items = staffItems;
+      } catch (_eStaff) { /* keep first fetch */ }
+      if (!items.length) return 'Recent project activity: (none found).';
+      var lines = ['Recent project activity (newest first — staff + client):'];
+      items.slice(0, 40).forEach(function (it) {
         var d = it.data || {};
-        var detail = d.summary || d.title || d.docType || d.description || '';
-        lines.push('- [' + pepperFormatWhen(d) + '] ' + (d.action || 'activity') + ': ' + detail);
+        var detail = d.summary || d.title || d.docType || d.description || d.details || '';
+        lines.push('- [' + pepperFormatWhen(d) + '] ' + (d.action || d.type || 'activity') + ': ' + detail);
       });
+      if (items.length > 40) lines.push('- … +' + (items.length - 40) + ' more');
       return lines.join('\n');
     } catch (e) {
       console.warn('[cchPepper] activity digest', e);
       return '';
+    }
+  }
+
+  async function buildProjectTasksDigest(projectId) {
+    if (!projectId) return '';
+    try {
+      var snap = await pepperDb().collection('boards').doc(projectId).collection('tasks').get();
+      var list = [];
+      snap.forEach(function (doc) {
+        list.push(Object.assign({ id: doc.id }, doc.data() || {}));
+      });
+      if (!list.length) return 'Project tasks: none on this project.';
+      var active = list.filter(function (t) {
+        return String(t.status || '') !== 'Done';
+      });
+      var done = list.length - active.length;
+      var priOrder = { Urgent: 0, High: 1, Medium: 2, Low: 3 };
+      active.sort(function (a, b) {
+        var pa = priOrder[a.priority] != null ? priOrder[a.priority] : 2;
+        var pb = priOrder[b.priority] != null ? priOrder[b.priority] : 2;
+        if (pa !== pb) return pa - pb;
+        return String(a.dueDate || '').localeCompare(String(b.dueDate || ''));
+      });
+      var lines = [
+        'Project tasks (' + active.length + ' open · ' + done + ' done · ' + list.length + ' total):'
+      ];
+      if (!active.length) {
+        lines.push('- (no open tasks)');
+      } else {
+        active.slice(0, 40).forEach(function (t) {
+          var who = t.assignee || t.assignedTo || t.owner || '';
+          lines.push('- [' + (t.priority || 'Medium') + '] ' + (t.title || t.name || 'task') +
+            ' · ' + (t.status || '—') +
+            (who ? ' · ' + who : '') +
+            (t.dueDate ? ' · due ' + t.dueDate : ''));
+        });
+        if (active.length > 40) lines.push('- … +' + (active.length - 40) + ' more open');
+      }
+      lines.push('When asked what needs attention: Urgent/High + overdue first. Draft only; never claim you completed a task.');
+      return lines.join('\n');
+    } catch (e) {
+      console.warn('[cchPepper] project tasks digest', e);
+      return 'Project tasks: could not load.';
     }
   }
 
@@ -185,7 +521,79 @@
     return '';
   }
 
-  async function buildUnbilledTimeDigest(projectId) {
+  /** Design Boards inventory — presentation boards (not Inspiration / Room Boards). */
+  async function buildDesignBoardsDigest(projectId) {
+    if (!projectId) return '';
+    try {
+      var snap = await pepperDb().collection('boards').doc(projectId).collection('designBoards').get();
+      if (!snap || snap.empty) return 'Design boards inventory: none on this project.';
+      var rows = [];
+      snap.forEach(function (doc) {
+        var d = doc.data() || {};
+        var title = String(d.title || d.name || 'Untitled').trim() || 'Untitled';
+        var room = String(d.room || '').trim();
+        var elN = Array.isArray(d.elements) ? d.elements.length : 0;
+        var when = '';
+        try {
+          when = pepperFormatWhen({ timestamp: d.updatedAt || d.createdAt || d.updated || d.created });
+        } catch (_eW) { when = ''; }
+        rows.push({
+          title: title,
+          room: room,
+          elN: elN,
+          when: when,
+          sort: String(d.updatedAt || d.createdAt || '')
+        });
+      });
+      rows.sort(function (a, b) {
+        return String(b.sort).localeCompare(String(a.sort));
+      });
+      var lines = ['Design boards inventory (' + rows.length + ') — presentation boards on Design Boards tab:'];
+      rows.slice(0, 60).forEach(function (r) {
+        lines.push('- ' + r.title +
+          (r.room ? ' · room: ' + r.room : '') +
+          ' · ' + r.elN + ' element' + (r.elN === 1 ? '' : 's') +
+          (r.when ? ' · updated ' + r.when : ''));
+      });
+      if (rows.length > 60) lines.push('- … +' + (rows.length - 60) + ' more');
+      lines.push('If staff says boards are missing from a digest or email draft, cross-check this list — do not invent boards not listed.');
+      return lines.join('\n');
+    } catch (e) {
+      console.warn('[cchPepper] design boards digest', e);
+      return 'Design boards inventory: could not load.';
+    }
+  }
+
+  /** Inspiration / ideabooks inventory (mood boards — separate from Design Boards). */
+  async function buildInspirationBoardsDigest(projectId) {
+    if (!projectId) return '';
+    try {
+      var snap = await pepperDb().collection('boards').doc(projectId).collection('ideabooks').get();
+      if (!snap || snap.empty) return 'Inspiration boards inventory: none on this project.';
+      var rows = [];
+      snap.forEach(function (doc) {
+        var d = doc.data() || {};
+        var title = String(d.name || d.title || 'Untitled').trim() || 'Untitled';
+        var imgs = Array.isArray(d.images) ? d.images.length : 0;
+        rows.push({ title: title, imgs: imgs });
+      });
+      rows.sort(function (a, b) {
+        return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
+      });
+      var lines = ['Inspiration boards inventory (' + rows.length + ') — Inspiration tab (not Design Boards):'];
+      rows.slice(0, 40).forEach(function (r) {
+        lines.push('- ' + r.title + ' · ' + r.imgs + ' image' + (r.imgs === 1 ? '' : 's'));
+      });
+      if (rows.length > 40) lines.push('- … +' + (rows.length - 40) + ' more');
+      return lines.join('\n');
+    } catch (e) {
+      console.warn('[cchPepper] inspiration boards digest', e);
+      return '';
+    }
+  }
+
+  async function buildUnbilledTimeDigest(projectId, opts) {
+    opts = opts || {};
     if (!projectId) return '';
     try {
       var database = pepperDb();
@@ -218,15 +626,22 @@
         });
       } catch (eInv) { /* */ }
 
+      var person = (!opts.allTeam && opts.scopeToSignedIn !== false) ? resolveSignedInStaff() : null;
       var unbilled = Object.keys(byId).map(function (k) { return byId[k]; }).filter(function (t) {
         if (!pepperIsBillableEntry(t)) return false;
         if (invoiced[String(t.id)]) return false;
         if (t.invoiced === true || t.invoiceId) return false;
-        return (parseFloat(t.hours) || 0) > 0;
+        if ((parseFloat(t.hours) || 0) <= 0) return false;
+        if (!pepperIsInUnbilledWindow(t)) return false;
+        /* WO-105: default to signed-in member; All Team only when opts.allTeam */
+        if (person && person.lane !== 'staff' && !timeEntryMatchesStaff(t, person)) return false;
+        return true;
       });
 
       if (!unbilled.length) {
-        return 'Unbilled time: none found (billable hours not already on an invoice).';
+        return person && person.lane !== 'staff'
+          ? ('Unbilled time for ' + person.first + ' this year (' + pepperUnbilledYearStartStr() + '+): none on this project.')
+          : 'Unbilled time this year (' + pepperUnbilledYearStartStr() + '+): none found (billable hours not already on an invoice).';
       }
       var byPerson = {};
       var totalH = 0;
@@ -242,8 +657,9 @@
         byPerson[who].n += 1;
       });
       var lines = [
-        'Unbilled billable time (' + unbilled.length + ' entries, ' + totalH.toFixed(1) + ' hrs' +
-          (total$ > 0 ? ', ~$' + Math.round(total$) : '') + '):'
+        'Unbilled billable time THIS YEAR (' + pepperUnbilledYearStartStr() + '+; prior years excluded) — ' +
+          unbilled.length + ' entries, ' + totalH.toFixed(1) + ' hrs' +
+          (total$ > 0 ? ', ~$' + Math.round(total$) : '') + ':'
       ];
       Object.keys(byPerson).sort().forEach(function (who) {
         var p = byPerson[who];
@@ -262,6 +678,196 @@
     }
   }
 
+  function pepperMoneyFmt(n) {
+    var x = Math.round(parseFloat(n) || 0);
+    return '$' + x.toLocaleString();
+  }
+
+  function pepperDocPaidSum(doc) {
+    return (doc.payments || []).reduce(function (s, p) {
+      return s + (parseFloat(p.amount) || 0);
+    }, 0);
+  }
+
+  function pepperDocTotal(doc) {
+    var t = parseFloat(doc.total);
+    if (!isNaN(t) && t > 0) return t;
+    t = parseFloat(doc.grandTotal);
+    if (!isNaN(t) && t > 0) return t;
+    t = parseFloat(doc.amount);
+    if (!isNaN(t) && t > 0) return t;
+    return 0;
+  }
+
+  function pepperPoNotReceivedYet(po) {
+    if (!po) return false;
+    if (typeof window.cchOmIsOpenPo === 'function' && !window.cchOmIsOpenPo(po)) return false;
+    if (typeof window.cchOmIsHouzzPo === 'function' && window.cchOmIsHouzzPo(po)) return false;
+    var ship = '';
+    try {
+      if (typeof window.cchPoShippingStatus === 'function') {
+        ship = String(window.cchPoShippingStatus(po, po.items || []) || '');
+      }
+    } catch (_e) { ship = ''; }
+    if (!ship) ship = String(po.shippingStatus || po.status || '');
+    var s = ship.toLowerCase();
+    if (/received|installed|cancelled|canceled|closed|paid/.test(s) && !/partially\s*received|partial\b/.test(s)) {
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Project money chase — proposals / invoices / POs (numbers + status + $, not every line).
+   * Priority for Pepper: AR balance → drafts to send → order follow-up flags.
+   */
+  async function buildProjectMoneyDigest(projectId) {
+    if (!projectId) return '';
+    try {
+      var board = pepperDb().collection('boards').doc(projectId);
+      var propSnap = await board.collection('proposals').get();
+      var invSnap = await board.collection('invoices').get();
+      var poSnap = await board.collection('purchaseOrders').get();
+
+      var props = [];
+      propSnap.forEach(function (doc) {
+        props.push(Object.assign({ id: doc.id }, doc.data() || {}));
+      });
+      var invs = [];
+      invSnap.forEach(function (doc) {
+        invs.push(Object.assign({ id: doc.id }, doc.data() || {}));
+      });
+      var pos = [];
+      poSnap.forEach(function (doc) {
+        pos.push(Object.assign({ id: doc.id }, doc.data() || {}));
+      });
+
+      var propChase = [];
+      props.forEach(function (p) {
+        if (String(p.importedFrom || '').toLowerCase() === 'houzz') return;
+        var st = String(p.status || 'Draft').trim();
+        var stL = st.toLowerCase();
+        if (stL === 'invoiced' || stL === 'declined' || stL === 'cancelled' || stL === 'canceled') return;
+        var num = p.number || p.num || p.id;
+        var total = pepperDocTotal(p);
+        var flag = '';
+        if (!p.published || stL === 'draft') flag = 'needs send / publish';
+        else if (stL === 'published' || stL === 'in review' || stL === 'in_review' || stL === 'sent') flag = 'waiting on client';
+        else if (stL === 'approved' || stL.indexOf('partial') >= 0) flag = 'approved — convert / invoice next?';
+        else flag = 'open';
+        propChase.push({ num: num, st: st, total: total, flag: flag, published: !!p.published });
+      });
+
+      var draftInv = [];
+      var openAr = [];
+      invs.forEach(function (inv) {
+        var st = String(inv.status || 'Draft').trim();
+        var stL = st.toLowerCase();
+        if (stL === 'void' || stL === 'voided' || stL === 'cancelled' || stL === 'canceled') return;
+        var num = inv.number || inv.num || inv.id;
+        var total = pepperDocTotal(inv);
+        var paid = pepperDocPaidSum(inv);
+        var bal = Math.max(0, total - paid);
+        if (stL === 'paid' || bal <= 0.01) return;
+        var row = {
+          num: num,
+          st: st,
+          total: total,
+          bal: bal,
+          qb: !!(inv.qbDocId || inv.qbId)
+        };
+        if (stL === 'draft' || stL === 'unsent' || (stL === 'published' && !inv.sentAt)) draftInv.push(row);
+        else openAr.push(row);
+      });
+      openAr.sort(function (a, b) { return b.bal - a.bal; });
+      draftInv.sort(function (a, b) { return b.total - a.total; });
+
+      var noConfirm = [];
+      var noBill = [];
+      var notRecv = [];
+      var openPos = [];
+      pos.forEach(function (po) {
+        if (typeof window.cchOmIsHouzzPo === 'function' && window.cchOmIsHouzzPo(po)) return;
+        var isOpen = typeof window.cchOmIsOpenPo === 'function' ? window.cchOmIsOpenPo(po) : true;
+        if (!isOpen) return;
+        openPos.push(po);
+        var num = po.number || po.num || po.id;
+        var vendor = po._displayVendor || po.vendor || '—';
+        var total = pepperDocTotal(po);
+        var row = { num: num, vendor: vendor, total: total, st: po.status || '—' };
+        if (typeof window.cchOmNeedsConfirmation === 'function' && window.cchOmNeedsConfirmation(po)) {
+          noConfirm.push(row);
+        }
+        if (typeof window.cchOmNeedsBill === 'function' && window.cchOmNeedsBill(po)) {
+          noBill.push(row);
+        }
+        if (pepperPoNotReceivedYet(po)) {
+          var ship = '';
+          try {
+            ship = typeof window.cchPoShippingStatusLabel === 'function'
+              ? window.cchPoShippingStatusLabel(po, po.items || [])
+              : (po.shippingStatus || po.status || '');
+          } catch (_e2) { ship = po.shippingStatus || po.status || ''; }
+          notRecv.push(Object.assign({}, row, { ship: ship || '—' }));
+        }
+      });
+
+      var arSum = openAr.reduce(function (s, r) { return s + r.bal; }, 0);
+      var lines = [
+        'PROJECT MONEY + ORDER CHASE (proactive — money first, then vendor/order follow-up):',
+        'Counts: ' + props.length + ' proposals · ' + invs.length + ' invoices · ' + pos.length + ' POs (' + openPos.length + ' open Studio)',
+        'Open AR on this project: ' + openAr.length + ' invoice(s) · ~' + pepperMoneyFmt(arSum),
+        'Draft/unsent invoices: ' + draftInv.length,
+        'Proposals still in play: ' + propChase.length,
+        'POs missing confirmation: ' + noConfirm.length + ' · missing bills: ' + noBill.length + ' · not fully received (Studio shipping): ' + notRecv.length,
+        '',
+        'When asked what needs attention: (1) open AR / draft invoices (2) proposals waiting send or client (3) unbilled time if present (4) PO confirmation / ETA / bills (5) not-received goods. Draft only — never claim you emailed, invoiced, or pushed QB.'
+      ];
+
+      function pushRows(title, rows, limit, fmt) {
+        lines.push('');
+        lines.push(title + ' (' + rows.length + '):');
+        if (!rows.length) {
+          lines.push('- (none)');
+          return;
+        }
+        rows.slice(0, limit || 25).forEach(function (r) { lines.push(fmt(r)); });
+        if (rows.length > (limit || 25)) lines.push('- … +' + (rows.length - (limit || 25)) + ' more');
+      }
+
+      pushRows('Open AR — invoices with balance (chase money)', openAr, 30, function (r) {
+        return '- ' + r.num + ' · ' + r.st + ' · balance ' + pepperMoneyFmt(r.bal) +
+          ' of ' + pepperMoneyFmt(r.total) + (r.qb ? ' · QB synced' : ' · not on QB yet');
+      });
+      pushRows('Draft / unsent invoices', draftInv, 20, function (r) {
+        return '- ' + r.num + ' · ' + r.st + ' · ' + pepperMoneyFmt(r.total);
+      });
+      pushRows('Proposals still open (not invoiced/declined)', propChase, 25, function (r) {
+        return '- ' + r.num + ' · ' + r.st +
+          (r.published ? ' · published' : ' · unpublished') +
+          ' · ' + pepperMoneyFmt(r.total) + ' · ' + r.flag;
+      });
+      pushRows('POs — missing vendor confirmation', noConfirm, 25, function (r) {
+        return '- ' + r.num + ' · ' + r.vendor + ' · ' + r.st + ' · ' + pepperMoneyFmt(r.total);
+      });
+      pushRows('POs — missing vendor bills', noBill, 20, function (r) {
+        return '- ' + r.num + ' · ' + r.vendor + ' · ' + r.st + ' · ' + pepperMoneyFmt(r.total);
+      });
+      pushRows('POs — not fully received yet (Studio shippingStatus — Airtable check-ins not live here)', notRecv, 25, function (r) {
+        return '- ' + r.num + ' · ' + r.vendor + ' · ship: ' + r.ship + ' · ' + pepperMoneyFmt(r.total);
+      });
+
+      if (typeof window.cchOmNeedsConfirmation !== 'function') {
+        lines.push('');
+        lines.push('Note: OM helpers not loaded this session — confirmation/bill flags may be incomplete. Open Order Management once to warm helpers, or trust shipping/status fields above.');
+      }
+      return lines.join('\n');
+    } catch (e) {
+      console.warn('[cchPepper] project money digest', e);
+      return 'PROJECT MONEY + ORDER CHASE: could not load.';
+    }
+  }
+
   async function buildPoNudgeDigest(projectId, poId) {
     if (!projectId || !poId) return '';
     try {
@@ -270,6 +876,7 @@
       var po = Object.assign({ id: snap.id }, snap.data() || {});
       var num = po.number || po.num || po.id;
       var needsConf = typeof window.cchOmNeedsConfirmation === 'function' && window.cchOmNeedsConfirmation(po);
+      var needsBill = typeof window.cchOmNeedsBill === 'function' && window.cchOmNeedsBill(po);
       var missEta = typeof window.cchOmMissingEtaLineCount === 'function' ? window.cchOmMissingEtaLineCount(po) : 0;
       var lines = [
         'OPEN PO PAGE — staff is viewing this purchase order right now. Do not ask which PO.',
@@ -279,6 +886,8 @@
         '- Vendor: ' + (po.vendor || po._displayVendor || '—'),
         '- Status: ' + (po.status || '—'),
         '- Needs confirmation: ' + (needsConf ? 'yes' : 'no'),
+        '- Needs vendor bill: ' + (needsBill ? 'yes' : 'no'),
+        '- Not fully received (Studio): ' + (pepperPoNotReceivedYet(po) ? 'yes' : 'no'),
         '- Lines missing ETA: ' + missEta
       ];
       (po.items || []).slice(0, 20).forEach(function (it, i) {
@@ -372,14 +981,22 @@
       if (poBit) parts.push(poBit);
     }
     if (projectId) {
+      var money = await buildProjectMoneyDigest(projectId);
       var a = await buildDecisionsDigest(projectId);
       var b = await buildFollowUpsDigest(projectId);
       var c = await buildActivityDigest(projectId);
       var d = await buildUnbilledTimeDigest(projectId);
+      var e = await buildDesignBoardsDigest(projectId);
+      var f = await buildInspirationBoardsDigest(projectId);
+      var g = await buildProjectTasksDigest(projectId);
+      if (money) parts.push(money);
       if (a) parts.push(a);
+      if (g) parts.push(g);
       if (b) parts.push(b);
       if (c) parts.push(c);
       if (d && (opts.includeUnbilled !== false)) parts.push(d);
+      if (e) parts.push(e);
+      if (f) parts.push(f);
     }
     return parts.filter(Boolean).join('\n\n');
   }
@@ -428,13 +1045,76 @@
     var title = pageTitleText() || 'Studio page';
     var h = window.location.hash || '';
     return [
-      'Studio page context (no firm-wide or project digest for this route):',
+      'Studio page context (supplemental — firm-wide digest should also be attached):',
       'Title: ' + title,
       'Route: ' + h,
       '',
-      'Pepper cannot see screen pixels. For grounded answers, open Follow-Ups, Tasks, a project, Order Management, or Smart Time, then ask again.',
-      'Do not ask the user to paste a digest.'
+      'Do not ask the user to open a project first. Prefer the FIRM-WIDE STAFF DIGEST.'
     ].join('\n');
+  }
+
+  /**
+   * WO-105 Phase A: no project required, never "working blind."
+   * Default = PERSON plate (signed-in). All Team = opt-in firm dump.
+   */
+  async function buildFirmWideStaffDigest(opts) {
+    opts = opts || {};
+    var allTeam = !!opts.allTeam;
+    var person = resolveSignedInStaff();
+    var parts = [
+      allTeam
+        ? 'ALL-TEAM DIGEST — staff asked for the whole firm. Still never invent numbers.'
+        : 'MY PLATE DIGEST — no project selected is fine. Answer for ' + person.first + ' (' + person.label + ') only.',
+      'Do NOT say you are working blind. Do NOT require opening a project first.',
+      allTeam
+        ? 'They asked All Team — firm context is allowed.'
+        : 'Do NOT describe firm-wide tasks/follow-ups/OM as theirs. Person plate first. Say "ask for All Team" if they want everyone\'s.'
+    ];
+    try {
+      var brief = await buildMyAgendaBrief({ allTeam: allTeam });
+      if (brief && brief.digest) parts.push(brief.digest);
+    } catch (e0) {
+      console.warn('[cchPepper] firm agenda', e0);
+      parts.push('MY AGENDA: could not load.');
+    }
+    /* Always include MY tasks (assignee fingerprint). Full active list only for All Team. */
+    try {
+      var tasks = await buildFirmTasksDigest({ forceMine: !allTeam });
+      if (tasks) parts.push(tasks);
+    } catch (e3) { /* */ }
+    if (allTeam) {
+      try {
+        var snap = await pepperDb().collection('_cache').doc('financialSummary').get();
+        if (snap.exists) {
+          var s = snap.data() || {};
+          parts.push([
+            'FIRM FINANCIAL SUMMARY (_cache/financialSummary, updatedAt: ' + (s.updatedAt || '?') + '):',
+            '- Open invoices: ' + (s.openInvoiceCount || 0) + (s.openInvoiceAmount != null ? (' · ~$' + Math.round(s.openInvoiceAmount).toLocaleString()) : ''),
+            '- Open POs: ' + (s.openPOCount || 0) + (s.openPOAmount != null ? (' · ~$' + Math.round(s.openPOAmount).toLocaleString()) : ''),
+            '- Proposals (total count only, not draft-vs-sent): ' + (s.proposalCount || 0),
+            '- Billable value (firm): ~$' + Math.round(s.billableValue || 0).toLocaleString(),
+            'If draft/sent proposal split is missing, say so — never invent a to-send count from total alone.'
+          ].join('\n'));
+        }
+      } catch (e1) { /* */ }
+      try {
+        var fu = await buildFirmFollowUpsDigest();
+        if (fu) parts.push(fu);
+      } catch (e2) { /* */ }
+      try {
+        var om = buildOmDigest({ includeBills: true });
+        if (om) parts.push(om);
+      } catch (e4) { /* */ }
+    } else {
+      /* Person plate: include firm OM confirm + bills when cache warm (money/order chase). */
+      try {
+        var omV = buildOmDigest({ includeBills: true });
+        if (omV && omV.indexOf('not loaded') < 0) {
+          parts.push('OM ORDER CHASE (firm cache — confirmation / ETA / bills; proactive follow-up):\n' + omV);
+        }
+      } catch (eOm) { /* */ }
+    }
+    return parts.filter(Boolean).join('\n\n');
   }
 
   async function buildFirmFollowUpsDigest() {
@@ -449,9 +1129,14 @@
     return 'FIRM-WIDE FOLLOW-UPS — digest unavailable (Follow-Ups module not loaded). Stay on Follow-Ups and hard refresh, then ask again.';
   }
 
-  async function buildFirmTasksDigest() {
+  async function buildFirmTasksDigest(opts) {
+    opts = opts || {};
+    var forceMine = !!opts.forceMine;
+    var person = resolveSignedInStaff();
     var lines = [
-      'FIRM-WIDE TASKS — staff is on the overall Tasks page. Answer the big picture. Do not ask them to open a project first.'
+      forceMine
+        ? ('MY TASKS — assignee matched to ' + person.first + '. Do not list other people\'s tasks as theirs.')
+        : 'FIRM-WIDE TASKS — big picture. Do not ask them to open a project first.'
     ];
     var cached = window._cchPepperAllTasksCache;
     var list = (cached && Array.isArray(cached.tasks)) ? cached.tasks.slice() : null;
@@ -477,24 +1162,26 @@
         }));
       } catch (e) {
         console.warn('[cchPepper] firm tasks digest', e);
-        return 'FIRM-WIDE TASKS — could not load tasks. Stay on Tasks and try again.';
+        return 'TASKS — could not load tasks.';
       }
     }
     var filter = '';
     try { filter = String(window._allTaskFilter || (cached && cached.filter) || 'active'); } catch (eF) { filter = 'active'; }
+    if (forceMine) filter = 'mine';
     var active = list.filter(function (t) { return String(t.status || '') !== 'Done'; });
     var mine = [];
     try {
-      var memberName = typeof window.currentMemberName === 'function' ? String(window.currentMemberName() || '') : '';
-      var first = memberName.split(/\s+/)[0] || '';
+      var memberName = person.label || (typeof window.currentMemberName === 'function' ? String(window.currentMemberName() || '') : '');
+      var first = person.first || memberName.split(/\s+/)[0] || '';
       if (first) {
         mine = active.filter(function (t) {
-          return String(t.assignee || '').toLowerCase().indexOf(first.toLowerCase()) >= 0;
+          return attributionMatchesStaff(String(t.assignee || t.assignedTo || t.owner || ''), person) ||
+            String(t.assignee || '').toLowerCase().indexOf(first.toLowerCase()) >= 0;
         });
       }
     } catch (eM) { /* */ }
     var view = active;
-    if (filter === 'mine') view = mine.length ? mine : active;
+    if (filter === 'mine') view = mine;
     else if (filter === 'done') view = list.filter(function (t) { return String(t.status || '') === 'Done'; });
     else if (filter === 'all') view = list;
     var priOrder = { Urgent: 0, High: 1, Medium: 2, Low: 3 };
@@ -528,19 +1215,38 @@
     opts = opts || {};
     var ctx = currentContext();
     if (ctx.poId && !opts.poId) opts.poId = ctx.poId;
+    /* Firm-wide on demand — even when a project is open, staff can ask for the whole plate */
+    if (opts.forceFirmWide) return buildFirmWideStaffDigest(opts);
     if (ctx.projectId) {
       // On a PO page, always include that PO's lines; skip unbilled noise unless asked.
       if (ctx.poId && opts.includeUnbilled == null) opts.includeUnbilled = false;
-      return buildFullDigest(ctx.projectId, opts);
+      var projDigest = await buildFullDigest(ctx.projectId, opts);
+      /* Append firm money snapshot so she is never only project-local for open-items asks */
+      if (opts.includeFirmWide !== false) {
+        try {
+          var firmBit = await buildFirmWideStaffDigest(opts);
+          return (projDigest || '') + '\n\n---\n\n' + firmBit;
+        } catch (_eFirm) { return projDigest; }
+      }
+      return projDigest;
     }
-    if (ctx.scope === 'followups') return buildFirmFollowUpsDigest();
-    if (ctx.scope === 'tasks') return buildFirmTasksDigest();
-    if (ctx.scope === 'om') return buildOmDigest(opts);
-    if (ctx.scope === 'time') return buildSmartTimeDigest();
-    return buildGenericPageDigest();
+    if (ctx.scope === 'followups') {
+      return (await buildFirmFollowUpsDigest()) + '\n\n' + (await buildFirmWideStaffDigest(opts));
+    }
+    if (ctx.scope === 'tasks') {
+      return (await buildFirmTasksDigest()) + '\n\n' + (await buildFirmWideStaffDigest(opts));
+    }
+    if (ctx.scope === 'om') {
+      return buildOmDigest(opts) + '\n\n' + (await buildFirmWideStaffDigest(opts));
+    }
+    if (ctx.scope === 'time') {
+      return buildSmartTimeDigest() + '\n\n' + (await buildFirmWideStaffDigest(opts));
+    }
+    return buildFirmWideStaffDigest(opts);
   }
 
   var PRESETS = [
+    { key: 'my_agenda', label: "What's on my agenda" },
     { key: 'summarize_status', label: 'Summarize status' },
     { key: 'whats_next', label: "What needs attention today" },
     { key: 'unbilled_time', label: 'Unbilled time' },
@@ -552,8 +1258,8 @@
 
   var PEPPER_DOCK_KEY = 'cchPepperDock'; /* 'header' | 'float' — legacy minimized/right mapped */
   /* WO-086 Part 2: final handoff face — chip for FAB, full for panel header */
-  var PEPPER_AVATAR_SRC = 'assets/pepper-avatar.png?v=20260806final2';
-  var PEPPER_AVATAR_CHIP_SRC = 'assets/pepper-avatar-chip.png?v=20260806final2';
+  var PEPPER_AVATAR_SRC = 'assets/pepper-avatar.png?v=20260812';
+  var PEPPER_AVATAR_CHIP_SRC = 'assets/pepper-avatar-chip.png?v=20260812';
 
   /* One-time: leave left-edge tuck; prefer header dock on projects. */
   try {
@@ -779,11 +1485,18 @@
     s.textContent = css;
   }
   function appendMsg(log, who, text) {
+    if (!log) return;
     var row = document.createElement('div');
     row.className = 'cch-pepper-msg';
     row.innerHTML = '<b>' + esc(who) + '</b>' + esc(text);
     log.appendChild(row);
     log.scrollTop = log.scrollHeight;
+  }
+
+  /** Live log node — never keep a stale ref across await (remount can detach the old panel). */
+  function pepperLiveLog() {
+    var p = panel || document.getElementById('cch-pepper-panel');
+    return p ? p.querySelector('#cch-pepper-log') : null;
   }
 
   /* ── Feature G (Fable v1.2): browser SpeechRecognition + speechSynthesis ── */
@@ -1253,7 +1966,9 @@
 
   async function callPepper(payload) {
     var fn = firebase.app().functions('us-central1').httpsCallable('cchPepper');
-    var res = await fn(payload);
+    var body = Object.assign({}, payload || {});
+    if (body.activityDigest) body.activityDigest = pepperCapDigest(body.activityDigest, 48000);
+    var res = await fn(body);
     return String(((res || {}).data || {}).reply || '').trim();
   }
 
@@ -1286,7 +2001,16 @@
         thinking.innerHTML = '<b>Pepper</b>' + esc(spoken);
       }
     } catch (e) {
-      spoken = 'Something went wrong: ' + (e.message || e);
+      var msg = String((e && e.message) || e || '');
+      var code = String((e && e.code) || '');
+      console.warn('[cchPepper] call failed', code, msg);
+      if (/API key is not configured/i.test(msg)) {
+        spoken = 'Pepper\'s API key needs a re-set (Cindy: ANTHROPIC_API_KEY — key line only).';
+      } else if (/unavailable|Could not reach|internal|deadline|503/i.test(msg + code)) {
+        spoken = 'Something went wrong: Could not reach Pepper. Try once more; if it keeps failing, the Cloud Function or Anthropic key needs a check.';
+      } else {
+        spoken = 'Something went wrong: ' + msg;
+      }
       thinking.innerHTML = '<b>Pepper</b>' + esc(spoken);
     }
     log.scrollTop = log.scrollHeight;
@@ -1398,6 +2122,25 @@
       btn.textContent = p.label;
       btn.onclick = async function () {
         var ctx = currentContext();
+        if (p.key === 'my_agenda') {
+          appendMsg(log, 'You', "What's on my agenda");
+          appendMsg(log, 'Pepper', 'Pulling your plate…');
+          try {
+            var brief = await buildMyAgendaBrief({});
+            appendMsg(log, 'Pepper', brief.spoken);
+            if (pepperSpeakEnabled()) pepperSpeakReply(brief.spoken, { force: true });
+            send({
+              action: 'whats_next',
+              input: 'Staff asked what is on MY agenda. Use the MY AGENDA digest. Stay scoped to the signed-in person. Rank money-first. Draft-only. Do not invent numbers not in the digest.',
+              projectName: ctx.projectName || 'Firm',
+              activityDigest: brief.digest
+            }, log);
+          } catch (eAg) {
+            console.warn('[cchPepper] my agenda', eAg);
+            appendMsg(log, 'Pepper', 'I couldn\'t build your agenda just now. Try again in a moment.');
+          }
+          return;
+        }
         if (p.key === 'report_bug') {
           var input = panel.querySelector('#cch-pepper-input');
           var typed = (input && input.value.trim()) || '';
@@ -1410,7 +2153,19 @@
           return;
         }
         if (p.key === 'unbilled_time' && ctx.scope !== 'project') {
-          appendMsg(log, 'Pepper', 'Unbilled time is project-scoped. Open a project, then ask again.');
+          appendMsg(log, 'You', 'Unbilled time');
+          try {
+            var ubBrief = await buildMyAgendaBrief({});
+            appendMsg(log, 'Pepper', ubBrief.spoken);
+            send({
+              action: 'unbilled_time',
+              input: 'Report MY unbilled hours firm-wide from MY AGENDA. No project required.',
+              projectName: 'Firm-wide',
+              activityDigest: ubBrief.digest
+            }, log);
+          } catch (eUb) {
+            appendMsg(log, 'Pepper', 'I couldn\'t load your unbilled hours just now.');
+          }
           return;
         }
         if (p.key === 'draft_email' && (ctx.scope === 'om' || ctx.scope === 'followups' || ctx.scope === 'tasks')) {
@@ -1568,8 +2323,33 @@
         send({ action: 'report_bug', input: val, projectName: ctx.projectName }, log);
         return;
       }
-      var digest = await buildActiveDigest({});
+      if (looksLikeMyAgendaAsk(val)) {
+        appendMsg(log, 'You', val);
+        try {
+          var briefAsk = await buildMyAgendaBrief({ allTeam: /\ball team\b/.test(lower) });
+          appendMsg(log, 'Pepper', briefAsk.spoken);
+          if (pepperSpeakEnabled()) pepperSpeakReply(briefAsk.spoken, { force: true });
+          var firmAskDigest = await buildFirmWideStaffDigest({ allTeam: /\ball team\b/.test(lower) });
+          send({
+            action: 'whats_next',
+            input: 'Staff asked: ' + val + '\n\nUse the FIRM-WIDE STAFF DIGEST and MY AGENDA. No project required. Money-first. Draft-only. Never invent. Never say you are working blind.',
+            projectName: 'Firm-wide',
+            activityDigest: firmAskDigest
+          }, log);
+        } catch (eAsk) {
+          console.warn('[cchPepper] agenda ask', eAsk);
+          appendMsg(log, 'Pepper', 'I couldn\'t pull your agenda just now.');
+        }
+        return;
+      }
+      var digest = await buildActiveDigest({
+        forceFirmWide: !ctx.projectId || wantsFirmWideAsk(val),
+        allTeam: /\ball team\b/.test(lower)
+      });
       var task = val;
+      if (!ctx.projectId) {
+        task = val + '\n\n(Staff has no project selected. Use the FIRM-WIDE STAFF DIGEST. Do not ask them to open a project first. Never say you are working blind.)';
+      }
       if (ctx.poId && /\b(follow\s*up|email|status|eta|confirm)/i.test(val)) {
         task = val + '\n\n(Staff is on open PO ' + (ctx.poNumber || ctx.poId) +
           '. Use that PO from the digest. Do not ask which PO. Draft email body only unless they ask to open mailto.)';
@@ -1577,7 +2357,7 @@
       send({
         action: '',
         input: task,
-        projectName: ctx.projectName || ctx.label || '(none selected)',
+        projectName: ctx.projectId ? (ctx.projectName || ctx.label) : 'Firm-wide',
         activityDigest: digest
       }, log);
     }
@@ -1733,6 +2513,7 @@
     }
     syncPepperVisibility();
     applyPepperDock();
+    /* Cindy Aug 10: do not auto-pop Pepper on dashboard / hashchange — wait until engaged. */
     if (!panel) {
       lastProjectId = contextKey();
       return;
@@ -1755,16 +2536,21 @@
         note = 'Order Management — chat cleared. I can see firm-wide open POs (confirmation / ETA / bills).';
       } else if (ctx.scope === 'time') {
         note = 'Smart Time — chat cleared. I can read Missing Time Alerts from this page.';
+      } else if (isStudioHomeRoute()) {
+        note = 'Dashboard — here\'s your plate. Ask what\'s on my agenda anytime.';
       } else {
         note = 'Chat cleared. Open Follow-Ups, Tasks, a project, PO, Order Management, or Smart Time for grounded answers.';
       }
-      clearChat(panel, { note: note });
+      if (!isStudioHomeRoute()) clearChat(panel, { note: note });
+      else syncPanelHeader(panel);
     } else {
       syncPanelHeader(panel);
     }
   }
 
   /** WO-086: close Pepper panel (Team Chat calls this when opening so panels do not stack). */
+  var staffUserDismissedPanel = false;
+
   function closePepperPanel() {
     var p = panel || document.getElementById('cch-pepper-panel');
     if (!p) return;
@@ -1773,8 +2559,95 @@
       pepperStopSpeaking();
     } catch (_eStop) { /* */ }
     p.classList.remove('open');
+    p.style.display = 'none';
+    staffUserDismissedPanel = true;
   }
   window.cchPepperClosePanel = closePepperPanel;
+
+  function openPepperPanel() {
+    if (isClientRoute() || !isStaff()) return null;
+    if (!panel) panel = buildPanel();
+    syncPanelHeader(panel);
+    applyPepperDock();
+    if (typeof window.cchFbCloseTeamPanel === 'function') {
+      try { window.cchFbCloseTeamPanel(); } catch (_eCloseFb) { /* */ }
+    }
+    panel.classList.add('open');
+    panel.style.display = 'flex';
+    panel.style.zIndex = '100050';
+    staffUserDismissedPanel = false;
+    return panel;
+  }
+
+  /** Dashboard / Projects home — used when user opens Pepper (no auto-pop). */
+  function isStudioHomeRoute() {
+    var h = String(window.location.hash || '');
+    if (isClientRoute()) return false;
+    if (/#\/project\//i.test(h)) return false;
+    if (/#\/dashboard(\/|$|\?)/i.test(h)) return true;
+    if (/#\/projects(\/|$|\?)/i.test(h)) return true;
+    if (!h || h === '#' || h === '#/') return true;
+    return false;
+  }
+
+  var dashboardPopInFlight = false;
+  var lastDashboardPopKey = '';
+
+  /**
+   * Fill plate / greet — only when engaged (clicked Pepper or asked for agenda).
+   * Cindy Aug 10: no unsolicited dashboard pop / "hi".
+   */
+  async function maybeDashboardPepperPop(opts) {
+    opts = opts || {};
+    if (!opts.engaged) return;
+    if (isClientRoute() || !isStaff()) return;
+    if (!isStudioHomeRoute()) return;
+    var key = agendaDayKey() + ':' + String(window.location.hash || '#/dashboard');
+    if (lastDashboardPopKey === key && panel && panel.classList.contains('open')) {
+      var existing = pepperLiveLog();
+      if (existing && existing.querySelector('.cch-pepper-msg')) return;
+    }
+    if (dashboardPopInFlight) return;
+    dashboardPopInFlight = true;
+    try {
+      var p = openPepperPanel();
+      if (!p) return;
+      lastDashboardPopKey = key;
+      var log = pepperLiveLog();
+      if (log) log.innerHTML = '';
+      appendMsg(log, 'Pepper', 'Hi — pulling what\'s on your plate…');
+      var brief = await buildMyAgendaBrief({});
+      p = openPepperPanel();
+      log = pepperLiveLog();
+      if (log) {
+        log.innerHTML = '';
+        appendMsg(log, 'Pepper', brief.spoken);
+      }
+      markAgendaSurfacedToday();
+      /* Speak only if Speak is already on — never force voice on open. */
+      if (pepperSpeakEnabled()) {
+        try { pepperSpeakReply(brief.spoken); } catch (_eSp) { /* */ }
+      }
+      console.info('[CCH Pepper] engaged plate for', brief.person.first, BUILD);
+    } catch (e) {
+      console.warn('[CCH Pepper] engaged plate', e);
+      try {
+        openPepperPanel();
+        var errLog = pepperLiveLog();
+        if (errLog) {
+          errLog.innerHTML = '';
+          appendMsg(errLog, 'Pepper', 'Hi — I couldn\'t build your plate just now. Tap What\'s on my agenda.');
+        }
+      } catch (_e2) { /* */ }
+    } finally {
+      dashboardPopInFlight = false;
+    }
+  }
+
+  /** @deprecated name kept — no auto morning pop; use engaged click */
+  async function maybeMorningAgendaBrief() {
+    return;
+  }
 
   function mountPepperUi() {
     if (document.getElementById('cch-pepper-btn')) {
@@ -1803,7 +2676,17 @@
       if (willOpen && typeof window.cchFbCloseTeamPanel === 'function') {
         try { window.cchFbCloseTeamPanel(); } catch (_eCloseFb) { /* */ }
       }
-      panel.classList.toggle('open');
+      if (willOpen) {
+        staffUserDismissedPanel = false;
+        panel.classList.add('open');
+        panel.style.display = 'flex';
+        /* Engaged: fill plate on home; elsewhere leave empty for presets / ask. */
+        if (isStudioHomeRoute()) {
+          setTimeout(function () { void maybeDashboardPepperPop({ engaged: true }); }, 50);
+        }
+      } else {
+        closePepperPanel();
+      }
     };
     if (!pepperUiBound) {
       window.addEventListener('hashchange', onPepperRouteChange);
@@ -1824,7 +2707,9 @@
     try {
       var a = (typeof auth !== 'undefined' && auth) || firebase.auth();
       if (a && typeof a.onAuthStateChanged === 'function') {
-        a.onAuthStateChanged(function () { syncPepperVisibility(); });
+        a.onAuthStateChanged(function () {
+          syncPepperVisibility();
+        });
       }
     } catch (eAuth) { /* */ }
     var tries = 0;
@@ -1841,5 +2726,5 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
-  console.info('[CCH Pepper] build 20260806dock1 — topbar icons nowrap (Overview clip fix)');
+  console.info('[CCH Pepper] build ' + BUILD + ' — dashboard auto-pop + person-scoped plate');
 })();

@@ -7,7 +7,7 @@
   if (window._cchStaffChatLoaded) return;
   window._cchStaffChatLoaded = true;
 
-  var BUILD = '20260806sc089';
+  var BUILD = '20260811sc090';
   var POLL_MS = 45000;
   var ROOM_PATH = 'internal/staffChat';
   var MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -21,7 +21,11 @@
     fabHost: null,
     pendingImage: null,
     hydrated: false,
-    loadError: ''
+    loadError: '',
+    pingReady: false,
+    lastPingMsgId: '',
+    lastPingAt: 0,
+    audioCtx: null
   };
 
   /** index.html keeps currentUser in script scope — never bare-ref it (login-page ReferenceError). */
@@ -51,6 +55,52 @@
   function scEscAttr(s) { return scEsc(s).replace(/"/g, '&quot;'); }
   function scToast(msg, type) {
     if (typeof showToast === 'function') showToast(msg, type || 'info');
+  }
+  /** Soft two-tone ping for incoming staff chat (recipient only). */
+  function scPlayPing() {
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      if (!scState.audioCtx) scState.audioCtx = new Ctx();
+      var ctx = scState.audioCtx;
+      if (ctx.state === 'suspended' && typeof ctx.resume === 'function') ctx.resume();
+      var t0 = ctx.currentTime;
+      function tone(freq, start, dur) {
+        var o = ctx.createOscillator();
+        var g = ctx.createGain();
+        o.type = 'sine';
+        o.frequency.value = freq;
+        g.gain.setValueAtTime(0.0001, start);
+        g.gain.exponentialRampToValueAtTime(0.07, start + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.start(start);
+        o.stop(start + dur + 0.02);
+      }
+      tone(880, t0, 0.12);
+      tone(1174.7, t0 + 0.11, 0.14);
+    } catch (ePing) { /* browsers may block until a click */ }
+  }
+  function scNotifyIncoming(m) {
+    if (!m || !scIsTeam() || !scIsStudioRoute()) return;
+    var myRole = scMyRole();
+    if (m.authorRole === myRole) return;
+    var now = Date.now();
+    if (scState.lastPingAt && (now - scState.lastPingAt) < 1600) return;
+    scState.lastPingAt = now;
+    var who = String(m.authorName || '').trim();
+    if (!who) {
+      if (m.fromClient || m.source === 'client_pepper' || m.authorRole === 'client') who = 'Client';
+      else if (m.authorRole === 'vanessa') who = 'Vanessa';
+      else who = 'Cindy';
+    }
+    var preview = String(m.text || '').trim();
+    if (!preview && m.imageUrl) preview = '[photo]';
+    if (preview.length > 72) preview = preview.slice(0, 71) + '\u2026';
+    scToast('Staff chat \u00b7 ' + who + (preview ? ': ' + preview : ''), 'info');
+    scPlayPing();
+    try { scRefreshUnread(); } catch (eU) { /* */ }
   }
   function scFmtDate(ts) {
     if (!ts) return '';
@@ -528,6 +578,31 @@
     if (opts.error != null) scState.loadError = String(opts.error || '');
     else if (opts.clearError) scState.loadError = '';
     scRenderThreadEl();
+
+    var msgs = scState.messages || [];
+    if (!scState.pingReady) {
+      scState.pingReady = true;
+      scState.lastPingMsgId = msgs.length ? String(msgs[msgs.length - 1].id || '') : '';
+      return;
+    }
+    var start = 0;
+    if (scState.lastPingMsgId) {
+      for (var i = 0; i < msgs.length; i++) {
+        if (String(msgs[i].id || '') === scState.lastPingMsgId) {
+          start = i + 1;
+          break;
+        }
+      }
+    }
+    var newestIncoming = null;
+    for (var j = start; j < msgs.length; j++) {
+      var m = msgs[j];
+      if (!m) continue;
+      if (m.authorRole === scMyRole()) continue;
+      newestIncoming = m;
+    }
+    if (msgs.length) scState.lastPingMsgId = String(msgs[msgs.length - 1].id || '');
+    if (newestIncoming) scNotifyIncoming(newestIncoming);
   }
 
   function scRenderThreadEl() {
@@ -889,6 +964,8 @@
           scState.messages = [];
           scState.hydrated = false;
           scState.loadError = '';
+          scState.pingReady = false;
+          scState.lastPingMsgId = '';
           scInjectNavBadge(false);
         }
       });

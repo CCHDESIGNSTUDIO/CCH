@@ -35,13 +35,18 @@
     'Fabric + Trim': 'Fabric & Trim',
     'Fabric': 'Fabric & Trim',
     'Fabri': 'Fabric & Trim',
+    'Furniture & Fixtures': 'Furniture',
+    'Furnishings': 'Furniture',
     'Furniture & Upholstery': 'Furniture',
+    'LIGHTING': 'Lighting',
+    'lighting': 'Lighting',
     'Mirrors & Accessories': 'Accessories',
-    'mirror': 'Accessories',
+    'mirror': 'Mirror',
     'Floor Covering': 'Flooring',
     'floor': 'Flooring',
     'Stone & Tile': 'Tile & Stone',
     'Wall': 'Wall Covering',
+    'Window': 'Windows',
     'Appliances  & Plumbing': 'Plumbing & Appliances',
     'Kitchen and Bath': 'Plumbing & Appliances',
     'Cushions': 'Bedding & Pillows',
@@ -53,6 +58,13 @@
     'Cabinet hardware': 'Cabinet Hardware',
     'Window hardware': 'Window Hardware'
   };
+
+  /** Legacy combined / billing labels — never offer in FFE category pickers. */
+  var DEPRECATED_FFE_EXTRA = new Set([
+    'materials / cogs', 'materials', 'cogs', 'cog',
+    'furniture & fixtures', 'furnishings',
+    'mirrors & accessories', 'mirrors and accessories'
+  ]);
 
   global.CCH_PRODUCT_CATEGORIES_MASTER = MASTER.slice();
 
@@ -242,7 +254,10 @@
     'time billing', 'time track', 'time tracking', 'hourly', 'retainer',
     'cch admin', 'shipping', 'handling', 'sales tax', 'discount', 'other expense',
     'professional services', 'project management', 'design fee - rates are already set in smart time',
-    'uncategorized', 'etails', 'details', 'etail', 'retail', 'fee', 'fees', 'taxes'
+    'uncategorized', 'etails', 'details', 'etail', 'retail', 'fee', 'fees', 'taxes',
+    'materials / cogs', 'materials', 'cogs', 'cog',
+    'furniture & fixtures', 'furnishings',
+    'mirrors & accessories', 'mirrors and accessories'
   ]);
 
   /** Billing / service labels — never show in Product Library or Selections category pickers. */
@@ -250,6 +265,37 @@
     var s = String(label || '').trim();
     if (!s) return true;
     return NOT_FFE_CATEGORY_LABEL.has(s.toLowerCase());
+  };
+
+  /** Houzz / legacy junk — never surface as a picker option even if stored on old clips. */
+  global.cchIsDeprecatedFfeCategoryExtra = function (label) {
+    var s = String(label || '').trim().toLowerCase();
+    if (!s) return false;
+    return DEPRECATED_FFE_EXTRA.has(s);
+  };
+
+  /** Filter junk / duplicates from a category list; master order first, then valid extras. */
+  global.cchSanitizeFfeCategoryPickerList = function (list) {
+    var seen = new Set();
+    var out = [];
+    (list || []).forEach(function (raw) {
+      if (!raw) return;
+      if (global.cchIsDeprecatedFfeCategoryExtra(raw)) return;
+      if (global.cchIsNonProductFfeCategory(raw)) return;
+      var norm = global.cchNormalizeProductCategory(raw);
+      if (!norm || global.cchIsDeprecatedFfeCategoryExtra(norm) || global.cchIsNonProductFfeCategory(norm)) return;
+      var key = norm.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(norm);
+    });
+    var masterPart = MASTER.filter(function (m) { return seen.has(m.toLowerCase()); });
+    var extraPart = out.filter(function (c) {
+      return MASTER.map(function (m) { return m.toLowerCase(); }).indexOf(c.toLowerCase()) < 0;
+    }).sort(function (a, b) {
+      return a.localeCompare(b, undefined, { sensitivity: 'base' });
+    });
+    return masterPart.length ? masterPart.concat(extraPart) : MASTER.slice();
   };
 
   /** Room / space labels must not appear in FFE category pickers (e.g. "Master Bedroom" in category field). */
@@ -272,6 +318,7 @@
    */
   global.cchAllProductCategories = function (boardCategories, boardRooms) {
     var masterSet = new Set(MASTER);
+    var masterLc = new Set(MASTER.map(function (m) { return String(m).toLowerCase(); }));
     var roomSet = new Set();
     if (boardRooms && boardRooms.length) {
       boardRooms.forEach(function (r) {
@@ -280,6 +327,7 @@
       });
     }
     var extras = [];
+    var extrasLc = new Set();
     if (boardCategories && boardCategories.length) {
       boardCategories.forEach(function (x) {
         if (!x) return;
@@ -287,10 +335,21 @@
         if (!s) return;
         if (global.cchCategoryIsCommaMulti(s)) return;
         if (global.cchStringLooksLikePhysicalRoom(s)) return;
+        if (global.cchIsDeprecatedFfeCategoryExtra(s)) return;
         var sl = s.toLowerCase();
         if (roomSet.has(sl)) return;
         if (NOT_FFE_CATEGORY_LABEL.has(sl)) return;
-        if (!masterSet.has(s)) extras.push(s);
+        var normalized = global.cchNormalizeProductCategory(s);
+        if (!normalized) return;
+        if (global.cchIsDeprecatedFfeCategoryExtra(normalized)) return;
+        if (global.cchIsNonProductFfeCategory(normalized)) return;
+        var nl = normalized.toLowerCase();
+        if (roomSet.has(nl)) return;
+        if (NOT_FFE_CATEGORY_LABEL.has(nl)) return;
+        if (masterSet.has(normalized) || masterLc.has(nl)) return;
+        if (extrasLc.has(nl)) return;
+        extrasLc.add(nl);
+        extras.push(normalized);
       });
     }
     extras = Array.from(new Set(extras)).sort(function (a, b) {

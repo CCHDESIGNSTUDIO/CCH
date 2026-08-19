@@ -9,7 +9,7 @@
   if (window._cchBugsRequestsLoaded) return;
   window._cchBugsRequestsLoaded = true;
 
-  var BUILD = '20260806wo086';
+  var BUILD = '20260811fb147';
   var POLL_MS = 45000;
   var MIGRATE_KEY = 'cchFbMigratedV1';
 
@@ -247,6 +247,9 @@
       var id = row.id;
       var data = row.data || row;
       if (!id) continue;
+      // Fast path: parent doc already has assistant lastMessage — skip messages subcollection query
+      var lm = data && data.lastMessage;
+      if (lm && String(lm.authorRole || '') === 'assistant') continue;
       var did = await fbPostAssistantAck(database, id, data, new Date().toISOString(), { useBot: false });
       if (did) posted++;
     }

@@ -26,7 +26,7 @@ async function showNewInvoiceModal(projectId) {
     }
   } catch (e0) { invNum = ''; }
   if (!invNum) invNum = 'INV-TEMP-' + String(Date.now());
-  var dueDefault = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+  var dueDefault = new Date().toISOString().split('T')[0]; /* due upon receipt */
   var invNumAttr = typeof escAttr === 'function' ? escAttr(invNum) : invNum.replace(/"/g, '&quot;');
   document.getElementById('modalContainer').innerHTML =
     '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">' +
@@ -61,10 +61,10 @@ async function saveNewInvoice(projectId) {
     if (!niNum) niNum = 'INV-TEMP-' + String(Date.now());
     var docTag = document.getElementById('niDocTag') ? String(document.getElementById('niDocTag').value || '').trim() : '';
     var notesRaw = document.getElementById('niNotes') ? document.getElementById('niNotes').value.trim() : '';
-    var defaultNotes = 'All fees are non-refundable. Freight and delivery charges will be invoiced separately upon shipment. Payment due within 30 days of invoice date. Please reference invoice number with payment.';
+    var defaultNotes = 'All fees are non-refundable. Freight and delivery charges will be invoiced separately upon shipment. Payment due upon receipt. Please reference invoice number with payment.';
     var today = new Date().toISOString().split('T')[0];
     var dueEl = document.getElementById('niDue');
-    var due = dueEl && dueEl.value ? dueEl.value : new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+    var due = dueEl && dueEl.value ? dueEl.value : today;
 
     var cName = '';
     var cEmail = '';
@@ -422,9 +422,10 @@ function _cchInferLinkedDocsOverlap(docType, docId, docData, lists, push) {
   }
 }
 
-/** Sync linked-doc resolver for finance list rows. */
-window.cchCollectLinkedProjectDocsSync = function(docType, docId, docData, lists) {
+/** Sync linked-doc resolver for finance list rows. opts.strictLinks = true skips fuzzy item/vendor overlap (list columns). */
+window.cchCollectLinkedProjectDocsSync = function(docType, docId, docData, lists, opts) {
   lists = lists || {};
+  opts = opts || {};
   docData = docData || {};
   var proposals = lists.proposals || [];
   var invoices = lists.invoices || [];
@@ -464,7 +465,7 @@ window.cchCollectLinkedProjectDocsSync = function(docType, docId, docData, lists
       if (sid(iv.linkedProposalId) === docId || sid(iv.fromProposal) === docId) invId = iv.id;
     });
   }
-  if (docType !== 'invoice' && invId) {
+  if (docType !== 'invoice' && invId && !(opts.strictLinks && docType === 'po')) {
     var ivm = invoices.find(function(iv) { return iv.id === invId; });
     if (ivm) push('invoice', ivm.id, ivm);
   }
@@ -532,7 +533,9 @@ window.cchCollectLinkedProjectDocsSync = function(docType, docId, docData, lists
   }
 
   _cchParseConnectedDocsField(docData.connectedDocs, lists, push);
-  _cchInferLinkedDocsOverlap(docType, docId, docData, lists, push);
+  if (!opts.strictLinks) {
+    _cchInferLinkedDocsOverlap(docType, docId, docData, lists, push);
+  }
 
   // PO sources surface only their proposal & invoice — never sibling POs (per
   // Cynthia). Applied at discovery so both the Linked Docs column and the
@@ -989,9 +992,9 @@ async function showNewVendorModal(existingId, categoryHint) {
   }
   document.getElementById('modalContainer').innerHTML =
     '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">' +
-    '<div class="modal" style="width:680px;max-height:90vh;overflow-y:auto;">' +
-    '<div class="modal-header"><div class="modal-title">' + title + '</div><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
-    '<div class="modal-body"><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">' +
+    '<div class="modal" style="width:680px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;">' +
+    '<div class="modal-header" style="flex-shrink:0;"><div class="modal-title">' + title + '</div><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+    '<div class="modal-body" style="overflow-y:auto;flex:1;min-height:0;"><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">' +
     '<div class="form-group"><label class="form-label">Name *</label><input class="form-input" id="vnName" value="' + escAttr(v.name||'') + '"></div>' +
     '<div class="form-group"><label class="form-label">Type</label><select class="form-input" id="vnType" style="padding:8px 10px;">' + typeSelectOpts + '</select></div>' +
     '<div class="form-group"><label class="form-label">Contact</label><input class="form-input" id="vnContact" value="' + escAttr(v.contact||'') + '"></div>' +
@@ -1017,59 +1020,99 @@ async function showNewVendorModal(existingId, categoryHint) {
     '<div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="vnNotes" rows="2">' + esc(v.notes||'') + '</textarea></div>' +
     moveOpts +
     '</div>' +
-    '<div class="modal-footer" style="justify-content:space-between;">' + deleteBtn +
-    '<div style="display:flex;gap:8px;"><button class="btn btn-secondary" onclick="closeModal()">Cancel</button>' +
-    '<button class="btn btn-primary" onclick="saveVendor(\'' + (existingId||'') + '\',\'' + cat + '\')">' + (existingId ? 'Save Changes' : 'Add ' + cat) + '</button></div>' +
+    '<div class="modal-footer" style="flex-shrink:0;justify-content:space-between;border-top:1px solid var(--gray-200);background:#fff;">' + deleteBtn +
+    '<div style="display:flex;gap:8px;"><button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>' +
+    '<button type="button" class="btn btn-primary" id="vnSaveBtn" onclick="saveVendor(\'' + (existingId||'') + '\',\'' + cat + '\')">' + (existingId ? 'Save Changes' : 'Add ' + cat) + '</button></div>' +
     '</div></div></div>';
 }
 
 async function saveVendor(existingId, category) {
   var cat = category || 'Vendor';
-  var name = document.getElementById('vnName').value.trim();
-  if (!name) { if (typeof cchAlert === 'function') await cchAlert('Name is required.', 'Vendor'); return; }
+  var nameEl = document.getElementById('vnName');
+  if (!nameEl) {
+    if (typeof cchAlert === 'function') await cchAlert('Form not ready — reopen Edit and try again.', cat);
+    return;
+  }
+  var name = nameEl.value.trim();
+  if (!name) { if (typeof cchAlert === 'function') await cchAlert('Name is required.', cat); return; }
   var addrParts = {
-    line1: document.getElementById('vnAddress1').value.trim(),
-    line2: document.getElementById('vnAddress2').value.trim(),
-    city: document.getElementById('vnCity').value.trim(),
-    state: document.getElementById('vnState').value.trim(),
-    zip: document.getElementById('vnZip').value.trim()
+    line1: (document.getElementById('vnAddress1') || {}).value || '',
+    line2: (document.getElementById('vnAddress2') || {}).value || '',
+    city: (document.getElementById('vnCity') || {}).value || '',
+    state: (document.getElementById('vnState') || {}).value || '',
+    zip: (document.getElementById('vnZip') || {}).value || ''
   };
+  addrParts.line1 = String(addrParts.line1).trim();
+  addrParts.line2 = String(addrParts.line2).trim();
+  addrParts.city = String(addrParts.city).trim();
+  addrParts.state = String(addrParts.state).trim();
+  addrParts.zip = String(addrParts.zip).trim();
+  // City accidentally typed in Address 2 (common legacy) — promote when City is empty
+  if (!addrParts.city && addrParts.line2 && !/\d/.test(addrParts.line2) && addrParts.line2.length < 40 && !/^suite|^unit|^apt/i.test(addrParts.line2)) {
+    addrParts.city = addrParts.line2;
+    addrParts.line2 = '';
+  }
+  if (typeof window.cchStripDuplicateCityStateZipFromStreet === 'function') {
+    addrParts.line1 = window.cchStripDuplicateCityStateZipFromStreet(addrParts.line1, addrParts.city, addrParts.state, addrParts.zip);
+  }
   var composed = typeof window.cchComposeAddressMultiline === 'function'
     ? window.cchComposeAddressMultiline(addrParts)
-    : [addrParts.line1, addrParts.line2, [addrParts.city, addrParts.state].filter(Boolean).join(', '), addrParts.zip].filter(Boolean).join('\n');
+    : [addrParts.line1, addrParts.line2, [addrParts.city, addrParts.state].filter(Boolean).join(', ') + (addrParts.zip ? ' ' + addrParts.zip : '')].filter(Boolean).join('\n');
+  var ownerEmail = '';
+  try {
+    if (typeof currentUser !== 'undefined' && currentUser && currentUser.email) ownerEmail = currentUser.email;
+    else if (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) ownerEmail = firebase.auth().currentUser.email || '';
+  } catch (_o) {}
   var data = {
     name: name,
     category: cat,
-    type: document.getElementById('vnType').value.trim(),
-    contact: document.getElementById('vnContact').value.trim(),
-    phone: document.getElementById('vnPhone').value.trim(),
-    email: document.getElementById('vnEmail').value.trim(),
-    website: document.getElementById('vnWebsite').value.trim(),
+    type: ((document.getElementById('vnType') || {}).value || '').trim(),
+    contact: ((document.getElementById('vnContact') || {}).value || '').trim(),
+    phone: ((document.getElementById('vnPhone') || {}).value || '').trim(),
+    email: ((document.getElementById('vnEmail') || {}).value || '').trim(),
+    website: ((document.getElementById('vnWebsite') || {}).value || '').trim(),
     address: composed,
     addressLine1: addrParts.line1,
     addressLine2: addrParts.line2,
     city: addrParts.city,
     state: addrParts.state,
     zip: addrParts.zip,
-    account: document.getElementById('vnAccount').value.trim(),
-    leadTime: document.getElementById('vnLeadTime').value.trim(),
-    description: document.getElementById('vnDescription').value.trim(),
-    tags: document.getElementById('vnTags').value.trim(),
-    login: document.getElementById('vnLogin').value.trim(),
-    password: document.getElementById('vnPassword').value.trim(),
-    notes: document.getElementById('vnNotes').value.trim(),
-    updatedAt: new Date().toISOString(),
-    owner: currentUser.email
+    account: ((document.getElementById('vnAccount') || {}).value || '').trim(),
+    leadTime: ((document.getElementById('vnLeadTime') || {}).value || '').trim(),
+    description: ((document.getElementById('vnDescription') || {}).value || '').trim(),
+    tags: ((document.getElementById('vnTags') || {}).value || '').trim(),
+    login: ((document.getElementById('vnLogin') || {}).value || '').trim(),
+    password: ((document.getElementById('vnPassword') || {}).value || '').trim(),
+    notes: ((document.getElementById('vnNotes') || {}).value || '').trim(),
+    updatedAt: new Date().toISOString()
   };
+  if (ownerEmail) data.owner = ownerEmail;
+  var saveBtn = document.getElementById('vnSaveBtn');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
   try {
     if (existingId) { await db.collection('vendors').doc(existingId).update(data); }
     else { data.createdAt = new Date().toISOString(); await db.collection('vendors').add(data); }
+    try {
+      if (typeof window.cchSyncVendorNameToClipperList === 'function') {
+        await window.cchSyncVendorNameToClipperList(name);
+      }
+    } catch (_eSync) {}
     if (typeof window._invalidateShipToContactsCache === 'function') window._invalidateShipToContactsCache();
+    if (typeof showToast === 'function') showToast('Saved ' + name, 'success');
     closeModal();
-    if (cat === 'Workroom') renderWorkrooms();
-    else if (cat === 'Delivery / Receiver') renderDeliveryReceivers();
-    else renderVendors();
-  } catch(e) { if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Vendor'); }
+    if (cat === 'Workroom') {
+      if (typeof window.renderWorkrooms === 'function') window.renderWorkrooms();
+      else if (typeof renderWorkrooms === 'function') renderWorkrooms();
+    } else if (cat === 'Delivery / Receiver') {
+      if (typeof window.renderDeliveryReceivers === 'function') window.renderDeliveryReceivers();
+      else if (typeof renderDeliveryReceivers === 'function') renderDeliveryReceivers();
+    } else if (typeof renderVendors === 'function') {
+      renderVendors();
+    }
+  } catch (e) {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = existingId ? 'Save Changes' : 'Add ' + cat; }
+    if (typeof cchAlert === 'function') await cchAlert('Error: ' + (e.message || e), cat);
+  }
 }
 
 async function deleteVendor(id, category) {
@@ -1509,6 +1552,7 @@ async function renderWorkrooms() {
     renderWorkroomsView('');
   } catch(e) { T.innerHTML = '<div class="empty-state"><div class="empty-text">Error: ' + esc(e.message) + '</div></div>'; }
 }
+window.renderWorkrooms = renderWorkrooms;
 
 function renderWorkroomsView(query) {
   var T = document.getElementById('contentArea');
@@ -1586,12 +1630,22 @@ function renderReceiversView(query) {
     return;
   }
   var rows = filtered.map(function(v) {
+    var addrDisp = '';
+    if (typeof window.cchComposeAddressMultiline === 'function' && typeof window.cchAddressPartsFromRecord === 'function') {
+      var ap = (typeof window.cchCoerceStructuredAddressParts === 'function')
+        ? window.cchCoerceStructuredAddressParts(window.cchAddressPartsFromRecord(v))
+        : window.cchAddressPartsFromRecord(v);
+      addrDisp = window.cchComposeAddressMultiline(ap) || '';
+    } else {
+      addrDisp = v.address || '';
+    }
+    addrDisp = String(addrDisp).replace(/\n/g, ', ');
     return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="showNewVendorModal(\'' + v.id + '\',\'Delivery / Receiver\')">' +
       '<td style="padding:10px 12px;font-weight:600;">' + esc(v.name||'') + '</td>' +
       '<td style="padding:10px 12px;font-size:12px;color:var(--gray-500);">' + esc(v.description||v.type||'') + '</td>' +
       '<td style="padding:10px 12px;">' + esc(v.contact||'') + '</td>' +
       '<td style="padding:10px 12px;">' + esc(v.phone||'') + (v.email ? '<br><span style="font-size:11px;color:var(--gray-400);">' + esc(v.email) + '</span>' : '') + '</td>' +
-      '<td style="padding:10px 12px;font-size:12px;">' + esc(v.address||'').substring(0,40) + '</td>' +
+      '<td style="padding:10px 12px;font-size:12px;">' + esc(addrDisp).substring(0,40) + '</td>' +
       '<td style="padding:10px 8px;"><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();showNewVendorModal(\'' + v.id + '\',\'Delivery / Receiver\')">Edit</button></td></tr>';
   }).join('');
   T.innerHTML = '<h1 class="page-title">Delivery / Receivers</h1>' +

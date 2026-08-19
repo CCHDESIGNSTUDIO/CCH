@@ -114,6 +114,220 @@
     return { id: snap.id, data: snap.data() || {} };
   }
 
+  function cchNormTitleVendor(title, vendor) {
+    return String(title || '').trim().toLowerCase() + '|' + String(vendor || '').trim().toLowerCase();
+  }
+
+  function cchLibraryVendor(row) {
+    row = row || {};
+    return String(row.vendor || row.manufacturer || '').trim();
+  }
+
+  async function cchFindSiblingLibraryRows(prod, libId) {
+    var out = [];
+    var data = (prod && prod.data) || {};
+    var title = String(data.title || '').trim();
+    var vendor = cchLibraryVendor(data);
+    var tv = cchNormTitleVendor(title, vendor);
+    var titleOnly = String(title || '').trim().toLowerCase();
+    var houzzId = String(data.houzzId || data.houzzProductId || '').trim();
+    if (!title) return out;
+
+    function titlesMatch(a, b) {
+      var ta = String(a || '').trim().toLowerCase();
+      var tb = String(b || '').trim().toLowerCase();
+      return !!ta && ta === tb;
+    }
+    function vendorsCompatible(a, b) {
+      var va = String(a || '').trim().toLowerCase();
+      var vb = String(b || '').trim().toLowerCase();
+      if (!va || !vb) return true; // empty vendor on either side still matches same title
+      return va === vb;
+    }
+
+    function consider(id, row) {
+      if (!id || id === libId) return;
+      row = row || {};
+      var rowVend = cchLibraryVendor(row);
+      if (houzzId && String(row.houzzId || row.houzzProductId || '').trim() === houzzId) {
+        if (!out.some(function(x) { return x.id === id; })) out.push({ id: id, data: row });
+        return;
+      }
+      // Same title + compatible vendor (vendor OR manufacturer — Houzz rows often only have manufacturer)
+      if (titlesMatch(row.title, title) && vendorsCompatible(rowVend, vendor)) {
+        if (!out.some(function(x) { return x.id === id; })) out.push({ id: id, data: row });
+        return;
+      }
+      if (tv !== '|' && cchNormTitleVendor(row.title, rowVend) === tv) {
+        if (!out.some(function(x) { return x.id === id; })) out.push({ id: id, data: row });
+      }
+    }
+
+    if (global.libraryProducts && Array.isArray(global.libraryProducts) && global.libraryProducts.length) {
+      global.libraryProducts.forEach(function(p) { if (p) consider(p.id, p); });
+    }
+
+    // If we already found siblings, or the in-memory catalog looks complete, stop.
+    // If catalog is tiny / empty, fall through to Firestore title query.
+    if (out.length || (global.libraryProducts && global.libraryProducts.length > 50)) return out;
+
+    var db = global.db;
+    if (!db || !titleOnly) return out;
+    try {
+      var snap = await db.collection('products').where('title', '==', title).limit(40).get();
+      snap.forEach(function(d) { consider(d.id, d.data()); });
+    } catch (_e1) {
+      try {
+        var snapAll = await db.collection('products').limit(800).get();
+        snapAll.forEach(function(d) { consider(d.id, d.data()); });
+      } catch (_e1b) {}
+    }
+    try {
+      var snap2 = await db.collection('productLibrary').where('title', '==', title).limit(40).get();
+      snap2.forEach(function(d) { consider(d.id, d.data()); });
+    } catch (_e2) {
+      try {
+        var snap2b = await db.collection('productLibrary').limit(800).get();
+        snap2b.forEach(function(d) { consider(d.id, d.data()); });
+      } catch (_e2b) {}
+    }
+    return out;
+  }
+
+  /** Title match; vendor required only when both sides have one (WO-057). */
+  function cchTitleVendorLooseMatch(rowTitle, rowVendor, title, vendor) {
+    var lt = String(rowTitle || '').trim().toLowerCase();
+    var pt = String(title || '').trim().toLowerCase();
+    if (!lt || !pt || lt !== pt) return false;
+    var lv = String(rowVendor || '').trim().toLowerCase();
+    var pv = String(vendor || '').trim().toLowerCase();
+    if (!lv || !pv) return true;
+    return lv === pv;
+  }
+
+  async function cchScanClipsByTitleVendor(projectId, title, vendor, libId, addTarget) {
+    var db = global.db;
+    if (!db || !projectId || !title) return;
+    var pname = projectId;
+    try {
+      var bs = await db.collection('boards').doc(projectId).get();
+      if (bs.exists) pname = (bs.data() || {}).name || projectId;
+    } catch (_eBn) {}
+    try {
+      var cs = await db.collection('boards').doc(projectId).collection('clips').limit(500).get();
+      cs.forEach(function(cd) {
+        var c = cd.data() || {};
+        if (!cchTitleVendorLooseMatch(c.title, c.vendor, title, vendor)) return;
+        var clipLib = String(c.libraryProductId || c.libraryId || '').trim();
+        // Already linked to this library id — covered by libraryProductId query; skip dupe work
+        if (clipLib && clipLib === libId) return;
+        // Linked to a different library product — do not hijack
+        if (clipLib && clipLib !== libId) return;
+        addTarget({
+          key: 'clip|' + projectId + '|' + cd.id,
+          type: 'clip',
+          projectId: projectId,
+          projectName: pname,
+          id: cd.id,
+          title: c.title || '',
+          currentCost: cchClipTradeCost(c),
+          lockReason: cchClipCostLockReason(c, projectId),
+          _titleVendorMatch: true,
+          _healLibraryId: libId
+        });
+      });
+    } catch (_eClip) {}
+  }
+
+  /**
+   * WO-057 — match unlocked proposal/invoice/PO lines by title(+vendor) when libraryProductId is missing.
+   * Respects cchDocLineCostLockReason (draft proposals stay unlocked).
+   */
+  async function cchScanLinesByTitleVendor(projectId, title, vendor, libId, addTarget) {
+    var db = global.db;
+    if (!db || !projectId || !title) return;
+    var pname = projectId;
+    try {
+      var bs = await db.collection('boards').doc(projectId).get();
+      if (bs.exists) pname = (bs.data() || {}).name || projectId;
+    } catch (_eBn) {}
+    var collections = ['proposals', 'invoices', 'purchaseOrders'];
+    for (var ci = 0; ci < collections.length; ci++) {
+      var coll = collections[ci];
+      try {
+        var snap = await db.collection('boards').doc(projectId).collection(coll).get();
+        for (var di = 0; di < snap.docs.length; di++) {
+          var d = snap.docs[di];
+          var docData = d.data() || {};
+          var items = docData.items || [];
+          var num = '';
+          if (coll === 'proposals') num = docData.proposalNum || docData.number || d.id;
+          else if (coll === 'invoices') num = docData.invoiceNum || docData.number || d.id;
+          else num = docData.poNumber || docData.number || d.id;
+          for (var li = 0; li < items.length; li++) {
+            var line = items[li];
+            if (!line) continue;
+            if (typeof global.isProposalGroupHeaderItem === 'function' && global.isProposalGroupHeaderItem(line)) continue;
+            if (!cchTitleVendorLooseMatch(line.title || line.name, line.vendor, title, vendor)) continue;
+            var lineLib = String(line.libraryProductId || line.linkedLibraryProductId || '').trim();
+            if (lineLib && lineLib === libId) continue;
+            if (lineLib && lineLib !== libId) continue;
+            addTarget({
+              key: 'line|' + projectId + '|' + coll + '|' + d.id + '|' + li,
+              type: 'line',
+              projectId: projectId,
+              projectName: pname,
+              collection: coll,
+              docId: d.id,
+              docNum: num,
+              lineIndex: li,
+              title: line.title || line.name || '',
+              currentCost: cchLineTradeCost(line),
+              lockReason: cchDocLineCostLockReason(line, coll, docData, projectId),
+              _titleVendorMatch: true,
+              _healLibraryId: libId
+            });
+          }
+        }
+      } catch (_eColl) {}
+    }
+  }
+
+  async function cchPruneStaleLibraryUsageRefs(libId, staleKeys) {
+    libId = String(libId || '').trim();
+    if (!libId || !staleKeys || !staleKeys.length) return 0;
+    var db = global.db;
+    if (!db) return 0;
+    var prod = await cchLoadLibraryProduct(libId);
+    if (!prod) return 0;
+    var refs = Object.assign({}, prod.data.libraryUsageRefs || {});
+    var removed = 0;
+    for (var i = 0; i < staleKeys.length; i++) {
+      var k = staleKeys[i];
+      if (k && refs[k] != null) {
+        delete refs[k];
+        removed++;
+      }
+    }
+    if (!removed) return 0;
+    var patch = { libraryUsageRefs: refs, updatedAt: new Date().toISOString() };
+    try {
+      if (typeof global._updateLibraryProductDual === 'function') {
+        await global._updateLibraryProductDual(libId, patch, {
+          explicitLibraryEdit: true,
+          explicitUserAction: true,
+          source: 'cchPruneStaleLibraryUsageRefs'
+        });
+      } else {
+        await db.collection('products').doc(libId).set(patch, { merge: true });
+      }
+    } catch (_ePrune) {
+      console.warn('[cchPruneStaleLibraryUsageRefs]', libId, _ePrune);
+      return 0;
+    }
+    return removed;
+  }
+
   /**
    * @param {object} opts
    * @param {string} opts.libraryProductId
@@ -171,6 +385,22 @@
       });
     }
 
+    var siblings = await cchFindSiblingLibraryRows(prod, libId);
+    var siblingIds = [];
+    for (var si = 0; si < siblings.length; si++) {
+      var sib = siblings[si];
+      siblingIds.push(sib.id);
+      addTarget({
+        key: 'library|' + sib.id,
+        type: 'library',
+        id: sib.id,
+        title: sib.data.title || '',
+        currentCost: cchParseTradeCost(sib.data.costPrice != null ? sib.data.costPrice : sib.data.unitCost),
+        lockReason: cchLibraryCostLockReason(sib.data),
+        _siblingLibrary: true
+      });
+    }
+
     var refs = prod.data.libraryUsageRefs || {};
     Object.keys(refs).forEach(function(refKey) {
       var r = refs[refKey];
@@ -178,15 +408,23 @@
       projectIds[r.projectId] = true;
     });
 
-    projectIds = await cchResolveScanProjectIds(prod.data, opts);
+    // Library pushes always deep-scan: stale libraryUsageRefs used to disable fallback and hide siblings' clips.
+    var doDeep = opts.deepScan === true || opts.source === 'library';
+    projectIds = await cchResolveScanProjectIds(prod.data, Object.assign({}, opts, { deepScan: doDeep }));
     Object.keys(refs).forEach(function(refKey) {
       var r = refs[refKey];
       if (r && r.projectId) projectIds[r.projectId] = true;
     });
 
+    var staleRefKeys = [];
+    function markStaleRef(refKey) {
+      if (!refKey || staleRefKeys.indexOf(refKey) >= 0) return;
+      staleRefKeys.push(refKey);
+    }
     var refKeys = Object.keys(refs);
     for (var ri = 0; ri < refKeys.length; ri++) {
-      var ref = refs[refKeys[ri]];
+      var refKey = refKeys[ri];
+      var ref = refs[refKey];
       if (!ref || ref.lineIndex == null) continue;
       var coll = collectionFromKind(ref.kind);
       if (!coll) continue;
@@ -194,11 +432,19 @@
       if (isNaN(lineIdx) || lineIdx < 0) continue;
       try {
         var ds = await db.collection('boards').doc(ref.projectId).collection(coll).doc(ref.docId).get();
-        if (!ds.exists) continue;
+        if (!ds.exists) {
+          markStaleRef(refKey);
+          skipped.push({ key: 'line|' + refKey, lockReason: 'Could not load linked doc' });
+          continue;
+        }
         var docData = ds.data() || {};
         var items = docData.items || [];
         var line = items[lineIdx];
-        if (!line) continue;
+        if (!line) {
+          markStaleRef(refKey);
+          skipped.push({ key: 'line|' + refKey, lockReason: 'Could not load linked doc' });
+          continue;
+        }
         addTarget({
           key: 'line|' + ref.projectId + '|' + coll + '|' + ref.docId + '|' + lineIdx,
           type: 'line',
@@ -213,36 +459,54 @@
           lockReason: cchDocLineCostLockReason(line, coll, docData, ref.projectId)
         });
       } catch (_eRef) {
-        skipped.push({ key: 'line|' + refKeys[ri], lockReason: 'Could not load linked doc' });
+        markStaleRef(refKey);
+        skipped.push({ key: 'line|' + refKey, lockReason: 'Could not load linked doc' });
       }
     }
 
+    var libIdsToScan = [libId].concat(siblingIds);
     var pids = Object.keys(projectIds);
     for (var pi = 0; pi < pids.length; pi++) {
       var pid = pids[pi];
-      try {
-        var cs = await db.collection('boards').doc(pid).collection('clips').where('libraryProductId', '==', libId).get();
-        cs.forEach(function(cd) {
-          var c = cd.data() || {};
-          var pname = refProjectName(refs, pid) || pid;
-          addTarget({
-            key: 'clip|' + pid + '|' + cd.id,
-            type: 'clip',
-            projectId: pid,
-            projectName: pname,
-            id: cd.id,
-            title: c.title || '',
-            currentCost: cchClipTradeCost(c),
-            lockReason: cchClipCostLockReason(c, pid)
+      for (var li = 0; li < libIdsToScan.length; li++) {
+        var scanLib = libIdsToScan[li];
+        try {
+          var cs = await db.collection('boards').doc(pid).collection('clips').where('libraryProductId', '==', scanLib).get();
+          cs.forEach(function(cd) {
+            var c = cd.data() || {};
+            var pname = refProjectName(refs, pid) || pid;
+            addTarget({
+              key: 'clip|' + pid + '|' + cd.id,
+              type: 'clip',
+              projectId: pid,
+              projectName: pname,
+              id: cd.id,
+              title: c.title || '',
+              currentCost: cchClipTradeCost(c),
+              lockReason: cchClipCostLockReason(c, pid)
+            });
           });
-        });
-      } catch (_eClip) {}
+        } catch (_eClip) {}
+      }
     }
 
     var usedFallback = false;
-    if (!Object.keys(refs).length || opts.deepScan) {
+    if (!Object.keys(refs).length || doDeep) {
       usedFallback = true;
-      await cchFallbackScanProjectsForLibraryId(libId, projectIds, addTarget, opts);
+      for (var fi = 0; fi < libIdsToScan.length; fi++) {
+        await cchFallbackScanProjectsForLibraryId(libIdsToScan[fi], projectIds, addTarget, opts);
+      }
+    }
+
+    if (doDeep && prod.data.title) {
+      var scanPids = Object.keys(projectIds);
+      var scanTitle = prod.data.title;
+      var scanVendor = cchLibraryVendor(prod.data);
+      for (var tvi = 0; tvi < scanPids.length; tvi++) {
+        await cchScanClipsByTitleVendor(scanPids[tvi], scanTitle, scanVendor, libId, addTarget);
+        // WO-057: unlinked draft proposal / invoice / PO lines (libId missing)
+        await cchScanLinesByTitleVendor(scanPids[tvi], scanTitle, scanVendor, libId, addTarget);
+      }
     }
 
     return {
@@ -253,7 +517,11 @@
       libraryProductId: libId,
       productTitle: prod.data.title || '',
       usedFallback: usedFallback,
-      refsCount: Object.keys(refs).length
+      refsCount: Object.keys(refs).length,
+      siblingCount: siblings.length,
+      projectsScanned: Object.keys(projectIds).length,
+      deepScan: doDeep,
+      staleRefKeys: staleRefKeys
     };
   }
 
@@ -346,11 +614,19 @@
     opts = opts || {};
     if (opts.projectId) ids[opts.projectId] = true;
     if (prodData.projectId) ids[String(prodData.projectId).trim()] = true;
-    if (opts.deepScan && typeof global.getCachedBoards === 'function') {
-      try {
-        var snap = await global.getCachedBoards();
-        snap.forEach(function(d) { ids[d.id] = true; });
-      } catch (_eAll) {}
+    if (opts.deepScan) {
+      if (typeof global.getCachedBoards === 'function') {
+        try {
+          var snap = await global.getCachedBoards();
+          snap.forEach(function(d) { ids[d.id] = true; });
+        } catch (_eAll) {}
+      }
+      if (!Object.keys(ids).length && global.db) {
+        try {
+          var bs = await global.db.collection('boards').limit(400).get();
+          bs.forEach(function(d) { ids[d.id] = true; });
+        } catch (_eB) {}
+      }
     }
     return ids;
   }
@@ -381,8 +657,10 @@
       ? '<p style="margin:0 0 14px;padding:10px 12px;background:rgba(196,164,100,0.08);border-radius:6px;font-size:12px;color:var(--gray-600);line-height:1.45;">' +
           (plan._noLibraryId
             ? '<strong>Selection saved.</strong> No Product Library row matched this title + vendor, so trade cost cannot sync elsewhere yet.'
-            : '<strong>Product Library saved.</strong> Project Selections may already show $' + newCost.toFixed(2) + ' when a room-board clip has no trade cost. ' +
-              'Apply below only writes to clips, proposals, invoices, and POs — not the row you just saved.') +
+            : '<strong>Product Library saved.</strong> No unlocked clips / proposals / invoices / POs / duplicate library rows need $' + newCost.toFixed(2) + ' right now.' +
+              (plan.siblingCount ? ' Found ' + plan.siblingCount + ' same-title library duplicate(s) — they already match or are locked.' : ' No same-title library duplicates found in the loaded catalog.') +
+              (plan.projectsScanned != null ? ' Scanned ' + plan.projectsScanned + ' project(s).' : '') +
+              (unchgN ? ' ' + unchgN + ' linked item(s) already match this cost.' : '')) +
           '</p>'
       : '';
 
@@ -393,7 +671,7 @@
         '<div class="modal-body" style="overflow:auto;flex:1;font-size:13px;line-height:1.45;">' +
           '<p style="margin:0 0 12px;"><strong>' + title + '</strong><br>Trade cost (DNET): <strong>$' + newCost.toFixed(2) + '</strong></p>' +
           zeroNote +
-          '<p style="font-size:11px;color:var(--gray-500);margin:0 0 10px;line-height:1.45;">All <strong>unlocked</strong> linked rows with a different trade cost are listed below. Locked invoices, sent POs, and cost-locked lines are skipped.</p>' +
+          '<p style="font-size:11px;color:var(--gray-500);margin:0 0 10px;line-height:1.45;">All <strong>unlocked</strong> linked rows with a different trade cost are listed below — including duplicate library rows with the same title + vendor. Locked invoices, sent POs, and cost-locked lines are skipped.</p>' +
           '<label style="display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:12px;cursor:pointer;">' +
             '<input type="checkbox" id="cchCostBulkFillEmpty"' + (fillEmptyOnly === true ? ' checked' : '') + '> Only fill empty or $0 rows (skip rows that already have trade cost)</label>' +
           '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--gray-500);margin-bottom:6px;">Will update (' + eligible.length + ')</div>' +
@@ -436,12 +714,18 @@
     }
 
     if (t.type === 'clip') {
-      await db.collection('boards').doc(t.projectId).collection('clips').doc(t.id).update({
+      var clipPatch = {
         cost: newCost,
         unitCost: newCost,
         costPrice: newCost,
         updatedAt: ts
-      });
+      };
+      // WO-057 heal: stamp library link when matched by title+vendor only
+      var healClip = String(t._healLibraryId || '').trim();
+      if (healClip && t._titleVendorMatch) {
+        clipPatch.libraryProductId = healClip;
+      }
+      await db.collection('boards').doc(t.projectId).collection('clips').doc(t.id).update(clipPatch);
       return true;
     }
 
@@ -453,6 +737,11 @@
       var line = items[t.lineIndex];
       if (!line) return false;
       line.cost = newCost;
+      var healLine = String(t._healLibraryId || '').trim();
+      if (healLine && t._titleVendorMatch) {
+        var existingLib = String(line.libraryProductId || line.linkedLibraryProductId || '').trim();
+        if (!existingLib) line.libraryProductId = healLine;
+      }
       var patch = { items: items, updatedAt: ts };
       if (t.collection === 'proposals') {
         patch.total = items.reduce(function(s, i) { return s + (parseFloat(i && i.amount) || 0); }, 0);
@@ -468,7 +757,13 @@
 
   global.cchApplyTradeCostBulk = async function(plan) {
     plan = plan || global._cchTradeCostBulkPlan;
-    if (!plan || !plan.eligible || !plan.eligible.length) return { applied: 0 };
+    if (!plan || !plan.eligible || !plan.eligible.length) {
+      // Still prune stale refs even when nothing to update (user opened modal / force path)
+      if (plan && plan.staleRefKeys && plan.staleRefKeys.length && plan.libraryProductId) {
+        try { await cchPruneStaleLibraryUsageRefs(plan.libraryProductId, plan.staleRefKeys); } catch (_eP0) {}
+      }
+      return { applied: 0 };
+    }
     var btn = document.getElementById('cchCostBulkApplyBtn');
     if (btn) { btn.disabled = true; btn.textContent = 'Applying…'; }
     var applied = 0;
@@ -481,9 +776,15 @@
         console.warn('[cchApplyTradeCostBulk]', plan.eligible[i], e);
       }
     }
+    var pruned = 0;
+    if (plan.staleRefKeys && plan.staleRefKeys.length && plan.libraryProductId) {
+      try { pruned = await cchPruneStaleLibraryUsageRefs(plan.libraryProductId, plan.staleRefKeys); } catch (_eP) {}
+    }
     global.cchCloseTradeCostBulkModal();
     if (typeof global.showToast === 'function') {
-      global.showToast('Trade cost updated on ' + applied + ' item(s)' + (errors ? ' (' + errors + ' failed)' : ''), errors ? 'warning' : 'success', 5000);
+      var msg = 'Trade cost updated on ' + applied + ' item(s)' + (errors ? ' (' + errors + ' failed)' : '');
+      if (pruned) msg += ' · cleared ' + pruned + ' stale link(s)';
+      global.showToast(msg, errors ? 'warning' : 'success', 5000);
     }
     if (typeof global.invalidateProjectSelectionsCache === 'function' && plan.projectId) {
       try { global.invalidateProjectSelectionsCache(plan.projectId); } catch (_e) {}
@@ -528,6 +829,10 @@
       };
     } else {
       plan = await cchBuildTradeCostBulkPlan(opts);
+    }
+    // WO-057: drop dead libraryUsageRefs even when Apply is disabled (only skips)
+    if (plan.staleRefKeys && plan.staleRefKeys.length && plan.libraryProductId) {
+      try { await cchPruneStaleLibraryUsageRefs(plan.libraryProductId, plan.staleRefKeys); plan.staleRefKeys = []; } catch (_ePruneModal) {}
     }
     if (!opts.forceModal) {
       if (!plan.eligible.length && !plan.skipped.length && !plan.unchanged.length) {
@@ -596,19 +901,25 @@
       } catch (_eCm) {}
     }
     if (!libId) {
-      await global.cchShowTradeCostBulkModal({
-        forceModal: true,
-        newCost: newCost,
-        _noLibraryId: true,
-        productTitle: (opts.clip && opts.clip.title) || opts.productTitle || 'Selection'
-      });
+      if (typeof global.showToast === 'function') {
+        global.showToast('No Product Library link — save a trade cost on a linked item first.', 'info', 5000);
+      }
       return;
     }
 
     var scanOpts = Object.assign({}, opts, { libraryProductId: libId, newCost: newCost });
-    var prodSnap = await cchLoadLibraryProduct(libId);
-    var refsEmpty = !(prodSnap && prodSnap.data && prodSnap.data.libraryUsageRefs && Object.keys(prodSnap.data.libraryUsageRefs).length);
-    scanOpts.deepScan = !!refsEmpty;
+    // Always deep-scan from library — stale libraryUsageRefs were short-circuiting sibling/clip discovery.
+    scanOpts.deepScan = true;
+    var plan = await cchBuildTradeCostBulkPlan(scanOpts);
+    if (plan.staleRefKeys && plan.staleRefKeys.length && plan.libraryProductId) {
+      try { await cchPruneStaleLibraryUsageRefs(plan.libraryProductId, plan.staleRefKeys); plan.staleRefKeys = []; } catch (_ePruneOffer) {}
+    }
+    if (!plan.eligible.length) {
+      if (typeof global.showToast === 'function') {
+        global.showToast(cchTradeCostBulkEmptyMessage(plan), 'info', 5500);
+      }
+      return;
+    }
     await global.cchShowTradeCostBulkModal(Object.assign({}, scanOpts, {
       libraryProductId: libId,
       newCost: newCost,

@@ -93,7 +93,7 @@
   function cchCaliforniaInvoiceLineIsTaxable(it) {
     if (!it) return false;
     var et = norm(it.expenseType || it.itemType);
-    if (et === 'sales_tax' || et === 'discount') return false;
+    if (et === 'sales_tax' || et === 'discount' || et === 'retainer_credit') return false;
 
     var caDefault = cchInvoiceLineCaliforniaTaxableDefault(it);
 

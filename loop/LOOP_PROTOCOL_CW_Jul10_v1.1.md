@@ -29,6 +29,7 @@ DISCOVER (Claude, from KNOWN_ISSUES / CURRENT_PRIORITIES / _DEPLOY_QUEUE / track
 
 - `loop/LOOP_LEDGER.md` — single status table. States: OPEN → IN PROGRESS → DONE-UNVERIFIED → VERIFIED / FAILED → PROD (Cindy only). Plus BLOCKED-DECISION / BLOCKED-DISCUSSION.
 - `loop/WO-###_<slug>_CW_[MonDD].md` — work orders (Claude). Grounded diagnosis with file:line, change requested, binding constraints, numbered binary acceptance criteria, verify steps, rollback, attempt count, BF/FT id.
+- **Lane suffix (optional):** `WO-###-B_*.md` / ledger id `###-B` = **Custom Order Builder** (`platform/builder/`). Use so Builder work is obvious next to Studio platform WOs. Other lanes may get letter suffixes later if needed.
 - `loop/WO-###_DONE_CR_[MonDD].md` — completion notes (Cursor). Files touched, what changed (file:line), self-test, queue line appended yes/no. Cursor never sets VERIFIED and never deploys or commits (commit-deploy-policy.mdc governs).
 - `loop/verify/` — Claude's verification evidence (screenshots, console output).
 

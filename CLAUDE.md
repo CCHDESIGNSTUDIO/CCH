@@ -17,7 +17,49 @@
 
 Every session that opens this project must read this file first. No need for Cindy to paste context.
 
-*Last revised by: Claude — Jun 9, 2026 — reconciled the deploy/commit guidance below with the canonical staging-first DEPLOYMENT RULE in the project-root `CLAUDE.md` (removed stale "deploy after every fix / commit and push"). The root CLAUDE.md governs; this file is subordinate.*
+*Last revised by: Claude (Cowork) — Aug 01, 2026 — closed the loop/ commit gap below (three sources now write there: Cursor, Fable, Cowork; none should commit/push it themselves). Prior revision Jul 11, 2026 — added the IMPROVEMENT LOOP section (Cindy's request). Prior revision Jul 10 (handoff folder rule).*
+
+---
+
+## ⚠️ HANDOFF FOLDER — every agent, every session (added Jul 10, 2026 per Cindy)
+
+**All deliverable files an agent produces must ALSO be saved to the shared handoff folder:**
+
+```
+C:\Users\cindy\Dropbox\Claude - CCH studio\Cursor1 to cursor2 Claude Handoffs
+```
+
+- This applies to every agent working on CCH Studio (Claude Code, Cursor 1–8, Cowork/Hermes, Grok): finished code files, generated pages, memos, reports, screenshots of verified fixes — a **copy** of anything Cindy or another agent would need to pick up your work.
+- The **working copy stays canonical** in `C:\dev\CCH-Platform-Deploy\cch-deploy` (edit code there, per the banner above). The handoff folder holds *copies* for visibility and cross-agent pickup — Dropbox is still never the place to *edit* code.
+- Name files so their origin and date are obvious, e.g. `client.html_COWORK_Jul10`, `MEMO_design-board-footprint_CURSOR3_Jul08.md`. Do not overwrite another session's handoff file; add your own.
+- Drop a short companion note (`_MH_[MonDD]` .md or .txt) with each batch: what changed, which build/bundle version, deploy status (pending / staging / prod GO).
+
+---
+
+## ⚠️ IMPROVEMENT LOOP — work order queue (added Jul 11, 2026 per Cindy)
+
+**Files:** `loop/LOOP_LEDGER.md` (status table, single source of truth) · `loop/LOOP_PROTOCOL_CW_Jul10_v1.1.md` (full protocol) · `loop/WO-###_*.md` (work orders). Cursor enforcement: `.cursor/rules/loop-work-orders.mdc` — **this section is the Claude Code equivalent.**
+
+Roles: Claude (Cowork) discovers, writes work orders, and verifies on staging. Cursor sessions and Claude Code execute. Deploy Master #1 deploys via `_DEPLOY_QUEUE.md` exactly as today. **Cindy alone GOes production.**
+
+When Cindy says **"work the queue"** in any coding session:
+
+1. Read `loop/LOOP_LEDGER.md`. Take the OLDEST row in state OPEN whose Executor matches you or is unassigned. Set it IN PROGRESS with your session name.
+2. Ground before editing per CODE_GROUNDING_PROTOCOL — the work order's diagnosis is a lead, not evidence. Respect every constraint in the order; on conflict, set BLOCKED-DISCUSSION and stop.
+3. On completion: write `loop/WO-###_DONE_<you>_[MonDD].md` (files touched, file:line, self-test), append the standard one-line handoff to `_DEPLOY_QUEUE.md` (STATUS: pending, staging), set the row DONE-UNVERIFIED.
+4. NEVER mark a row VERIFIED (verification belongs to the verifying agent). NEVER deploy production (STOP-READ-FIRST.md). Max 3 attempts per order; on a FAILED order read `loop/verify/` evidence first.
+
+Claude Code running staging deploys: allowed when Cindy asks (e.g. "run DEPLOY-STAGING.bat"), coordinated through #1's queue like any batch.
+
+**⚠️ loop/ commit ownership (added Aug 01, 2026 per Cindy).** Writing a file into `loop/` (a new `WO-###_*.md`, a `DONE_*` note, an edit to `LOOP_LEDGER.md`) is NOT a commit and does not bypass the shared-working-copy rule above. Three sources now write into `loop/` on Machine 1: Cursor sessions, Fable, and Cowork/Claude. None of them should `git add`/`commit`/`push` those files on their own judgment call, same reasoning as the code itself, one session's commit sweeps up whatever the other two left uncommitted. Instead: when a WO, DONE note, or ledger update is ready, the session tells Cindy directly (don't stay silent, don't assume repo owner #1 already saw it) — she decides when it's committed, same as she decides when code deploys. This applies even though `loop/` is process/ops content, not product code; the git history is still shared and still hers to gate.
+
+---
+
+## ⚠️ Platform rules & design intention (canon — Aug 12, 2026)
+
+**Authoritative:** [Docs/CCH_PLATFORM_RULES_AND_DESIGN_INTENT_CR_Aug12_v1.0.md](Docs/CCH_PLATFORM_RULES_AND_DESIGN_INTENT_CR_Aug12_v1.0.md) · Cursor: `.cursor/rules/cch-platform-canonical-facts.mdc`
+
+One doc for locked facts (doc numbering, copy-not-link, QB bidirectional, client boundary, Firestore names, staging/Timely policy) and design intention. **Claude Team skills and older memos defer to this** when they conflict. Aug 12 skill audit checklist lives in §5 of that doc.
 
 ---
 
@@ -39,14 +81,15 @@ New-Houzz tracker exports have dirty categories/rooms; May 27 canonical taxonomy
 
 ## ⚠️ CODE GROUNDING PROTOCOL (read first, every turn)
 
-**Authoritative doc:** [Docs/CODE_GROUNDING_PROTOCOL_MH_May13_v1.0.md](Docs/CODE_GROUNDING_PROTOCOL_MH_May13_v1.0.md)
+**Authoritative doc:** [CODE_GROUNDING_PROTOCOL_MH_May13_v1.0.md](CODE_GROUNDING_PROTOCOL_MH_May13_v1.0.md) (also in `Docs/`). **Cursor enforcement:** `.cursor/rules/code-grounding.mdc` + `bug-diagnosis-before-fix.mdc` (always apply). **All agents:** Dropbox handoff `For ALL agents — NO GUESSING — CODE GROUNDING Jun 30.txt`.
 
-**Hard rule, no exceptions:** No architectural claim, "what the platform does" summary, phased fix table, effort estimate, or "my recommendation" — without a `grep` or file `view` executed THIS turn. Memory is not evidence. User description is not evidence. Skill files are not evidence about current code state.
+**Hard rule, no exceptions:** No architectural claim, "what the platform does" summary, phased fix table, effort estimate, bug root-cause, or code edit — without a `grep` or file read executed **THIS turn**. Memory is not evidence. User description is not evidence. Session logs and handoff notes are not evidence. Skill files are not evidence about current code state.
 
-Required before any such claim:
+Required before any such claim or edit:
 1. Grep under **at least three** plausible aliases (rename drift is real — see drift map in the protocol).
 2. **Read the function body** — name in grep output isn't enough.
 3. Trace the call site before claiming unreachability.
+4. Cite **file:line** in diagnosis and handoffs.
 
 On "RELOOK" or "GROUNDING CHECK" from Cindy: stop generating, state the search terms, run them, read the hits, state the corrected finding. No "you're right" apology paragraph — that phrase is a tell the original claim wasn't grounded.
 

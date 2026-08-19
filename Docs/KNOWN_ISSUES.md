@@ -1,8 +1,8 @@
 # CCH Studio — Known Issues
 
-**Last updated:** June 9, 2026  
+**Last updated:** August 2, 2026  
 **Maintainer:** Cynthia Holloway  
-**Last revised by:** Cursor (CR) (Jun 9, 2026 — DOC-1 SKU/finish on new doc lines; F-131 full catalog propagation deferred)
+**Last revised by:** Cursor (Aug 2, 2026 — Pepper/notes incident + PEPPER-1)
 
 Tracked regressions and open bugs. For prioritized work order see `CURRENT_PRIORITIES.md`.
 
@@ -26,6 +26,7 @@ Tracked regressions and open bugs. For prioritized work order see `CURRENT_PRIOR
 |---|--------|-------------------|-------|
 | RB-1 | Changing a clip's client-selection status on the Room Board (e.g. **Decline**) pops a `🔄 New clips detected — refreshing…` toast and full-re-renders the page, resetting the dropdown so the change appears not to take. Reported by Cynthia on **production** after the v20260603d deploys. | Status saves quietly: no refresh toast, dropdown keeps its value, view/scroll does not reset. | **Root cause (grounded Jun 7):** `setClipApprovalStatus()` writes `clientSelectionStatus` to `boards/{proj}/clips/{id}` (`index.html:18179`); that write trips the real-time clips `onSnapshot` listener `setupClipsListener()` (CLR-02, `index.html:13300-13310`), which can't distinguish the user's own write from an external one → toast (`13307`) + `renderProjectDetail()`. The decline **does** persist on the clip (`getClipApprovalStatus` reads the same field, `18088`) — defect is the disruptive refresh, not the save. **Possible compounding:** console also shows `SyntaxError: Unexpected end of input` + `[renderBoardsTab] projectTabContent missing` (not yet grounded). **Fix location:** `setupClipsListener` (~13297) — skip self-writes via `snapshot.metadata.hasPendingWrites` / `docChanges()`, or a local-write suppression window around `setClipApprovalStatus`. Staging first. **STATUS (Jun 7):** Fixed via `_cchSuppressClipsRefreshUntil` window set in `setClipApprovalStatus` (`18184`) + early-return in `setupClipsListener` (`13303`). Deployed to staging; awaiting Cynthia test → prod. |
 | RB-2 | Approve/Decline does not sync between the Room Board and the linked Proposal/Invoice line. Declining a **proposal-linked** clip (PR-pill card) on the room-board dropdown does **not** stick — it reverts on render. Cynthia wants it bidirectional: decline on room board → declined on proposal; decline on proposal → declined on room board. | One client decision, consistent on both surfaces, whichever surface it was set from. | **Root cause (grounded Jun 7):** the proposal/invoice line (`lineApprovalStatus`) is **already the source of truth**. `enrichClipsWithProjectDocLinks()` RESOLVES it onto `clip.clientSelectionStatus` in memory on every render (`index.html:32918-32919`, read-only scan, `persistToClips:false`, called at `18557`). So proposal→room-board already works for display. The missing half: `setClipApprovalStatus()` (`18174`) writes **only the clip**, never the proposal line → room-board→proposal never happens, and the next render overwrites the clip from the (still-pending) proposal line. **Correct fix per AI Session Rule #3 (RESOLVE/APPLY):** for a proposal-linked clip, the room-board dropdown should **APPLY** the status to the proposal line `lineApprovalStatus` (the source of truth) on explicit user action; display already RESOLVES back. **Do NOT** implement as a second mirrored field / two-way auto-copy — that dual-write is the drift class the isolation work just removed. Cross-entity write must be gated as explicit user action only. **Depends on RB-1** (listener self-refresh) being fixed first. **STATUS (Jun 7):** Root fix deployed to staging — a `pending` line can no longer overwrite an explicit clip approve/decline, in BOTH the DB writer `syncProposalLinkOntoClips` (`33042`) and the on-render resolver `applyLink` (`32919`). Only real `approved`/`declined` decisions flow line→clip. This stops the "decline won't stick" wipe for all docs/projects automatically (no archiving). Full room-board→proposal write-back intentionally **deferred** per Cynthia (no bidirectional sync). Sibling behavior **confirmed intended** by Cynthia (Jun 7): deleting a line from a proposal leaves the clip on the room board showing **pending** — no change (`29070`). |
+| RB-3 | Room board 🗑 labeled "Remove from room board" but called `deleteClip()` — permanently deleted the Firestore clip, so the row vanished from Selections too. Reported Jul 6 (Holtz + other projects). | Trash on room board clears `room` only; clip stays in Selections (Unassigned on room board). Permanent delete only from clip detail modal or Selections delete. | **Root cause (grounded Jul 6):** room board card + list trash wired to `deleteClip` which deletes `boards/{proj}/clips/{id}`; Selections builds from those clip docs first (`source: 'boardclip'`). **Fix (Jul 6):** `removeClipFromRoomBoard()` clears clip `room` + `_clearCatalogRoomForRemovedClip`; trash wired there (~19820 card, ~20272 list); `deleteClip` kept for clip detail and Selections permanent delete. **STATUS:** **done** — staging 2026-07-06 12:30; **production 2026-07-06 ~13:45** (v9.8.19 bundle). |
 
 ## Selections page (regression — June 7, 2026)
 
@@ -60,6 +61,12 @@ Logged by Claude Code to production `feedbackRequests` and `CCH_Feature_Bug_Trac
 | O259 | Clipper “More details” header bigger | Vendor/SKU fields easier to see in Clipper sidebar. | `cch-clipper/.../sidebar.js` ~849; increase fold header size/padding; clearer chevron. |
 
 ---
+
+## Pepper / notes (incident — August 2, 2026)
+
+| # | Issue | Expected behavior | Notes |
+|---|--------|-------------------|-------|
+| PEPPER-1 | Pepper chat is never saved to Firestore. Aug 2: agents **crashed Cindy’s computer** (she did not switch projects); session death wiped Rolling Hills Pepper notes. | Pepper should persist per-project chat so a crash does not erase her working memory; agents must not thrash the machine. | **Grounded:** chat is DOM-only (`cch-pepper.js` `clearChat`). Incident: `Docs/INCIDENT_notes_loss_Rolling_Hills_Pepper_2026-08-02.md`. Standing memory in `Functions/cchPepper.js`. Persistence = feature (needs Cindy GO). |
 
 ## Other known issues
 

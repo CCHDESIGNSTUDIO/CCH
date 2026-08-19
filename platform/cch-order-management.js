@@ -5,7 +5,7 @@
 (function() {
   'use strict';
 
-  var OM_BUILD = '20260630om32';
+  var OM_BUILD = '20260726om37';
   var OM_NAVY = '#0F1A2E';
   var OM_NAVY_MID = '#1B3352';
   var OM_BORDER = 'rgba(15,26,46,0.12)';
@@ -717,10 +717,14 @@
         '<td style="' + td + 'text-align:right;font-family:monospace;font-size:12px;color:' +
         (paidAmt > 0.01 ? '#2E7D32' : 'var(--gray-400)') + ';" title="Vendor payments recorded on this PO">' +
         (paidAmt > 0.01 ? '$' + paidAmt.toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—') + '</td>' +
+        '<td style="' + td + 'white-space:nowrap;" onclick="event.stopPropagation()">' +
+        '<button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 8px;" ' +
+        'onclick="typeof cchPepperVendorFollowUp===\'function\'&&cchPepperVendorFollowUp(\'' +
+        escAttr(po.projectId) + '\',\'' + escAttr(po.id) + '\')">Follow up</button></td>' +
         '</tr>';
     }).join('');
     return '<div id="cchOmTableWrap" class="card" style="overflow:hidden;overflow-x:auto;">' +
-      '<table style="width:100%;min-width:1340px;border-collapse:collapse;font-size:13px;">' +
+      '<table style="width:100%;min-width:1420px;border-collapse:collapse;font-size:13px;">' +
       '<thead><tr style="border-bottom:2px solid var(--gray-200);">' +
       thSort('PO #', 'number') +
       thSort('Vendor', 'vendor') +
@@ -737,6 +741,7 @@
       thSort('Lines w/o ETA', 'missingEta', 'text-align:center;') +
       thSort('Total', 'amount', 'text-align:right;') +
       thSort('Amount paid', 'paidAmount', 'text-align:right;') +
+      '<th style="padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;white-space:nowrap;">Action</th>' +
       '</tr></thead><tbody>' + body + '</tbody></table></div>';
   }
 
@@ -771,13 +776,18 @@
         '<td style="' + td + '">' + esc(row.title) + '</td>' +
         '<td style="' + td + 'font-size:12px;">' + esc(po.status || '') + '</td>' +
         '<td style="' + td + '" onclick="event.stopPropagation()">' + omLineEtaCellHtml(po, row.item, row.idx) + '</td>' +
+        '<td style="' + td + 'white-space:nowrap;" onclick="event.stopPropagation()">' +
+        '<button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 8px;" ' +
+        'onclick="typeof cchPepperVendorFollowUp===\'function\'&&cchPepperVendorFollowUp(\'' +
+        escAttr(po.projectId) + '\',\'' + escAttr(po.id) + '\')">Follow up</button></td>' +
         '</tr>';
     }).join('');
     var more = lines.length > 500 ? '<p style="font-size:12px;color:var(--gray-500);margin:12px 0;">Showing first 500 of ' + lines.length + ' lines. Set ETA inline or click a row to open the PO.</p>' : '';
     return more + '<div class="card" style="overflow-x:auto;margin-top:8px;"><table style="width:100%;border-collapse:collapse;">' +
       '<thead><tr style="border-bottom:2px solid var(--gray-200);">' +
       '<th style="' + th + '">PO #</th><th style="' + th + 'text-align:center;">Line #</th><th style="' + th + '">Vendor</th><th style="' + th + '">Project</th>' +
-      '<th style="' + th + '">Line item</th><th style="' + th + '">PO status</th><th style="' + th + '">ETA</th></tr></thead><tbody>' + body + '</tbody></table></div>';
+      '<th style="' + th + '">Line item</th><th style="' + th + '">PO status</th><th style="' + th + '">ETA</th>' +
+      '<th style="' + th + '">Action</th></tr></thead><tbody>' + body + '</tbody></table></div>';
   }
 
   function missingBillsReport(rows) {

@@ -117,43 +117,124 @@ function mapOverallStatus(po) {
   return 'Open';
 }
 
-function rawImageCandidate(it) {
-  const direct = firstStr(it.imageUrl, it.image, it.productImage, it.thumbnail);
-  if (direct) return direct;
-  const arrs = [it.imageUrls, it.images];
-  for (const a of arrs) {
-    if (!Array.isArray(a)) continue;
-    for (const el of a) {
-      if (typeof el === 'string' && str(el)) return str(el);
-      if (el && typeof el === 'object') {
-        const s = firstStr(el.imageUrl, el.url, el.src, el.image);
-        if (s) return s;
-      }
-    }
+function coerceImageIterable(val) {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') {
+    return val.split(/[\n,|]/).map((s) => s.trim()).filter(Boolean);
   }
-  return '';
+  return [];
+}
+
+function pushImageUrl(list, u) {
+  u = str(u);
+  if (!u) return;
+  if (u.indexOf('//') === 0) u = 'https:' + u;
+  const low = u.toLowerCase();
+  for (let i = 0; i < list.length; i++) {
+    if (list[i].toLowerCase() === low) return;
+  }
+  list.push(u);
+}
+
+function collectLineImageCandidates(it) {
+  it = it || {};
+  const out = [];
+  const arrs = [it.images, it.imageUrls, it.gallery, it.photos, it.photoUrls, it.productPhotos];
+  for (let a = 0; a < arrs.length; a++) {
+    coerceImageIterable(arrs[a]).forEach((el) => {
+      if (typeof el === 'string') pushImageUrl(out, el);
+      else if (el && typeof el === 'object') {
+        pushImageUrl(out, firstStr(el.imageUrl, el.url, el.src, el.image, el.thumbnail));
+      }
+    });
+  }
+  [it.imageUrl, it.image, it.productImage, it.thumbnail, it.photo, it.imageUrlOverride]
+    .forEach((u) => pushImageUrl(out, u));
+
+  const heroIdx = Math.max(0, Math.min(parseInt(it.heroImageIndex, 10) || 0, Math.max(0, out.length - 1)));
+  if (out.length > 1 && heroIdx > 0) {
+    const hero = out[heroIdx];
+    out.splice(heroIdx, 1);
+    out.unshift(hero);
+  }
+  return out.sort((a, b) => imageUrlScore(b) - imageUrlScore(a));
+}
+
+function rawImageCandidate(it) {
+  const list = collectLineImageCandidates(it);
+  return list.length ? list[0] : '';
+}
+
+function imageUrlScore(u) {
+  u = str(u);
+  if (!u) return -1;
+  if (/^data:image/i.test(u)) return 95;
+  if (/firebasestorage\.googleapis|\.firebasestorage\.app|storage\.googleapis\.com/i.test(u)) return 100;
+  if (looksUnreliable(u)) return 5;
+  return 40;
 }
 
 function looksUnreliable(u) {
+  u = str(u);
+  if (!u) return true;
+  if (/firebasestorage\.googleapis|\.firebasestorage\.app|storage\.googleapis\.com/i.test(u)) return false;
   return /ivy-uploads\.|img\.houzz|houzzcdn|houzz\.com/i.test(u) || /&amp;|&#38;/.test(u);
 }
 
-async function resolveImageUrl(storage, it) {
-  const raw = rawImageCandidate(it);
+async function enrichItemImages(db, projectId, it) {
+  const candidates = collectLineImageCandidates(it);
+  const hasGood = candidates.some((u) => imageUrlScore(u) >= 40);
+  if (hasGood) return it;
+
+  const lid = firstStr(it.libraryProductId, it.linkedLibraryProductId);
+  if (lid) {
+    try {
+      const d = await db.collection('products').doc(lid).get();
+      if (d.exists) return Object.assign({}, d.data() || {}, it);
+    } catch (_e) {}
+  }
+  const cid = firstStr(it.clipId, it.sourceClipId);
+  if (cid && projectId) {
+    try {
+      const d = await db.collection('boards').doc(projectId).collection('clips').doc(cid).get();
+      if (d.exists) return Object.assign({}, d.data() || {}, it);
+    } catch (_e) {}
+  }
+  return it;
+}
+
+async function resolveOneImageUrl(storage, raw) {
+  raw = str(raw);
   if (!raw) return null;
   if (/^https?:\/\//i.test(raw)) return looksUnreliable(raw) ? null : raw;
   try {
     if (/^gs:\/\//i.test(raw)) {
       const m = raw.match(/^gs:\/\/([^/]+)\/(.+)$/i);
       if (!m) return null;
-      const [url] = await storage.bucket(m[1]).file(m[2]).getSignedUrl({ action: 'read', expires: Date.now() + 24 * 3600 * 1000 });
+      const [url] = await storage.bucket(m[1]).file(m[2]).getSignedUrl({
+        action: 'read',
+        expires: Date.now() + 7 * 24 * 3600 * 1000,
+      });
       return url || null;
     }
     if (raw.indexOf('/') >= 0 && !raw.startsWith('//') && !/^data:/i.test(raw)) {
-      const [url] = await storage.bucket().file(raw.replace(/^\//, '')).getSignedUrl({ action: 'read', expires: Date.now() + 24 * 3600 * 1000 });
+      const [url] = await storage.bucket().file(raw.replace(/^\//, '')).getSignedUrl({
+        action: 'read',
+        expires: Date.now() + 7 * 24 * 3600 * 1000,
+      });
       return url || null;
     }
   } catch (_e) {}
+  return null;
+}
+
+async function resolveImageUrl(storage, it) {
+  const candidates = collectLineImageCandidates(it);
+  for (let i = 0; i < candidates.length; i++) {
+    const url = await resolveOneImageUrl(storage, candidates[i]);
+    if (url) return url;
+  }
   return null;
 }
 
@@ -452,7 +533,7 @@ async function pushPoBatch(opts) {
     const items = po.items || po.lineItems || [];
     const lineRecords = [];
     for (let i = 0; i < items.length; i++) {
-      const it = items[i] || {};
+      const it = await enrichItemImages(db, entry.projectId, items[i] || {});
       const sourceKey = str(it.id) ? (pod.id + ':' + str(it.id)) : (pod.id + ':' + i);
       const qty = num(it.qty);
       const unit = num(it.cost != null ? it.cost : (it.unitCost != null ? it.unitCost : it.costPrice));

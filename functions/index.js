@@ -6,6 +6,7 @@ const admin = require("firebase-admin");
 admin.initializeApp();
 
 const db = admin.firestore();
+const cchTaxRules = require("./cch-invoice-tax-rules.js");
 
 /** Normalize Timely / Studio project label for board matching (mirrors client `_normProjectLabelForBoard`). */
 function normTimelyProjectName(s) {
@@ -76,7 +77,28 @@ const TIMELY_ACCOUNT_ID = "874495";
 
 const REGION = "us-central1";
 const CORS_STUDIO = "https://cch-platform.web.app";
+const CORS_STUDIO_HOSTS = /^https:\/\/cch-platform(-staging)?\.web\.app$/;
 const HTTP_STUDIO = { region: REGION, cors: CORS_STUDIO, invoker: "public" };
+/** Timely HTTP — prod + staging origins; manual ACAO mirrors preflight (WO-024 / staging sync). */
+const TIMELY_HTTP = { region: REGION, invoker: "public", cors: CORS_STUDIO_HOSTS };
+/** Year-to-date Timely pull can exceed default 60s (504 → browser CORS noise). */
+const TIMELY_SYNC_HTTP = { ...TIMELY_HTTP, timeoutSeconds: 540, memory: "512MiB" };
+
+function cchSetStudioCors(req, res) {
+  const origin = String((req.get && req.get("Origin")) || req.headers.origin || "").trim();
+  if (CORS_STUDIO_HOSTS.test(origin)) {
+    res.set("Access-Control-Allow-Origin", origin);
+  } else {
+    res.set("Access-Control-Allow-Origin", CORS_STUDIO);
+  }
+  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type");
+}
+
+function cchStudioOriginFromReq(req) {
+  const origin = String((req.get && req.get("Origin")) || req.headers.origin || "").trim();
+  return CORS_STUDIO_HOSTS.test(origin) ? origin : CORS_STUDIO;
+}
 const CALLABLE_PUBLIC = { region: REGION, invoker: "public" };
 
 exports.healthCheck = onCall(CALLABLE_PUBLIC, (request) => {
@@ -258,15 +280,248 @@ exports.importDesignBoardImageFromUrl = onCall(STUDIO_CALLABLE, async (request) 
   return { downloadUrl, path, contentType: mime };
 });
 
+const CLIENT_IDEAS_SECTION_ID = "client-ideas";
+const CLIENT_IDEAS_HTTP = { ...TIMELY_HTTP, timeoutSeconds: 120, memory: "512MiB" };
+
+function cchStripClientIdeaCaption(raw) {
+  return String(raw || "")
+    .replace(/<[^>]*>/g, "")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
+    .trim()
+    .slice(0, 500);
+}
+
+/**
+ * WO-091 — Client portal "Share an idea": upload to Storage, append to Client Ideas ideabook
+ * (Immediate / clientPublished), notify Cindy + Vanessa. Public HTTP; scoped by projectId.
+ */
+exports.clientPortalShareIdea = onRequest(CLIENT_IDEAS_HTTP, async (req, res) => {
+  cchSetStudioCors(req, res);
+  if (req.method === "OPTIONS") return res.status(204).send("");
+  if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+
+  try {
+    const body = req.body || {};
+    const projectId = String(body.projectId || "").trim();
+    const caption = cchStripClientIdeaCaption(body.caption);
+    const clientName = String(body.clientName || "Client").trim().slice(0, 120) || "Client";
+    const clientEmail = String(body.clientEmail || "").trim().toLowerCase().slice(0, 200);
+    const imageUrlIn = String(body.imageUrl || "").trim();
+    const imageBase64 = String(body.imageBase64 || "").replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, "");
+    const mimeHint = String(body.mimeType || "").trim().toLowerCase();
+
+    if (!projectId || projectId.indexOf("/") >= 0 || projectId.length > 180) {
+      return res.status(400).json({ error: "Invalid project" });
+    }
+    const boardSnap = await db.collection("boards").doc(projectId).get();
+    if (!boardSnap.exists) return res.status(404).json({ error: "Project not found" });
+    const projectName = String((boardSnap.data() || {}).name || (boardSnap.data() || {}).title || projectId).trim();
+
+    let buf;
+    let mime = mimeHint.startsWith("image/") ? mimeHint.split(";")[0] : "";
+    if (imageBase64) {
+      if (imageBase64.length > 12 * 1024 * 1024) {
+        return res.status(400).json({ error: "Image too large (max ~8MB)" });
+      }
+      buf = Buffer.from(imageBase64, "base64");
+      if (!mime) mime = "image/jpeg";
+    } else if (imageUrlIn && /^https?:\/\//i.test(imageUrlIn)) {
+      const fetched = await fetchRemoteImageBuffer(imageUrlIn);
+      buf = fetched.buf;
+      mime = fetched.mime || "image/jpeg";
+    } else {
+      return res.status(400).json({ error: "Provide an image file or https image URL" });
+    }
+    if (!buf || !buf.length) return res.status(400).json({ error: "Empty image" });
+    if (buf.length > 8 * 1024 * 1024) return res.status(400).json({ error: "Image too large (max 8MB)" });
+    if (!String(mime).startsWith("image/")) return res.status(400).json({ error: "Not an image" });
+
+    const sectionRef = db.collection("boards").doc(projectId).collection("ideabooks").doc(CLIENT_IDEAS_SECTION_ID);
+    const sectionSnap = await sectionRef.get();
+    const existingImages = Array.isArray((sectionSnap.data() || {}).images) ? (sectionSnap.data().images || []) : [];
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+    const recentFromClient = existingImages.filter((im) => {
+      if (!im || typeof im !== "object" || !im.fromClient) return false;
+      const t = Date.parse(im.addedAt || "") || 0;
+      if (t < oneHourAgo) return false;
+      if (clientEmail && String(im.clientEmail || "").toLowerCase() === clientEmail) return true;
+      return !clientEmail;
+    }).length;
+    if (recentFromClient >= 12) {
+      return res.status(429).json({ error: "Please wait before sharing more ideas." });
+    }
+
+    let ext = "jpeg";
+    if (mime.indexOf("png") >= 0) ext = "png";
+    else if (mime.indexOf("webp") >= 0) ext = "webp";
+    else if (mime.indexOf("gif") >= 0) ext = "gif";
+    const ts = Date.now() + "-" + Math.random().toString(36).slice(2, 9);
+    const storagePath = "images/ideabooks/" + projectId + "/" + CLIENT_IDEAS_SECTION_ID + "/" + ts + "." + ext;
+    const bucket = admin.storage().bucket();
+    const token = require("crypto").randomUUID();
+    await bucket.file(storagePath).save(buf, {
+      metadata: {
+        contentType: mime,
+        metadata: {
+          firebaseStorageDownloadTokens: token,
+          source: "client",
+          projectId: projectId
+        }
+      }
+    });
+    const downloadUrl =
+      "https://firebasestorage.googleapis.com/v0/b/" +
+      bucket.name +
+      "/o/" +
+      encodeURIComponent(storagePath) +
+      "?alt=media&token=" +
+      token;
+
+    const imageKey = "ci-" + ts;
+    const nowIso = new Date().toISOString();
+    const fromUrl = !!(imageUrlIn && /^https?:\/\//i.test(imageUrlIn));
+    const imageRow = {
+      imageUrl: downloadUrl,
+      thumbnailUrl: downloadUrl,
+      caption: caption,
+      fromClient: true,
+      source: fromUrl ? "client_url" : "client_upload",
+      sourceUrl: fromUrl ? imageUrlIn : "",
+      clientName: clientName,
+      clientEmail: clientEmail,
+      addedAt: nowIso,
+      feedback: { stars: [], comments: [] },
+      imageKey: imageKey,
+      hiddenFromClient: false,
+      showPrice: false,
+      showSource: fromUrl
+    };
+
+    if (!sectionSnap.exists) {
+      await sectionRef.set({
+        name: "Client Ideas",
+        title: "Client Ideas",
+        boardKind: "clientIdeas",
+        type: "inspiration",
+        clientPublished: true,
+        clientPublishedAt: nowIso,
+        images: [imageRow],
+        order: 9000,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+        description: "Ideas shared by the client from their portal"
+      });
+    } else {
+      const images = existingImages.slice();
+      images.push(imageRow);
+      await sectionRef.set(
+        {
+          name: "Client Ideas",
+          boardKind: "clientIdeas",
+          type: "inspiration",
+          clientPublished: true,
+          images: images,
+          updatedAt: nowIso
+        },
+        { merge: true }
+      );
+    }
+
+    const noteText =
+      clientName +
+      " shared an idea on Client Ideas" +
+      (caption ? ': "' + caption.slice(0, 120) + '"' : "") +
+      ".";
+    try {
+      await db.collection("boards").doc(projectId).collection("messages").add({
+        text: noteText + "\n" + downloadUrl,
+        author: clientName,
+        from: "client",
+        createdAt: nowIso,
+        type: "client",
+        source: "client_pepper",
+        fromClient: true,
+        meta: { kind: "client_idea", sectionId: CLIENT_IDEAS_SECTION_ID, imageKey: imageKey }
+      });
+    } catch (eMsg) {
+      console.warn("[clientPortalShareIdea] messages", eMsg);
+    }
+    try {
+      const room = db.collection("internal").doc("staffChat");
+      const label = clientName + (projectName ? " · " + projectName : "");
+      const body = "[" + label + (clientEmail ? " · " + clientEmail : "") + "]\n" + noteText;
+      await room.collection("messages").add({
+        text: body,
+        authorRole: "client",
+        authorName: clientName,
+        authorEmail: clientEmail,
+        createdAt: nowIso,
+        fromClient: true,
+        source: "client_pepper",
+        projectId: projectId,
+        projectName: projectName
+      });
+      await room.set(
+        {
+          lastMessage: {
+            text: body.length > 100 ? body.slice(0, 99) + "…" : body,
+            authorRole: "client",
+            at: nowIso,
+            hasImage: true,
+            fromClient: true
+          },
+          unreadBy: { owner: true, vanessa: true },
+          updatedAt: nowIso
+        },
+        { merge: true }
+      );
+    } catch (eStaff) {
+      console.warn("[clientPortalShareIdea] staffChat", eStaff);
+    }
+    try {
+      await db.collection("activity").add({
+        type: "inspiration",
+        action: "client_idea_shared",
+        description: noteText,
+        projectId: projectId,
+        projectName: projectName,
+        user: clientName,
+        createdAt: nowIso,
+        meta: {
+          source: "client_portal",
+          authorType: "client",
+          clientName: clientName,
+          clientEmail: clientEmail,
+          sectionId: CLIENT_IDEAS_SECTION_ID,
+          imageKey: imageKey,
+          imageUrl: downloadUrl,
+          sourceUrl: fromUrl ? imageUrlIn : ""
+        }
+      });
+    } catch (eAct) {
+      console.warn("[clientPortalShareIdea] activity", eAct);
+    }
+
+    return res.status(200).json({
+      status: "ok",
+      sectionId: CLIENT_IDEAS_SECTION_ID,
+      imageKey: imageKey,
+      imageUrl: downloadUrl
+    });
+  } catch (err) {
+    console.error("[clientPortalShareIdea]", err);
+    return res.status(500).json({ error: (err && err.message) || "Upload failed" });
+  }
+});
+
 // Exchange Timely OAuth code for access token
-exports.timelyAuth = onRequest(HTTP_STUDIO, async (req, res) => {
-  res.set("Access-Control-Allow-Origin", "https://cch-platform.web.app");
-  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.set("Access-Control-Allow-Headers", "Content-Type");
+exports.timelyAuth = onRequest(TIMELY_HTTP, async (req, res) => {
+  cchSetStudioCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).send("");
 
-  const { code } = req.body || {};
+  const { code, redirectUri: bodyRedirect } = req.body || {};
   if (!code) return res.status(400).json({ error: "Missing code parameter" });
+  const redirectUri = String(bodyRedirect || cchStudioOriginFromReq(req) || TIMELY_REDIRECT_URI).trim();
 
   try {
     const fetch = (await import("node-fetch")).default;
@@ -277,7 +532,7 @@ exports.timelyAuth = onRequest(HTTP_STUDIO, async (req, res) => {
         grant_type: "authorization_code",
         client_id: TIMELY_CLIENT_ID,
         client_secret: TIMELY_CLIENT_SECRET,
-        redirect_uri: TIMELY_REDIRECT_URI,
+        redirect_uri: redirectUri,
         code: code
       }).toString()
     });
@@ -360,10 +615,8 @@ async function fetchAllTimelyEvents(fetch, accountId, accessToken, startDate, en
 }
 
 // Pull time entries from Timely API
-exports.timelySyncEntries = onRequest(HTTP_STUDIO, async (req, res) => {
-  res.set("Access-Control-Allow-Origin", "https://cch-platform.web.app");
-  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.set("Access-Control-Allow-Headers", "Content-Type");
+exports.timelySyncEntries = onRequest(TIMELY_SYNC_HTTP, async (req, res) => {
+  cchSetStudioCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).send("");
 
   try {
@@ -392,7 +645,7 @@ exports.timelySyncEntries = onRequest(HTTP_STUDIO, async (req, res) => {
       }
     }
 
-    const boardsArr = await loadBoardsLookupForTimely();
+    const boardsArr = await getBoardsLookupForTimelyCached();
 
     let saved = 0;
     for (const entry of entries) {
@@ -641,16 +894,36 @@ function qbStudioLineCategoryFields(item) {
 function qbStudioLineIsDesignServiceCategory(item) {
   if (qbStudioLineLooksLikeTravelExpense(item)) return false;
   const cat = qbStudioLineCategoryFields(item);
-  if (/design\s+services?|design\s+fee|studio\s+design|project\s+manag/.test(cat)) return true;
+  if (/design\s+services?|design\s+fees?|studio\s+design|project\s+manag|blended\s+design|consultation|transaction\s+fees|cch\s+admin|design\s+concept|client\s+project\s+support|^expenses$|^other$/.test(cat)) {
+    return true;
+  }
   const title = String(item.title || item.name || "").toLowerCase();
-  if (/^cch\s+(design|client\s+project|project\s+manag|blended\s+design|admin)/.test(title)) return true;
+  if (/^cch\s+(design|client\s+project|project\s+manag|blended\s+design|admin|design\s+concept)/.test(title)) return true;
   if (/\bcch\s+design\b/.test(cat) || /\bclient\s+project\s+support\b/.test(cat)) return true;
   const et = String(item.expenseType || item.itemType || "").toLowerCase();
+  if (et === "service" || et === "design_service") return true;
   if (et === "service") {
     if (/design|project\s+manag|client\s+project|time\s+billing|professional\s+service|consultation|hourly/.test(cat + " " + title)) {
       return true;
     }
   }
+  return false;
+}
+
+/** Lines mapped to Studio Design Fee / labor / T&E — never sales-taxable in QB. */
+function qbStudioLineMapsToNonTaxableQbItem(item) {
+  const ref = qbItemRefForStudioLine(item);
+  const name = String((ref && ref.name) || "").toLowerCase();
+  const id = String((ref && ref.value) || "");
+  if (/studio design fee|^labor$|travel|reimbursable|subcontractor|prepaid tax|discount|retainer|sample/.test(name)) {
+    return true;
+  }
+  if (id === String(QB_ITEM_IDS.designFee)) return true;
+  if (id === String(QB_ITEM_IDS.labor)) return true;
+  if (id === String(QB_ITEM_IDS.travelExpense)) return true;
+  if (id === String(QB_ITEM_IDS.reimbursable)) return true;
+  if (id === String(QB_ITEM_IDS.subcontractor)) return true;
+  if (id === String(QB_ITEM_IDS.sample)) return true;
   return false;
 }
 
@@ -1152,14 +1425,16 @@ const QB_PUSH_LOCK_FIELD = "qbPushLockAt";
 const QB_PUSH_LOCK_TTL_MS = 3 * 60 * 1000;
 
 /** Serialize concurrent QB pushes so double-clicks do not create duplicate QB docs. */
-async function beginQbDocumentPush(docRef) {
+async function beginQbDocumentPush(docRef, opts) {
+  opts = opts || {};
+  const allowUpdate = !!opts.allowUpdate;
   return db.runTransaction(async (transaction) => {
     const snap = await transaction.get(docRef);
     if (!snap.exists) {
       throw new HttpsError("not-found", "Document not found");
     }
     const d = snap.data();
-    if (d.qbDocId) {
+    if (d.qbDocId && !allowUpdate) {
       return { alreadySynced: true, qbDocId: d.qbDocId };
     }
     const lockAt = d[QB_PUSH_LOCK_FIELD];
@@ -1219,28 +1494,35 @@ function qbStudioInvoiceLineAmount(item) {
   return sell || 0;
 }
 
-/** CA-style taxable flag for QB TaxCodeRef (TAX / NON). */
+/**
+ * CA-style taxable flag for QB TaxCodeRef (TAX / NON).
+ * Must match Studio cchInvoiceLineIsTaxable — never blind item.taxable === true for services.
+ */
 function qbStudioInvoiceLineTaxable(item) {
   if (!item) return false;
   const et = String(item.expenseType || item.itemType || "").toLowerCase();
   if (et === "sales_tax" || et === "discount" || et === "retainer_credit") return false;
+  if (qbStudioLineLooksLikeLabor(item)) return false;
+  if (qbStudioLineLooksLikeTravelExpense(item)) return false;
+  if (qbStudioLineIsDesignServiceCategory(item)) return false;
+  if (qbStudioLineMapsToNonTaxableQbItem(item)) return false;
+  if (cchTaxRules.cchInvoiceLineIsNonTaxableService(item)) return false;
+  if (["service", "design_service", "labor", "expense", "other_expense", "installation", "handling"].indexOf(et) >= 0) {
+    return false;
+  }
   const blob = [item.title, item.name, item.category, item.service, item.billingCategory, item.description]
     .map((s) => String(s || "").toLowerCase())
     .join(" ");
-  if (/design\s+service|professional\s+service|time\s+billing|smart\s*time|consultation|hourly|project manag/.test(blob)) {
+  if (/^cch\s+(design|client\s+project|project\s+manag|blended\s+design|admin|design\s+concept)/.test(blob)) {
+    return false;
+  }
+  if (/design\s+service|design\s+concept|professional\s+service|time\s+billing|smart\s*time|consultation|hourly|project manag|client\s+project\s+support|\bcch\s+admin\b/.test(blob)) {
     return false;
   }
   if (/\blabor\b/.test(String(item.category || "").toLowerCase()) || /\b(install(?:ation)?|wall\s*paper\s*install)\b/.test(blob)) {
     return false;
   }
-  if (item.taxable === false || item.taxable === "off" || item.taxable === "non-taxable") return false;
-  if (item.taxable === true || item.taxable === "on" || item.taxable === "taxable") return true;
-  const cat = String(item.category || "").toLowerCase();
-  if (/lighting|furniture|fabric|rug|tile|stone|product|appliance|hardware|bedding|mirror|art|wallpaper/.test(cat)) {
-    return true;
-  }
-  if (et === "service") return false;
-  return (parseFloat(item.cost) || 0) > 0 || et === "product" || !et;
+  return !!cchTaxRules.cchCaliforniaInvoiceLineIsTaxable(item);
 }
 
 /** Effective client sales-tax rate: invoice rate if > 0, else project rate. (0 on the doc must NOT block the project rate.) */
@@ -1268,21 +1550,15 @@ function qbStudioInvoiceSalesTax(invoice, proj) {
  * QuickBooks invoice create/update path. Intuit OAuth is refreshed automatically from
  * Firestore admin/qb (no Intuit login per push). This function has no Firebase user check.
  */
-async function runPushInvoiceToQBCore(projectId, docId, sendEmail) {
+async function runPushInvoiceToQBCore(projectId, docId, sendEmail, opts) {
+  opts = opts || {};
   const docRef = db.collection("boards").doc(projectId).collection("invoices").doc(docId);
   const snap = await docRef.get();
   if (!snap.exists) throw new HttpsError("not-found", "Invoice not found");
   const invoice = snap.data();
 
-  if (invoice.qbDocId) {
-    if (invoice.qbPushPending) {
-      await docRef.update({
-        qbPushPending: false,
-        qbPushSendEmail: admin.firestore.FieldValue.delete()
-      }).catch(() => {});
-    }
-    return { success: true, message: "Already synced to QB", qbDocId: invoice.qbDocId };
-  }
+  const existingQbId = _qbInvoiceEntityId(invoice);
+  const allowUpdate = !!opts.allowUpdate;
 
   const projSnap = await db.collection("boards").doc(projectId).get();
   const proj = projSnap.exists ? projSnap.data() : {};
@@ -1299,9 +1575,9 @@ async function runPushInvoiceToQBCore(projectId, docId, sendEmail) {
       "Invoice has no line items. Add items before pushing to QB.");
   }
 
-  const pushState = await beginQbDocumentPush(docRef);
+  const pushState = await beginQbDocumentPush(docRef, { allowUpdate });
   if (pushState.alreadySynced) {
-    return { success: true, message: "Already synced to QB", qbDocId: pushState.qbDocId };
+    return { success: true, message: "Already synced to QB", qbDocId: pushState.qbDocId || invoice.qbDocId };
   }
 
   try {
@@ -1352,12 +1628,17 @@ async function runPushInvoiceToQBCore(projectId, docId, sendEmail) {
       if (restDesc && lineLabel && restDesc.toLowerCase().startsWith(lineLabel.toLowerCase())) {
         restDesc = restDesc.slice(lineLabel.length).replace(/^\s*\([^)]*\)\s*[\u2014—\-]\s*/, "").trim();
       }
+      // Line notes (Studio "+ Notes") belong in QB Description — not PrivateNote only.
+      let lineNotes = String((item && (item.lineNotes || item.notes || item.clientNotes || item.clientNote)) || "").trim();
+      if (lineNotes && restDesc && lineNotes.toLowerCase() === restDesc.toLowerCase()) lineNotes = "";
+      if (lineNotes && lineLabel && lineNotes.toLowerCase() === lineLabel.toLowerCase()) lineNotes = "";
       return {
         LineNum: idx + 1,
         Amount: lineTotal,
         Description: [
           lineLabel,
           restDesc && restDesc.toLowerCase() !== lineLabel.toLowerCase() ? restDesc : "",
+          lineNotes,
           item.vendor ? "(" + item.vendor + ")" : "",
           item.room || item.category || ""
         ].filter(Boolean).join(" — "),
@@ -1387,20 +1668,28 @@ async function runPushInvoiceToQBCore(projectId, docId, sendEmail) {
     }
 
     if (invoice.shipping && parseFloat(invoice.shipping) > 0) {
+      const shipAmt = parseFloat(invoice.shipping);
+      const shipTaxable = salesTaxForQb > 0.02 && cchTaxRules.cchCaliforniaInvoiceLineIsTaxable({
+        category: "Freight",
+        expenseType: "freight",
+        title: "Shipping & Handling",
+        taxable: true
+      });
       lineItems.push({
-        Amount: parseFloat(invoice.shipping),
+        Amount: shipAmt,
         Description: "Shipping & Handling",
         DetailType: "SalesItemLineDetail",
         SalesItemLineDetail: {
           ItemRef: { value: QB_ITEMS.shipping, name: "Studio Shipping" },
           Qty: 1,
-          UnitPrice: parseFloat(invoice.shipping)
+          UnitPrice: shipAmt,
+          TaxCodeRef: { value: shipTaxable ? "TAX" : "NON" }
         }
       });
     }
 
     const dueDate = invoice.dueDate ||
-      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      new Date().toISOString().split("T")[0];
 
     const qbInvoice = {
       Line: lineItems,
@@ -1415,11 +1704,32 @@ async function runPushInvoiceToQBCore(projectId, docId, sendEmail) {
     };
     if (salesTaxForQb > 0.02) {
       qbInvoice.TxnTaxDetail = { TotalTax: salesTaxForQb };
+    } else if (allowUpdate) {
+      qbInvoice.TxnTaxDetail = { TotalTax: 0 };
     }
 
-    const result = await qbApiCall("POST", "invoice", accessToken, realmId, qbInvoice);
-    const qbInv = result.Invoice || {};
-    const qbId = qbInv.Id;
+    let qbInv;
+    let qbId;
+    let wasUpdate = false;
+
+    if (allowUpdate) {
+      wasUpdate = true;
+      const fetched = await fetchQBInvoiceForStudio(accessToken, realmId, invoice);
+      const existing = fetched.qbInv;
+      qbInvoice.Id = existing.Id;
+      qbInvoice.SyncToken = existing.SyncToken;
+      qbInvoice.sparse = true;
+      if (existing.CustomerRef && existing.CustomerRef.value) {
+        qbInvoice.CustomerRef = existing.CustomerRef;
+      }
+      const result = await qbApiCall("POST", "invoice", accessToken, realmId, qbInvoice);
+      qbInv = result.Invoice || {};
+      qbId = qbInv.Id || existing.Id;
+    } else {
+      const result = await qbApiCall("POST", "invoice", accessToken, realmId, qbInvoice);
+      qbInv = result.Invoice || {};
+      qbId = qbInv.Id;
+    }
 
     await docRef.update({
       qbDocId: qbId,
@@ -1431,6 +1741,7 @@ async function runPushInvoiceToQBCore(projectId, docId, sendEmail) {
       qbPushedWithSalesTax: salesTaxForQb > 0.02,
       taxAmount: salesTaxForQb > 0.02 ? salesTaxForQb : (invoice.taxAmount || null),
       qbPushPending: false,
+      qbPushAllowUpdate: admin.firestore.FieldValue.delete(),
       qbPushSendEmail: admin.firestore.FieldValue.delete(),
       qbPushLastError: admin.firestore.FieldValue.delete(),
       [QB_PUSH_LOCK_FIELD]: admin.firestore.FieldValue.delete()
@@ -1441,7 +1752,9 @@ async function runPushInvoiceToQBCore(projectId, docId, sendEmail) {
       qbDocId: qbId,
       qbInvoiceNum: qbInv.DocNumber,
       qbSalesTaxPushed: salesTaxForQb,
-      emailSent: sendEmail !== false && !!clientEmail
+      emailSent: sendEmail !== false && !!clientEmail,
+      updated: wasUpdate,
+      message: wasUpdate ? "QuickBooks invoice updated" : "Sent to QuickBooks"
     };
   } catch (err) {
     await clearQbPushLock(docRef);
@@ -1604,14 +1917,15 @@ async function resolveQbVendorIdForPush(accessToken, realmId, vendorName) {
 exports.pushInvoiceToQB = onCall(QB_CALLABLE, async (request) => {
   assertQbPushAllowed(request);
 
-  const { projectId, docId, sendEmail } = request.data || {};
+  const { projectId, docId, sendEmail, update, allowUpdate } = request.data || {};
   if (!projectId || !docId) {
     throw new HttpsError("invalid-argument", "projectId and docId required");
   }
 
-  return runPushInvoiceToQBCore(projectId, docId, sendEmail !== false);
-  }
-);
+  return runPushInvoiceToQBCore(projectId, docId, sendEmail !== false, {
+    allowUpdate: !!(allowUpdate || update)
+  });
+});
 
 /** Numeric QuickBooks entity id from Firestore (not DocNumber like INV-6012). */
 function _qbInvoiceEntityId(data) {
@@ -2226,15 +2540,12 @@ exports.processInvoiceQBPushPending = onDocumentWritten(
     const { projectId, invoiceId } = event.params;
 
     if (!data.qbPushPending) return;
-    if (data.qbDocId) {
-      await snap.ref.update({ qbPushPending: false }).catch(() => {});
-      return;
-    }
 
     const sendEmail = data.qbPushSendEmail !== false;
+    const allowUpdate = !!data.qbPushAllowUpdate;
 
     try {
-      await runPushInvoiceToQBCore(projectId, invoiceId, sendEmail);
+      await runPushInvoiceToQBCore(projectId, invoiceId, sendEmail, { allowUpdate });
     } catch (e) {
       const msg =
         e instanceof HttpsError
@@ -3789,3 +4100,14 @@ exports.pushPOsToAirtable = onCall(AIRTABLE_CALLABLE, async (request) => {
 
 /** AI invoice summary — requires ANTHROPIC_API_KEY secret on this Firebase project. */
 exports.draftInvoiceSummary = require("./aiInvoiceSummary").draftInvoiceSummary;
+exports.createSquarePaymentLink = require("./squarePaymentLink").createSquarePaymentLink;
+exports.checkSquarePayment = require("./squarePaymentLink").checkSquarePayment;
+exports.squarePaymentWebhook = require("./squarePaymentLink").squarePaymentWebhook;
+/** AI bi-weekly progress update draft — WO-029 voice profile. */
+exports.draftProgressUpdate = require("./aiProgressUpdate").draftProgressUpdate;
+/** Fix-It bot for Bugs & Requests — WO-025. */
+exports.cchFixItBot = require("./cchFixItBot").cchFixItBot;
+/** Pepper staff assistant — WO-062. */
+exports.cchPepper = require("./cchPepper").cchPepper;
+/** Pepper Speak — ElevenLabs TTS (staff-only; secret ELEVENLABS_API_KEY). */
+exports.cchPepperSpeak = require("./cchPepperSpeak").cchPepperSpeak;

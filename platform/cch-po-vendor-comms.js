@@ -50,6 +50,7 @@
   }
 
   window.cchPoOrdersInboxEmail = function() { return ORDERS_EMAIL; };
+  window.cchPoAppendVendorComm = appendComm;
 
   window.cchPoVendorCommsPanelHtml = function(projectId, poId, docData, projData) {
     docData = docData || {};
@@ -76,6 +77,7 @@
         '<div class="cch-doc-view-panel-title" style="margin:0;">Vendor communications</div>' +
         '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
           '<button type="button" class="btn btn-primary btn-sm" style="background:#1B3352;color:#EDE8E0;" onclick="cchPoEmailVendor(\'' + escAttr(projectId) + '\',\'' + escAttr(poId) + '\')">📧 Send to vendor</button>' +
+          '<button type="button" class="btn btn-secondary btn-sm" onclick="typeof cchPepperVendorFollowUp===\'function\'&&cchPepperVendorFollowUp(\'' + escAttr(projectId) + '\',\'' + escAttr(poId) + '\')">Follow up</button>' +
           '<button type="button" class="btn btn-secondary btn-sm" onclick="cchPoLogVendorReply(\'' + escAttr(projectId) + '\',\'' + escAttr(poId) + '\')">↩ Log reply</button>' +
         '</div>' +
       '</div>' +
@@ -106,10 +108,11 @@
           if (resolved && resolved.name) contact.name = resolved.name;
         } catch (_e) {}
       }
-      if (!contact.email && typeof window.cchPrompt === 'function') {
+      // Always prompt so Cindy can send to anyone (pre-fill vendor email when known; not saved).
+      if (typeof window.cchPrompt === 'function') {
         var typed = await window.cchPrompt(
-          'Vendor email (for this send only — not saved to the vendor record):',
-          '',
+          'Send to (email — edit freely; not saved to the vendor record):',
+          contact.email || '',
           'Send to vendor'
         );
         if (typed === null) return;
@@ -147,7 +150,20 @@
         '?cc=' + encodeURIComponent(ORDERS_EMAIL) +
         '&subject=' + encodeURIComponent(subject) +
         '&body=' + encodeURIComponent(body);
-      window.open(href, '_blank');
+      // Prefer <a> click / _self — window.open(mailto,_blank) is often blocked after async Send.
+      try {
+        var a = document.createElement('a');
+        a.href = href;
+        a.target = '_self';
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch (_eMailOpen) {
+        try { window.location.href = href; } catch (_e2) {
+          window.open(href, '_self');
+        }
+      }
 
       if (typeof window.showToast === 'function') window.showToast('Outbound logged · opening email', 'success');
       if (window.location.hash.indexOf('/po/' + poId) >= 0 && typeof window.renderProjectDetail === 'function') {

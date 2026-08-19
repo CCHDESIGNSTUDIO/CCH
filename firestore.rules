@@ -242,6 +242,17 @@ service cloud.firestore {
         allow read: if true;
         allow write: if isAuth();
       }
+      // External contractor invites (capability URL + token). Not TEAM_CONFIG.contractors.
+      match /contractorAccess/{token} {
+        allow get: if true;
+        allow list: if isAuth();
+        allow create, delete: if isAuth();
+        allow update: if isAuth()
+          || (
+            resource.data.revoked != true
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSeenAt'])
+          );
+      }
       match /workOrders/{docId} {
         allow read: if isAuth();
         allow write: if isAuth();

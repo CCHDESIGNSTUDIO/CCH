@@ -3213,6 +3213,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-functions-compat.js"></script>
+  <script src="cch-contractor-access.js?v=20260814ca5"></script>
   <script>
     // ==================== CCH DESIGN — LIGHTWEIGHT CLIENT PORTAL ====================
     // GENERATED FILE — do not hand-edit. Rebuild with: node _scripts/generate-client-html.js
@@ -3762,16 +3764,30 @@ function cchPoLineSpecsBlockHtml(item, opts) {
       item = item || {};
       var parts = [];
       var rm = String(item.room || '').trim();
-      if (rm && !opts.omitRoom) parts.push({ label: 'Room', value: rm });
       var tag = (typeof cchLineTagText === 'function' ? cchLineTagText(item) : '') ||
         String(item.lineTag || item.lineTagCode || item.fixtureTag || '').trim();
       if (tag) parts.push({ label: 'Tag', value: tag });
-      var sku = String(item.sku || item.model || item.itemCode || '').trim();
-      if (sku) parts.push({ label: 'SKU', value: sku });
-      var fin = String(item.finish || item.color || item.finishColor || '').trim();
-      if (fin) parts.push({ label: 'Finish', value: fin });
-      var dim = String(item.dimensions || item.dimension || '').trim();
-      if (dim) parts.push({ label: 'Dimensions', value: dim });
+      var sku = String(item.sku || item.model || item.itemCode || item.productCode || item.productSku || item.vendorSku || '').trim();
+      var color = String(item.color || item.colour || '').trim();
+      var fin = String(item.finish || item.finishColor || item.materials || item.finishMaterial || '').trim();
+      if (!color && item.finishColor && item.finish) color = String(item.finishColor || '').trim();
+      var dim = String(item.dimensions || item.dimension || item.size || item.dims || item.measurements || '').trim();
+      if (opts.forceVendorFields) {
+        if (!opts.omitRoom) parts.push({ label: 'Room', value: rm || '—' });
+        parts.push({ label: 'SKU', value: sku || '—' });
+        parts.push({ label: 'Color', value: color || '—' });
+        parts.push({ label: 'Finish', value: fin || '—' });
+        parts.push({ label: 'Dimensions', value: dim || '—' });
+      } else {
+        if (rm && !opts.omitRoom) parts.push({ label: 'Room', value: rm });
+        if (sku) parts.push({ label: 'SKU', value: sku });
+        if (color) parts.push({ label: 'Color', value: color });
+        if (fin) parts.push({ label: 'Finish', value: fin });
+        else if (!color && String(item.finishColor || '').trim()) {
+          parts.push({ label: 'Finish', value: String(item.finishColor).trim() });
+        }
+        if (dim) parts.push({ label: 'Dimensions', value: dim });
+      }
       var html = '';
       if (parts.length) {
         html += '<div class="cch-po-line-specs" style="margin-top:6px;font-size:11px;color:#5C6B80;line-height:1.5;">';
@@ -5435,11 +5451,18 @@ async function _previewDocumentOriginal(type, projectId, docId) {
           (clientPhone ? esc(clientPhone) : '') +
           (!clientName && !clientEmail ? '<span style="color:#ccc;font-style:italic;">No client info</span>' : ''));
       var billToBlockLegacy = '<div class="info-block"><div class="info-label">Bill To</div><div class="info-value">' + billToInnerLegacy + '</div></div>';
-      var memoHtml = (docData.memo || docData.notes) ?
+      var _legMemo = String(docData.memo || docData.notes || '').trim();
+      if (type === 'invoice' && (/vendor\s+bill\s+variance/i.test(_legMemo) || String(docData.source || '') === 'po_bill_variance' || /^All fees are non-refundable\./i.test(_legMemo))) {
+        _legMemo = '';
+      }
+      var memoHtml = _legMemo ?
         '<div style="margin-top:20px;padding:12px 16px;background:#f9f9f7;border-radius:6px;border-left:3px solid #C9A96E;">' +
         '<div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#999;margin-bottom:4px;">Notes</div>' +
-        '<div style="font-size:13px;color:#555;line-height:1.6;">' + esc(docData.memo||docData.notes||'') + '</div></div>' : '';
+        '<div style="font-size:13px;color:#555;line-height:1.6;">' + esc(_legMemo) + '</div></div>' : '';
 
+      var _invPay = Object.assign({ id: docId }, docData);
+      var payBar = (type === 'invoice' && typeof window.cchInvoiceClientPayBarHtml === 'function')
+        ? window.cchInvoiceClientPayBarHtml(projectId, _invPay, {}) : '';
       var win = window.open('', '_blank');
       win.document.write(
         '<html><head><title>' + typeLabel + ' ' + esc(docNum) + '</title>' +
@@ -5448,9 +5471,9 @@ async function _previewDocumentOriginal(type, projectId, docId) {
         'body{font-family:"DM Sans",sans-serif;padding:48px 56px;color:#1a1a1a;max-width:850px;margin:0 auto}' +
         '.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}' +
         '.logo{font-family:"DM Serif Display",serif;font-size:52px;letter-spacing:6px;font-weight:400}' +
-        '.logo-sub{font-size:11px;letter-spacing:4px;color:#5EC6C6;text-transform:uppercase;margin-top:-4px}' +
+        '.logo-sub{font-size:11px;letter-spacing:4px;color:#C4A464;text-transform:uppercase;margin-top:-4px}' +
         '.company{font-size:12px;color:#666;line-height:1.8;margin-top:6px}' +
-        '.teal{height:3px;background:#5EC6C6;margin:16px 0 28px}' +
+        '.gold-rule{height:3px;background:#C4A464;margin:16px 0 28px}' +
         '.doc-type{font-size:11px;text-transform:uppercase;letter-spacing:3px;color:#C9A96E;margin-bottom:4px}' +
         '.info-row{display:flex;gap:32px;margin-bottom:24px;padding:16px 0;border-bottom:1px solid #eee}' +
         '.info-block{flex:1}.info-label{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:#999;margin-bottom:4px}' +
@@ -5466,9 +5489,10 @@ async function _previewDocumentOriginal(type, projectId, docId) {
         '.footer{margin-top:40px;padding-top:12px;border-top:1px solid #eee;text-align:center;font-size:12px;color:#999;font-style:italic}' +
         '.print-btn{position:fixed;top:16px;right:16px;background:#333;color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:12px;z-index:100}' +
         '.print-btn:hover{background:#555}' +
-        '@media print{.print-btn{display:none!important}body{padding:24px 40px}}' +
+        '@media print{.print-btn{display:none!important}.cch-inv-pay-bar{display:none!important}body{padding:24px 40px}}' +
         '</style></head><body>' +
         '<button class="print-btn" onclick="window.print()">🖨️ Print / PDF</button>' +
+        payBar +
         '<div class="header"><div>' +
           '<div class="logo">CCH</div><div class="logo-sub">Design Inc</div>' +
           '<div class="company">2481 N. Riverside Dr. · Santa Ana, CA 92706<br>(949) 497-7979 · cindy@cchdesign.com<br>www.cchdesign.com</div>' +
@@ -5478,7 +5502,7 @@ async function _previewDocumentOriginal(type, projectId, docId) {
           '<div style="font-size:13px;color:#666;">' + dateStr + '</div>' +
           '<div style="margin-top:8px;"><span style="display:inline-block;padding:4px 12px;border-radius:12px;font-size:11px;font-weight:600;background:#f0f0ee;color:#666;">' + esc(docData.status||'Draft') + '</span></div>' +
         '</div></div>' +
-        '<div class="teal"></div>' +
+        '<div class="gold-rule"></div>' +
         '<div class="info-row" style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start;">' +
           (type === 'po'
             ? vendorBlock + projectBlockLegacy +
@@ -6012,10 +6036,20 @@ function cpPortalScrollToDecisionFocus(kind, id) {
 
 function cpPortalRouteStateFromHash(projectId) {
       var p = (window.location.hash || '').replace(/^#\/?/, '').split('/').map(function(s) { return String(s || '').trim(); }).filter(Boolean);
-      var out = { page: 'home', proposalId: null, inspirationBoardId: null, roomBoardKey: null, decisionFocusKind: null, decisionFocusId: null, updateId: null };
+      var out = { page: 'home', proposalId: null, inspirationBoardId: null, roomBoardKey: null, decisionFocusKind: null, decisionFocusId: null, updateId: null, zelleInvoiceId: null, payInvoiceId: null };
       var pid = String(projectId || '').trim();
       if (String(p[0] || '').toLowerCase() !== 'clientview' || !p[1]) return out;
       if (String(p[1]).toLowerCase() !== pid.toLowerCase()) return out;
+      if (String(p[2] || '').toLowerCase() === 'pay' && p[3]) {
+        try { out.payInvoiceId = decodeURIComponent(String(p[3] || '').replace(/\+/g, '%20')); } catch (_ePay) { out.payInvoiceId = String(p[3] || ''); }
+        out.page = 'pay';
+        return out;
+      }
+      if (String(p[2] || '').toLowerCase() === 'zelle' && p[3]) {
+        try { out.zelleInvoiceId = decodeURIComponent(String(p[3] || '').replace(/\+/g, '%20')); } catch (_eZelle) { out.zelleInvoiceId = String(p[3] || ''); }
+        out.page = 'zelle';
+        return out;
+      }
       if (String(p[2] || '').toLowerCase() === 'proposal' && p[3]) {
         out.proposalId = p[3];
         out.page = 'proposal';
@@ -6387,9 +6421,12 @@ function cpIdeabookCoverUrl(ib) {
       if (!ib) return '';
       var u = String(ib.coverImageUrl || ib.coverUrl || ib.heroImageUrl || ib.imageUrl || '').trim();
       if (u) return u;
-      if (Array.isArray(ib.images) && ib.images.length) {
-        var x = ib.images[0];
-        return String(typeof x === 'string' ? x : (x && (x.url || x.imageUrl || x.src)) || '').trim();
+      var arr = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(ib.images) : (Array.isArray(ib.images) ? ib.images : []);
+      for (var ci = 0; ci < arr.length; ci++) {
+        var x = arr[ci];
+        if (typeof cchClientIdeasImageHidden === 'function' && cchClientIdeasImageHidden(x)) continue;
+        var xu = String(typeof x === 'string' ? x : (x && (x.url || x.imageUrl || x.src)) || '').trim();
+        if (xu) return xu;
       }
       return '';
     }
@@ -6398,9 +6435,14 @@ function cpIdeabookItemCount(ib) {
       if (!ib) return 0;
       var nItems = Array.isArray(ib.items) ? ib.items.length : 0;
       var nProd = Array.isArray(ib.products) ? ib.products.length : 0;
-      var nImg = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(ib.images).length : (Array.isArray(ib.images) ? ib.images.length : 0);
+      var imgArr = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(ib.images) : (Array.isArray(ib.images) ? ib.images : []);
+      var nImg = 0;
+      for (var ii = 0; ii < imgArr.length; ii++) {
+        if (typeof cchClientIdeasImageHidden === 'function' && cchClientIdeasImageHidden(imgArr[ii])) continue;
+        nImg++;
+      }
       var derived = Math.max(nItems, nProd, nImg);
-      if (ib.itemCount != null) {
+      if (ib.itemCount != null && !(typeof cchClientIdeasIsClientIdeasBoard === 'function' && cchClientIdeasIsClientIdeasBoard(ib))) {
         var stored = parseInt(ib.itemCount, 10) || 0;
         return Math.max(stored, derived);
       }
@@ -6792,6 +6834,7 @@ window.cpPortalPreviewDocument = async function(type, projectId, docId, label) {
       projectId = String(projectId || '').trim();
       docId = String(docId || '').trim();
       label = String(label || docId || '').trim();
+      window._cchPortalDocOpen = true;
       if (!cpPortalIsStudioPreview() && typeof cpPortalLogClientActivity === 'function') {
         var projName = await cpPortalResolveProjectName(projectId, null);
         if (type === 'invoice') {
@@ -7183,6 +7226,7 @@ function cpCollectIdeabookImageUrls(ib) {
       var arr = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(ib.images) : [];
       for (var i = 0; i < arr.length; i++) {
         var x = arr[i];
+        if (typeof cchClientIdeasImageHidden === 'function' && cchClientIdeasImageHidden(x)) continue;
         var one = _cpIdeabookRowImageUrl(x);
         var rowBase = (x && typeof x === 'object') ? _ibResolveIdeabookProductPageUrl(x) : '';
         add(one, rowBase);
@@ -8374,6 +8418,8 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
       var updateId = _routeState.updateId || null;
       var inspirationBoardId = _routeState.inspirationBoardId || null;
       var roomBoardKey = _routeState.roomBoardKey || null;
+      var zelleInvoiceId = _routeState.zelleInvoiceId || null;
+      var payInvoiceId = _routeState.payInvoiceId || null;
       var proj = {}, clips = [], proposals = [], invoices = [], notes = [], ideabooks = [], messages = [], roomMeta = {}, activity = [], tasks = [];
       var clientDocuments = [], clientDecisions = [], whatsNewItems = [], timeEntries = [];
       // Safe defaults at top of function — render paths reference these even if try{} below throws.
@@ -8665,12 +8711,15 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
         '.cp-sb-logo-top { font-size:13px; font-weight:500; letter-spacing:0.12em; text-transform:uppercase; color:#0A1F3D; }' +
         '.cp-sb-logo-sub { font-size:10px; color:#9CA3AF; margin-top:2px; letter-spacing:0.05em; }' +
         '.cp-sb-nav { padding:16px 0; flex:1; overflow-y:auto; }' +
-        '.cp-sb-item { display:flex; align-items:center; gap:10px; padding:10px 24px; cursor:pointer; font-size:13px; font-weight:400; color:#6B7280; background:transparent; border:none; width:100%; text-align:left; font-family:inherit; border-left:2px solid transparent; transition:background 0.15s ease,color 0.15s ease; }' +
-        '.cp-sb-item:hover { background:#FAFAFA; color:#0A1F3D; }' +
-        '.cp-sb-item.active { font-weight:500; color:#0A1F3D; background:#FAFAFA; border-left-color:#0A1F3D; }' +
+        // LOCK: portal left-nav text must stay navy on white (never fade/wash out).
+        '.cp-sb-item { display:flex; align-items:center; gap:10px; padding:10px 24px; cursor:pointer; font-size:13px; font-weight:500; color:#0A1F3D !important; background:transparent; border:none; width:100%; text-align:left; font-family:inherit; border-left:2px solid transparent; transition:background 0.15s ease,color 0.15s ease; }' +
+        '.cp-sb-item:hover { background:#FAFAFA; color:#0A1F3D !important; }' +
+        '.cp-sb-item.active { font-weight:700; color:#0A1F3D !important; background:#FAFAFA; border-left-color:#0A1F3D; }' +
         '.cp-sb-icon { font-size:14px; opacity:0.55; width:20px; text-align:center; flex-shrink:0; }' +
         '.cp-sb-item.active .cp-sb-icon { opacity:1; }' +
-        '.cp-sb-badge { margin-left:auto; background:#0A1F3D; color:#fff; font-size:9px; font-weight:500; padding:2px 6px; min-width:16px; text-align:center; }' +
+        '.cp-sb-badge { margin-left:auto; background:#0A1F3D !important; color:#FFFFFF !important; font-size:9px; font-weight:500; padding:2px 6px; min-width:16px; text-align:center; }' +
+        // LOCK: Home column count badges (Decisions / Documents / Invoices) — white on navy.
+        '.cp-count-badge { background:#0A1F3D !important; color:#FFFFFF !important; font-size:11px; font-weight:500; padding:3px 10px; min-width:16px; text-align:center; display:inline-block; }' +
         '.cp-sb-foot { padding:20px 24px; border-top:1px solid #E2E2E2; font-size:11px; color:#9CA3AF; line-height:1.4; }' +
         '.cp-main-stack { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; background:#FFFFFF !important; }' +
         '.cp-top-header { background:#0A1F3D; padding:10px 24px; min-height:64px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; gap:16px; }' +
@@ -8990,6 +9039,7 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
           if (slug === 'inspiration') return activePage === 'inspirations' || activePage === 'inspirationBoard';
           if (slug === 'rooms') return activePage === 'rooms' || activePage === 'roomBoard';
           if (slug === 'updates') return activePage === 'updates' || activePage === 'updateDetail';
+          if (slug === 'invoices') return activePage === 'invoices' || activePage === 'zelle' || activePage === 'pay';
           return activePage === slug;
         };
         function _cpClientSafeActivity(a) {
@@ -9017,13 +9067,23 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
           (ib.images || []).forEach(function(img) {
             var ts = img.addedAt || img.createdAt || '';
             if (!ts || ts < _synthCutoff) return;
+            var _whoAdd = (img && img.fromClient)
+              ? ((img.clientName || 'Client') + ' shared an idea on ' + ibName)
+              : ('Added a new image to ' + ibName);
             _synthActivity.push({
               _synthetic: true,
               type: 'inspiration',
-              action: 'image_added',
-              description: 'Added a new image to ' + ibName,
+              action: img && img.fromClient ? 'client_idea_shared' : 'image_added',
+              description: _whoAdd,
               timestamp: ts,
-              meta: { boardName: ibName, imageUrl: img.imageUrl || '' }
+              meta: {
+                boardName: ibName,
+                imageUrl: img.imageUrl || '',
+                source: img && img.fromClient ? 'client_portal' : 'studio',
+                authorType: img && img.fromClient ? 'client' : 'studio',
+                clientName: (img && img.clientName) || '',
+                sourceUrl: (img && img.sourceUrl) || ''
+              }
             });
           });
         });
@@ -9354,6 +9414,7 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
           var _visInsp = [];
           for (var _rix = 0; _rix < _ibImgRowsLb.length; _rix++) {
             var _rr = _ibImgRowsLb[_rix];
+            if (typeof cchClientIdeasImageHidden === 'function' && cchClientIdeasImageHidden(_rr)) continue;
             var _uPix = _cpIdeabookRowImageUrl(_rr);
             var _rowBaseIn = '';
             if (_rr && typeof _rr === 'object' && typeof _ibResolveIdeabookProductPageUrl === 'function') {
@@ -9419,11 +9480,29 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
                 : '';
               var _capLine = String(_cell.caption || '').trim();
               var _cliNote = String(_cell.clientNote || '').trim();
-              var _capStudioHtml = _capLine
-                ? ('<div class="cp-insp-cap-studio" title="From your design team">' + esc(_capLine) + '</div>')
-                : ('<div class="cp-insp-cap-studio cp-insp-cap-muted">Studio caption (if any) appears here.</div>');
+              var _rawObj = (typeof _rawRow === 'object' && _rawRow) ? _rawRow : {};
+              var _fromCli = !!_rawObj.fromClient;
+              var _ownIdea = _fromCli && _inspIdent && _inspIdent.email && String(_rawObj.clientEmail || '').toLowerCase() === String(_inspIdent.email).toLowerCase();
+              var _srcUrl = String(_rawObj.sourceUrl || '').trim();
+              var _srcHost = '';
+              if (_srcUrl) {
+                try { _srcHost = new URL(_srcUrl).hostname.replace(/^www\./, ''); } catch (_eH) { _srcHost = 'source'; }
+              }
+              var _capStudioHtml = _fromCli
+                ? ('<div class="cp-insp-cap-studio" title="Shared from the client portal">' +
+                  (_capLine ? esc(_capLine) : 'Shared idea') +
+                  (_rawObj.clientName ? ' <span style="color:#C4A464;">· ' + esc(_rawObj.clientName) + '</span>' : '') +
+                  (_rawObj.clientEmail ? ' <span style="color:#9CA3AF;font-size:11px;">(' + esc(_rawObj.clientEmail) + ')</span>' : '') +
+                  (_srcUrl ? '<div style="margin-top:4px;font-size:11px;"><a href="' + escAttr(_srcUrl) + '" target="_blank" rel="noopener" style="color:#0A1F3D;text-decoration:underline;" onclick="event.stopPropagation();">Source: ' + esc(_srcHost) + '</a></div>' : '') +
+                  '</div>')
+                : (_capLine
+                  ? ('<div class="cp-insp-cap-studio" title="From your design team">' + esc(_capLine) + '</div>')
+                  : ('<div class="cp-insp-cap-studio cp-insp-cap-muted">Studio caption (if any) appears here.</div>'));
               var _noteBtnClass = 'cp-insp-client-note' + (_cliNote ? '' : ' cp-insp-client-note-empty');
               var _noteBtnTxt = _cliNote ? esc(_cliNote) : 'Add your note\u2026';
+              var _rmOwn = _ownIdea
+                ? ('<button type="button" class="cp-btn cp-btn-outline" style="margin-top:6px;padding:6px 10px;font-size:11px;border-color:#E2E2E2;color:#6B7280;" onclick="event.preventDefault();event.stopPropagation();void window.cchClientIdeasRemoveOwn(\'' + pidJs + '\',' + _cell.imageIndex + ')">Remove my idea</button>')
+                : '';
               html += '<div class="cp-insp-board-cell" data-cp-pid="' + escAttr(String(projectId)) + '" data-cp-sid="' + escAttr(String(inspirationBoardId)) + '" data-cp-idx="' + _cell.imageIndex + '">' +
                 '<div class="cp-insp-board-tile" role="button" tabindex="0" onclick="cpProposalLineLightboxOpenFromEncoded(\'' + encEsc2 + '\',' + _vj + ')">' +
                 '<img src="' + _escImgSrcAttr(iuB2) + '" alt="" referrerpolicy="no-referrer" onerror="this.style.opacity=\'0.2\'">' +
@@ -9432,7 +9511,8 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
                 '</div>' +
                 '<div class="cp-insp-board-caption-block">' +
                 _capStudioHtml +
-                '<button type="button" class="' + _noteBtnClass + '" onclick="event.preventDefault();event.stopPropagation();void window.cpPortalSaveInspirationClientNote(\'' + pidJs + '\',\'' + secIdJs + '\',' + _cell.imageIndex + ')">' + _noteBtnTxt + '</button>' +
+                (_fromCli ? '' : ('<button type="button" class="' + _noteBtnClass + '" onclick="event.preventDefault();event.stopPropagation();void window.cpPortalSaveInspirationClientNote(\'' + pidJs + '\',\'' + secIdJs + '\',' + _cell.imageIndex + ')">' + _noteBtnTxt + '</button>')) +
+                _rmOwn +
                 _threadHtml +
                 _compose +
                 '</div></div>';
@@ -9456,9 +9536,12 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
         }
       } else if (activePage === 'inspirations') {
         html += '<div class="cp-sec-label-jx" style="margin-bottom:20px;">Inspirations</div>' +
-          '<p style="font-size:12px;color:#6B7280;font-family:\'DM Sans\',sans-serif;line-height:1.55;margin:-8px 0 18px;max-width:720px;">Open a board, then an image to view it large. When signed in, use the star to save favorites and add comments for your designer. <strong>Design Boards</strong> in the portal are layout presentations only — starring happens here under <strong>Inspirations</strong>.</p>';
+          '<p style="font-size:13px;color:#0A1F3D;font-family:\'DM Sans\',sans-serif;line-height:1.55;margin:-8px 0 10px;max-width:720px;">If you have images to share, you can upload them to your own <strong>Client Ideas</strong> board. Use a photo from your device, or paste an image link from the web.</p>' +
+          '<p style="font-size:12px;color:#6B7280;font-family:\'DM Sans\',sans-serif;line-height:1.55;margin:0 0 18px;max-width:720px;">Open any board to view images larger, star favorites, and leave comments for your designer. Starring lives here under Inspirations (layout presentations are under Design Boards).</p>' +
+          '<div style="margin:0 0 22px;"><button type="button" class="cp-btn cp-btn-primary" style="padding:12px 20px;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;" onclick="typeof cchClientIdeasOpenShare===\'function\'&&cchClientIdeasOpenShare(\'' + escJsStr(projectId) + '\')">Share an idea</button>' +
+          '<div style="font-size:11px;color:#9CA3AF;margin-top:8px;font-family:\'DM Sans\',sans-serif;">Upload a photo or paste an image URL. Ideas stay on Client Ideas, separate from boards your designer curated.</div></div>';
         if (!inspirationIdeabooks.length) {
-          html += '<div style="font-size:13px;color:#6B7280;font-family:\'DM Sans\',sans-serif;">No inspiration boards shared yet.</div>';
+          html += '<div style="font-size:13px;color:#6B7280;font-family:\'DM Sans\',sans-serif;">No inspiration boards shared yet. You can still share an idea above.</div>';
         } else {
           html += '<div style="text-align:center;padding:24px 0 12px;"><div style="font-family:\'Playfair Display\',serif;font-size:28px;font-weight:400;color:#0A1F3D;letter-spacing:0.08em;text-transform:uppercase;">CCH Design</div></div>' +
             '<div style="text-align:center;padding:16px 0;border-top:1px solid #E2E2E2;border-bottom:1px solid #E2E2E2;margin-bottom:20px;"><span style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#6B7280;font-family:\'DM Sans\',sans-serif;">Inspirations</span></div>' +
@@ -9468,13 +9551,14 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
               var iu = cpIdeabookCoverUrl(ib);
               var tit = ib.name || ib.title || 'Board';
               var _ic = cpIdeabookItemCount(ib);
+              var _isCi = typeof cchClientIdeasIsClientIdeasBoard === 'function' && cchClientIdeasIsClientIdeasBoard(ib);
               var _inspCardHash = '#/clientview/' + projectId + '/inspirations/' + ib.id;
               html += '<div class="cp-board-list-item" style="cursor:pointer;" role="link" tabindex="0" onclick=' + cpPortalNavigateOnclickAttr(_inspCardHash) + '>' +
                 '<div class="cp-inspiration-card">' +
                 (iu ? '<img class="cp-inspiration-cover-img" src="' + _escImgSrcAttr(iu) + '" alt="" referrerpolicy="no-referrer" style="filter:grayscale(30%);" onerror="this.style.opacity=\'0\';this.style.visibility=\'hidden\';var fb=this.parentNode&&this.parentNode.querySelector(\'.cp-inspiration-cover-fallback\');if(fb){fb.style.display=\'flex\';}">' : '') +
                 '<div class="cp-inspiration-cover-fallback" style="display:' + (iu ? 'none' : 'flex') + ';filter:grayscale(30%);">\u273F</div>' +
                 '</div>' +
-                '<div class="cp-board-list-title">' + esc(tit) + '</div>' +
+                '<div class="cp-board-list-title">' + esc(tit) + (_isCi ? ' <span style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#C4A464;font-weight:600;">From you</span>' : '') + '</div>' +
                 '<div class="cp-board-list-count">' + _ic + ' item' + (_ic !== 1 ? 's' : '') + '</div></div>';
             } catch (eIb) {
               console.error('[renderClientPortal] inspiration card skipped:', (ib && ib.id) || ib, eIb);
@@ -9612,6 +9696,23 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
             if (!_invByYear[yr]) _invByYear[yr] = [];
             _invByYear[yr].push(inv);
           });
+          /* Studio INV-* first, then newest invoice date within each year. */
+          Object.keys(_invByYear).forEach(function(yr) {
+            _invByYear[yr].sort(function(a, b) {
+              var na = String(a.invoiceNum || a.number || a.name || '').trim();
+              var nb = String(b.invoiceNum || b.number || b.name || '').trim();
+              var sa = /^INV-/i.test(na) ? 0 : 1;
+              var sb = /^INV-/i.test(nb) ? 0 : 1;
+              if (sa !== sb) return sa - sb;
+              function _ms(inv) {
+                var d = typeof getDocDate === 'function' ? getDocDate(inv) : '';
+                if (!d) d = inv.invoiceDate || inv.date || inv.sentAt || inv.publishedAt || inv.createdAt || inv.dueDate || inv.due || '';
+                var t = Date.parse(d);
+                return isNaN(t) ? 0 : t;
+              }
+              return _ms(b) - _ms(a);
+            });
+          });
           var _invYears = Object.keys(_invByYear).sort(function(a, b) {
             if (a === 'Other') return 1; if (b === 'Other') return -1;
             return b.localeCompare(a);
@@ -9654,22 +9755,26 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
                   ? ('Invoice total ' + formatMoney(invTotal) + ' · Paid ' + formatMoney(invPaid) + ' · Balance ' + formatMoney(invBal))
                   : (invPaid > 0.01 ? ('Paid in full · Invoice total ' + formatMoney(invTotal)) : '');
                 var border = ii < yrInvs.length - 1 ? 'border-bottom:1px solid #F0F0F0;' : '';
-                var qbLink = (inv.qbInvoiceUrl || inv.qbUrl || '').trim();
+                var qbLink = String(inv.squareCheckoutUrl || '').trim();
                 var _invTag = (typeof proposalDocumentTagText === 'function' ? proposalDocumentTagText(inv) : '') || '';
                 var _invDesc = String(inv.memo || inv.shortDescription || inv.projectName || '').trim();
                 var _invPreviewJs = 'void window.cpPortalPreviewDocument(' + JSON.stringify('invoice') + ',' + JSON.stringify(projectId) + ',' + JSON.stringify(inv.id) + ',' + JSON.stringify(inv.invoiceNum || inv.name || inv.id) + ')';
                 var _invCanUnpub = isOwner && inv.published && String(inv.id || '').indexOf('houzz-') !== 0;
                 var _invUnpubJs = 'void window.cpPortalTogglePublished(' + JSON.stringify(projectId) + ',' + JSON.stringify('invoices') + ',' + JSON.stringify(inv.id) + ',false,' + JSON.stringify('invoices') + ')';
+                var _payHash = '#/clientview/' + projectId + '/pay/' + encodeURIComponent(inv.id);
+                var _payBtn = (invOpen && invBal > 0.01)
+                  ? '<button type="button" class="cp-btn cp-btn-outline" style="padding:6px 12px;font-size:11px;border-color:#E2E2E2;color:#0A1F3D;" onclick=' + cpPortalNavigateOnclickAttr(_payHash) + '>Pay</button>'
+                  : '';
                 var _invActions = '<div style="display:inline-flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;">' +
                   (_invCanUnpub ? '<button type="button" class="cp-btn cp-btn-outline" style="padding:6px 12px;font-size:11px;border-color:#E2E2E2;color:#6B7280;" onclick=' + cpPortalOnclickAttr(_invUnpubJs) + '>Unpublish</button>' : '') +
                   '<button type="button" class="cp-btn cp-btn-primary" style="padding:6px 12px;font-size:11px;" onclick=' + cpPortalOnclickAttr(_invPreviewJs) + '>Open</button>' +
-                  (qbLink ? '<a href="' + escAttr(qbLink) + '" target="_blank" rel="noopener" class="cp-btn cp-btn-primary" style="display:inline-block;padding:6px 12px;font-size:11px;">Pay Now</a>' : '') +
+                  _payBtn +
                   '</div>';
                 html += '<div style="display:grid;grid-template-columns:' + _cpInvGrid + ';gap:8px 12px;padding:16px 24px;align-items:center;' + border + '">' +
                   '<span style="font-size:13px;font-weight:500;color:#0A1F3D;font-family:\'DM Sans\',sans-serif;">' + esc(inv.invoiceNum || inv.name || 'Invoice') + '</span>' +
                   '<span style="font-size:12px;color:#6B7280;font-family:\'DM Sans\',sans-serif;line-height:1.35;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;" title="' + escAttr(_invTag) + '">' + esc(_invTag) + '</span>' +
                   '<span style="font-size:13px;color:#0A1F3D;font-family:\'DM Sans\',sans-serif;line-height:1.35;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">' + esc(_invDesc) + '</span>' +
-                  '<span style="font-size:13px;font-weight:500;color:#0A1F3D;font-family:\'DM Sans\',sans-serif;"' + (invAmtTitle ? ' title="' + escAttr(invAmtTitle) + '"' : '') + '>' + (invBal <= 0.01 && invPaid > 0.01 ? '<span style="color:#5FA56B;">Paid</span>' : formatMoney(invBal)) + (invOpen && invBal > 0.01 ? ' <span style="font-size:11px;font-weight:400;color:#9CA3AF;">due</span>' : '') + '</span>' +
+                  '<span style="font-size:13px;font-weight:500;color:#0A1F3D;font-family:\'DM Sans\',sans-serif;"' + (invAmtTitle ? ' title="' + escAttr(invAmtTitle) + '"' : '') + '>' + (invBal <= 0.01 && invPaid > 0.01 ? '<span style="color:#0A1F3D;">Paid</span>' : formatMoney(invBal)) + (invOpen && invBal > 0.01 ? ' <span style="font-size:11px;font-weight:400;color:#9CA3AF;">due</span>' : '') + '</span>' +
                   '<span style="font-size:12px;color:#9CA3AF;font-family:\'DM Sans\',sans-serif;">' + esc(inv.dueDate || inv.due || '') + '</span>' +
                   '<div style="text-align:right;">' + _invActions + '</div></div>';
               });
@@ -9682,6 +9787,28 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
             '<span style="font-size:13px;font-weight:500;color:#0A1F3D;font-family:\'DM Sans\',sans-serif;">Total Outstanding (open invoices)</span>' +
             '<span style="font-size:15px;font-weight:500;color:#0A1F3D;font-family:\'DM Sans\',sans-serif;">' + formatMoney(_invTot) + '</span></div>';
         }
+      } else if (activePage === 'pay') {
+        var _payInv = null;
+        var _payWant = String(payInvoiceId || '').trim();
+        if (_payWant) {
+          for (var _pi = 0; _pi < invoices.length; _pi++) {
+            if (String(invoices[_pi].id) === _payWant) { _payInv = invoices[_pi]; break; }
+          }
+        }
+        html += typeof window.cchPayChoiceHtml === 'function'
+          ? window.cchPayChoiceHtml(projectId, _payInv)
+          : '<div style="padding:24px;color:#6B7280;">Pay page is not loaded.</div>';
+      } else if (activePage === 'zelle') {
+        var _zelleInv = null;
+        var _zelleWant = String(zelleInvoiceId || '').trim();
+        if (_zelleWant) {
+          for (var _zi = 0; _zi < invoices.length; _zi++) {
+            if (String(invoices[_zi].id) === _zelleWant) { _zelleInv = invoices[_zi]; break; }
+          }
+        }
+        html += typeof window.cchZelleInstructionsHtml === 'function'
+          ? window.cchZelleInstructionsHtml(projectId, _zelleInv)
+          : '<div style="padding:24px;color:#6B7280;">Zelle page is not loaded.</div>';
       } else if (activePage === 'documents') {
         var docList = (Array.isArray(portalMergedDocs) && portalMergedDocs.length) ? portalMergedDocs : clientDocuments;
         var docFolderFilt = (window._cpDocFolderFilterByProject && window._cpDocFolderFilterByProject[projectId]) || 'all';
@@ -9880,7 +10007,7 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
         html += '<div style="border:1px solid #E2E2E2;padding:24px 28px;min-width:0;overflow:hidden;">' +
           '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">' +
           '<div style="font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:#0A1F3D;">Decisions Needed</div>' +
-          '<span style="background:#0A1F3D;color:#fff;font-size:11px;font-weight:500;padding:3px 10px;">' + _decisionsNeededCount + '</span></div>';
+          '<span class="cp-count-badge">' + _decisionsNeededCount + '</span></div>';
         if (_cpOpenDecisionItems.length) {
           _cpOpenDecisionItems.slice(0, 2).forEach(function(it, di) {
             html += typeof cpPortalHomeDecisionRowHtml === 'function'
@@ -9898,7 +10025,7 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
         html += '<div style="border:1px solid #E2E2E2;padding:24px 28px;min-width:0;overflow:hidden;">' +
           '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">' +
           '<div style="font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:#0A1F3D;">Shared Documents</div>' +
-          '<span style="background:#0A1F3D;color:#fff;font-size:11px;font-weight:500;padding:3px 10px;">' + _recentSharedDocs.length + '</span></div>';
+          '<span class="cp-count-badge">' + _recentSharedDocs.length + '</span></div>';
         if (_recentSharedDocs.length) {
           _recentSharedDocs.slice(0, 2).forEach(function(d, di) {
             html += typeof cpPortalHomeDocRowHtml === 'function'
@@ -9920,19 +10047,23 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
         html += '<div style="border:1px solid #E2E2E2;padding:24px 28px;">' +
           '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">' +
           '<div style="font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:#0A1F3D;">Open Invoices</div>' +
-          '<span style="background:#0A1F3D;color:#fff;font-size:11px;font-weight:500;padding:3px 10px;">' + _openInvoices.length + '</span></div>';
+          '<span class="cp-count-badge">' + _openInvoices.length + '</span></div>';
         if (_openInvoices.length) {
           _openInvoices.slice(0, 8).forEach(function(inv, ii) {
             var invTotal = parseFloat(inv.total || inv.amount) || 0;
             var invBal = typeof window.cpPortalInvoiceBalance === 'function' ? window.cpPortalInvoiceBalance(inv) : invTotal;
-            var qbLink = (inv.qbInvoiceUrl || inv.qbUrl || '').trim();
+            var qbLink = String(inv.squareCheckoutUrl || '').trim();
             var _miniInvJs = 'void window.cpPortalPreviewDocument(' + JSON.stringify('invoice') + ',' + JSON.stringify(projectId) + ',' + JSON.stringify(inv.id) + ',' + JSON.stringify(inv.invoiceNum || inv.name || inv.id) + ')';
+            var _miniPayHash = '#/clientview/' + projectId + '/pay/' + encodeURIComponent(inv.id);
+            var _miniPayBtn = (invBal > 0.01)
+              ? '<button type="button" class="cp-btn cp-btn-outline" style="padding:6px 14px;font-size:11px;border-color:#E2E2E2;color:#0A1F3D;" onclick=' + cpPortalNavigateOnclickAttr(_miniPayHash) + '>Pay</button>'
+              : '';
             html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;' + (ii ? 'border-top:1px solid #F0F0F0;' : '') + '">' +
               '<div style="min-width:0;"><div style="font-size:13px;color:#0A1F3D;">' + esc(inv.invoiceNum || inv.name || 'Invoice') + '</div>' +
               '<div style="font-size:11px;color:#9CA3AF;margin-top:2px;">' + esc(inv.status || 'Open') + (invBal < invTotal - 0.01 ? ' · ' + formatMoney(invBal) + ' due' : '') + '</div></div>' +
               '<div style="display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center;">' +
               '<button type="button" class="cp-btn cp-btn-primary" style="padding:6px 14px;font-size:11px;" onclick=' + cpPortalOnclickAttr(_miniInvJs) + '>Open</button>' +
-              (qbLink ? '<a href="' + escAttr(qbLink) + '" target="_blank" rel="noopener" class="cp-btn cp-btn-primary" style="padding:6px 14px;font-size:11px;">Pay Now</a>' : '') +
+              _miniPayBtn +
               '</div></div>';
           });
           html += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid #E2E2E2;display:flex;justify-content:space-between;font-size:13px;font-weight:500;color:#0A1F3D;">' +
@@ -10134,14 +10265,27 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
         }
       }
       T.innerHTML = html;
-      // WO-089: client Pepper — docked in navy header (clients + staff Preview for placement QA)
+      // WO-089 + WO-104: client Pepper — live open-counts from same sources as portal badges
       if (typeof window.cchClientPepperMount === 'function') {
         var _pepperIdent = (typeof cpPortalEffectiveClientIdentity === 'function' ? (cpPortalEffectiveClientIdentity() || {}) : {});
+        var _pepperSnap = typeof window.cpPortalBuildPepperOpenSnapshot === 'function'
+          ? window.cpPortalBuildPepperOpenSnapshot({
+              proposals: proposals,
+              invoices: invoices,
+              clientDecisions: clientDecisions,
+              tasks: tasks,
+              whatsNewItems: whatsNewItems
+            })
+          : { openCounts: { decisions: _decisionsNeededCount, proposals: proposals.filter(function(p) { return typeof proposalNeedsClientReview === 'function' && proposalNeedsClientReview(p); }).length, invoices: _openInvoices.length, loadError: false }, proposalNudges: [], whatsNew: null };
         window.cchClientPepperMount({
           projectId: projectId,
           projectName: String((proj && (proj.name || proj.projectName)) || projName || projectId),
           clientName: String(_pepperIdent.name || _pepperIdent.clientName || (isOwner ? 'Studio Preview' : 'Client')),
-          clientEmail: String(_pepperIdent.email || '')
+          clientEmail: String(_pepperIdent.email || ''),
+          baseHash: '#/clientview/' + projectId,
+          openCounts: _pepperSnap.openCounts,
+          proposalNudges: _pepperSnap.proposalNudges,
+          whatsNew: _pepperSnap.whatsNew
         });
       }
       if (typeof cpPortalPaintPdfThumbs === 'function') void cpPortalPaintPdfThumbs(T);
@@ -10710,12 +10854,16 @@ function cpPortalDocCardHtml(projectId, d) {
       } else if (studioFid || clientRowId) {
         actions += '<button type="button" class="cp-btn cp-btn-primary" style="padding:6px 10px;font-size:11px;width:100%;" onclick=' + cpPortalOnclickAttr('void window.cpPortalOpenResolvedDoc(' + JSON.stringify(projectId) + ',' + JSON.stringify(studioFid) + ',' + JSON.stringify(clientRowId) + ')') + '>Open</button>';
       }
-      if (typeof isCCHStudioStaffSession === 'function' && isCCHStudioStaffSession() && !_cpIsStudioFileRow) {
+      if (typeof isCCHStudioStaffSession === 'function' && isCCHStudioStaffSession()) {
         actions += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;padding-top:8px;border-top:1px dashed #E2E2E2;">' +
-          '<span style="font-size:10px;color:#9CA3AF;align-self:center;">Admin</span>' +
-          '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;flex:1;" onclick=' + cpPortalOnclickAttr('void cpAdminOpenShareDocumentModal(' + JSON.stringify(projectId) + ',' + JSON.stringify(d.id) + ')') + '>Edit</button>' +
-          '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;flex:1;color:#B45309;border-color:#FCD9BD;" onclick=' + cpPortalOnclickAttr('void cpAdminDeleteClientDocument(' + JSON.stringify(projectId) + ',' + JSON.stringify(d.id) + ')') + '>Delete</button>' +
-          '</div>';
+          '<span style="font-size:10px;color:#9CA3AF;align-self:center;">Admin</span>';
+        if (_cpIsStudioFileRow && studioFid) {
+          actions += '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;flex:1;color:#B45309;border-color:#FCD9BD;" onclick=' + cpPortalOnclickAttr('void cpAdminRemoveDocFromClientPortal(' + JSON.stringify(projectId) + ',' + JSON.stringify('studioFile') + ',' + JSON.stringify(studioFid) + ')') + '>Remove from portal</button>';
+        } else if (clientRowId) {
+          actions += '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;flex:1;" onclick=' + cpPortalOnclickAttr('void cpAdminOpenShareDocumentModal(' + JSON.stringify(projectId) + ',' + JSON.stringify(d.id) + ')') + '>Edit</button>' +
+            '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;flex:1;color:#B45309;border-color:#FCD9BD;" onclick=' + cpPortalOnclickAttr('void cpAdminRemoveDocFromClientPortal(' + JSON.stringify(projectId) + ',' + JSON.stringify('clientDoc') + ',' + JSON.stringify(d.id) + ')') + '>Delete</button>';
+        }
+        actions += '</div>';
       }
       return '<div class="cp-doc-card">' +
         '<div class="cp-doc-card-thumb">' + (typeof cpPortalDocThumbHtml === 'function' ? cpPortalDocThumbHtml(d, { layout: 'card', projectId: projectId }) : '') + '</div>' +
@@ -10903,12 +11051,16 @@ function cpPortalHomeDocRowHtml(projectId, d, di) {
           '<div style="font-size:13px;font-weight:600;color:#0A1F3D;overflow:hidden;text-overflow:ellipsis;">' + esc(typeof cpPortalDocDisplayFileName === 'function' ? cpPortalDocDisplayFileName(d) : (d.title || d.docNumber || 'Document')) + '</div>' +
           '<div style="font-size:10px;color:#9CA3AF;margin-top:2px;">' + esc(cpClientDocNormalizedFolder(d)) + '</div>' +
         '</div>' + openBtn + '</div>';
-      if (typeof isCCHStudioStaffSession === 'function' && isCCHStudioStaffSession() && cid.indexOf('studiofile:') !== 0) {
+      if (typeof isCCHStudioStaffSession === 'function' && isCCHStudioStaffSession()) {
         html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #E2E2E2;">' +
-          '<span style="font-size:10px;color:#9CA3AF;align-self:center;">Admin</span>' +
-          '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;" onclick=' + cpPortalOnclickAttr('void cpAdminOpenShareDocumentModal(' + JSON.stringify(projectId) + ',' + JSON.stringify(cid) + ')') + '>Edit</button>' +
-          '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;color:#B45309;border-color:#FCD9BD;" onclick=' + cpPortalOnclickAttr('void cpAdminDeleteClientDocument(' + JSON.stringify(projectId) + ',' + JSON.stringify(cid) + ')') + '>Delete</button>' +
-          '</div>';
+          '<span style="font-size:10px;color:#9CA3AF;align-self:center;">Admin</span>';
+        if (cid.indexOf('studiofile:') === 0 && studioFid) {
+          html += '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;color:#B45309;border-color:#FCD9BD;" onclick=' + cpPortalOnclickAttr('void cpAdminRemoveDocFromClientPortal(' + JSON.stringify(projectId) + ',' + JSON.stringify('studioFile') + ',' + JSON.stringify(studioFid) + ')') + '>Remove from portal</button>';
+        } else if (cid) {
+          html += '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;" onclick=' + cpPortalOnclickAttr('void cpAdminOpenShareDocumentModal(' + JSON.stringify(projectId) + ',' + JSON.stringify(cid) + ')') + '>Edit</button>' +
+            '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;color:#B45309;border-color:#FCD9BD;" onclick=' + cpPortalOnclickAttr('void cpAdminRemoveDocFromClientPortal(' + JSON.stringify(projectId) + ',' + JSON.stringify('clientDoc') + ',' + JSON.stringify(cid) + ')') + '>Delete</button>';
+        }
+        html += '</div>';
       }
       html += '</div>';
       return html;
@@ -11024,6 +11176,93 @@ function cpPortalDedupeDecisionItems(items) {
       });
       return out;
     }
+
+/**
+ * WO-104 — live snapshot for Client Pepper. Counts MUST match portal badges:
+ * decisions = Decisions Needed badge (_openClientDecisions + needs_input tasks)
+ * proposals = Proposals sidebar badge (proposalNeedsClientReview)
+ * invoices = Home Open Invoices badge
+ * Pepper must never invent or recompute these differently.
+ */
+window.cpPortalBuildPepperOpenSnapshot = function(opts) {
+      opts = opts || {};
+      var proposals = Array.isArray(opts.proposals) ? opts.proposals : [];
+      var invoices = Array.isArray(opts.invoices) ? opts.invoices : [];
+      var clientDecisions = Array.isArray(opts.clientDecisions) ? opts.clientDecisions : [];
+      var tasks = Array.isArray(opts.tasks) ? opts.tasks : [];
+      var whatsNewItems = Array.isArray(opts.whatsNewItems) ? opts.whatsNewItems : [];
+      try {
+        var openDec = clientDecisions.filter(function(d) {
+          return typeof cpPortalDecisionStatusIsOpen === 'function' && cpPortalDecisionStatusIsOpen(d.status);
+        });
+        var needsInput = tasks.filter(function(t) {
+          return String(t.clientFlag || '') === 'needs_input' && !t.clientResponse;
+        });
+        var decisions = openDec.length + needsInput.length;
+        var awaiting = proposals.filter(function(p) {
+          return typeof proposalNeedsClientReview === 'function' && proposalNeedsClientReview(p);
+        });
+        var openInv = invoices.filter(function(inv) {
+          return inv.status === 'Sent' || inv.status === 'Unpaid' || inv.status === 'Due' || inv.status === 'Overdue' || inv.status === 'Partial';
+        });
+        var nudges = [];
+        awaiting.slice(0, 3).forEach(function(p) {
+          var visible = [];
+          var hg = null;
+          (p.items || []).forEach(function(it) {
+            if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it)) {
+              hg = it.hideFromClient ? it.groupId : null;
+              return;
+            }
+            if (hg && it.groupId === hg) return;
+            hg = null;
+            visible.push(it);
+          });
+          var appr = 0, decl = 0, pend = 0;
+          visible.forEach(function(it) {
+            var s = typeof getProposalLineApprovalStatus === 'function' ? getProposalLineApprovalStatus(it) : 'pending';
+            if (s === 'approved') appr++;
+            else if (s === 'declined') decl++;
+            else pend++;
+          });
+          var readyForFinal = visible.length > 0 && pend === 0 && appr >= 1 && !p.clientApprovedTotalAt && p.status !== 'Invoiced';
+          nudges.push({
+            id: p.id,
+            num: p.proposalNum || p.name || 'Proposal',
+            approved: appr,
+            declined: decl,
+            pending: pend,
+            readyForFinal: !!readyForFinal
+          });
+        });
+        var wn = null;
+        for (var wi = 0; wi < whatsNewItems.length; wi++) {
+          var w = whatsNewItems[wi];
+          if (!w) continue;
+          var wText = String(w.text || w.body || '').trim();
+          if (!wText) continue;
+          wn = {
+            id: String(w.id || ('wn' + wi)),
+            title: String(w.title || 'What\'s New').trim(),
+            text: wText.slice(0, 160),
+            speakText: wText.slice(0, 120)
+          };
+          break;
+        }
+        return {
+          openCounts: { decisions: decisions, proposals: awaiting.length, invoices: openInv.length, loadError: false },
+          proposalNudges: nudges,
+          whatsNew: wn
+        };
+      } catch (e) {
+        console.warn('[cpPortalBuildPepperOpenSnapshot]', e);
+        return {
+          openCounts: { decisions: 0, proposals: 0, invoices: 0, loadError: true },
+          proposalNudges: [],
+          whatsNew: null
+        };
+      }
+    };
 
 function cpPortalCollectOpenDecisionItems(clientDecisions, tasks) {
       var items = [];
@@ -11573,22 +11812,70 @@ async function cpAdminDeleteClientDecision(projectId, decisionId) {
       }
     }
 
-async function cpAdminDeleteClientDocument(projectId, docId) {
+function cpPortalStaffRerenderAfterDocChange(projectId) {
+      var hash = String(window.location.hash || '');
+      var page = 'documents';
+      if (hash.indexOf('/clientview/') >= 0) {
+        if (/\/documents(?:\/|$|\?)/.test(hash)) page = 'documents';
+        else if (/\/home(?:\/|$|\?)/.test(hash) || /#\/clientview\/[^/]+\/?$/.test(hash)) page = 'home';
+        else page = 'home';
+      }
+      if (hash.indexOf('/clientview/' + projectId) >= 0 && typeof renderClientPortal === 'function') {
+        return renderClientPortal(projectId, null, page);
+      }
+      if (typeof renderProjectDetail === 'function') renderProjectDetail();
+      return Promise.resolve();
+    }
+
+/** Remove from client portal: delete +Share doc, or hide Studio file from portal (keeps Files copy). */
+window.cpAdminRemoveDocFromClientPortal = async function(projectId, kindLabel, docId) {
       projectId = String(projectId || '').trim();
       docId = String(docId || '').trim();
+      var isStudio = String(kindLabel || '').toLowerCase() === 'studiofile';
       if (!projectId || !docId) return;
-      if (!(await cchConfirm('Delete this shared document? The client will no longer see it.', 'Delete Document', { confirmText: 'Delete', danger: true }))) return;
+      var ok = await cchConfirm(
+        isStudio
+          ? 'Remove this file from the client portal? It stays in Studio Files (hidden from the client).'
+          : 'Delete this shared document? The client will no longer see it.',
+        isStudio ? 'Remove from portal' : 'Delete Document',
+        { confirmText: isStudio ? 'Remove' : 'Delete', danger: true }
+      );
+      if (!ok) return;
       try {
-        await db.collection('boards').doc(projectId).collection('clientDocuments').doc(docId).delete();
-        showToast('Document deleted');
-        if (String(window.location.hash || '').indexOf('/clientview/' + projectId) >= 0 && typeof renderClientPortal === 'function') {
-          await renderClientPortal(projectId, null, 'documents');
-        } else if (typeof renderProjectDetail === 'function') {
-          renderProjectDetail();
+        if (isStudio) {
+          await db.collection('boards').doc(projectId).collection('files').doc(docId).set({
+            hideFromClient: true,
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+          try {
+            var _bSnap = await db.collection('boards').doc(projectId).get();
+            var _arr = (_bSnap.exists && Array.isArray((_bSnap.data() || {}).clientPortalDesignStory))
+              ? (_bSnap.data().clientPortalDesignStory || []).slice() : [];
+            _arr = _arr.filter(function(r) {
+              if (!r || r.id == null) return true;
+              var rk = String(r.kind || 'clientDoc').toLowerCase();
+              if (rk === 'file') rk = 'studiofile';
+              return !(rk === 'studiofile' && String(r.id) === docId);
+            });
+            await db.collection('boards').doc(projectId).update({
+              clientPortalDesignStory: _arr,
+              updatedAt: new Date().toISOString()
+            });
+          } catch (_eStory) { /* */ }
+          showToast('Removed from client portal');
+        } else {
+          await db.collection('boards').doc(projectId).collection('clientDocuments').doc(docId).delete();
+          showToast('Document deleted');
         }
+        await cpPortalStaffRerenderAfterDocChange(projectId);
       } catch (e) {
-        showToast('Could not delete document', 'error');
+        console.error('cpAdminRemoveDocFromClientPortal', e);
+        showToast('Could not update document: ' + ((e && e.message) || String(e)), 'error');
       }
+    };
+
+async function cpAdminDeleteClientDocument(projectId, docId) {
+      return window.cpAdminRemoveDocFromClientPortal(projectId, 'clientDoc', docId);
     }
 
 async function _publishDraftsOnShare(projectId) {
@@ -11850,6 +12137,13 @@ async function logActivity(type, action, description, projectId, projectName, me
         if (page === 'clientview' && parts[1]) {
           var prop = (String(parts[2] || '').toLowerCase() === 'proposal' && parts[3]) ? parts[3] : null;
           renderClientPortal(parts[1], prop);
+        } else if (page === 'contractorview' && parts[1] && parts[2]) {
+          if (typeof cchRenderContractorView === 'function') {
+            cchRenderContractorView(parts[1], parts[2]);
+          } else if (T) {
+            T.innerHTML = '<div style="max-width:420px;margin:120px auto;text-align:center;font-family:\'DM Sans\',sans-serif;color:#6B7280;font-size:13px;">Loading contractor view…</div>';
+            setTimeout(cchClientRoute, 200);
+          }
         } else if (page === 'clientboard' && parts[1] && typeof openClientBoard === 'function') {
           openClientBoard(parts[1], parts[2]);
         } else if (page === 'clientportal') {
@@ -11866,7 +12160,28 @@ async function logActivity(type, action, description, projectId, projectName, me
     }
     window.addEventListener('hashchange', cchClientRoute);
     var _cchBooted = false;
-    function _cchBootOnce() { if (_cchBooted) return; _cchBooted = true; cchClientRoute(); }
+    function _cchBootOnce() {
+      if (_cchBooted) return;
+      _cchBooted = true;
+      if (typeof window.cchApplyPortalQueryRoute === 'function') window.cchApplyPortalQueryRoute();
+      else {
+        try {
+          var _qp = new URLSearchParams(window.location.search || '');
+          var _pid = String(_qp.get('p') || '').trim();
+          if (_pid) {
+            var _zh = String(_qp.get('zelle') || '').trim();
+            var _pay = String(_qp.get('pay') || '').trim();
+            var _pr = String(_qp.get('proposal') || '').trim();
+            var _h = '#/clientview/' + _pid;
+            if (_pay) _h += '/pay/' + encodeURIComponent(_pay);
+            else if (_zh) _h += '/zelle/' + encodeURIComponent(_zh);
+            else if (_pr) _h += '/proposal/' + encodeURIComponent(_pr);
+            window.history.replaceState({}, '', (window.location.pathname || '/client.html') + _h);
+          }
+        } catch (_eQp) {}
+      }
+      cchClientRoute();
+    }
     try {
       auth.onAuthStateChanged(function(u) { currentUser = u || null; _cchBootOnce(); });
     } catch (e) { console.warn('[client portal] auth listener', e); }
@@ -11877,6 +12192,10 @@ async function logActivity(type, action, description, projectId, projectName, me
   <script src="cch-voice-profile.js?v=20260713voice1"></script>
   <script src="cch-progress-updates.js?v=20260714pu18"></script>
   <script src="cch-client-board.js?v=20260710cp1"></script>
-  <script src="cch-client-pepper.js?v=20260806cp090"></script>
+  <script src="cch-client-pepper.js?v=20260812pepper"></script>
+  <script src="cch-client-ideas.js?v=20260807ci091b"></script>
+  <script src="cch-square-pay.js?v=20260818mail3"></script>
+  <script src="cch-invoice-redesign.js?v=20260817size1"></script>
+  <script src="cch-proposals-invoices-fix.js?v=20260818additem1"></script>
 </body>
 </html>

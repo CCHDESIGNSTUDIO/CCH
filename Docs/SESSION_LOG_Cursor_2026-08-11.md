@@ -1,50 +1,42 @@
-# Session Log — Cursor: Invoice Client/Manage, More, Publish labels
+# Session Log — Cursor: Invoice Publish/Sent, Hixson, portal, chat ping
 
 **File:** SESSION_LOG_Cursor_2026-08-11.md  
-**Original Author:** Cursor (CR)  
+**Original Author:** Cursor (CR) / #1  
 **Created:** Aug 11, 2026  
 **Last Modified:** Aug 11, 2026  
 **Last Modified By:** Cursor (CR)  
-**Version:** 1.0  
+**Version:** 1.2  
 
 **Workspace:** `C:\dev\CCH-Platform-Deploy\cch-deploy`  
-**Primary paths:** `platform/cch-proposals-invoices-fix.js`, `platform/index.html`  
-**Build:** Studio **9.9.136** / `cch-proposals-invoices-fix.js?v=20260811invfix`
+**Build (end of day):** Studio **9.9.147** / staff chat `sc090` / bugs `fb147`  
+**Branch:** `staging-fixes-2026-07-08`
 
 ---
 
 ## Session overview
 
-Cindy reported three invoice bugs on prod INV-6056 (Eden): Client View showed the studio table; More did not open; Publish flipped status to Sent.
+Invoice Client/Manage + Publish vs Sent, Time Ledger Hixson/Greene grouping, staff chat recipient ping, client portal syntax hotfix, Time Ledger double-create guard. Production GO for several items (Hixson, portal, ping).
 
-## What changed (not committed; queued staging)
+## Shipped (production)
 
-| Fix | Grounding | Change |
-|-----|-----------|--------|
-| Client / Manage backwards | `renderInvoiceDetail` ~46281; DS Manage embedded gift sheet ~4077 | Client View → `renderInvoiceDesignServicesClientView` (gift sheet). Manage → editor + working table. |
-| More dead | `cchDocMoreMenuWrap` absolute menu under content paint | `cchToggleDocMoreDd` — fixed + body-append (same pattern as `toggleActionMenu`). Topbar z-index. |
-| Publish → Sent | `togglePublished` wrapper set `status: 'Sent'` | Draft/Unsent → **Published**. Email/Send still sets **Sent**. |
+| Item | Build | Notes |
+|------|-------|--------|
+| Publish vs Sent; optional email after Publish | 9.9.141+ | Sent always publishes |
+| TL invoice group by board + Hixson overrides Greene | 9.9.142–144 | Vanessa unblocked |
+| Staff chat recipient toast + ping | sc090 / 9.9.143+ | Cindy confirmed working |
+| Client portal `client.html` SyntaxError | hotfix | Broken `/* LOCK */` in string concat |
+| TL no double-create + safe release | 9.9.145 | Lock + Firestore re-check |
 
-## Deploy
+## Open / follow-up
 
-- GitHub: pushed `3080c5b` on `staging-fixes-2026-07-08` (2026-08-11 ~12:28 PT)
-- Staging hosting: **done** 2026-08-11 ~12:30 → https://cch-platform-staging.web.app
-- **Production** needs Cindy typed GO after staging verify
+- Katke INV-6058 discarded by Cindy (kept INV-6059).
+- **9.9.147:** Bugs & Requests paint-first (prod-only deploy) — verify sidebar shows v9.9.147 after Ctrl+Shift+R.
+- Other local dirty `platform/*.js` may still be uncommitted; hosting deploys upload full `platform/` from disk.
+- Historical invoices wrongly marked Sent by old Publish path not auto-corrected.
 
-## Verify (staging)
+## Verify (prod)
 
-1. Hard refresh Ctrl+Shift+R — build **9.9.136**
-2. Open a design-services invoice
-3. **Client View** = luxury gift sheet; **Manage** = summary editor + table
-4. **More ▾** opens (Publish, Tear sheets, etc.)
-5. **Publish to client dashboard** → status **Published** (not Sent)
-6. **Send** → status **Sent**
-
-## Also this session
-
-- Time Ledger description hover: full note in `title` (was “Double-click to edit”) — Studio **9.9.137**
-
-## Open
-
-- Existing invoices already marked Sent from the old Publish path stay Sent until manually corrected
-- Satellite `cch-pepper.js` etc. still uncommitted locally (index.html was pushed in 3080c5b)
+1. Hard refresh → **v9.9.145**
+2. Client link loads (Holtz / any): `client.html#/clientview/{id}`
+3. Staff chat: recipient toast + ping while Studio open
+4. Time Ledger Create Invoice: one click → alert → opens invoice; second click won’t duplicate hours

@@ -1,7 +1,7 @@
 // ==================== CCH FOLLOW-UPS COMMAND CENTER (WO-010) ====================
 // Cross-project + per-project stall tracker — two lanes, pipeline-legal actions.
 // Spec: loop/WO-010_followups-module_CW_Jul11.md + Docs/NAV_SUBPANEL_SPEC_CW_Jul11_v1.2.html
-// Build 20260711fu5 — drop Admin-SDK .select(); Studio-only detectors; fix 999-day artifact
+// Build 20260726fu8 — Houzz IN-band normalize; design-service invoices skip no-PO detector
 
 (function() {
   'use strict';
@@ -9,7 +9,7 @@
   if (window._cchFollowupsLoaded) return;
   window._cchFollowupsLoaded = true;
 
-  var BUILD = '20260711fu5';
+  var BUILD = '20260726fu9';
   var META_STALL_DAYS = 7;
   var PORTAL_STALE_DAYS = 14;
   var SCAN_BATCH = 12;
@@ -71,16 +71,80 @@
     return Math.floor((Date.now() - ms) / 86400000);
   }
 
-  /** WO-012 — exclude Houzz legacy docs from Studio workflow stall detectors. */
-  function fuDocIsStudioNative(d) {
+  function fuNormalizeDocNum(d) {
+    var n = String((d && (d.invoiceNum || d.number || d.num || d.houzzInvoice || d.displayNumber || d.proposalNum || d.poNum || d.poNumber)) || '').trim();
+    if (!n) return '';
+    n = n.toUpperCase().replace(/\s+/g, '');
+    if (/^INV/i.test(n)) n = 'IN' + n.slice(3);
+    return n;
+  }
+
+  function fuIsLegacyHouzzInvoiceBand(d) {
+    var n = fuNormalizeDocNum(d);
+    if (!n) return false;
+    // Houzz legacy IN-11xxx / IN-12xxx (handles IN-12788, IN12788, IN 12788, INV-12788)
+    return /^IN-?1[12]\d{2,}$/.test(n);
+  }
+
+  /** WO-019 — Houzz detector aligned with cchOmIsHouzzSourcePo (Order Management). */
+  function fuDocIsHouzzSource(d) {
     if (!d) return false;
-    if (d.houzzId) return false;
-    if (d.isHouzz) return false;
-    var src = String(d.source || d.Source || '').toLowerCase();
-    if (src === 'houzz-import') return false;
-    return true;
+    if (fuIsLegacyHouzzInvoiceBand(d)) return true;
+    if (typeof window.cchOmIsHouzzSourcePo === 'function') {
+      try { if (window.cchOmIsHouzzSourcePo(d)) return true; } catch (e) {}
+    }
+    if (d.houzzImport === true) return true;
+    if (d.houzzId) return true;
+    if (d.isHouzz) return true;
+    if (d.houzzInvoice || d.houzzProposal) return true;
+    var src = String(d.source || d.Source || d.dataSource || d.origin || d.importedFrom || '').trim().toLowerCase();
+    if (src === 'houzz-import' || src === 'houzz_import' || src.indexOf('houzz') >= 0) return true;
+    if (d.houzzBalance != null && d.houzzBalance !== '') return true;
+    if (String(d._qbIdSource || '').toLowerCase() === 'houzz-import') return true;
+    var mem = String(d.member || d.importedBy || '').toLowerCase();
+    if (mem.indexOf('houzz') >= 0) return true;
+    var pays = d.payments || [];
+    for (var pi = 0; pi < pays.length; pi++) {
+      var pm = String((pays[pi] || {}).method || '').toLowerCase();
+      if (pm.indexOf('houzz') >= 0) return true;
+    }
+    if (typeof window.cchOmIsLegacyHouzzNumber === 'function') {
+      try { if (window.cchOmIsLegacyHouzzNumber(d)) return true; } catch (e) {}
+    } else {
+      var poN = fuNormalizeDocNum(d);
+      if (/^(?:PO)?400\d+$/i.test(poN)) return true;
+    }
+    return false;
+  }
+
+  /** Paid invoices with only design/labor/expense lines never need a merchandise PO. */
+  function fuInvoiceExpectsPo(inv) {
+    if (!inv) return false;
+    var items = inv.items || [];
+    if (!items.length) return true;
+    var hasProduct = false;
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i] || {};
+      if (typeof window.isProposalGroupHeaderItem === 'function' && window.isProposalGroupHeaderItem(it)) continue;
+      var et = String(it.expenseType || '').toLowerCase();
+      if (et === 'sales_tax' || et === 'shipping' || et === 'handling' || et === 'discount' || et === 'retainer_credit') continue;
+      if (typeof window._cchSidebarClassifyItem === 'function') {
+        var cls = window._cchSidebarClassifyItem(it);
+        if (cls === 'product' || cls === 'bundle') { hasProduct = true; break; }
+        continue;
+      }
+      if (et === 'product') { hasProduct = true; break; }
+      if (!et && typeof window.isRealProduct === 'function' && window.isRealProduct(it)) { hasProduct = true; break; }
+    }
+    return hasProduct;
+  }
+
+  /** Studio-native only — excludes all Houzz-sourced docs (every Follow-Ups lane). */
+  function fuDocIsStudioNative(d) {
+    return !fuDocIsHouzzSource(d);
   }
   window.cchDocIsStudioNative = fuDocIsStudioNative;
+  window.cchIsHouzzSourceDoc = fuDocIsHouzzSource;
 
   function fuFmtDate(val) {
     var ms = fuTs(val);
@@ -359,6 +423,7 @@
 
     // Lane A — waiting on client
     bundle.proposals.forEach(function(p) {
+      if (!fuDocIsStudioNative(p)) return;
       if (String(p.status || '') !== 'Sent') return;
       if (p.clientApprovedTotalAt) return;
       var ageFrom = p.sentAt || p.updatedAt || p.createdAt;
@@ -493,6 +558,7 @@
 
     bundle.invoices.forEach(function(inv) {
       if (!fuDocIsStudioNative(inv)) return;
+      if (!fuInvoiceExpectsPo(inv)) return;
       if (String(inv.status || '') !== 'Paid') return;
       var hasPo = bundle.pos.some(function(po) {
         return po.linkedInvoiceId === inv.id || po.invoiceId === inv.id;
@@ -1006,6 +1072,49 @@
     return { total: t, hot: t };
   };
 
+  /** Plain-text Follow-Ups stalls for Pepper digests (read-only). Pass projId for one project; omit/empty for firm-wide. */
+  window._cchFuPepperDigest = async function(projId) {
+    if (!fuEnabled()) return '';
+    var firm = !projId;
+    try {
+      var stalls = await fuScanProjects(firm ? null : projId);
+      if (!stalls || !stalls.length) {
+        return firm
+          ? 'FIRM-WIDE FOLLOW-UPS — no stalled handoffs across active projects.'
+          : 'Follow-Ups: no stalled handoffs.';
+      }
+      var client = stalls.filter(function(s) { return s.lane === 'client'; });
+      var studio = stalls.filter(function(s) { return s.lane === 'studio'; });
+      var lines = firm
+        ? [
+            'FIRM-WIDE FOLLOW-UPS — staff is on the overall Follow-Ups page. Answer the big picture. Do not ask them to open a project first.',
+            'Stalls: ' + stalls.length + ' across active projects.'
+          ]
+        : ['Follow-Ups (' + stalls.length + ' stalls):'];
+      function addLane(label, rows) {
+        if (!rows.length) return;
+        lines.push(label + ' (' + rows.length + '):');
+        rows.slice(0, firm ? 40 : 25).forEach(function(s) {
+          var projBit = firm && s.projName ? (s.projName + ' · ') : '';
+          lines.push('- [' + (s.days != null ? s.days + 'd' : '?') + '] ' + projBit + (s.title || 'stall') + (s.sub ? ' — ' + s.sub : ''));
+        });
+        if (rows.length > (firm ? 40 : 25)) {
+          lines.push('- … +' + (rows.length - (firm ? 40 : 25)) + ' more in ' + label.toLowerCase());
+        }
+      }
+      addLane('Waiting on client', client);
+      addLane('Waiting on studio', studio);
+      if (firm) {
+        lines.push('');
+        lines.push('When asked what matters most: prioritize oldest days + client-lane stalls that block money or approvals. Name project + item. Draft nudges only; never claim you emailed.');
+      }
+      return lines.join('\n');
+    } catch (e) {
+      console.warn('[follow-ups] pepper digest', e);
+      return '';
+    }
+  };
+
   function fuInjectNavItem() {
     if (document.getElementById('navFollowUps')) return;
     if (document.querySelector('.nav-item[data-page="followups"]')) return;
@@ -1056,7 +1165,6 @@
       var page = (parts[0] || 'projects').toLowerCase();
       if (page === 'followups') {
         if (!currentUser) return;
-        try { document.title = 'CCH Design Studio'; } catch (e) {}
         document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
         var activeNav = document.querySelector('.nav-item[data-page="followups"]');
         if (activeNav) activeNav.classList.add('active');

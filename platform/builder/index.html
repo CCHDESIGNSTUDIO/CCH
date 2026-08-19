@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>CCH Custom Order Builder</title>
-<meta name="cch-builder-rev" content="2026-08-06ft065-wo090-everywhere">
+<meta name="cch-builder-rev" content="2026-08-13ft066-workroom-cost-draft">
 <script src="https://cdn.jsdelivr.net/gh/gitbrent/PptxGenJS@v3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -6074,10 +6074,17 @@ function maybeRestoreBuilderLocalDraft(cat) {
   }
   const serverRev = Number(d.revision || 1);
   const draftRev = Number(draft.revision || 1);
-  if (woId && serverRev !== draftRev) {
-    const msg = "This browser has an unsaved draft (rev " + draftRev + ") from "
+  // Always confirm for an existing saved WO — silent same-rev restore was wiping
+  // fields (e.g. workroomCosts) when a browser draft was emptier than Firestore.
+  if (woId) {
+    const msg = "This browser has an unsaved draft"
+      + (serverRev !== draftRev ? " (rev " + draftRev + ")" : "")
+      + " from "
       + new Date(draft.savedAt).toLocaleString()
-      + ". The saved work order is revision " + serverRev + ".\n\nRestore the unsaved draft?\n(Cancel keeps the saved copy.)";
+      + (serverRev !== draftRev
+        ? ". The saved work order is revision " + serverRev + "."
+        : ".")
+      + "\n\nRestore the unsaved draft?\n(Cancel keeps the saved copy.)";
     if (!confirm(msg)) {
       try {
         localStorage.removeItem(key);
@@ -6440,6 +6447,15 @@ async function deleteCurrentWorkOrder() {
 async function loadWorkOrderById(id) {
   const cat = state.category;
   const data = getCatData(cat);
+  // Flush browser draft for the WO we are leaving so cost/labor edits survive a switch.
+  // Skip until UI is ready so boot URL-load does not overwrite a "new" draft with blanks.
+  if (state.builderUiReady) {
+    const nextId = id || "";
+    const prevId = state.currentWorkOrderId || "";
+    if (String(prevId) !== String(nextId)) {
+      try { writeBuilderLocalDraftNow(); } catch (eFlush) {}
+    }
+  }
   if (!id) {
     const keep = {
       projectId: data.projectId || "",
@@ -10462,22 +10478,22 @@ function buildWorkroomCostsSection(d, cat) {
     const costRow = el("div", { class:"wr-cost-row" });
     costRow.append(el("div", { style:"font-size:12px;font-weight:600;color:var(--ink);padding-bottom:6px" }, lineDef.label));
     const qtyInp = el("input", { type:"text", value: row.qty || "1", inputMode:"numeric", placeholder:"1" });
-    qtyInp.addEventListener("input", e => { row.qty = e.target.value; refreshTotals(); });
+    qtyInp.addEventListener("input", e => { row.qty = e.target.value; refreshTotals(); scheduleBuilderDraftSave(); });
     costRow.append(el("div", { class:"field" }, el("label", {}, "Qty"), qtyInp));
     const amtInp = el("input", { type:"text", value: row.amount || "", inputMode:"decimal", placeholder:"0.00" });
-    amtInp.addEventListener("input", e => { row.amount = e.target.value; refreshTotals(); });
+    amtInp.addEventListener("input", e => { row.amount = e.target.value; refreshTotals(); scheduleBuilderDraftSave(); });
     costRow.append(el("div", { class:"field" }, el("label", {}, "$"), amtInp));
     const notePh = lineDef.id === "nailheads" ? "e.g. antique brass #9"
       : (lineDef.id === "otherExpense" ? "e.g. foam, base, freight from mill"
         : (lineDef.id === "hardware" ? "e.g. Houles Cosmo track" : ""));
     const noteInp = el("input", { type:"text", value: row.note || "", placeholder: notePh });
-    noteInp.addEventListener("input", e => { row.note = e.target.value; });
+    noteInp.addEventListener("input", e => { row.note = e.target.value; scheduleBuilderDraftSave(); });
     costRow.append(el("div", { class:"field" }, el("label", {}, "Note"), noteInp));
     grid.append(costRow);
   });
   inner.append(grid);
   const mkInp = el("input", { type:"text", value: String(d.proposalMarkupPct || "100"), inputMode:"decimal", style:"max-width:88px" });
-  mkInp.addEventListener("input", e => { d.proposalMarkupPct = e.target.value; refreshTotals(); });
+  mkInp.addEventListener("input", e => { d.proposalMarkupPct = e.target.value; refreshTotals(); scheduleBuilderDraftSave(); });
   inner.append(el("div", { class:"field-row", style:"margin-top:10px;align-items:end" },
     el("div", { class:"field" }, el("label", {}, "Client markup %"), mkInp),
     el("div", { class:"field" }, el("label", {}, "Workroom subtotal"), el("div", { style:"font-size:13px;padding:7px 0;color:var(--ink)" }, totalEl))
@@ -12073,6 +12089,7 @@ auth.onAuthStateChanged(async user => {
   }
   try {
     await renderForm();
+    state.builderUiReady = true;
   } catch (e) {
     console.error("[Builder] renderForm failed", e);
     const pane = document.getElementById("formPane");
