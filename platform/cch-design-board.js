@@ -890,6 +890,23 @@
         cs2.forEach(function(d) { dbEditor.clips.push({ id: d.id, data: d.data() }); });
       } catch(e2) {}
     }
+    try {
+      if (typeof enrichClipsWithProjectDocLinks === 'function' && dbEditor.clips.length) {
+        var _enRows = dbEditor.clips.map(function(c) { return Object.assign({ id: c.id }, c.data || {}); });
+        await enrichClipsWithProjectDocLinks(projectId, _enRows, { persistToClips: false });
+        var _enById = {};
+        _enRows.forEach(function(r) { if (r && r.id) _enById[r.id] = r; });
+        dbEditor.clips.forEach(function(c) {
+          var r = _enById[c.id];
+          if (!r || !c.data) return;
+          if (r.proposalId) c.data.proposalId = r.proposalId;
+          if (r.proposalNum) c.data.proposalNum = r.proposalNum;
+          if (r.invoiceId) c.data.invoiceId = r.invoiceId;
+          if (r.invoiceNum) c.data.invoiceNum = r.invoiceNum;
+          if (r._linkedDocUnitSell > 0) c.data._linkedDocUnitSell = r._linkedDocUnitSell;
+        });
+      }
+    } catch (_enDb) { console.warn('[design board] enrich proposal links:', _enDb); }
     var roomSet = {};
     dbEditor.clips.forEach(function(c) {
       var rm = String((c.data && c.data.room) || '').trim();
@@ -1037,7 +1054,7 @@
         if (c > 0) { el.cost = c; changed = true; }
       }
       if (!el._boardCostEdited && (el.sellPrice == null || +el.sellPrice === 0)) {
-        var s = parseFloat(d.clientPrice) || parseFloat(d.sellingPrice) || 0;
+        var s = parseFloat(d._linkedDocUnitSell) || parseFloat(d.clientPrice) || parseFloat(d.sellingPrice) || 0;
         if (s > 0) { el.sellPrice = s; changed = true; }
       }
     });
@@ -1080,6 +1097,8 @@
       '.db-el-caption{margin-top:5px;font-size:14px;font-weight:600;color:#1B3352;text-align:center;pointer-events:none;line-height:1.3;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;}' +
       '.db-el-desc{margin-top:3px;font-size:12px;color:#4B5563;text-align:center;pointer-events:none;line-height:1.4;white-space:pre-wrap;}' +
       '.db-el-price{margin-top:3px;font-size:14px;font-weight:700;color:#0A1F3D;text-align:center;pointer-events:none;line-height:1.25;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}' +
+      '.db-el-pr-chip{display:inline-block;margin-top:4px;font-size:10px;font-weight:700;letter-spacing:0.04em;color:#0F1A2E;background:#F4F6FA;border:1px solid rgba(15,26,46,0.12);padding:2px 6px;text-decoration:none;cursor:pointer;pointer-events:auto;}' +
+      '.db-el-pr-chip:hover{border-color:#C4A464;color:#0A1F3D;}' +
       '.db-el-annotation{margin-top:4px;font-size:12px;color:#6B7280;text-align:center;font-style:italic;pointer-events:none;white-space:pre-line;line-height:1.35;}' +
       '.db-resize{position:absolute;width:calc(18px / var(--db-zoom,1));height:calc(18px / var(--db-zoom,1));background:var(--gold);border:calc(2px / var(--db-zoom,1)) solid #fff;border-radius:50%;z-index:31;box-shadow:0 2px 6px rgba(0,0,0,0.28);pointer-events:auto;touch-action:none;}' +
       '.db-resize::before{content:"";position:absolute;left:50%;top:50%;width:calc(40px / var(--db-zoom,1));height:calc(40px / var(--db-zoom,1));transform:translate(-50%,-50%);}' +
@@ -1765,15 +1784,16 @@
       var ew = el.w || 180;
       var eh = el.h || 180;
       var mediaInner = imgSrc
-        ? '<img src="' + imgSrc + '" referrerpolicy="no-referrer" draggable="false" decoding="async" loading="lazy" onerror="this.onerror=null;this.style.display=\'none\';this.insertAdjacentHTML(\'afterend\',\'<div class=&quot;db-el-media-fallback&quot; style=&quot;width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--gray-300);font-size:24px;&quot;>📷</div>\')">'
+        ? '<img src="' + imgSrc + '" referrerpolicy="no-referrer" draggable="false" decoding="async" loading="lazy" onerror="this.onerror=null;void dbProductImgError(this,\'' + escJsStr(el.id) + '\')">'
         : (hasImg
-          ? '<div class="db-el-media-fallback" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--gray-500);font-size:11px;">Image link blocked</div>'
-          : '<div class="db-el-media-fallback" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--gray-300);">📷</div>');
+          ? '<div class="db-el-media-fallback" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--gray-500);font-size:11px;padding:8px;text-align:center;">' + (el.hideCaption ? esc(dbBoardDisplayTitle(el.title) || 'Image link blocked') : '') + '</div>'
+          : '<div class="db-el-media-fallback" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--gray-500);font-size:11px;padding:8px;text-align:center;">' + (el.hideCaption ? esc(dbBoardDisplayTitle(el.title) || 'No image') : '') + '</div>');
       return '<div class="db-el db-el-product' + selClass + '" data-id="' + el.id + '" style="position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;width:' + ew + 'px;z-index:' + (sel ? 100 : 10) + ';" onpointerdown="elMouseDown(event,\'' + el.id + '\')" ondblclick="event.stopPropagation();void dbOpenProductDetail(\'' + el.id + '\')" oncontextmenu="return dbProductContextMenu(event,\'' + el.id + '\')">' +
         '<div class="db-el-frame" style="width:' + ew + 'px;height:' + eh + 'px;">' +
           '<div class="db-el-media" style="width:100%;height:100%;">' + mediaInner + '</div>' +
           (sel ? '<div class="db-el-handles-layer">' + resizeHandlesHtml() + '</div>' : '') +
         '</div>' +
+        dbProductProposalChipHtml(el) +
         dbProductCaptionHtml(el) +
         dbProductPriceHtml(el) +
         (el.annotation ? '<div class="db-el-annotation">' + esc(el.annotation) + '</div>' : '') +
@@ -1885,7 +1905,7 @@
       var rm = toRemove[ri];
       if (rm.parentNode === node) node.removeChild(rm);
     }
-    var tail = dbProductCaptionHtml(el) + dbProductPriceHtml(el);
+    var tail = dbProductProposalChipHtml(el) + dbProductCaptionHtml(el) + dbProductPriceHtml(el);
     if (el.annotation) {
       tail += '<div class="db-el-annotation">' + esc(el.annotation) + '</div>';
     }
@@ -1953,11 +1973,82 @@
     return String(cd.description || cd.shortDescription || cd.desc || '').trim();
   }
 
+  function dbClipDataForElement(el) {
+    if (!el || !el.clipId) return null;
+    var clip = (dbEditor.clips || []).find(function(c) { return c && c.id === el.clipId; });
+    return clip ? (clip.data || null) : null;
+  }
+
+  function dbProductDisplaySell(el) {
+    if (!el) return 0;
+    var d = dbClipDataForElement(el);
+    if (d) {
+      var linked = parseFloat(d._linkedDocUnitSell);
+      if (linked > 0) return linked;
+      if (typeof cchClipBoardUnitSell === 'function') {
+        var u = cchClipBoardUnitSell(d);
+        if (u > 0) return u;
+      }
+    }
+    return parseFloat(el.sellPrice) || 0;
+  }
+
+  function dbProductProposalChipHtml(el) {
+    if (!el || dbEditor.clientView) return '';
+    var d = dbClipDataForElement(el) || {};
+    var pid = String(dbEditor.projectId || '').trim();
+    var id = String(d.proposalId || el.proposalId || '').trim();
+    var num = String(d.proposalNum || el.proposalNum || '').trim();
+    if (!pid || !id) return '';
+    var href = '#/project/' + pid + '/proposal/' + id;
+    return '<a class="db-el-pr-chip" href="' + escAttr(href) + '" title="Open proposal" onpointerdown="event.stopPropagation()" onclick="event.preventDefault();event.stopPropagation();navigate(\'' + escAttr(href) + '\');return false;">PR ' + esc(num || 'Proposal') + '</a>';
+  }
+
+  function dbProductImgShowFallback(img, el) {
+    if (!img) return;
+    img.style.display = 'none';
+    var media = img.parentNode;
+    if (!media) return;
+    if (media.querySelector('.db-el-media-fallback')) return;
+    var fb = document.createElement('div');
+    fb.className = 'db-el-media-fallback';
+    fb.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#6B7280;font-size:11px;padding:8px;text-align:center;';
+    fb.textContent = (el && el.hideCaption) ? (dbBoardDisplayTitle(el.title || '') || 'No image') : '';
+    media.appendChild(fb);
+  }
+
+  window.dbProductImgError = function(img, elId) {
+    if (!img) return;
+    img.onerror = null;
+    var el = (dbEditor.elements || []).find(function(e2) { return e2 && e2.id === elId; });
+    var d = dbClipDataForElement(el);
+    var merged = d ? Object.assign({}, d, el || {}) : (el || {});
+    var best = (typeof window.cchPickPreferredProductImageUrl === 'function')
+      ? String(window.cchPickPreferredProductImageUrl(merged) || '').trim()
+      : '';
+    var cur = String(img.getAttribute('src') || '').trim();
+    if (best && best !== cur) {
+      img.style.display = '';
+      img.onerror = function() {
+        img.onerror = null;
+        dbProductImgShowFallback(img, el);
+      };
+      img.src = best;
+      if (el && el.imageUrl !== best) {
+        el.imageUrl = best;
+        dbEditor.dirty = true;
+      }
+      return;
+    }
+    dbProductImgShowFallback(img, el);
+  };
+
   function dbProductPriceHtml(el) {
     if (!el) return '';
     var showPrice = dbEditor.showPricing && !dbEditor.clientView && el.showPrice !== false;
-    if (!showPrice || !el.sellPrice) return '';
-    return '<div class="db-el-price">' + fmt$(el.sellPrice) + '</div>';
+    var sell = dbProductDisplaySell(el);
+    if (!showPrice || !sell) return '';
+    return '<div class="db-el-price">' + fmt$(sell) + '</div>';
   }
 
   function dbProductCaptionHtml(el) {

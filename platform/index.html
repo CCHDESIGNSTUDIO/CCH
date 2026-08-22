@@ -3630,8 +3630,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-functions-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
-  <script src="cch-product-categories.js?v=20260715b"></script>
-  <script src="cch-doc-isolation.js?v=20260603d"></script>
+  <script src="cch-product-categories.js?v=20260820cat1"></script>
+  <script src="cch-doc-isolation.js?v=20260820price1"></script>
   <script src="cch-cost-lock.js?v=20260724cost13"></script>
   <script>
     if (typeof cchNoBackSyncFromDoc !== 'function') {
@@ -4292,7 +4292,7 @@
     window.buildFinancialHealthBarHtml = buildFinancialHealthBarHtml;
 
     // -- Platform Version --
-    const CCH_BUILD = { version: '9.9.227', date: '2026-08-18', tag: 'portal-inv-sort-studio-first-2026-08-18' };
+    const CCH_BUILD = { version: '9.9.251', date: '2026-08-21', tag: 'cp-portal-phone-wo121-2026-08-21' };
     window.CCH_BUILD = CCH_BUILD;
 
     /** ASCII-safe UI glyphs — always \u escapes so Windows re-encodes cannot turn them into '?'. */
@@ -8805,6 +8805,7 @@
           ui.projectId = projectId;
           ui.docId = docId;
           if (result.pricingSaved) ui.pricingSaved = true;
+          if (result.approvalOnly) ui.approvalOnly = true;
           _docItemFieldSavePendingUi[qKey] = ui;
         }
         return result;
@@ -8819,6 +8820,10 @@
         delete _docItemFieldSavePendingUi[qKey];
         if (!ui || !ui.collectionName) return;
         if (ui.pricingSaved && typeof showToast === 'function') showToast('Price saved');
+        if (ui.approvalOnly) {
+          if (typeof _cchPaintProposalApprovalChrome === 'function') _cchPaintProposalApprovalChrome(ui.projectId, ui.docId);
+          return;
+        }
         if (ui.collectionName === 'proposals') renderProposalDetail(ui.projectId, ui.docId);
         else if (ui.collectionName === 'invoices') renderInvoiceDetail(ui.projectId, ui.docId);
         else navigate(window.location.hash);
@@ -8911,21 +8916,35 @@
           patch.clientApprovedTotalAt = firebase.firestore.FieldValue.delete();
         }
         await docRef.update(patch);
-        if (typeof cchLibraryUsageSyncDocument === 'function') {
-          try {
-            var _docSnap = await docRef.get();
-            var _docData = _docSnap.exists ? (_docSnap.data() || {}) : {};
-            await cchLibraryUsageSyncDocument(projectId, collectionName, docId, _docData, items);
-          } catch (_eLibUsage) { console.warn('[cchLibraryUsageSyncDocument]', _eLibUsage); }
+        if (window._docEdit && window._docEdit.docId === docId && String(window._docEdit.projectId || '') === String(projectId || '')) {
+          window._docEdit.items = items;
+          if (window._docEdit.docData) window._docEdit.docData.items = items;
         }
-        if (collectionName === 'proposals' && typeof syncProposalLinkOntoClips === 'function') {
-          try {
-            var _propSnap = await docRef.get();
-            var _propData = _propSnap.exists ? (_propSnap.data() || {}) : {};
-            await syncProposalLinkOntoClips(projectId, docId, _propData, items, {});
-          } catch (_eClipSync) { console.warn('[updateProposalItemField] syncProposalLinkOntoClips', _eClipSync); }
+        var _approvalOnly = collectionName === 'proposals' && field === 'lineApprovalStatus';
+        var _sideData = Object.assign({}, data, { items: items, total: total });
+        function _runPostSaveSideEffects() {
+          var jobs = [];
+          if (typeof cchLibraryUsageSyncDocument === 'function') {
+            jobs.push(Promise.resolve().then(function() {
+              return cchLibraryUsageSyncDocument(projectId, collectionName, docId, _sideData, items);
+            }).catch(function(_eLibUsage) { console.warn('[cchLibraryUsageSyncDocument]', _eLibUsage); }));
+          }
+          if (collectionName === 'proposals' && typeof syncProposalLinkOntoClips === 'function') {
+            var clipRows = _approvalOnly ? [items[itemIdx]] : items;
+            jobs.push(Promise.resolve().then(function() {
+              return syncProposalLinkOntoClips(projectId, docId, _sideData, clipRows, { explicitUserAction: !!_approvalOnly });
+            }).catch(function(_eClipSync) { console.warn('[updateProposalItemField] syncProposalLinkOntoClips', _eClipSync); }));
+          }
+          if ((collectionName === 'proposals' || collectionName === 'invoices') && pricingFields[field] && typeof cchPushDocLinePricesToLinkedClips === 'function') {
+            jobs.push(Promise.resolve().then(function() {
+              return cchPushDocLinePricesToLinkedClips(projectId, [items[itemIdx]]);
+            }).catch(function(_ePriceClip) { console.warn('[updateProposalItemField] cchPushDocLinePricesToLinkedClips', _ePriceClip); }));
+          }
+          return Promise.all(jobs);
         }
-        return { saved: true, collectionName: collectionName, pricingSaved: !!pricingFields[field] };
+        if (_approvalOnly) _runPostSaveSideEffects();
+        else await _runPostSaveSideEffects();
+        return { saved: true, collectionName: collectionName, pricingSaved: !!pricingFields[field], approvalOnly: _approvalOnly };
       } catch(e) { showToast('Error: ' + e.message, 'error'); return null; }
     }
 
@@ -9147,7 +9166,7 @@
       var base = 'font-family:\'DM Sans\',sans-serif;font-size:13px;font-weight:500;padding:8px 16px;min-height:34px;line-height:1.2;cursor:pointer;border:none;margin:0;box-sizing:border-box;transition:background-color 150ms ease;flex:1;min-width:88px;text-align:center;';
       var leftStyle = base + (leftOn ? 'background:#0A1F3D;color:#FFFFFF;' : 'background:#FFFFFF;color:#0A1F3D;') + 'border-right:1px solid #E2E2E2;';
       var rightStyle = base + (rightOn ? 'background:#0A1F3D;color:#FFFFFF;' : 'background:#FFFFFF;color:#0A1F3D;');
-      return '<div class="cp-appr-toggle" role="group" aria-label="Approve or decline this line" style="display:inline-flex;border:1px solid #E2E2E2;border-radius:0;overflow:hidden;vertical-align:middle;box-shadow:none;">' +
+      return '<div class="cp-appr-toggle" data-cch-cp-appr-idx="' + lineIdx + '" role="group" aria-label="Approve or decline this line" style="display:inline-flex;border:1px solid #E2E2E2;border-radius:0;overflow:hidden;vertical-align:middle;box-shadow:none;">' +
         '<button type="button" style="' + leftStyle + '" onclick="clientApproveLine(\'' + pid + '\',\'' + prid + '\',' + lineIdx + ')">Approve</button>' +
         '<button type="button" style="' + rightStyle + '" onclick="clientDeclineLine(\'' + pid + '\',\'' + prid + '\',' + lineIdx + ')">Decline</button>' +
         '</div>';
@@ -10117,8 +10136,7 @@
       await updateProposalItemField(projectId, proposalId, idx, 'lineApprovalStatus', status);
       try {
         var userName = (currentUser && currentUser.displayName) || (currentUser && currentUser.email) || 'Designer';
-        var prSnap = await db.collection('boards').doc(projectId).collection('proposals').doc(proposalId).get();
-        var pr = prSnap.exists ? (prSnap.data() || {}) : {};
+        var pr = (window._docEdit && window._docEdit.docId === proposalId && window._docEdit.docData) ? window._docEdit.docData : {};
         var prNum = pr.proposalNum || pr.name || 'proposal';
         var lab = status === 'approved' ? 'Approved' : status === 'declined' ? 'Declined' : 'Pending';
         logDocActivity(projectId, 'proposals', proposalId, 'line_approval_designer', userName + ' set Line ' + (idx + 1) + ' to ' + lab + ' on ' + prNum + ' (recorded by designer)');
@@ -10154,12 +10172,37 @@
         var bs = on ? ('background:' + bg + ';color:' + fg + ';border:1px solid ' + bdc + ';') : 'background:transparent;color:#0A1F3D;border:1px solid #E2E2E2;';
         return '<button type="button" title="' + tip + '" style="min-width:30px;padding:5px 8px;font-size:11px;font-weight:700;border-radius:0;margin:0;' + bs + 'cursor:pointer;line-height:1;" onclick="event.stopPropagation();designerSetProposalLineApproval(\'' + pid + '\',\'' + prid + '\',' + idx + ',\'' + key + '\')">' + label + '</button>';
       }
-      return '<div style="display:inline-flex;border:1px solid #E2E2E2;border-radius:0;overflow:hidden;">' +
+      return '<div data-cch-prop-appr-idx="' + idx + '" style="display:inline-flex;border:1px solid #E2E2E2;border-radius:0;overflow:hidden;">' +
         one('pending', '\u2014', s === 'pending', '#ECEFF1', '#37474F', '#CFD8DC') +
         one('approved', '\u2713', s === 'approved', '#2E7D4F', '#FFFFFF', '#2E7D4F') +
         one('declined', '\u2715', s === 'declined', '#B84545', '#FFFFFF', '#B84545') +
         '</div>';
     }
+
+    function _cchPaintProposalApprovalChrome(projectId, proposalId) {
+      var items = (window._docEdit && window._docEdit.docId === proposalId && window._docEdit.items) ? window._docEdit.items : [];
+      items.forEach(function(it, idx) {
+        if (!it || (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it))) return;
+        var st = typeof getProposalLineApprovalStatus === 'function' ? getProposalLineApprovalStatus(it) : 'pending';
+        var wrap = document.querySelector('[data-cch-prop-appr-idx="' + idx + '"]');
+        if (wrap && wrap.parentNode) {
+          wrap.outerHTML = designerProposalApprovalPillsHtml(projectId, proposalId, idx, st);
+        }
+      });
+      var ap = 0, dc = 0, pd = 0;
+      items.forEach(function(it) {
+        if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it)) return;
+        var s = typeof getProposalLineApprovalStatus === 'function' ? getProposalLineApprovalStatus(it) : 'pending';
+        if (s === 'approved') ap++;
+        else if (s === 'declined') dc++;
+        else pd++;
+      });
+      var label = ap + ' approved \u00B7 ' + dc + ' declined \u00B7 ' + pd + ' pending';
+      document.querySelectorAll('[data-cch-prop-appr-counts]').forEach(function(el) {
+        el.textContent = label;
+      });
+    }
+    window._cchPaintProposalApprovalChrome = _cchPaintProposalApprovalChrome;
 
     window.proposalRowMoreCloseAll = function() {
       document.querySelectorAll('.prop-row-more-dd').forEach(function(d) {
@@ -13183,18 +13226,150 @@
     }
     window.cchPushDocLineRoomsToLinkedClips = cchPushDocLineRoomsToLinkedClips;
 
+    /** Cindy Aug 20: proposal/invoice line money must match the linked room-board clip. Does not write library. */
+    async function cchPushDocLinePricesToLinkedClips(projectId, items) {
+      var out = { updatedClips: 0, skipped: 0 };
+      if (!projectId || !items || !items.length) return out;
+      if (typeof cchProjectFinancialsAreFrozen === 'function' && cchProjectFinancialsAreFrozen(projectId)) {
+        out.skippedFrozenProject = true;
+        return out;
+      }
+      if (typeof cchGuardDocBackSync === 'function') {
+        var _pg = cchGuardDocBackSync('pushDocLinePricesToLinkedClip', {
+          source: 'cchPushDocLinePricesToLinkedClips',
+          projectId: projectId
+        });
+        if (_pg && _pg.blocked) return out;
+      }
+      var seen = {};
+      var ts = new Date().toISOString();
+      for (var i = 0; i < items.length; i++) {
+        var line = items[i];
+        if (!line) continue;
+        if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(line)) continue;
+        if (typeof cchDocLineEligibleForRoomBoardClip === 'function' && !cchDocLineEligibleForRoomBoardClip(line)) continue;
+        var clipId = String(line.clipId || line.sourceClipId || '').trim();
+        if (!clipId || seen[clipId]) continue;
+        seen[clipId] = true;
+        var qty = parseFloat(line.qty) || 1;
+        var cost = (typeof parseMoney === 'function' ? parseMoney(line.cost) : parseFloat(line.cost)) || 0;
+        var sell = (typeof cchDocLineUnitSell === 'function')
+          ? cchDocLineUnitSell(line)
+          : ((typeof parseMoney === 'function' ? parseMoney(line.clientPrice) : parseFloat(line.clientPrice)) || 0);
+        if (!(sell > 0)) {
+          var amt = (typeof parseMoney === 'function' ? parseMoney(line.amount) : parseFloat(line.amount)) || 0;
+          if (amt > 0) sell = qty > 0 ? amt / qty : amt;
+        }
+        try {
+          await db.collection('boards').doc(projectId).collection('clips').doc(clipId).update({
+            cost: cost,
+            unitCost: cost,
+            clientPrice: sell,
+            unitSellingPrice: sell,
+            qty: qty,
+            quantity: qty,
+            updatedAt: ts,
+            _priceFromDocAt: ts
+          });
+          out.updatedClips++;
+        } catch (eP) {
+          out.skipped++;
+          console.warn('[cchPushDocLinePricesToLinkedClips]', clipId, eP && eP.message ? eP.message : eP);
+        }
+      }
+      if (out.updatedClips && typeof window.invalidateProjectSelectionsCache === 'function') {
+        try { window.invalidateProjectSelectionsCache(projectId); } catch (_eInv) {}
+      }
+      return out;
+    }
+    window.cchPushDocLinePricesToLinkedClips = cchPushDocLinePricesToLinkedClips;
+
+    /** Unit client sell on a proposal/invoice line. clientPrice/sellPrice are unit; amount is line total. Never divide a unit by qty. */
+    function cchDocLineUnitSell(line) {
+      line = line || {};
+      var qty = parseFloat(line.qty) || 1;
+      if (!(qty > 0)) qty = 1;
+      var pm = (typeof parseMoney === 'function') ? parseMoney : function(v) { return parseFloat(v) || 0; };
+      var amt = pm(line.amount) || pm(line.totalSelling) || 0;
+      var cp = pm(line.clientPrice) || pm(line.sellPrice) || pm(line.unitSellingPrice) || pm(line.unitPrice) || 0;
+      if (amt > 0) {
+        var unitFromAmt = amt / qty;
+        if (cp > 0 && Math.abs((cp * qty) - amt) <= Math.max(0.05, amt * 0.02)) return Math.round(cp * 100) / 100;
+        return Math.round(unitFromAmt * 100) / 100;
+      }
+      if (cp > 0) return Math.round(cp * 100) / 100;
+      return 0;
+    }
+    window.cchDocLineUnitSell = cchDocLineUnitSell;
+
+    /** Unit trade cost on a proposal/invoice line. `cost` is unit — never divide by qty. */
+    function cchDocLineUnitCost(line) {
+      line = line || {};
+      var pm = (typeof parseMoney === 'function') ? parseMoney : function(v) { return parseFloat(v) || 0; };
+      return Math.round((pm(line.cost) || pm(line.unitCost) || pm(line.costPrice) || pm(line.tradeCost) || 0) * 100) / 100;
+    }
+    window.cchDocLineUnitCost = cchDocLineUnitCost;
+
+    /** Room-board display unit sell: linked proposal/invoice unit wins (in-memory only). */
+    function cchClipBoardUnitSell(clip) {
+      clip = clip || {};
+      var pm = (typeof parseMoney === 'function') ? parseMoney : function(v) { return parseFloat(v) || 0; };
+      var linked = pm(clip._linkedDocUnitSell);
+      if (linked > 0) return linked;
+      var qty = parseFloat(clip.qty || clip.quantity) || 1;
+      return pm(clip.clientPrice) || parseFloat(clip.sellPrice) || parseFloat(clip.unitSellingPrice) || 0
+        || (pm(clip.totalSelling) ? pm(clip.totalSelling) / qty : 0)
+        || parseFloat(clip.totalSell) || parseFloat(clip.retailPrice) || 0;
+    }
+    window.cchClipBoardUnitSell = cchClipBoardUnitSell;
+
+    /** Line client sell on a proposal/invoice row (amount is the subtotal). */
+    function cchDocLineSellTotal(line) {
+      line = line || {};
+      var pm = (typeof parseMoney === 'function') ? parseMoney : function(v) { return parseFloat(v) || 0; };
+      var amt = pm(line.amount) || pm(line.totalSelling) || 0;
+      if (amt > 0) return amt;
+      var qty = parseFloat(line.qty) || 1;
+      if (!(qty > 0)) qty = 1;
+      var unit = (typeof cchDocLineUnitSell === 'function') ? cchDocLineUnitSell(line) : (pm(line.clientPrice) || 0);
+      return unit * qty;
+    }
+    window.cchDocLineSellTotal = cchDocLineSellTotal;
+
+    function cchClipBoardDisplayQty(clip) {
+      var lq = parseFloat(clip && clip._linkedDocQty);
+      if (lq > 0) return lq;
+      var q = parseFloat((clip && (clip.qty || clip.quantity)) || 1);
+      return q > 0 ? q : 1;
+    }
+    window.cchClipBoardDisplayQty = cchClipBoardDisplayQty;
+
+    /** Board header / list Total column: qty × unit (linked line amount wins). Cards use unit, not this. */
+    function cchClipBoardLineSell(clip) {
+      clip = clip || {};
+      var pm = (typeof parseMoney === 'function') ? parseMoney : function(v) { return parseFloat(v) || 0; };
+      var linkedLine = pm(clip._linkedDocLineSell);
+      if (linkedLine > 0) return linkedLine;
+      var unit = (typeof cchClipBoardUnitSell === 'function') ? cchClipBoardUnitSell(clip) : (pm(clip.clientPrice) || 0);
+      var qty = (typeof cchClipBoardDisplayQty === 'function') ? cchClipBoardDisplayQty(clip) : (parseFloat(clip.qty || clip.quantity) || 1);
+      if (!(qty > 0)) qty = 1;
+      return unit * qty;
+    }
+    window.cchClipBoardLineSell = cchClipBoardLineSell;
+
     /** True when a doc line may become a Room Board / Selections product clip (WO-045). */
     function cchDocLineEligibleForRoomBoardClip(line) {
       line = line || {};
       if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(line)) return false;
-      if (typeof invoiceLineIsLaborInstallationLike === 'function' && invoiceLineIsLaborInstallationLike(line)) return false;
       if (typeof invoiceLineIsDesignServicesNoMarkup === 'function' && invoiceLineIsDesignServicesNoMarkup(line)) return false;
       if (typeof boardClipIsTimeBillingRow === 'function' && boardClipIsTimeBillingRow(line)) return false;
-      if (typeof _disSidebarItemIsProjectSelectionProduct === 'function' && !_disSidebarItemIsProjectSelectionProduct(line)) return false;
       var et = String(line.expenseType || line.itemType || '').toLowerCase();
       if (et && ['service', 'shipping', 'sales_tax', 'handling', 'expense', 'discount', 'labor', 'other_expense', 'freight', 'installation', 'retainer_credit'].indexOf(et) >= 0) {
         return false;
       }
+      /* Do not scan description for "install" / "labor" — lighting copy often says "installation recommended"
+         and was skipping Echo Sconce (and similar) off Room Boards. Expense-type + kind only. */
+      if (typeof _disRowIsRoomBoardProduct === 'function' && !_disRowIsRoomBoardProduct(line)) return false;
       return !!(String(line.title || line.name || '').trim());
     }
     window.cchDocLineEligibleForRoomBoardClip = cchDocLineEligibleForRoomBoardClip;
@@ -13208,10 +13383,12 @@
      * @param {string} [opts.collection]
      * @param {string} [opts.docId]
      * @param {boolean} [opts.persistLineLinks=true] · write clipId back onto the document
+     * @param {boolean} [opts.fillUnroomed=true] · false = create a new tile; leave blank-room Selections clips alone
      */
     async function cchEnsureClipsFromDocLines(projectId, items, opts) {
       opts = opts || {};
       var dryRun = opts.dryRun === true;
+      var fillUnroomed = opts.fillUnroomed !== false;
       var out = {
         dryRun: dryRun,
         projectId: projectId || '',
@@ -13324,10 +13501,21 @@
             lineClipDirty = true;
             out.linkedExisting.push({ lineIndex: i, title: title, room: room, clipId: existingRoomed });
           }
+          if (!dryRun) {
+            var matchQty = parseFloat(line.qty);
+            if (!(matchQty > 0)) matchQty = 1;
+            try {
+              await db.collection('boards').doc(projectId).collection('clips').doc(existingRoomed).update({
+                qty: matchQty,
+                quantity: matchQty,
+                updatedAt: ts
+              });
+            } catch (_eQtyMatch) {}
+          }
           continue;
         }
 
-        var unroomedId = findUnroomedClipId(line);
+        var unroomedId = fillUnroomed ? findUnroomedClipId(line) : '';
         if (unroomedId) {
           var fillRow = { lineIndex: i, title: title, room: room, clipId: unroomedId, action: 'fill-blank-room' };
           // WO-058b: user-cleared room wins · never refill from a doc line until deliberate re-add
@@ -13396,9 +13584,9 @@
         // Create new clip for (product, room)
         var qty = parseFloat(line.qty) || 1;
         var cost = (typeof parseMoney === 'function' ? parseMoney(line.cost || line.unitCost || line.costPrice) : parseFloat(line.cost)) || 0;
-        var sell = (typeof parseMoney === 'function'
-          ? parseMoney(line.clientPrice || line.sellPrice || line.amount)
-          : parseFloat(line.clientPrice || line.amount)) || 0;
+        var sell = (typeof cchDocLineUnitSell === 'function')
+          ? cchDocLineUnitSell(line)
+          : ((typeof parseMoney === 'function' ? parseMoney(line.clientPrice || line.sellPrice) : parseFloat(line.clientPrice)) || 0);
         var img = '';
         if (typeof getProposalLineHeroImageUrl === 'function') img = getProposalLineHeroImageUrl(line) || '';
         if (!img) img = String(line.imageUrl || line.image || '').trim();
@@ -13409,7 +13597,7 @@
           room: room,
           category: String(line.category || '').trim() || 'General',
           cost: cost,
-          clientPrice: qty > 0 && sell > 0 ? (sell / qty) : sell,
+          clientPrice: sell,
           qty: qty,
           imageUrl: img,
           sku: line.sku || '',
@@ -13426,8 +13614,11 @@
           ? boardClipWriteAllowedForRoomBoard(newClip)
           : { ok: true };
         if (!guard.ok) {
-          out.skippedGuard.push({ lineIndex: i, title: title, room: room, reason: guard.reason || 'guard' });
-          continue;
+          var productOk = typeof _disRowIsRoomBoardProduct === 'function' && _disRowIsRoomBoardProduct(line);
+          if (!productOk) {
+            out.skippedGuard.push({ lineIndex: i, title: title, room: room, reason: guard.reason || 'guard' });
+            continue;
+          }
         }
         var createRow = { lineIndex: i, title: title, room: room, vendor: line.vendor || '', libraryProductId: libId, action: 'create' };
         if (dryRun) {
@@ -13893,8 +14084,34 @@
       }
       var report = { projectId: projectId, dryRun: dryRun, docs: [], totals: cchSummarizeClipEnsureResult({}) };
       var colls = ['proposals', 'invoices'];
+      if (opts.collection && opts.docId) {
+        colls = [String(opts.collection)];
+      }
       for (var ci = 0; ci < colls.length; ci++) {
         var coll = colls[ci];
+        if (opts.collection && opts.docId) {
+          var one = await db.collection('boards').doc(projectId).collection(coll).doc(String(opts.docId)).get();
+          if (!one.exists) continue;
+          var dataOne = one.data() || {};
+          var itemsOne = (typeof coerceProposalDocItemsArray === 'function' && coll === 'proposals')
+            ? coerceProposalDocItemsArray(dataOne.items)
+            : ((dataOne.items || []).slice());
+          var resOne = await cchEnsureClipsFromDocLines(projectId, itemsOne, {
+            dryRun: dryRun,
+            collection: coll,
+            docId: one.id,
+            persistLineLinks: !dryRun,
+            fillUnroomed: opts.fillUnroomed
+          });
+          report.docs.push({
+            collection: coll,
+            docId: one.id,
+            num: dataOne.proposalNum || dataOne.invoiceNum || dataOne.num || one.id,
+            summary: cchSummarizeClipEnsureResult(resOne),
+            detail: resOne
+          });
+          continue;
+        }
         var snap = await db.collection('boards').doc(projectId).collection(coll).get();
         for (var di = 0; di < snap.docs.length; di++) {
           var d = snap.docs[di];
@@ -13904,7 +14121,8 @@
             dryRun: dryRun,
             collection: coll,
             docId: d.id,
-            persistLineLinks: !dryRun
+            persistLineLinks: !dryRun,
+            fillUnroomed: opts.fillUnroomed
           });
           report.docs.push({
             collection: coll,
@@ -13930,7 +14148,7 @@
       });
       report.totals = t;
       try { console.info('[WO-045 clip ensure]', dryRun ? 'DRY-RUN' : 'APPLY', report); } catch (_eLog) {}
-      if (typeof showToast === 'function') {
+      if (!opts.quiet && typeof showToast === 'function') {
         showToast(
           (dryRun ? 'Dry-run' : 'Applied') + ': create ' + t.wouldCreate +
           ', fill blank ' + t.wouldFillBlank +
@@ -13948,6 +14166,108 @@
     window.cchApplyDocLineClipSync = function(projectId) {
       return cchDryRunDocLineClipSync(projectId, { dryRun: false });
     };
+
+    function cchPlaceOnRoomBoardsBtnHtml(projectId, collection, docId) {
+      var pid = String(projectId || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      var coll = String(collection || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      var did = String(docId || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      var isDoc = !!(collection && docId);
+      var onclick = isDoc
+        ? "void cchPlaceDocLinesOnRoomBoards('" + pid + "','" + coll + "','" + did + "')"
+        : "void cchPlaceDocLinesOnRoomBoards('" + pid + "','','',true)";
+      var label = isDoc ? 'Place on Room Boards' : 'Check all documents';
+      var title = isDoc
+        ? 'This document only. Options has Check all documents.'
+        : 'Check every proposal and invoice in this project.';
+      return '<button type="button" class="btn btn-secondary btn-sm" title="' + title + '" onclick="' + onclick + '">' + label + '</button>';
+    }
+    window.cchPlaceOnRoomBoardsBtnHtml = cchPlaceOnRoomBoardsBtnHtml;
+
+    /** Explicit: place roomed lines onto Room Boards. Default = one document; allDocs=true scans the project. */
+    async function cchPlaceDocLinesOnRoomBoards(projectId, collection, docId, allDocs) {
+      projectId = String(projectId || (window._currentProject && window._currentProject.id) || '').trim();
+      collection = String(collection || '').trim();
+      docId = String(docId || '').trim();
+      if (!projectId) {
+        if (typeof showToast === 'function') showToast('Open a project first.', 'warning');
+        return null;
+      }
+      if (window._cchPlaceBoardsBusy) return null;
+      window._cchPlaceBoardsBusy = true;
+      var scopeAll = allDocs === true || allDocs === 'true' || !(collection && docId);
+      try {
+        if (typeof showToast === 'function') {
+          showToast(scopeAll
+            ? 'Checking all proposals and invoices for missing room tiles\u2026'
+            : 'Checking this document for missing room tiles\u2026', 'info', 4000);
+        }
+        var scanOpts = { dryRun: true, quiet: true, fillUnroomed: false };
+        if (!scopeAll) {
+          scanOpts.collection = collection;
+          scanOpts.docId = docId;
+        }
+        var scan = await cchDryRunDocLineClipSync(projectId, scanOpts);
+        if (!scan) return null;
+        var t = scan.totals || {};
+        var wouldCreate = t.wouldCreate || 0;
+        var wouldLink = t.linkedExisting || 0;
+        var noRoom = t.skippedNoRoom || 0;
+        var docLabel = (scan.docs && scan.docs[0] && scan.docs[0].num) ? String(scan.docs[0].num) : (docId || '');
+        var scopeLine = scopeAll
+          ? 'Every proposal and invoice in this project.'
+          : ('This document only' + (docLabel ? ' (' + docLabel + ')' : '') + '.');
+        if (!wouldCreate && !wouldLink) {
+          if (typeof showToast === 'function') {
+            showToast(
+              'Already placed: every product line with a room has a tile. ' +
+              noRoom + ' line(s) with no room stay in Selections.',
+              'success',
+              7000
+            );
+          }
+          return scan;
+        }
+        var msg =
+          scopeLine + '\nProduct lines with a room get a Room Board tile. Lines with no room stay in Selections.\n\n' +
+          'Would add ' + wouldCreate + ' new tile(s)' +
+          (wouldLink ? ' and link ' + wouldLink + ' existing' : '') + '.\n' +
+          noRoom + ' line(s) have no room \u2014 they stay in Selections.\n\n' +
+          'Does not change Product Library.';
+        var ok = true;
+        if (typeof cchConfirm === 'function') {
+          ok = await cchConfirm(msg, 'Place on Room Boards', { confirmText: 'Add tiles' });
+        }
+        if (!ok) return scan;
+        var applyOpts = { dryRun: false, quiet: true, fillUnroomed: false };
+        if (!scopeAll) {
+          applyOpts.collection = collection;
+          applyOpts.docId = docId;
+        }
+        var applied = await cchDryRunDocLineClipSync(projectId, applyOpts);
+        var a = (applied && applied.totals) || {};
+        if (typeof showToast === 'function') {
+          showToast(
+            'Room Boards updated: ' + (a.wouldCreate || 0) + ' tile(s) added. ' +
+            (a.skippedNoRoom || 0) + ' line(s) with no room left in Selections.',
+            'success',
+            7000
+          );
+        }
+        if (typeof window.invalidateProjectSelectionsCache === 'function') {
+          try { window.invalidateProjectSelectionsCache(projectId); } catch (_eInv) {}
+        }
+        return applied;
+      } catch (ePlace) {
+        if (typeof showToast === 'function') {
+          showToast('Place on Room Boards failed: ' + ((ePlace && ePlace.message) || ePlace), 'error');
+        }
+        console.warn('[cchPlaceDocLinesOnRoomBoards]', ePlace);
+        return null;
+      } finally {
+        window._cchPlaceBoardsBusy = false;
+      }
+    }
+    window.cchPlaceDocLinesOnRoomBoards = cchPlaceDocLinesOnRoomBoards;
 
     async function cchRunDocLineClipEnsureAfterSave(projectId, collection, docId, items) {
       if (collection !== 'proposals' && collection !== 'invoices') return null;
@@ -18114,15 +18434,17 @@
       `;
     }
 
-    // Selections duplicate key · title+vendor, or library id, or product page URL
+    // Selections duplicate key · SKU first (CLIP-3: same URL / title can be two finishes)
     function selDupKeyForItem(it) {
       it = it || {};
+      var sku = String(it.sku || it.itemNumber || it.itemNo || it.partNumber || it.partNo || '').trim().toLowerCase().replace(/\s+/g, '');
+      var v = String(it.vendor || '').trim().toLowerCase();
+      if (sku) return 'sku:' + (v ? (v + '|') : '') + sku;
       var lid = String(it.libraryProductId || it.linkedLibraryProductId || ((it.source === 'library' || it.source === 'products') ? it.id : '') || '').trim();
       if (lid) return 'lib:' + lid;
       var urlKey = cchNormalizeProductUrlForDedup(_cchProductPageUrlFromItem(it));
       if (urlKey && urlKey.length > 10) return 'url:' + urlKey;
-      var t = String(it.title || '').trim().toLowerCase();
-      var v = String(it.vendor || '').trim().toLowerCase();
+      var t = String(it.title || it.description || '').trim().toLowerCase();
       if (cchTitleIsGenericPlaceholder(t)) return '';
       return t && v ? (t + '|' + v) : '';
     }
@@ -18159,7 +18481,9 @@
       if (existing) continue;
       var qty = parseFloat(p.qty) || 1;
       var cost = parseMoney(p.unitCost) || parseMoney(p.cost) || parseMoney(p.costPrice) || parseMoney(p.totalCost) || 0;
-      var sell = parseMoney(p.clientPrice) || parseMoney(p.sellPrice) || parseMoney(p.price) || parseMoney(p.totalSelling) || 0;
+      var sell = (typeof cchDocLineUnitSell === 'function')
+        ? cchDocLineUnitSell({ clientPrice: p.clientPrice, sellPrice: p.sellPrice, amount: p.totalSelling, qty: qty })
+        : (parseMoney(p.clientPrice) || parseMoney(p.sellPrice) || 0);
       var newClip = {
         title: p.title || 'Untitled',
         description: p.description || '',
@@ -18167,7 +18491,7 @@
         room: room,
         category: (p.category || '').trim() || 'General',
         cost: cost,
-        clientPrice: qty > 0 && sell > 0 ? (sell / qty) : sell,
+        clientPrice: sell,
         qty: qty,
         imageUrl: p.imageUrl || p.image || '',
         sku: p.sku || '',
@@ -19103,6 +19427,7 @@
             <button class="btn btn-secondary btn-sm" onclick="selectionBulkDeleteSelected()" title="List view: check rows, then permanently remove room clips or Product Library items">🗑 Delete selected</button>
             <button class="btn btn-secondary btn-sm" onclick="selectionDedupeLibraryAgainstClips()" title="Deletes Product Library rows that duplicate a Room Board clip (same title + vendor). Keeps the clip.">Drop library dupes</button>
             <button class="btn btn-secondary btn-sm" onclick="openDocItemsSidebar({mode:'selections',projectId:'${proj.id}'})">Add item</button>
+            ${typeof cchPlaceOnRoomBoardsBtnHtml === 'function' ? cchPlaceOnRoomBoardsBtnHtml(proj.id) : ''}
           </div>
         </div>
 
@@ -19461,8 +19786,11 @@
             description: c.notes || '',
             clientDescription: c.clientDescription || c.description || '',
             vendorDescription: c.vendorDescription || '',
-            vendorUrl: c.pageUrl || c.vendorUrl || c.productUrl || '',
-            productUrl: c.productUrl || c.pageUrl || '',
+            vendorUrl: (typeof cchLineProductSourceUrl === 'function' ? cchLineProductSourceUrl(c) : '') || c.pageUrl || c.vendorUrl || c.productUrl || c.sourceUrl || '',
+            productUrl: (typeof cchLineProductSourceUrl === 'function' ? cchLineProductSourceUrl(c) : '') || c.productUrl || c.pageUrl || c.sourceUrl || '',
+            pageUrl: (typeof cchLineProductSourceUrl === 'function' ? cchLineProductSourceUrl(c) : '') || c.pageUrl || c.sourceUrl || '',
+            sourceUrl: c.sourceUrl || '',
+            clippedFromUrl: c.clippedFromUrl || '',
             materials: c.materials || '',
             finish: c.finish || '',
             dimensions: c.dimensions || '',
@@ -23268,18 +23596,19 @@
       var lid = String(clip.libraryProductId || clip.linkedLibraryProductId || '').trim();
       if (hid) add('Houzz', hid, '', 'font-size:10px;color:#1B5E20;background:#E6F4EA;border:1px solid rgba(27,94,32,0.2);padding:2px 6px;font-family:ui-monospace,monospace;');
       if (lid) add('Lib', lid.length > 14 ? lid.slice(0, 12) + '\u2014' : lid, '', 'font-size:10px;color:#0D47A1;background:#E3F2FD;border:1px solid rgba(13,71,161,0.2);padding:2px 6px;font-family:ui-monospace,monospace;');
-      add('PR', clip.proposalNum || clip.houzzProposal, '');
-      add('INV', clip.invoiceNum || clip.houzzInvoice, '');
+      var prNum = String(clip.proposalNum || clip.houzzProposal || '').trim();
+      var prId = String(clip.proposalId || '').trim();
+      var invNum = String(clip.invoiceNum || clip.houzzInvoice || '').trim();
+      var invId = String(clip.invoiceId || '').trim();
+      var poNum = String(clip.poNum || clip.purchaseOrderNum || '').trim();
+      var poId = String(clip.poId || clip.purchaseOrderId || '').trim();
+      if (projectId && prId) add('PR', prNum || prId, '#/project/' + String(projectId) + '/proposal/' + prId);
+      else add('PR', prNum, '');
+      if (projectId && invId) add('INV', invNum || invId, '#/project/' + String(projectId) + '/invoice/' + invId);
+      else add('INV', invNum, '');
       if (!forRoomBoard) {
-        add('PO', clip.poNum || clip.purchaseOrderNum, '');
-      }
-      if (projectId) {
-        var pid = String(projectId);
-        add('PR', clip.proposalId, '#/project/' + pid + '/proposal/' + String(clip.proposalId));
-        add('INV', clip.invoiceId, '#/project/' + pid + '/invoice/' + String(clip.invoiceId));
-        if (!forRoomBoard) {
-          add('PO', clip.poId || clip.purchaseOrderId, '#/project/' + pid + '/po/' + String(clip.poId || clip.purchaseOrderId));
-        }
+        if (projectId && poId) add('PO', poNum || poId, '#/project/' + String(projectId) + '/po/' + poId);
+        else add('PO', poNum, '');
       }
       if (!out.length) return '';
       return '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">' + out.join('') + '</div>';
@@ -23475,8 +23804,9 @@
       var imgSrc = _clipBoardHeroUrl(clip);
       var _imgCount = (typeof cchProposalLineImagesFromSource === 'function' ? (cchProposalLineImagesFromSource(clip).images || []).length : 0);
       var _clipLbUrls = (typeof cpProposalLineImageList === 'function') ? cpProposalLineImageList(clip) : (imgSrc ? [imgSrc] : []);
-      var qty = parseFloat(clip.qty || clip.quantity) || 1;
-      var sell = parseMoney(clip.clientPrice) || parseFloat(clip.sellPrice) || parseFloat(clip.unitSellingPrice) || (parseMoney(clip.totalSelling) ? parseMoney(clip.totalSelling) / qty : 0) || parseFloat(clip.totalSell) || parseFloat(clip.price) || parseFloat(clip.retailPrice) || 0;
+      var qty = (typeof cchClipBoardDisplayQty === 'function') ? cchClipBoardDisplayQty(clip) : (parseFloat(clip.qty || clip.quantity) || 1);
+      var unitSell = (typeof cchClipBoardUnitSell === 'function') ? cchClipBoardUnitSell(clip) : (parseMoney(clip.clientPrice) || 0);
+      var sell = (typeof cchClipBoardLineSell === 'function') ? cchClipBoardLineSell(clip) : (unitSell * (qty > 0 ? qty : 1));
       var isValid = imgSrc && (imgSrc.startsWith('http') || imgSrc.startsWith('data:') || imgSrc.startsWith('//') || (imgSrc.charAt(0) === '/' && imgSrc.length > 1));
       return '<div onclick="showClipDetail(\'' + escAttr(projId) + '\',\'' + escAttr(clip.id) + '\')" class="rb-board-clip-card' + _boardClipHiddenCardClass(clip) + '" data-rb-proj="' + escAttr(projId) + '" data-rb-section="' + escAttr(sectionKey) + '" data-rb-idx="' + idx + '" style="background:white;border:1px solid var(--gray-200);border-radius:6px;overflow:hidden;cursor:pointer;transition:box-shadow 0.2s,transform 0.15s;"' +
         ' ondragover="rbClipDragOver(event,this)" ondragenter="event.preventDefault()" ondragleave="rbClipDragLeave(this)" ondrop="rbClipDropOnItem(event,\'' + escJsStr(projId) + '\',\'' + escJsStr(sectionKey) + '\',' + idx + ',this)"' +
@@ -23486,10 +23816,13 @@
           '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:rgba(245,243,238,0.5);border-bottom:1px solid var(--gray-100);">' +
             '<div style="display:flex;gap:6px;align-items:center;">' +
               '<span draggable="true" class="rb-drag-handle" title="Drag to reorder" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" ondragstart="rbClipDragStart(event,\'' + escJsStr(projId) + '\',\'' + escJsStr(sectionKey) + '\',' + idx + ',\'' + escJsStr(clip.id) + '\')">\u25C7</span>' +
-              (clip.pageUrl ? '<a href="' + escAttr(clip.pageUrl) + '" target="_blank" onclick="event.stopPropagation()" title="View source" style="color:var(--gray-400);font-size:13px;text-decoration:none;padding:2px;">\u25C7</a>' : '') +
+              (function() {
+                var _srcU = (typeof cchLineProductSourceUrl === 'function') ? cchLineProductSourceUrl(clip) : String(clip.pageUrl || clip.productUrl || clip.sourceUrl || '').trim();
+                return _srcU ? '<a href="' + escAttr(_srcU) + '" target="_blank" onclick="event.stopPropagation()" title="View source" style="color:var(--gray-400);font-size:13px;text-decoration:none;padding:2px;">\u25C7</a>' : '';
+              })() +
             '</div>' +
             '<div style="display:flex;gap:6px;align-items:center;">' +
-              (sell > 0 ? '<span style="font-size:11px;font-weight:600;color:var(--gold);">$</span>' : '') +
+              (unitSell > 0 ? '<span style="font-size:11px;font-weight:600;color:var(--gold);">$</span>' : '') +
               _boardClipHideBtnHtml(projId, clip) +
               '<button type="button" title="Remove from room (keeps in Selections)" aria-label="Remove from room" onclick="event.stopPropagation();void removeClipFromRoomBoard(\'' + escAttr(projId) + '\',\'' + escAttr(clip.id) + '\')" style="border:1px solid #E2E2E2;background:#fff;color:#5C6B80;cursor:pointer;font-size:10px;font-weight:700;padding:2px 6px;line-height:1.2;border-radius:0;letter-spacing:0.04em;text-transform:uppercase;" onmouseenter="this.style.borderColor=\'#C9A96E\';this.style.color=\'#0A1F3D\'" onmouseleave="this.style.borderColor=\'#E2E2E2\';this.style.color=\'#5C6B80\'">Remove</button>' +
             '</div>' +
@@ -23521,7 +23854,15 @@
             _boardRoomSelectOptsHtml(_cchSanitizeClipRoomForDisplay(clip.room, clip.category), boardRoomSelectList) +
           '</select></div>' +
           (clip.description ? '<div style="font-size:11px;color:var(--gray-400);margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + esc(clip.description).substring(0, 80) + '</div>' : '') +
-          (sell > 0 ? '<div style="font-size:14px;font-weight:700;color:var(--gold);font-family:var(--font-mono);margin-top:6px;">' + formatMoney(sell) + (qty > 1 ? ' <span style="font-size:11px;color:var(--gray-400);font-weight:400;">x' + qty + '</span>' : '') + '</div>' : '') +
+          (function() {
+            var qn = parseFloat(qty);
+            if (!(qn > 0)) qn = 1;
+            var qtyBit = '<span style="font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#0F1A2E;">Qty ' + qn + '</span>';
+            var priceBit = (unitSell > 0)
+              ? '<span style="font-size:14px;font-weight:700;color:var(--gold);font-family:var(--font-mono);">' + formatMoney(unitSell) + '</span>'
+              : '';
+            return '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:6px;">' + qtyBit + priceBit + '</div>';
+          })() +
           clipLinkedDocPillsHtml(clip, projId, { forRoomBoard: true }) +
         '</div>' +
       '</div>';
@@ -23537,9 +23878,7 @@
           window._rbSectionClipOrders[focusRm] = focusItems.map(function(c) { return c.id; });
           var focusTotal = focusItems.reduce(function(s, c) {
             if (c && c._docResolveReadOnly) return s;
-            var q = parseFloat(c.qty || c.quantity) || 1;
-            var p = parseMoney(c.clientPrice) || parseFloat(c.sellPrice) || parseMoney(c.totalSelling) || parseFloat(c.price) || 0;
-            return s + (p * q);
+            return s + ((typeof cchClipBoardLineSell === 'function') ? cchClipBoardLineSell(c) : ((parseMoney(c.clientPrice) || 0) * (parseFloat(c.qty || c.quantity) || 1)));
           }, 0);
           var _focusFirstImg = focusItems.find(function(c) {
             return c && (c.imageUrl || (typeof _firstCoercedGalleryUrl === 'function' && _firstCoercedGalleryUrl(c)) || c.image || c.img || c.thumbnail);
@@ -23577,9 +23916,7 @@
           var items = groupedData[rm] || [];
           var totalSell = items.reduce(function(s, c) {
             if (c && c._docResolveReadOnly) return s;
-            var q = parseFloat(c.qty || c.quantity) || 1;
-            var p = parseMoney(c.clientPrice) || parseFloat(c.sellPrice) || parseMoney(c.totalSelling) || parseFloat(c.price) || 0;
-            return s + (p * q);
+            return s + ((typeof cchClipBoardLineSell === 'function') ? cchClipBoardLineSell(c) : ((parseMoney(c.clientPrice) || 0) * (parseFloat(c.qty || c.quantity) || 1)));
           }, 0);
           var firstWithImg = items.find(function(c) { return c.imageUrl || _firstCoercedGalleryUrl(c) || c.image || c.img || c.thumbnail; });
           var cover = ((roomMeta && roomMeta[rm] && roomMeta[rm].coverImage) || (firstWithImg ? (firstWithImg.imageUrl || _firstCoercedGalleryUrl(firstWithImg) || firstWithImg.image || firstWithImg.img || firstWithImg.thumbnail) : '') || '');
@@ -23609,9 +23946,7 @@
         window._rbSectionClipOrders[rm] = items.map(function(c) { return c.id; });
         var groupTotal = items.reduce(function(s, c) {
           if (c && c._docResolveReadOnly) return s;
-          var q = parseFloat(c.qty || c.quantity) || 1;
-          var p = parseMoney(c.clientPrice) || parseFloat(c.sellPrice) || parseMoney(c.totalSelling) || parseFloat(c.price) || 0;
-          return s + (p * q);
+          return s + ((typeof cchClipBoardLineSell === 'function') ? cchClipBoardLineSell(c) : ((parseMoney(c.clientPrice) || 0) * (parseFloat(c.qty || c.quantity) || 1)));
         }, 0);
         var rmKey = rm.replace(/[^a-zA-Z0-9]/g,'');
         var isCollapsed = window._rbCollapsed && window._rbCollapsed[rm];
@@ -23827,7 +24162,7 @@ async function renderBoardsTab(T, proj) {
           const items = dataMap[rm] || [];
           const count = items.length;
           const totalCost = items.reduce((s,c) => s + ((parseMoney(c.cost)||0) * (parseFloat(c.qty)||1)), 0);
-          const totalSell = items.reduce((s,c) => s + (parseMoney(c.totalSelling) || ((parseMoney(c.clientPrice)||0) * (parseFloat(c.qty)||1))), 0);
+          const totalSell = items.reduce((s,c) => s + ((typeof cchClipBoardLineSell === 'function') ? cchClipBoardLineSell(c) : (parseMoney(c.totalSelling) || ((parseMoney(c.clientPrice)||0) * (parseFloat(c.qty)||1)))), 0);
           const firstWithImg = items.find(c => c.imageUrl || _firstCoercedGalleryUrl(c) || c.image || c.img || c.thumbnail);
           const coverImg = (roomMeta[rm] && roomMeta[rm].coverImage) || (firstWithImg ? (firstWithImg.imageUrl || _firstCoercedGalleryUrl(firstWithImg) || firstWithImg.image || firstWithImg.img || firstWithImg.thumbnail) : '') || '';
           return { name: rm, count, totalCost, totalSell, coverImg, items };
@@ -23838,7 +24173,7 @@ async function renderBoardsTab(T, proj) {
 
       // Grand totals
       const grandCost = clips.reduce((s,c) => (c && c._docResolveReadOnly) ? s : s + ((parseMoney(c.cost)||0) * (parseFloat(c.qty)||1)), 0);
-      const grandSell = clips.reduce((s,c) => (c && c._docResolveReadOnly) ? s : s + (parseMoney(c.totalSelling) || ((parseMoney(c.clientPrice)||0) * (parseFloat(c.qty)||1))), 0);
+      const grandSell = clips.reduce((s,c) => (c && c._docResolveReadOnly) ? s : s + ((typeof cchClipBoardLineSell === 'function' ? cchClipBoardLineSell(c) : ((parseMoney(c.clientPrice) || 0) * (parseFloat(c.qty)||1)))), 0);
       const rbFocusRm = String(window._rbGridFocusRoom || '').trim();
 
       T.innerHTML = `
@@ -23926,7 +24261,7 @@ async function renderBoardsTab(T, proj) {
           const rmKey = rm.replace(/[^a-zA-Z0-9]/g,'');
           const isCollapsed = window._rbCollapsed && window._rbCollapsed[rm];
           const sectionItems = (window._boardViewMode === 'category' ? catGrouped : roomGrouped)[rm] || [];
-          const sectionTotal = sectionItems.reduce((s,c) => (c && c._docResolveReadOnly) ? s : s + (parseMoney(c.totalSelling) || ((parseMoney(c.clientPrice)||0) * (parseFloat(c.qty)||1))), 0);
+          const sectionTotal = sectionItems.reduce((s,c) => (c && c._docResolveReadOnly) ? s : s + ((typeof cchClipBoardLineSell === 'function' ? cchClipBoardLineSell(c) : ((parseMoney(c.clientPrice) || 0) * (parseFloat(c.qty)||1)))), 0);
           return `
           <div style="margin-bottom:8px;" id="room-sec-${rmKey}">
             <div onclick="rbToggleRoom('${escJsStr(rm)}')" style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid ${isUnassigned ? 'var(--red)' : 'var(--gray-200)'};cursor:pointer;user-select:none;">
@@ -23973,11 +24308,11 @@ async function renderBoardsTab(T, proj) {
                   if (clip && clip._docResolveReadOnly) return _rbDocResolveRowHtml(proj.id, clip);
                   const imgSrc = clip.imageUrl || _firstCoercedGalleryUrl(clip) || '';
                   const imgTag = _boardTableImgHtml(imgSrc);
-                  const qty = parseFloat(clip.qty || clip.quantity) || 1;
+                  const qty = (typeof cchClipBoardDisplayQty === 'function') ? cchClipBoardDisplayQty(clip) : (parseFloat(clip.qty || clip.quantity) || 1);
                   const cost = parseMoney(clip.cost) || parseFloat(clip.costPrice) || parseFloat(clip.tradeCost) || parseFloat(clip.unitCost) || (parseMoney(clip.totalCost) ? parseMoney(clip.totalCost) / qty : 0) || 0;
-                  const sell = parseMoney(clip.clientPrice) || parseFloat(clip.sellPrice) || parseFloat(clip.unitSellingPrice) || (parseMoney(clip.totalSelling) ? parseMoney(clip.totalSelling) / qty : 0) || parseFloat(clip.totalSell) || parseFloat(clip.price) || parseFloat(clip.retailPrice) || 0;
+                  const sell = (typeof cchClipBoardUnitSell === 'function') ? cchClipBoardUnitSell(clip) : (parseMoney(clip.clientPrice) || 0);
                   const markup = clip.markupPct || (cost > 0 && sell > 0 ? Math.round((sell - cost) / cost * 100) : 0);
-                  const total = parseMoney(clip.totalSelling) || (sell * qty);
+                  const total = (typeof cchClipBoardLineSell === 'function') ? cchClipBoardLineSell(clip) : (parseMoney(clip.totalSelling) || (sell * qty));
                   const status = clip.approvalStatus || clip.approval || clip.proposalStatus || '';
                   var _trHid = boardClipIsHidden(clip);
                   return '<tr class="' + (_trHid ? 'rb-clip-hidden' : '') + '" style="cursor:pointer;' + (_trHid ? 'background:#EEF1F5;' : '') + '">' +
@@ -33180,6 +33515,8 @@ async function renderBoardsTab(T, proj) {
           lineApprovalStatus: 'pending'
         };
         if (row.libraryProductId) row.libraryProductIdLocked = true;
+        var _srProp = String(c.showroomVendor || '').trim();
+        if (_srProp) row.showroomVendor = _srProp;
         return cchStampClipMarkupMeta(row, c, _projForMk);
       });
 
@@ -33475,7 +33812,7 @@ async function renderBoardsTab(T, proj) {
           else _cntPd++;
         });
         var _gateHelp = (!invGate.ok && invGate.msgs && invGate.msgs.length) ? escAttr(invGate.msgs.join(' ')) : 'All client line decisions and total approval are required before Convert to Invoice.';
-        var _countsOnly = '<span style="font-size:12px;color:var(--gray-600);">' + _cntAp + ' approved · ' + _cntDc + ' declined · ' + _cntPd + ' pending</span>' +
+        var _countsOnly = '<span data-cch-prop-appr-counts style="font-size:12px;color:var(--gray-600);">' + _cntAp + ' approved · ' + _cntDc + ' declined · ' + _cntPd + ' pending</span>' +
           ' <button type="button" class="btn btn-sm" style="padding:2px 8px;font-size:11px;border-radius:50%;min-width:22px;line-height:1.1;border:1px solid rgba(15,26,46,0.15);background:#fff;color:#0F1A2E;" title="' + _gateHelp + '">\u00D7</button>';
         var pe = escAttr(projectId);
         var pre = escAttr(proposalId);
@@ -36088,6 +36425,9 @@ async function renderBoardsTab(T, proj) {
       }
       if ((collection === 'proposals' || collection === 'invoices') && typeof cchPushDocLineRoomsToLinkedClips === 'function') {
         try { await cchPushDocLineRoomsToLinkedClips(projectId, items); } catch (_eLineRoom) {}
+      }
+      if ((collection === 'proposals' || collection === 'invoices') && typeof cchPushDocLinePricesToLinkedClips === 'function') {
+        try { await cchPushDocLinePricesToLinkedClips(projectId, [items[idx]]); } catch (_eLinePrice) {}
       }
       if ((collection === 'proposals' || collection === 'invoices') && typeof cchRunDocLineClipEnsureAfterSave === 'function') {
         try { await cchRunDocLineClipEnsureAfterSave(projectId, collection, docId, items); } catch (_eClipEns) {
@@ -40644,6 +40984,11 @@ async function renderBoardsTab(T, proj) {
             console.warn('[docEditSave] room?clip sync', _eRoomPush && _eRoomPush.message ? _eRoomPush.message : _eRoomPush);
           }
         }
+        if ((d.type === 'invoice' || d.type === 'proposal') && typeof cchPushDocLinePricesToLinkedClips === 'function') {
+          try { await cchPushDocLinePricesToLinkedClips(d.projectId, d.items); } catch (_ePricePush) {
+            console.warn('[docEditSave] price→clip sync', _ePricePush && _ePricePush.message ? _ePricePush.message : _ePricePush);
+          }
+        }
         if ((d.type === 'invoice' || d.type === 'proposal') && typeof cchRunDocLineClipEnsureAfterSave === 'function') {
           try {
             await cchRunDocLineClipEnsureAfterSave(
@@ -40945,6 +41290,10 @@ async function renderBoardsTab(T, proj) {
           clip.libraryProductId = link.libraryProductId;
         }
         if (link.sku && !String(clip.sku || '').trim()) clip.sku = link.sku;
+        if (link._linkedDocUnitSell > 0) clip._linkedDocUnitSell = link._linkedDocUnitSell;
+        if (link._linkedDocUnitCost > 0) clip._linkedDocUnitCost = link._linkedDocUnitCost;
+        if (link._linkedDocQty > 0) clip._linkedDocQty = link._linkedDocQty;
+        if (link._linkedDocLineSell > 0) clip._linkedDocLineSell = link._linkedDocLineSell;
       }
       function lineIdentityFromDocItem(it) {
         if (!it) return {};
@@ -40967,7 +41316,11 @@ async function renderBoardsTab(T, proj) {
             var st = String(it.lineApprovalStatus || 'pending').toLowerCase();
             var sel = st === 'approved' ? 'approved' : (st === 'declined' ? 'declined' : 'pending');
             applyLink(clipById[cid], Object.assign({
-              proposalId: d.id, proposalNum: prNum, selectionStatus: sel
+              proposalId: d.id, proposalNum: prNum, selectionStatus: sel,
+              _linkedDocUnitSell: (typeof cchDocLineUnitSell === 'function' ? cchDocLineUnitSell(it) : 0),
+              _linkedDocUnitCost: (typeof cchDocLineUnitCost === 'function' ? cchDocLineUnitCost(it) : 0),
+              _linkedDocQty: parseFloat(it.qty) || 0,
+              _linkedDocLineSell: (typeof cchDocLineSellTotal === 'function' ? cchDocLineSellTotal(it) : 0)
             }, lineIdentityFromDocItem(it)));
           });
         });
@@ -40985,7 +41338,11 @@ async function renderBoardsTab(T, proj) {
             var sel = (las === 'approved' || las === 'invoiced' || invSt === 'sent' || invSt === 'paid' || invSt === 'partial')
               ? 'approved' : 'pending';
             applyLink(clipById[cid], Object.assign({
-              invoiceId: d.id, invoiceNum: invNum, selectionStatus: sel
+              invoiceId: d.id, invoiceNum: invNum, selectionStatus: sel,
+              _linkedDocUnitSell: (typeof cchDocLineUnitSell === 'function' ? cchDocLineUnitSell(it) : 0),
+              _linkedDocUnitCost: (typeof cchDocLineUnitCost === 'function' ? cchDocLineUnitCost(it) : 0),
+              _linkedDocQty: parseFloat(it.qty) || 0,
+              _linkedDocLineSell: (typeof cchDocLineSellTotal === 'function' ? cchDocLineSellTotal(it) : 0)
             }, lineIdentityFromDocItem(it)));
           });
         });
@@ -41016,6 +41373,35 @@ async function renderBoardsTab(T, proj) {
       return clips;
     }
     window.enrichClipsWithProjectDocLinks = enrichClipsWithProjectDocLinks;
+
+    /** Overlay linked proposal/invoice unit money onto a clip-edit prefill (display only; no Firestore write). */
+    function cchPrefillFromLinkedDocPricing(clip, prefill) {
+      clip = clip || {};
+      prefill = prefill || {};
+      var pm = (typeof parseMoney === 'function') ? parseMoney : function(v) { return parseFloat(v) || 0; };
+      var unitSell = pm(clip._linkedDocUnitSell);
+      var unitCost = pm(clip._linkedDocUnitCost);
+      var qty = parseFloat(clip._linkedDocQty);
+      if (unitSell > 0) {
+        unitSell = Math.round(unitSell * 100) / 100;
+        prefill.sellPrice = unitSell;
+        prefill.clientPrice = unitSell;
+      }
+      if (unitCost > 0) {
+        unitCost = Math.round(unitCost * 100) / 100;
+        prefill.costPrice = unitCost;
+      }
+      if (qty > 0) prefill.sellingQty = qty;
+      if (unitCost > 0 && unitSell > 0) {
+        prefill.markupPct = ((unitSell - unitCost) / unitCost * 100).toFixed(2);
+      }
+      var inv = String(clip.invoiceNum || '').trim();
+      var pr = String(clip.proposalNum || '').trim();
+      if (inv) prefill._linkedDocPriceBanner = 'INV ' + inv;
+      else if (pr) prefill._linkedDocPriceBanner = 'PR ' + pr;
+      return prefill;
+    }
+    window.cchPrefillFromLinkedDocPricing = cchPrefillFromLinkedDocPricing;
 
     /**
      * RESOLVE-at-render (READ-ONLY — no Firestore writes, no clip moves/creates).
@@ -41158,8 +41544,9 @@ async function renderBoardsTab(T, proj) {
       var imgSrc = (typeof _clipBoardHeroUrl === 'function') ? _clipBoardHeroUrl(clip) : (clip.imageUrl || '');
       var _imgCount = (typeof cchProposalLineImagesFromSource === 'function' ? (cchProposalLineImagesFromSource(clip).images || []).length : 0);
       var _clipLbUrls = (typeof cpProposalLineImageList === 'function') ? cpProposalLineImageList(clip) : (imgSrc ? [imgSrc] : []);
-      var qty = parseFloat(clip.qty || clip.quantity) || 1;
-      var sell = parseMoney(clip.clientPrice) || parseFloat(clip.sellPrice) || parseFloat(clip.unitSellingPrice) || (parseMoney(clip.totalSelling) ? parseMoney(clip.totalSelling) / qty : 0) || parseFloat(clip.totalSell) || parseFloat(clip.price) || parseFloat(clip.retailPrice) || 0;
+      var qty = (typeof cchClipBoardDisplayQty === 'function') ? cchClipBoardDisplayQty(clip) : (parseFloat(clip.qty || clip.quantity) || 1);
+      var unitSell = (typeof cchClipBoardUnitSell === 'function') ? cchClipBoardUnitSell(clip) : (parseMoney(clip.clientPrice) || 0);
+      var sell = (typeof cchClipBoardLineSell === 'function') ? cchClipBoardLineSell(clip) : (unitSell * (qty > 0 ? qty : 1));
       var isValid = imgSrc && (imgSrc.startsWith('http') || imgSrc.startsWith('data:') || imgSrc.startsWith('//') || (imgSrc.charAt(0) === '/' && imgSrc.length > 1));
       var href = _rbResolvePrimaryDocHref(clip, projId);
       var realId = String(clip._docResolveRealClipId || '').trim();
@@ -41171,7 +41558,7 @@ async function renderBoardsTab(T, proj) {
         '<div style="position:relative;">' +
           '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:rgba(245,243,238,0.5);border-bottom:1px solid var(--gray-100);">' +
             chip +
-            (sell > 0 ? '<span style="font-size:11px;font-weight:600;color:var(--gold);">$</span>' : '') +
+            (unitSell > 0 ? '<span style="font-size:11px;font-weight:600;color:var(--gold);">$</span>' : '') +
           '</div>' +
           _boardClipPhotoHtml(imgSrc, isValid, _imgCount, _clipLbUrls) +
         '</div>' +
@@ -41179,7 +41566,15 @@ async function renderBoardsTab(T, proj) {
           '<div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#0F1A2E;">' + esc(clip.title || 'Untitled') + '</div>' +
           (clip.vendor ? '<div style="font-size:11px;color:var(--gray-500);margin-top:2px;">By ' + esc(clip.vendor) + '</div>' : '') +
           (typeof cchProductIdentityBadgesHtml === 'function' ? cchProductIdentityBadgesHtml(clip, { showIds: true, hideUnlinked: true }) : '') +
-          (sell > 0 ? '<div style="font-size:14px;font-weight:700;color:var(--gold);font-family:var(--font-mono);margin-top:6px;">' + formatMoney(sell) + ' <span style="font-size:10px;color:var(--gray-400);font-weight:600;">/ea</span>' + (qty > 1 ? ' <span style="font-size:11px;color:var(--gray-400);font-weight:400;">\u00d7' + qty + ' \u00b7 ' + formatMoney(sell * qty) + '</span>' : '') + '</div>' : '') +
+          (function() {
+            var qn = parseFloat(qty);
+            if (!(qn > 0)) qn = 1;
+            var qtyBit = '<span style="font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#0F1A2E;">Qty ' + qn + '</span>';
+            var priceBit = (unitSell > 0)
+              ? '<span style="font-size:14px;font-weight:700;color:var(--gold);font-family:var(--font-mono);">' + formatMoney(unitSell) + '</span>'
+              : '';
+            return '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:6px;">' + qtyBit + priceBit + '</div>';
+          })() +
           clipLinkedDocPillsHtml(clip, projId, { forRoomBoard: true }) +
         '</div>' +
       '</div>';
@@ -41246,21 +41641,19 @@ async function renderBoardsTab(T, proj) {
       }
       if (!ids.length) return;
       var ts = new Date().toISOString();
-      // WO-061: one existence snapshot · skip deleted clips (no "No document to update" flood / failed writes).
-      var existingClipIds = Object.create(null);
-      try {
-        var _clipExistSnap = await db.collection('boards').doc(projectId).collection('clips').get();
-        _clipExistSnap.forEach(function(d) { existingClipIds[d.id] = true; });
-      } catch (_eExist) {
-        console.warn('syncProposalLinkOntoClips existence scan', projectId, _eExist && _eExist.message ? _eExist.message : _eExist);
-        return;
-      }
       var liveIds = [];
       var missingIds = [];
-      for (var mi = 0; mi < ids.length; mi++) {
-        if (existingClipIds[ids[mi]]) liveIds.push(ids[mi]);
-        else missingIds.push(ids[mi]);
-      }
+      var existingClipIds = Object.create(null);
+      await Promise.all(ids.map(function(cid) {
+        return db.collection('boards').doc(projectId).collection('clips').doc(cid).get().then(function(snap) {
+          if (snap.exists) {
+            existingClipIds[cid] = true;
+            liveIds.push(cid);
+          } else {
+            missingIds.push(cid);
+          }
+        }).catch(function() { missingIds.push(cid); });
+      }));
       // Heal forward: clear dead line?clip pointers once so they are not retried every sync.
       if (missingIds.length) {
         try {
@@ -41376,7 +41769,7 @@ async function renderBoardsTab(T, proj) {
           room: _ensRoom || null,
           category: r.category || 'General',
           cost: cost,
-          clientPrice: qty > 0 ? (sell / qty) : sell,
+          clientPrice: (typeof cchDocLineUnitSell === 'function') ? cchDocLineUnitSell(r) : (qty > 0 ? (sell / qty) : sell),
           qty: qty,
           imageUrl: r.imageUrl || '',
           images: Array.isArray(r.images) ? r.images : [],
@@ -41469,7 +41862,7 @@ async function renderBoardsTab(T, proj) {
           room: String(r.room || '').trim() || null,
           category: r.category || 'General',
           cost: cost,
-          clientPrice: qty > 0 ? (sell / qty) : sell,
+          clientPrice: (typeof cchDocLineUnitSell === 'function') ? cchDocLineUnitSell(r) : (qty > 0 ? (sell / qty) : sell),
           qty: qty,
           imageUrl: r.imageUrl || '',
           images: Array.isArray(r.images) ? r.images : [],
@@ -41735,22 +42128,51 @@ async function renderBoardsTab(T, proj) {
                 }
               }
               var clipRef = db.collection('boards').doc(t.projectId).collection('clips').doc();
+              var _catCarry = String(r.category || '').trim();
+              if (typeof cchResolveSingleProductCategory === 'function') {
+                _catCarry = cchResolveSingleProductCategory(_catCarry, r.title) || _catCarry;
+              }
+              var _costCarry = (typeof parseMoney === 'function'
+                ? parseMoney(r.cost != null ? r.cost : (r.unitCost != null ? r.unitCost : r.costPrice))
+                : parseFloat(r.cost || r.unitCost || r.costPrice)) || 0;
+              var _sellCarry = (typeof parseMoney === 'function'
+                ? parseMoney(r.clientPrice != null ? r.clientPrice : (r.sell != null ? r.sell : r.amount))
+                : parseFloat(r.clientPrice != null ? r.clientPrice : (r.sell != null ? r.sell : r.amount))) || 0;
               var _clipRow = {
                 title: r.title || '',
                 description: r.description || '',
                 vendorDescription: String(r.vendorDescription || '').trim(),
                 vendor: r.vendor || '',
                 room: targetRoom,
-                category: r.category || 'General',
-                cost: parseFloat(r.cost) || 0,
-                clientPrice: parseFloat(r.amount) || 0,
+                category: _catCarry || 'General',
+                cost: _costCarry,
+                clientPrice: _sellCarry,
                 qty: parseFloat(r.qty) || 1,
-                imageUrl: r.imageUrl || '',
+                imageUrl: r.imageUrl || r.image || '',
+                images: Array.isArray(r.images) ? r.images.slice() : [],
                 sku: r.sku || '',
+                specUrl: r.specUrl || r.specLink || '',
+                specLink: r.specLink || r.specUrl || '',
+                productUrl: (typeof cchLineProductSourceUrl === 'function' ? cchLineProductSourceUrl(r) : '') || r.productUrl || r.vendorUrl || r.website || r.pageUrl || r.sourceUrl || '',
+                vendorUrl: r.vendorUrl || r.productUrl || r.pageUrl || r.sourceUrl || '',
+                website: r.website || '',
+                pageUrl: (typeof cchLineProductSourceUrl === 'function' ? cchLineProductSourceUrl(r) : '') || r.pageUrl || r.productUrl || r.sourceUrl || '',
+                sourceUrl: r.sourceUrl || r.pageUrl || r.productUrl || '',
+                clippedFromUrl: r.clippedFromUrl || r.sourceUrl || '',
+                manufacturer: r.manufacturer || '',
+                clientTitle: r.clientTitle || '',
+                clientDescription: r.clientDescription || '',
+                finish: r.finish || '',
+                materials: r.materials || '',
+                dimensions: r.dimensions || '',
+                notes: r.notes || '',
                 source: 'library',
                 _manualPlacement: true,
                 addedAt: new Date().toISOString()
               };
+              if (Array.isArray(r.productDocs) && r.productDocs.length) _clipRow.productDocs = r.productDocs.slice();
+              if (r.retailPrice != null && r.retailPrice !== '') _clipRow.retailPrice = r.retailPrice;
+              if (r.markupPct != null && r.markupPct !== '') _clipRow.markupPct = r.markupPct;
               if (r.libraryProductId) _clipRow.libraryProductId = r.libraryProductId;
               else if (r._libDocId) _clipRow.libraryProductId = r._libDocId;
               if (cchLineHasAdditionalNotes(r)) {
@@ -41950,7 +42372,7 @@ async function renderBoardsTab(T, proj) {
         if (r._selKind !== 'clip') return;
         var lid = String(r.libraryProductId || r.linkedLibraryProductId || '').trim();
         if (lid) clipLibIds.add(lid);
-        var dk = typeof selDupKeyForItem === 'function' ? selDupKeyForItem({ title: r.title, vendor: r.vendor }) : '';
+        var dk = typeof selDupKeyForItem === 'function' ? selDupKeyForItem(r) : '';
         if (dk) clipTvKeys.add(dk);
       });
       var seen = new Set();
@@ -41962,7 +42384,7 @@ async function renderBoardsTab(T, proj) {
         if (r._selKind === 'library') {
           var libId = String(r._libDocId || '').trim();
           if (libId && clipLibIds.has(libId)) return false;
-          var dk2 = typeof selDupKeyForItem === 'function' ? selDupKeyForItem({ title: r.title, vendor: r.vendor }) : '';
+          var dk2 = typeof selDupKeyForItem === 'function' ? selDupKeyForItem(r) : '';
           if (dk2 && clipTvKeys.has(dk2)) return false;
         }
         return true;
@@ -41996,6 +42418,7 @@ async function renderBoardsTab(T, proj) {
         var dk = selDupKeyForItem({
           title: item.title,
           vendor: item.vendor,
+          sku: item.sku,
           libraryProductId: item.libraryProductId,
           linkedLibraryProductId: item.linkedLibraryProductId,
           source: item.source || 'boardclip',
@@ -42193,7 +42616,7 @@ async function renderBoardsTab(T, proj) {
         if (!line || (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(line))) return;
         if (line.clipId) ex.add('clip:' + String(line.clipId));
         if (line.libraryProductId) ex.add('lib:' + String(line.libraryProductId));
-        var dk = selDupKeyForItem({ title: line.title || line.description, vendor: line.vendor });
+        var dk = selDupKeyForItem({ title: line.title || line.description, vendor: line.vendor, sku: line.sku });
         if (dk) ex.add('tv:' + dk);
       });
       return ex;
@@ -42204,7 +42627,7 @@ async function renderBoardsTab(T, proj) {
       if (!ex || !ex.size) return false;
       if (it._selKind === 'clip' && it._clipDocId && ex.has('clip:' + String(it._clipDocId))) return true;
       if (it._selKind === 'library' && it._libDocId && ex.has('lib:' + String(it._libDocId))) return true;
-      var dk = selDupKeyForItem({ title: it.title, vendor: it.vendor });
+      var dk = selDupKeyForItem(it);
       if (dk && ex.has('tv:' + dk)) return true;
       return false;
     }
@@ -42257,7 +42680,7 @@ async function renderBoardsTab(T, proj) {
           items.forEach(function(line) {
             if (line.clipId) ex.add('clip:' + String(line.clipId));
             if (line.libraryProductId) ex.add('lib:' + String(line.libraryProductId));
-            var dk = selDupKeyForItem({ title: line.title || line.description, vendor: line.vendor });
+            var dk = selDupKeyForItem({ title: line.title || line.description, vendor: line.vendor, sku: line.sku });
             if (dk) ex.add('tv:' + dk);
           });
         }
@@ -42527,7 +42950,7 @@ async function renderBoardsTab(T, proj) {
             _prItems0.forEach(function(line) {
               if (line.clipId) window._disProposalExcludeKeys.add('clip:' + String(line.clipId));
               if (line.libraryProductId) window._disProposalExcludeKeys.add('lib:' + String(line.libraryProductId));
-              var dk0 = selDupKeyForItem({ title: line.title || line.description, vendor: line.vendor });
+              var dk0 = selDupKeyForItem({ title: line.title || line.description, vendor: line.vendor, sku: line.sku });
               if (dk0) window._disProposalExcludeKeys.add('tv:' + dk0);
             });
           } else {
@@ -42575,108 +42998,199 @@ async function renderBoardsTab(T, proj) {
       (window._disSelectionProducts || []).forEach(function(it) {
         if (!it._searchBlob) it._searchBlob = _disBuildSearchBlob(it);
       });
-      window._disProducts = [];
-      window._disCatalogLoaded = false;
-      window._disCatalogLoading = false;
+      var _cacheOk = window._disCatalogPid === loadPid && Array.isArray(window._disProducts) && window._disProducts.length;
+      if (!_cacheOk) {
+        window._disProducts = [];
+        window._disCatalogLoaded = false;
+        window._disCatalogLoading = false;
+      }
       filterDocSidebar();
 
       async function _disLoadGlobalCatalog(pid) {
-        if (window._disCatalogLoaded || window._disCatalogLoading) return;
-        window._disCatalogLoading = true;
+        if (window._disCatalogLoaded && window._disCatalogPid === pid && (window._disProducts || []).length) return;
+        if (window._disCatalogLoading) return;
         var cEl = document.getElementById('disContent');
         var curFilter = (window._disFilter || 'products').toLowerCase();
-        if (cEl && curFilter === 'products') {
-          cEl.innerHTML = '<div style="padding:28px 16px;text-align:center;color:#5C6B80;font-size:13px;">Loading full catalog\u2026</div>';
+        window._disCatalogLoading = true;
+        var loadGen = window._disCatalogGen = (window._disCatalogGen || 0) + 1;
+        if (cEl && curFilter === 'products' && !(window._disProducts || []).length) {
+          cEl.innerHTML = '<div style="padding:28px 16px;text-align:center;color:#5C6B80;font-size:13px;">Loading library\u2026</div>';
         }
         var items = [];
         var seen = new Set();
         function ingestLibDoc(d, tag, colName) {
           var p = d.data();
           if (!p || !p.title) return;
-          // Dedupe products/ + productLibrary/ by doc id (tag only for clips).
           var k = (tag === 'l' || tag === 'g') ? ('lib:' + d.id) : (tag + ':' + d.id);
           if (seen.has(k)) return;
           seen.add(k);
           items.push(Object.assign({ id: d.id, _source: 'library', _catalogColl: colName || '' }, p));
         }
-        async function ingestCatalogCollection(colName, tag, cap) {
-          cap = cap || 6000;
-          var gotOrdered = 0;
+        function ingestLibRow(id, p, colName) {
+          if (!p || !p.title) return;
+          var k = 'lib:' + id;
+          if (seen.has(k)) return;
+          seen.add(k);
+          items.push(Object.assign({ id: id, _source: 'library', _catalogColl: colName || '' }, p));
+        }
+        function publishCatalog() {
+          if (window._disCatalogGen !== loadGen) return;
+          var shown = (typeof _disCollapseCatalogByVendorSku === 'function') ? _disCollapseCatalogByVendorSku(items.slice()) : items.slice();
+          shown.sort(function(a, b) {
+            if (a._source === 'project' && b._source !== 'project') return -1;
+            if (b._source === 'project' && a._source !== 'project') return 1;
+            var ta = _disSortTs(a), tb = _disSortTs(b);
+            if (tb !== ta) return tb - ta;
+            return (a.title || '').localeCompare(b.title || '');
+          });
+          shown.forEach(function(it) { if (!it._searchBlob) it._searchBlob = _disBuildSearchBlob(it); });
+          window._disProducts = shown;
+          window._disCatalogPid = pid;
+          if (document.getElementById('docItemsSidebar')) filterDocSidebar();
+        }
+        async function ingestCatalogFirstPage(colName, tag, pageSize) {
+          pageSize = pageSize || 500;
           try {
-            // Newest-first so just-added rows (Stone West soapstones, etc.) are always in Add item.
-            var snapNew = await db.collection(colName).orderBy('updatedAt', 'desc').limit(cap).get();
+            var snapNew = await db.collection(colName).orderBy('updatedAt', 'desc').limit(pageSize).get();
             snapNew.forEach(function(d) { ingestLibDoc(d, tag, colName); });
-            gotOrdered = snapNew.size;
+            return {
+              last: snapNew.docs.length === pageSize ? snapNew.docs[snapNew.docs.length - 1] : null,
+              ordered: true,
+              size: snapNew.size
+            };
           } catch (_eOrd) {
             console.warn('[Add item] ' + colName + ' orderBy updatedAt failed · falling back', _eOrd && _eOrd.message);
-          }
-          // Legacy rows missing updatedAt: fill only when orderBy failed or returned a thin page.
-          if (gotOrdered < cap) {
             try {
-              var snapAll = await db.collection(colName).limit(cap).get();
+              var snapAll = await db.collection(colName).limit(pageSize).get();
               snapAll.forEach(function(d) { ingestLibDoc(d, tag, colName); });
+              return {
+                last: snapAll.docs.length === pageSize ? snapAll.docs[snapAll.docs.length - 1] : null,
+                ordered: false,
+                size: snapAll.size
+              };
             } catch (_eAll) {
               console.warn('[Add item] ' + colName + ' catalog load failed', _eAll && _eAll.message);
+              return { last: null, ordered: false, size: 0 };
             }
           }
         }
-        try {
-          var clipSnap = await db.collection('boards').doc(pid).collection('clips').get();
-          clipSnap.forEach(function(d) {
-            var c = d.data();
-            if (!c.title) return;
-            var k = 'c:' + d.id;
-            if (!seen.has(k)) {
-              seen.add(k);
-              items.push(Object.assign({ id: d.id, _source: 'project', _clipId: d.id }, c));
+        async function ingestCatalogMore(colName, tag, state, cap, pageSize) {
+          cap = cap || 6000;
+          pageSize = pageSize || 500;
+          var loaded = state.size || 0;
+          var lastDoc = state.last;
+          var useOrder = !!state.ordered;
+          while (lastDoc && loaded < cap) {
+            if (window._disCatalogGen !== loadGen) return;
+            try {
+              var q = db.collection(colName);
+              if (useOrder) q = q.orderBy('updatedAt', 'desc');
+              var snap = await q.startAfter(lastDoc).limit(pageSize).get();
+              snap.forEach(function(d) { ingestLibDoc(d, tag, colName); });
+              loaded += snap.size;
+              lastDoc = snap.docs.length === pageSize ? snap.docs[snap.docs.length - 1] : null;
+              if (!snap.size) break;
+            } catch (_eMore) {
+              break;
             }
-          });
-        } catch (e) {}
+          }
+          if (!useOrder) return;
+          var fillLast = null;
+          var fillN = 0;
+          try {
+            do {
+              if (window._disCatalogGen !== loadGen) return;
+              var fq = fillLast
+                ? db.collection(colName).startAfter(fillLast).limit(pageSize)
+                : db.collection(colName).limit(pageSize);
+              var fs = await fq.get();
+              fs.forEach(function(d) { ingestLibDoc(d, tag, colName); });
+              fillN += fs.size;
+              fillLast = fs.docs.length === pageSize ? fs.docs[fs.docs.length - 1] : null;
+            } while (fillLast && fillN < cap);
+          } catch (_eFill) {}
+        }
+        try {
+          if (window._libraryCatalogMode !== 'junk' && typeof libraryProducts !== 'undefined' && libraryProducts && libraryProducts.length) {
+            libraryProducts.forEach(function(p) { ingestLibRow(p.id, p, 'memory'); });
+          }
+        } catch (_eMem) {}
+        var seededClips = false;
+        (window._disSelectionProducts || []).forEach(function(c) {
+          if (!c || !c.title) return;
+          var cid = c._clipDocId || String(c.id || '').replace(/^_selclip_/, '');
+          if (!cid) return;
+          var k = 'c:' + cid;
+          if (seen.has(k)) return;
+          seen.add(k);
+          items.push(Object.assign({}, c, { id: cid, _source: 'project', _clipId: cid }));
+          seededClips = true;
+        });
+        if (!seededClips) {
+          try {
+            var clipSnap = await db.collection('boards').doc(pid).collection('clips').get();
+            clipSnap.forEach(function(d) {
+              var c = d.data();
+              if (!c.title) return;
+              var k = 'c:' + d.id;
+              if (!seen.has(k)) {
+                seen.add(k);
+                items.push(Object.assign({ id: d.id, _source: 'project', _clipId: d.id }, c));
+              }
+            });
+          } catch (e) {}
+        }
+        if (items.length) publishCatalog();
+        var pageLib = { last: null, ordered: false, size: 0 };
+        var pageProd = { last: null, ordered: false, size: 0 };
         var projName = '';
         try {
           var bs = await db.collection('boards').doc(pid).get();
           if (bs.exists) projName = String(bs.data().name || '').trim();
         } catch (e0) {}
-        try {
-          if (projName) {
-            var libByProj = await db.collection('productLibrary').where('project', '==', projName).limit(400).get();
-            libByProj.forEach(function(d) { ingestLibDoc(d, 'l', 'productLibrary'); });
+        await Promise.all([
+          ingestCatalogFirstPage('productLibrary', 'l', 500).then(function(st) { pageLib = st || pageLib; }),
+          ingestCatalogFirstPage('products', 'g', 500).then(function(st) { pageProd = st || pageProd; }),
+          (async function() {
+            try {
+              if (projName) {
+                var libByProj = await db.collection('productLibrary').where('project', '==', projName).limit(400).get();
+                libByProj.forEach(function(d) { ingestLibDoc(d, 'l', 'productLibrary'); });
+              }
+              var libByPid = await db.collection('productLibrary').where('projectId', '==', pid).limit(400).get();
+              libByPid.forEach(function(d) { ingestLibDoc(d, 'l', 'productLibrary'); });
+            } catch (eLib) {}
+          })()
+        ]);
+        if (window._disCatalogGen !== loadGen) return;
+        publishCatalog();
+        (async function _disCatalogBackground() {
+          try {
+            await ingestCatalogMore('productLibrary', 'l', pageLib, 6000, 500);
+            if (window._disCatalogGen !== loadGen) return;
+            publishCatalog();
+            await ingestCatalogMore('products', 'g', pageProd, 6000, 500);
+            if (window._disCatalogGen !== loadGen) return;
+            publishCatalog();
+          } finally {
+            if (window._disCatalogGen === loadGen) {
+              window._disCatalogLoaded = true;
+              window._disCatalogLoading = false;
+              publishCatalog();
+            }
           }
-          var libByPid = await db.collection('productLibrary').where('projectId', '==', pid).limit(400).get();
-          libByPid.forEach(function(d) { ingestLibDoc(d, 'l', 'productLibrary'); });
-        } catch (eLib) {}
-        // Product Library page loads up to 6000; Add item used to stop at 500 by doc-id
-        // (~first 10% of ~5k products), so newer Stone West rows never appeared in search.
-        await ingestCatalogCollection('productLibrary', 'l', 6000);
-        await ingestCatalogCollection('products', 'g', 6000);
-        // WO-092 Part 1 — collapse vendor+SKU / vendor+title+price twins across both collections (display only).
-        items = (typeof _disCollapseCatalogByVendorSku === 'function') ? _disCollapseCatalogByVendorSku(items) : items;
-        items.sort(function(a, b) {
-          if (a._source === 'project' && b._source !== 'project') return -1;
-          if (b._source === 'project' && a._source !== 'project') return 1;
-          var ta = _disSortTs(a), tb = _disSortTs(b);
-          if (tb !== ta) return tb - ta;
-          return (a.title || '').localeCompare(b.title || '');
-        });
-        items.forEach(function(it) { it._searchBlob = _disBuildSearchBlob(it); });
-        window._disProducts = items;
-        window._disCatalogLoaded = true;
-        window._disCatalogLoading = false;
-        if (document.getElementById('docItemsSidebar')) filterDocSidebar();
+        })();
       }
       window._disEnsureCatalogLoaded = function() {
-        if (window._disCatalogLoaded) return;
+        if (window._disCatalogLoaded && window._disCatalogPid === loadPid) return;
         _disLoadGlobalCatalog(loadPid);
       };
 
-      // Full catalog (~12k-24k reads) only when Products tab is active (or room-prefill product pick).
-      // Project Selections already loaded above — do not block proposal Add item on catalog.
       if ((window._disFilter || '') === 'products' || String(target.roomPrefill || '').trim()) {
-        await _disLoadGlobalCatalog(loadPid);
+        _disLoadGlobalCatalog(loadPid);
       } else if (target.mode === 'selections' || window._disSelectionRail) {
         setTimeout(function() { window._disEnsureCatalogLoaded(); }, 400);
       }
-      // else: proposal / docEdit on project_selections — catalog loads when Products tab opens.
     }
 
     var _disFilterTimer = null;
@@ -42715,8 +43229,8 @@ async function renderBoardsTab(T, proj) {
       }
       var c = document.getElementById('disContent');
       if (!c) return;
-      if (filter === 'products' && !window._disCatalogLoaded && window._disCatalogLoading) {
-        c.innerHTML = '<div style="padding:28px 16px;text-align:center;color:#5C6B80;font-size:13px;">Loading full catalog\u2026</div>';
+      if (filter === 'products' && !window._disCatalogLoaded && window._disCatalogLoading && !(window._disProducts || []).length) {
+        c.innerHTML = '<div style="padding:28px 16px;text-align:center;color:#5C6B80;font-size:13px;">Loading library\u2026</div>';
         return;
       }
 
@@ -42863,13 +43377,19 @@ async function renderBoardsTab(T, proj) {
         return '<div style="padding:10px 14px 6px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:#5C6B80;background:#FAFAFA;border-bottom:1px solid #E2E2E2;">' + esc(title) + '</div>';
       }
 
-      function presetRow(icon, title, desc, rightLabel, clickAttr) {
+      function presetRow(kind, title, desc, rightLabel, clickAttr) {
+        var glyph = (typeof cchLineIconPlaceholderByKind === 'function')
+          ? cchLineIconPlaceholderByKind(kind, 36)
+          : '<div style="width:36px;height:36px;background:rgba(10,31,61,0.06);flex-shrink:0;"></div>';
         return '<div role="button" tabindex="0" onclick="' + clickAttr + '" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid #E2E2E2;cursor:pointer;" onmouseover="this.style.background=\'#FAFAFA\'" onmouseout="this.style.background=\'#fff\'">' +
-          '<div style="width:36px;height:36px;background:rgba(10,31,61,0.06);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#0A1F3D;flex-shrink:0;">' + esc(icon) + '</div>' +
+          glyph +
           '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:#0F1A2E;">' + esc(title) + '</div>' +
           '<div style="font-size:11px;color:#5C6B80;margin-top:2px;">' + esc(desc) + '</div></div>' +
           (rightLabel ? '<div style="font-size:12px;font-weight:700;color:#5FA56B;font-family:monospace;flex-shrink:0;text-align:right;">' + rightLabel + '</div>' : '<div style="font-size:10px;font-weight:600;color:#0A1F3D;flex-shrink:0;">ADD</div>') +
           '</div>';
+      }
+      function presetKind(probe) {
+        return (typeof cchLineIconKind === 'function') ? cchLineIconKind(probe) : 'default';
       }
 
       var html = '';
@@ -42880,10 +43400,10 @@ async function renderBoardsTab(T, proj) {
           var nm = String(s.name || '');
           var right = (nm.indexOf('Smart Time') >= 0 || nm.indexOf('Other Design') >= 0) ? 'Enter $' : (s.rate > 0 ? ('$' + s.rate + '/hr') : '$0/hr');
           var descShow = String(s.desc || '').trim();
-          return presetRow('DS', s.name, descShow, right, 'addSidebarServiceToDoc(\'' + escAttr(s.name) + '\',' + s.rate + ')');
+          return presetRow(presetKind({ title: s.name, expenseType: 'service', itemType: 'service', cchLineCategory: 'design_service', category: 'Design Services' }), s.name, descShow, right, 'addSidebarServiceToDoc(\'' + escAttr(s.name) + '\',' + s.rate + ')');
         }).join('');
         html += band('Design services — rate sheet') + '<div style="padding:0;min-height:0;">' + (dh || '<div style="padding:14px 16px;font-size:12px;color:#5C6B80;">No presets match search.</div>') + '</div>';
-        var rcRow = (!q || _disTokensMatch('retainer credit', q)) ? presetRow('RC', 'Retainer Credit', 'Pre-paid retainer applied as income credit (enter negative amount)', null, 'addSidebarExpenseToDoc(\'retainer_credit\',\'Retainer Credit\',\'Other:misc income retainer payment\')') : '';
+        var rcRow = (!q || _disTokensMatch('retainer credit', q)) ? presetRow(presetKind({ title: 'Retainer Credit', expenseType: 'retainer_credit', itemType: 'expense', cchLineCategory: 'expense' }), 'Retainer Credit', 'Pre-paid retainer applied as income credit (enter negative amount)', null, 'addSidebarExpenseToDoc(\'retainer_credit\',\'Retainer Credit\',\'Other:misc income retainer payment\')') : '';
         if (rcRow) html += band('Retainer credit') + '<div style="padding:0;">' + rcRow + '</div>';
       }
 
@@ -42898,13 +43418,13 @@ async function renderBoardsTab(T, proj) {
         ];
         var lh = laborPresets.filter(function(s) { return _disTokensMatch((s.name || '') + ' ' + (s.desc || ''), q); }).map(function(s) {
           var r = s.rate > 0 ? ('$' + s.rate) : '';
-          return presetRow('LB', s.name, s.desc, r || null, 'addSidebarLaborToDoc(\'' + escAttr(s.name) + '\',' + s.rate + ')');
+          return presetRow(presetKind({ title: s.name, expenseType: 'service', itemType: 'labor', cchLineCategory: 'labor', category: 'Labor' }), s.name, s.desc, r || null, 'addSidebarLaborToDoc(\'' + escAttr(s.name) + '\',' + s.rate + ')');
         }).join('');
         html += band('Labor — quick add') + '<div style="padding:0;">' + (lh || '<div style="padding:14px 16px;font-size:12px;color:#5C6B80;">No presets match search.</div>') + '</div>';
       }
 
       if (filter === 'expenses') {
-        var taxRow = (!q || _disTokensMatch('pre-paid sales tax pass-through', q)) ? presetRow('TX', 'Pre-Paid Sales Tax', 'Pass-through sales tax (enter amount)', null, 'addSidebarExpenseToDoc(\'sales_tax\',\'Pre-Paid Sales Tax\',\'Sales Tax\')') : '';
+        var taxRow = (!q || _disTokensMatch('pre-paid sales tax pass-through', q)) ? presetRow(presetKind({ title: 'Pre-Paid Sales Tax', expenseType: 'sales_tax', itemType: 'expense', cchLineCategory: 'expense' }), 'Pre-Paid Sales Tax', 'Pass-through sales tax (enter amount)', null, 'addSidebarExpenseToDoc(\'sales_tax\',\'Pre-Paid Sales Tax\',\'Sales Tax\')') : '';
         var exPresets = [
           { type: 'shipping', name: 'Freight / Shipping', desc: 'Delivery and freight charges', qb: 'Freight & Delivery' },
           { type: 'handling', name: 'Handling & Packing Fee', desc: 'Receiving, inspection, packing', qb: 'Shipping & Handling' },
@@ -42917,8 +43437,7 @@ async function renderBoardsTab(T, proj) {
           { type: 'other_expense', name: 'Other Expense', desc: 'Miscellaneous expense', qb: 'Reimbursable Expense' }
         ];
         var eh = exPresets.filter(function(e) { return _disTokensMatch((e.name || '') + ' ' + (e.desc || ''), q); }).map(function(e) {
-          var tag = { shipping: 'SH', handling: 'HD', expense: 'EX', discount: 'DC', other_expense: 'OT' }[e.type] || 'EX';
-          return presetRow(tag, e.name, e.desc, null, 'addSidebarExpenseToDoc(\'' + e.type + '\',\'' + escAttr(e.name) + '\',\'' + escAttr(e.qb) + '\')');
+          return presetRow(presetKind({ title: e.name, expenseType: e.type, itemType: 'expense', cchLineCategory: 'expense' }), e.name, e.desc, null, 'addSidebarExpenseToDoc(\'' + e.type + '\',\'' + escAttr(e.name) + '\',\'' + escAttr(e.qb) + '\')');
         }).join('');
         html += band('Tax — not service or labor') + '<div style="padding:0;">' + (taxRow || '<div style="padding:14px 16px;font-size:12px;color:#5C6B80;">No match.</div>') + '</div>';
         html += band('Expenses — quick add') + '<div style="padding:0;">' + (eh || '<div style="padding:14px 16px;font-size:12px;color:#5C6B80;">No presets match search.</div>') + '</div>';
@@ -42998,14 +43517,24 @@ async function renderBoardsTab(T, proj) {
         '</div>';
       }
 
-      function section(title, color, rows, emptyMsg) {
-        var h = '<div style="padding:8px 14px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:' + color + ';background:#FAFAFA;border-bottom:1px solid #E2E2E2;">' + esc(title) + ' (' + rows.length + ')</div>';
+      function section(title, color, rows, emptyMsg, totalCount) {
+        var n = (totalCount != null) ? totalCount : rows.length;
+        var h = '<div style="padding:8px 14px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:' + color + ';background:#FAFAFA;border-bottom:1px solid #E2E2E2;">' + esc(title) + ' (' + n + ')</div>';
         if (!rows.length) return h + '<div style="padding:14px 16px;font-size:12px;color:#5C6B80;border-bottom:1px solid #F0F0F0;">' + esc(emptyMsg) + '</div>';
         return h + '<div style="min-height:0;">' + rows.map(renderItemCard).join('') + '</div>';
       }
 
-      html += section('In this project — selections', '#C4A464', projItems, 'No matching selections for this filter.');
-      html += section('Master library & catalog', '#5C6B80', libItems, 'No catalog rows. Adjust search, open Products, or set Item type on library items.');
+      var _disRenderCap = 80;
+      var projShown = projItems.slice(0, _disRenderCap);
+      var libShown = libItems.slice(0, _disRenderCap);
+      html += section('In this project — selections', '#C4A464', projShown, 'No matching selections for this filter.', projItems.length);
+      html += section('Master library & catalog', '#5C6B80', libShown, 'No catalog rows. Adjust search, open Products, or set Item type on library items.', libItems.length);
+      if (libItems.length > _disRenderCap || projItems.length > _disRenderCap) {
+        html += '<div style="padding:12px 14px;font-size:11px;color:#5C6B80;line-height:1.45;border-top:1px solid #E2E2E2;">Showing ' + _disRenderCap + ' of ' + (projItems.length + libItems.length) + ' matches. Type in search to find a product.</div>';
+      }
+      if (!window._disCatalogLoaded && (filter === 'products' || filter === 'all')) {
+        html += '<div style="padding:8px 14px 14px;font-size:11px;color:#9E9A8F;">Loading more of the library\u2026</div>';
+      }
       if (!filtered.length && !projItems.length && !libItems.length && filter !== 'design_service' && filter !== 'labor' && filter !== 'expenses') {
         html = '<div style="padding:24px 16px;text-align:center;color:#5C6B80;font-size:13px;">Nothing matches. Adjust search or pick another tab.</div>';
       } else if (!filtered.length && !projItems.length && !libItems.length && filter === 'products') {
@@ -43691,7 +44220,10 @@ async function renderBoardsTab(T, proj) {
             clipId: c.id || '',
             taxable: (c.taxable === 'taxable' || c.taxable === true) ? true : (c.taxable === 'non-taxable' || c.taxable === false) ? false : (typeof getDefaultTaxable === 'function' ? getDefaultTaxable('product') : true)
             });
-            cchStampClipMarkupMeta(_docEdit.items[_docEdit.items.length - 1], c, window._docEditProjData);
+            var _addedSel = _docEdit.items[_docEdit.items.length - 1];
+            var _srSel = String(c.showroomVendor || '').trim();
+            if (_srSel) _addedSel.showroomVendor = _srSel;
+            cchStampClipMarkupMeta(_addedSel, c, window._docEditProjData);
           });
           docEditRenderItems();
           docEditAutoSave();
@@ -44620,6 +45152,22 @@ async function renderBoardsTab(T, proj) {
         }
         var created = [];
         var _cUser = (currentUser && currentUser.displayName) || (currentUser && currentUser.email) || 'Unknown';
+        var _srByClipId = {};
+        var _srSeen = {};
+        for (var _sri = 0; _sri < chosen.length; _sri++) {
+          var _srIt = chosen[_sri] || {};
+          if (String(_srIt.showroomVendor || '').trim()) continue;
+          var _srCid = String(_srIt.clipId || _srIt.sourceClipId || '').trim();
+          if (!_srCid || _srSeen[_srCid]) continue;
+          _srSeen[_srCid] = true;
+          try {
+            var _srSnap = await db.collection('boards').doc(st.projectId).collection('clips').doc(_srCid).get();
+            if (_srSnap.exists) {
+              var _srClip = String((_srSnap.data() || {}).showroomVendor || '').trim();
+              if (_srClip) _srByClipId[_srCid] = _srClip;
+            }
+          } catch (_eSrClip) {}
+        }
         for (var vi = 0; vi < vendors.length; vi++) {
           var vendor = vendors[vi];
           var vitems = groups[vendor];
@@ -44663,6 +45211,12 @@ async function renderBoardsTab(T, proj) {
               markupPct: item.markupPct || 0, shipping: item.shipping || 0,
               _srcKey: _poCoverageKey(item)
             }, cchLineHasAdditionalNotes(item) ? { includeAdditionalNote: true, additionalNotes: cchLineAdditionalNotesText(item) } : {});
+            var _srLine = String(item.showroomVendor || '').trim()
+              || _srByClipId[String(item.clipId || item.sourceClipId || '').trim()]
+              || '';
+            if (_srLine && _srLine.toLowerCase() !== String(vendor).toLowerCase()) {
+              poLine.showroomVendor = _srLine;
+            }
             return useInvoiceSnapshot ? poLine : cchProtectClipSourcedLine(poLine);
           });
           var nowIso = new Date().toISOString();
@@ -44679,6 +45233,15 @@ async function renderBoardsTab(T, proj) {
             activityLog: [{ action: 'po_generated', details: 'Vendor: ' + vendor + ', ' + vitems.length + ' items (item-selected' + (useInvoiceSnapshot ? ', invoice-snapshot no-library' : '') + ')', userName: _cUser, userEmail: (currentUser && currentUser.email) || '', timestamp: nowIso }],
             _poFromInvoiceSnapshot: useInvoiceSnapshot || null
           };
+          var _billFrom = '';
+          poItems.forEach(function(it) {
+            var s = String(it.showroomVendor || '').trim();
+            if (s && !_billFrom) _billFrom = s;
+          });
+          if (_billFrom && _billFrom.toLowerCase() !== String(vendor).toLowerCase()) {
+            _poDoc.billFromVendor = _billFrom;
+            _poDoc.bill = { billFromVendor: _billFrom };
+          }
           await db.collection('boards').doc(st.projectId).collection('purchaseOrders').add(typeof _stripUndefinedDeep === 'function' ? _stripUndefinedDeep(_poDoc) : _poDoc);
           created.push(vendor + ' (' + vitems.length + ' items)');
         }
@@ -47074,6 +47637,8 @@ async function renderBoardsTab(T, proj) {
                   amount: c.totalCost || c.cost || 0, imageUrl: c.imageUrl || '', description: c.description || '',
                   lineTag: (typeof cchLineTagText === 'function' ? cchLineTagText(c) : '') || String(c.lineTag || c.lineTagCode || c.fixtureTag || '').trim() || null,
                   libraryProductId: c.libraryProductId || '' };
+                var _srClipPo = String(c.showroomVendor || '').trim();
+                if (_srClipPo) _poL.showroomVendor = _srClipPo;
                 if (cchLineHasAdditionalNotes(c)) {
                   _poL.includeAdditionalNote = true;
                   _poL.additionalNotes = cchLineAdditionalNotesText(c);
@@ -47085,10 +47650,20 @@ async function renderBoardsTab(T, proj) {
                 if (c.vendor && !vendor) vendor = c.vendor;
               }
             });
-            const newDoc = await db.collection('boards').doc(projectId).collection('purchaseOrders').add(_stripUndefinedDeep({
-              number: poNum, vendor, status, total, items,
+            var _clipPoDoc = {
+              number: poNum, vendor: vendor, status: status, total: total, items: items,
               createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), _fromClips: true
-            }));
+            };
+            var _clipBillFrom = '';
+            items.forEach(function(it) {
+              var s = String(it.showroomVendor || '').trim();
+              if (s && !_clipBillFrom) _clipBillFrom = s;
+            });
+            if (_clipBillFrom && _clipBillFrom.toLowerCase() !== String(vendor).toLowerCase()) {
+              _clipPoDoc.billFromVendor = _clipBillFrom;
+              _clipPoDoc.bill = { billFromVendor: _clipBillFrom };
+            }
+            const newDoc = await db.collection('boards').doc(projectId).collection('purchaseOrders').add(_stripUndefinedDeep(_clipPoDoc));
             docData = { id: newDoc.id, number: poNum, vendor, status, total, items };
             poId = newDoc.id;
             window.location.hash = '#/project/' + projectId + '/po/' + poId;
@@ -48891,10 +49466,10 @@ async function renderBoardsTab(T, proj) {
     }
 
     /**
-     * Time Agent tab — owner always. Contractors only when Cindy adds their email to the allowlist
-     * (empty until Vanessa's desktop agent is set up).
-     * Example later: window.CCH_TIME_AGENT_CONTRACTOR_EMAILS = ['vanessa'];
+     * Time Agent tab — owner always. Contractors only when listed here.
+     * Scan/render still own-captures only (canSeeAllDesktopCaptures = owner).
      */
+    window.CCH_TIME_AGENT_CONTRACTOR_EMAILS = ['vanessa'];
     function canAccessTimeAgentTab() {
       if (isTimeAdmin()) return true;
       var allow = window.CCH_TIME_AGENT_CONTRACTOR_EMAILS;
@@ -62155,8 +62730,9 @@ async function renderBoardsTab(T, proj) {
       return 0;
     }
     function _libPrimaryProductUrl(p) {
+      if (typeof cchLineProductSourceUrl === 'function') return cchLineProductSourceUrl(p);
       if (!p) return '';
-      var list = [p.vendorUrl, p.productUrl, p.pageUrl, p.url, p.link, p.clippedFromUrl, p.sourceUrl];
+      var list = [p.vendorUrl, p.productUrl, p.pageUrl, p.url, p.link, p.clippedFromUrl, p.sourceUrl, p.houzzUrl, p.canonicalUrl];
       for (var i = 0; i < list.length; i++) {
         var s = String(list[i] || '').trim();
         if (s) return s;
@@ -64617,6 +65193,7 @@ async function renderBoardsTab(T, proj) {
 
     async function showNewProductModal(prefill) {
       try { await cchEnsureVendorsCache(false); } catch (_eVendLoad) {}
+      try { if (typeof cchPoLoadBillFromVendors === 'function') await cchPoLoadBillFromVendors(false); } catch (_eBfLoad) {}
       const p = prefill || {};
       window._prodCategoryUserEdited = false;
       window._lastProductModalPrefill = Object.assign({}, p, { images: Array.isArray(p.images) ? p.images.slice() : [] });
@@ -64634,20 +65211,24 @@ async function renderBoardsTab(T, proj) {
         if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
         return '';
       }
+      var _prodPageUrl = (typeof cchLineProductSourceUrl === 'function' ? cchLineProductSourceUrl(p) : '') || String(p.vendorUrl || p.productUrl || p.pageUrl || p.sourceUrl || p.clippedFromUrl || p.url || p.link || p.houzzUrl || '').trim();
       var _costPf = parseMoney(p.costPrice) || parseMoney(p.cost) || parseMoney(p.unitCost) || parseMoney(p.tradeCost) || '';
-      var _sellPf = parseMoney(p.sellPrice) || parseMoney(p.clientPrice) || parseMoney(p.totalSelling) || parseMoney(p.unitSellingPrice) || '';
+      var _sellPf = parseMoney(p.sellPrice) || parseMoney(p.clientPrice) || parseMoney(p.unitSellingPrice) || '';
       var _retailPf = parseMoney(p.retailPrice) || '';
       if (_costPf === 0) _costPf = '';
+      else if (_costPf !== '') _costPf = (Math.round(_costPf * 100) / 100).toFixed(2);
       if (_sellPf === 0) _sellPf = '';
+      else if (_sellPf !== '') _sellPf = (Math.round(_sellPf * 100) / 100).toFixed(2);
       if (_retailPf === 0) _retailPf = '';
+      else if (_retailPf !== '') _retailPf = (Math.round(_retailPf * 100) / 100).toFixed(2);
       var _cNum = parseFloat(_costPf) || 0;
       var _sNum = parseFloat(_sellPf) || 0;
       var _mkSaved = parseFloat(p.markupPct != null && p.markupPct !== '' ? p.markupPct : (p.markupPercent != null && p.markupPercent !== '' ? p.markupPercent : NaN));
       var _mkPf = '';
-      if (!isNaN(_mkSaved) && _mkSaved > 0) {
-        _mkPf = _mkSaved.toFixed(2);
-      } else if (_cNum > 0 && _sNum > 0) {
+      if (_cNum > 0 && _sNum > 0) {
         _mkPf = ((_sNum - _cNum) / _cNum * 100).toFixed(2);
+      } else if (!isNaN(_mkSaved) && _mkSaved > 0) {
+        _mkPf = _mkSaved.toFixed(2);
       }
       var _plIsEdit = !!(p.id || p._clipDocId);
       var _plIsClipEdit = !!(p._clipProjectId && p._clipDocId);
@@ -64726,6 +65307,10 @@ async function renderBoardsTab(T, proj) {
           '<option value="">— Select vendor —</option>' +
           _plVendorOptions.map(function(v) { return '<option value="' + escAttr(v) + '"' + (v === (p.vendor || '') ? ' selected' : '') + '>' + esc(v) + '</option>'; }).join('') +
           '</select>');
+      var _plShowroomFieldHtml = (typeof cchPoBillFromOptionsHtml === 'function')
+        ? ('<select class="form-input form-select" id="prodShowroomVendor" style="width:100%;appearance:auto;">' +
+          cchPoBillFromOptionsHtml(p.showroomVendor || '', p.vendor || '') + '</select>')
+        : ('<input class="form-input" id="prodShowroomVendor" value="' + escAttr(p.showroomVendor || '') + '" placeholder="Optional — who you buy from">');
 
       var _plCategoryFieldHtml = '<select class="form-input form-select" id="prodCategory" onchange="window._prodCategoryUserEdited=true" style="width:100%;appearance:auto;">' +
         _plLibraryFfeCategoryOptions(p.category || '') + '</select>';
@@ -64857,11 +65442,16 @@ async function renderBoardsTab(T, proj) {
                         <input class="form-input" id="prodClientTitle" value="${escAttr(p.clientTitle || '')}" placeholder="Shown on proposals — defaults to product title if empty">
                       </div>
                       <div class="form-group">
-                        <label class="form-label">Vendor</label>
+                        <label class="form-label">Vendor (manufacturer)</label>
                         <div style="display:flex;gap:6px;align-items:flex-start;">
                           <div style="flex:1;">${_plVendorFieldHtml}</div>
                           <button type="button" class="btn btn-secondary btn-sm" onclick="quickAddVendor()" style="white-space:nowrap;font-size:10px;padding:4px 8px;margin-top:0;" title="Add typed vendor to Vendors list">+ New</button>
                         </div>
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">Showroom / source</label>
+                        ${_plShowroomFieldHtml}
+                        <div style="font-size:10px;color:var(--gray-500);margin-top:4px;line-height:1.35;">Who you buy from (MyKnobs, Hardware Hut). Leave blank on the maker&apos;s own site. Same list as PO Bill-from.</div>
                       </div>
                       <div class="form-group">
                         <label class="form-label">Manufacturer</label>
@@ -64878,8 +65468,8 @@ async function renderBoardsTab(T, proj) {
                       <div class="form-group" style="grid-column:span 2;">
                         <label class="form-label">Product website</label>
                         <div style="display:flex;gap:6px;">
-                          <input class="form-input" id="prodUrl" value="${escAttr(p.vendorUrl || p.productUrl || p.clippedFromUrl || p.pageUrl || '')}" placeholder="https://\u2026" style="flex:1;">
-                          ${(p.vendorUrl || p.productUrl || p.clippedFromUrl || p.pageUrl) ? '<a href="' + escAttr(p.vendorUrl || p.productUrl || p.clippedFromUrl || p.pageUrl) + '" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="white-space:nowrap;font-size:10px;padding:4px 10px;">Open ?</a>' : ''}
+                          <input class="form-input" id="prodUrl" value="${escAttr(_prodPageUrl)}" placeholder="https://\u2026" style="flex:1;">
+                          ${_prodPageUrl ? '<a href="' + escAttr(_prodPageUrl) + '" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="white-space:nowrap;font-size:10px;padding:4px 10px;">Open ?</a>' : ''}
                           <button type="button" class="btn btn-secondary btn-sm" onclick="saveProductSpecToProjectFiles()" style="white-space:nowrap;font-size:10px;padding:4px 10px;" title="Save this URL in Project Files & Docs as a Specifications link">Save to Files</button>
                         </div>
                       </div>
@@ -64936,7 +65526,7 @@ async function renderBoardsTab(T, proj) {
                     </div>
                   </div>
                   <div class="pl-edit-panel" data-panel="accounting" style="display:none;">
-                    ${_plIsClipEdit ? `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-items:end;">
+                    ${_plIsClipEdit ? (p._linkedDocPriceBanner ? '<div style="margin-bottom:12px;padding:8px 10px;background:#F4F6FA;border:1px solid #E2E2E2;font-size:11px;color:#0F1A2E;line-height:1.4;">From <strong>' + esc(p._linkedDocPriceBanner) + '</strong> — unit cost and client price (ea.) match that line. Line sell total = qty × each.</div>' : '') + `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-items:end;">
                       <div class="form-group">
                         <label class="form-label">Selling qty</label>
                         <input class="form-input" id="prodSellQty" type="number" step="0.01" min="0" value="${(p.sellingQty != null && p.sellingQty !== '') ? escAttr(String(p.sellingQty)) : '1'}">
@@ -65290,6 +65880,7 @@ async function renderBoardsTab(T, proj) {
         title: data.title,
         clientTitle: data.clientTitle,
         vendor: data.vendor,
+        showroomVendor: data.showroomVendor,
         manufacturer: data.manufacturer,
         category: data.category,
         sku: data.sku,
@@ -65349,6 +65940,15 @@ async function renderBoardsTab(T, proj) {
         clientTitle: _gv('prodClientTitle') || null,
         vendor: (typeof ibEditReadSelectValue === 'function' ? ibEditReadSelectValue('prodVendor') : _gv('prodVendor')),
         manufacturer: _gv('prodManufacturer'),
+        showroomVendor: (function() {
+          var el = document.getElementById('prodShowroomVendor');
+          var sr = el ? String(el.value || '').trim() : '';
+          if (sr) return sr;
+          if (existingId || (window._productModalCtx && window._productModalCtx.clipDocId)) {
+            return firebase.firestore.FieldValue.delete();
+          }
+          return undefined;
+        })(),
         category: _gv('prodCategory'),
         sku: _gv('prodSku'),
         room: _roomVal || null,
@@ -65464,6 +66064,9 @@ async function renderBoardsTab(T, proj) {
             title: data.title,
             vendor: data.vendor,
             manufacturer: data.manufacturer || null,
+            showroomVendor: (typeof data.showroomVendor === 'string' && data.showroomVendor)
+              ? data.showroomVendor
+              : firebase.firestore.FieldValue.delete(),
             category: data.category,
             sku: data.sku || null,
             room: data.room || null,
@@ -65481,8 +66084,11 @@ async function renderBoardsTab(T, proj) {
             description: data.clientDescription || null,
             vendorDescription: data.vendorDescription || null,
             notes: data.description || null,
-            pageUrl: data.vendorUrl || data.productUrl || null,
-            productUrl: data.productUrl || null,
+            pageUrl: (data.vendorUrl || data.productUrl) || null,
+            productUrl: (data.productUrl || data.vendorUrl) || null,
+            vendorUrl: (data.vendorUrl || data.productUrl) || null,
+            sourceUrl: (data.vendorUrl || data.productUrl) || null,
+            clippedFromUrl: (data.vendorUrl || data.productUrl) || null,
             specUrl: data.specUrl || data.specLink || null,
             specLink: data.specUrl || data.specLink || null,
             materials: data.materials || null,
@@ -65595,6 +66201,7 @@ async function renderBoardsTab(T, proj) {
                 clientTitle: libData.clientTitle,
                 vendor: libData.vendor,
                 manufacturer: libData.manufacturer,
+                showroomVendor: libData.showroomVendor,
                 category: libData.category,
                 sku: libData.sku,
                 room: libData.room,
@@ -74293,11 +74900,11 @@ async function renderBoardsTab(T, proj) {
             '</div></div>';
           html += '<tr' + (rowCls ? ' class="' + rowCls + '"' : '') + '>' +
             '<td>' + itemInner + '</td>' +
-            '<td style="text-align:center;" class="cp-prem-money">' + _qty + '</td>' +
-            '<td class="r cp-prem-money">' + formatMoney(_unitPrice) + '</td>' +
-            '<td class="r ship cp-prem-money">' + (_ship > 0 ? formatMoney(_ship) : '<span style="color:#5C6B80;">\u2014</span>') + '</td>' +
-            '<td style="text-align:center;" class="cp-prem-money">' + (_taxable ? '<span style="color:#5C6B80;">\u2713</span>' : '\u2014') + '</td>' +
-            '<td class="r total-cell cp-prem-money" style="font-weight:600;">' + formatMoney(_lineTotal) + '</td>' +
+            '<td data-cp-label="Qty" style="text-align:center;" class="cp-prem-money">' + _qty + '</td>' +
+            '<td data-cp-label="Price" class="r cp-prem-money">' + formatMoney(_unitPrice) + '</td>' +
+            '<td data-cp-label="Shipping" class="r ship cp-prem-money">' + (_ship > 0 ? formatMoney(_ship) : '<span style="color:#5C6B80;">\u2014</span>') + '</td>' +
+            '<td data-cp-label="Tax" style="text-align:center;" class="cp-prem-money">' + (_taxable ? '<span style="color:#5C6B80;">\u2713</span>' : '\u2014') + '</td>' +
+            '<td data-cp-label="Total" class="r total-cell cp-prem-money" style="font-weight:600;">' + formatMoney(_lineTotal) + '</td>' +
             '<td class="cp-prem-decision-cell">' + decisionCell + '</td></tr>';
         }
 
@@ -74648,6 +75255,7 @@ async function renderBoardsTab(T, proj) {
         } catch (e2) {}
       }
 
+      if (activePage === 'progress') {
       try {
         var teById = {};
         var teProjectName = String((proj.name || proj.projectName || '')).trim();
@@ -74663,6 +75271,7 @@ async function renderBoardsTab(T, proj) {
           });
         });
       } catch (e) {}
+      }
 
       if (!isOwner) {
         for (var _cpi = 0; _cpi < proposals.length; _cpi++) {
@@ -74978,6 +75587,21 @@ async function renderBoardsTab(T, proj) {
         '.cp-prem-doc .cp-prem-group-row { background:#F4F6FA; font-weight:700; padding:10px 8px !important; border-bottom:1px solid #E8ECF3; font-size:11px; text-transform:uppercase; letter-spacing:2px; color:#C4A464; }' +
         '.cp-prem-doc .cp-prop-line-declined .cp-prem-item-title, .cp-prem-doc .cp-prop-line-declined .cp-prem-item-desc, .cp-prem-doc .cp-prop-line-declined .cp-prem-money { text-decoration:line-through; color:#6B7280; }' +
         '.cp-prem-doc .cp-prem-decision-cell { vertical-align:middle !important; }' +
+        '@media (max-width:900px){' +
+        '.cp-prem-doc .cp-prem-items-section{padding:14px 12px 8px;}' +
+        '.cp-prem-doc .cp-prem-items-table,.cp-prem-doc .cp-prem-items-table thead,.cp-prem-doc .cp-prem-items-table tbody,.cp-prem-doc .cp-prem-items-table tr,.cp-prem-doc .cp-prem-items-table th,.cp-prem-doc .cp-prem-items-table td,.cp-prem-doc .cp-prem-items-table colgroup,.cp-prem-doc .cp-prem-items-table col{display:block;width:100%;}' +
+        '.cp-prem-doc .cp-prem-items-table thead{display:none;}' +
+        '.cp-prem-doc .cp-prem-items-table{table-layout:auto;border-collapse:separate;border-spacing:0;}' +
+        '.cp-prem-doc .cp-prem-items-table tr{border:1px solid #E2E2E2;margin:0 0 12px;padding:12px;background:#FFFFFF;}' +
+        '.cp-prem-doc .cp-prem-items-table td{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:1px solid #F0F0F0;padding:8px 0;text-align:right !important;word-break:normal;overflow-wrap:anywhere;}' +
+        '.cp-prem-doc .cp-prem-items-table td:first-child{display:block;text-align:left !important;border-bottom:1px solid #E2E2E2;padding-bottom:12px;}' +
+        '.cp-prem-doc .cp-prem-items-table td::before{content:attr(data-cp-label);font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#5C6B80;flex-shrink:0;text-align:left;}' +
+        '.cp-prem-doc .cp-prem-items-table td:first-child::before,.cp-prem-doc .cp-prem-decision-cell::before{content:none;}' +
+        '.cp-prem-doc .cp-prem-item-grid{grid-template-columns:minmax(0,1fr) !important;}' +
+        '.cp-prem-doc .cp-prop-line-thumb img{width:100%;max-height:200px;object-fit:cover;}' +
+        '.cp-prem-doc .cp-prem-decision-cell{display:block !important;padding-top:12px;border-bottom:none;}' +
+        '.cp-prem-doc .cp-appr-toggle{display:flex !important;width:100%;}' +
+        '}' +
         '.cp-inv-card { margin-bottom: 16px; padding: 20px; }' +
         '.cp-inv-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }' +
         '.cp-inv-num { font-weight: 700; font-size: 16px; }' +
@@ -75047,7 +75671,19 @@ async function renderBoardsTab(T, proj) {
         '.cp-hours-table th,.cp-hours-table td { padding:10px 12px;border-bottom:1px solid var(--cp-border-light);font-size:12px; }' +
         '.cp-hours-table tfoot td { font-weight:700;border-top:1px solid var(--cp-border); }' +
         '.cp-prop-num-hit { cursor:pointer; color:#C4A464; font-weight:700; text-decoration:underline; text-underline-offset:2px; background:none; border:none; font:inherit; padding:0; font-family:\"Playfair Display\",Georgia,serif; font-size:16px; }' +
-        '@media (max-width: 900px) {' +
+        '@media (max-width: 1180px) {' +
+          '.cp-left-sidebar { width:148px; min-width:148px; }' +
+          '.cp-sb-logo { padding:16px 12px 18px; }' +
+          '.cp-sb-logo-top { font-size:11px; letter-spacing:0.08em; }' +
+          '.cp-sb-nav { padding:10px 0; }' +
+          '.cp-sb-item { padding:8px 10px; gap:6px; font-size:12px; }' +
+          '.cp-sb-icon { width:14px; font-size:12px; }' +
+          '.cp-sb-foot { padding:12px 10px; font-size:10px; }' +
+          '.cp-page-pad { padding:20px 16px 40px; }' +
+          '.cp-action-grid-3 { grid-template-columns:1fr !important; gap:12px; }' +
+          '.cp-rooms-grid, .cp-rooms-home-bleed .cp-rooms-grid { grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); }' +
+        '}' +
+        '@media (max-width: 640px) {' +
           '.cp-shell-row { flex-direction:column; }' +
           '.cp-left-sidebar { width:100%; min-width:0; border-right:none; border-bottom:1px solid #E2E2E2; }' +
           '.cp-sb-nav { display:flex; flex-wrap:wrap; gap:4px; padding:8px 12px; max-height:none; }' +
@@ -76039,12 +76675,12 @@ async function renderBoardsTab(T, proj) {
             var _cpGalN = (typeof cpPortalClipGalleryUrls === 'function') ? cpPortalClipGalleryUrls(c).length : 0;
             html += '<div class="cp-card cp-product-card cp-room-board-card" role="button" tabindex="0" onclick="cvShowProduct(this)"' + _cpLbAttr + ' data-title="'+escAttr(c.title||'Untitled')+'" data-vendor="'+escAttr(c.vendor||c.manufacturer||'')+'" data-price="'+(c.clientPrice||c.totalSelling||'')+'" data-img="'+_escImgSrcAttr(_cpCardImg)+'" data-sku="'+escAttr(c.sku||'')+'" data-category="'+escAttr(c.category||'')+'" data-finish="'+escAttr(c.finish||'')+'" data-dims="'+escAttr(c.dimensions||'')+'" data-room="'+escAttr(c.room||'')+'" data-clip-id="'+escAttr(c.id||'')+'" data-project-id="'+escAttr(projectId)+'" data-status="'+escAttr(getClipApprovalStatus(c))+'" data-pr="'+escAttr(c.proposalNum||c.houzzProposal||'')+'" data-inv="'+escAttr(c.invoiceNum||c.houzzInvoice||'')+'" data-po="'+escAttr(c.poNum||c.purchaseOrderNum||'')+'">' +
               '<div style="position:relative;">' +
-              (_cpCardImg ? '<img class="cp-product-img" src="'+_escImgSrcAttr(_cpCardImg)+'" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div class="cp-product-img" style="display:flex;align-items:center;justify-content:center;font-size:32px;color:#C4A464;">\u25C7</div>') +
+              (_cpCardImg ? '<img class="cp-product-img" src="'+_escImgSrcAttr(_cpCardImg)+'" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div class="cp-product-img" style="display:flex;align-items:center;justify-content:center;font-size:32px;color:#C4A464;">\u25C7</div>') +
               (_cpGalN > 1 ? '<span style="position:absolute;bottom:8px;right:8px;background:rgba(10,31,61,0.82);color:#fff;font-size:10px;font-weight:600;padding:3px 8px;letter-spacing:0.04em;">' + _cpGalN + ' photos</span>' : '') +
               '</div>' +
               '<div class="cp-product-body"><div class="cp-product-title">' + esc(c.title || 'Untitled') + '</div><div class="cp-product-vendor">' + esc(c.vendor || '') + '</div>' +
               (c.clientPrice || c.totalSelling ? '<div class="cp-product-price cp-price">' + formatMoney(parseFloat(c.clientPrice || c.totalSelling) || 0) + '</div>' : '') +
-              '<div style="margin-top:6px;">' + clipApprovalBadgeHtml(c) + '</div>' + act + clipLinkedDocPillsHtml(c, projectId, { forRoomBoard: true }) +
+              '<div style="margin-top:6px;">' + clipApprovalBadgeHtml(c) + '</div>' + act +
               '</div></div>';
           });
           html += '</div>';
@@ -76052,7 +76688,7 @@ async function renderBoardsTab(T, proj) {
         html += '</div>';
       } else {
         html += '<div class="cp-sec-label-jx" style="color:#C8A97E;">Action Required</div>';
-        html += '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin-bottom:40px;font-family:\'DM Sans\',sans-serif;" class="cp-action-grid-3">';
+        html += '<div class="cp-action-grid-3" style="margin-bottom:40px;font-family:\'DM Sans\',sans-serif;">';
         html += '<div style="border:1px solid #E2E2E2;padding:24px 28px;min-width:0;overflow:hidden;">' +
           '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">' +
           '<div style="font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:#0A1F3D;">Decisions Needed</div>' +
@@ -76211,52 +76847,18 @@ async function renderBoardsTab(T, proj) {
         html += '</div></div>';
       }
 
-      // --- Your Rooms (tile tap expands inline; "Full room page" opens dedicated room board route)
+      // --- Your Rooms (tile opens the dedicated room board page — do not dump every product image on Home)
       if (rooms.length > 0) {
         html += '<div id="cp-anchor-rooms" class="cp-section cp-section-block cp-rooms-home-bleed"><div class="cp-section-label">YOUR ROOMS</div><div class="cp-rooms-grid">';
         rooms.forEach(function(rm, ri) {
           var cover = roomCovers[rm];
           var _roomDeepHome = '#/clientview/' + projectId + '/rooms/' + encodeURIComponent(rm);
           html += '<div class="cp-card cp-room-card" onclick=' + cpPortalNavigateOnclickAttr(_roomDeepHome) + '>' +
-            (cover ? '<img class="cp-room-img" src="'+escAttr(cover)+'" onerror="this.style.display=\'none\'">' : '<div class="cp-room-img" style="display:flex;align-items:center;justify-content:center;font-size:36px;color:#C4A464;">\u25C7</div>') +
+            (cover ? '<img class="cp-room-img" src="'+escAttr(cover)+'" loading="lazy" decoding="async" onerror="this.style.display=\'none\'">' : '<div class="cp-room-img" style="display:flex;align-items:center;justify-content:center;font-size:36px;color:#C4A464;">\u25C7</div>') +
             '<div class="cp-room-overlay"><div class="cp-room-name">' + esc(rm) + '</div><div class="cp-room-count">' + byRoom[rm].length + ' item' + (byRoom[rm].length !== 1 ? 's' : '') + '</div></div>' +
           '</div>';
         });
-        html += '</div>';
-        rooms.forEach(function(rm, ri) {
-          var _rDeepH = '#/clientview/' + projectId + '/rooms/' + encodeURIComponent(rm);
-          var _list = byRoom[rm] || [];
-          html += '<div class="cp-expand-room" id="cpRoom'+ri+'">' +
-            '<div class="cp-section-label" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;">' + esc(rm) +
-            '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 10px;font-size:11px;" onclick=' + cpPortalNavigateOnclickAttr(_rDeepH) + '>Full room page</button></div>';
-          html += '<div class="cp-products-grid">';
-          _list.forEach(function(c) {
-            var _cpCardImg = cpPortalClipCardImageUrl(c);
-            var st = getClipApprovalStatus(c);
-            var act = '';
-            if (st === 'pending') {
-              act = '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;" onclick="event.stopPropagation()">' +
-                '<button type="button" class="cp-btn cp-btn-primary" style="padding:6px 12px;font-size:11px;" onclick=' + cpPortalOnclickAttr('void window.clientSetRoomBoardStatus(' + JSON.stringify(projectId) + ',' + JSON.stringify(c.id) + ',' + JSON.stringify('approved') + ')') + '>Approve</button>' +
-                '<button type="button" class="cp-btn cp-btn-outline" style="padding:6px 12px;font-size:11px;" onclick=' + cpPortalOnclickAttr('void window.clientSetRoomBoardStatus(' + JSON.stringify(projectId) + ',' + JSON.stringify(c.id) + ',' + JSON.stringify('declined') + ')') + '>Decline</button></div>';
-            } else {
-              act = '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center;" onclick="event.stopPropagation()">' +
-                '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 10px;font-size:10px;" onclick=' + cpPortalOnclickAttr('void window.clientSetRoomBoardStatus(' + JSON.stringify(projectId) + ',' + JSON.stringify(c.id) + ',' + JSON.stringify('pending') + ')') + '>Undo decision</button></div>';
-            }
-            var _cpLbAttrH = cpPortalClipLbDataAttr(c);
-            var _cpGalNH = cpPortalClipGalleryUrls(c).length;
-            html += '<div class="cp-card cp-product-card cp-room-board-card" role="button" tabindex="0" onclick="cvShowProduct(this)"' + _cpLbAttrH + ' data-title="'+escAttr(c.title||'Untitled')+'" data-vendor="'+escAttr(c.vendor||c.manufacturer||'')+'" data-price="'+(c.clientPrice||c.totalSelling||'')+'" data-img="'+_escImgSrcAttr(_cpCardImg)+'" data-sku="'+escAttr(c.sku||'')+'" data-category="'+escAttr(c.category||'')+'" data-finish="'+escAttr(c.finish||'')+'" data-dims="'+escAttr(c.dimensions||'')+'" data-room="'+escAttr(c.room||'')+'" data-clip-id="'+escAttr(c.id||'')+'" data-project-id="'+escAttr(projectId)+'" data-status="'+escAttr(getClipApprovalStatus(c))+'" data-pr="'+escAttr(c.proposalNum||c.houzzProposal||'')+'" data-inv="'+escAttr(c.invoiceNum||c.houzzInvoice||'')+'" data-po="'+escAttr(c.poNum||c.purchaseOrderNum||'')+'">' +
-              '<div style="position:relative;">' +
-              (_cpCardImg ? '<img class="cp-product-img" src="'+_escImgSrcAttr(_cpCardImg)+'" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div class="cp-product-img" style="display:flex;align-items:center;justify-content:center;font-size:32px;color:#C4A464;">\u25C7</div>') +
-              (_cpGalNH > 1 ? '<span style="position:absolute;bottom:8px;right:8px;background:rgba(10,31,61,0.82);color:#fff;font-size:10px;font-weight:600;padding:3px 8px;">' + _cpGalNH + ' photos</span>' : '') +
-              '</div>' +
-              '<div class="cp-product-body"><div class="cp-product-title">' + esc(c.title || 'Untitled') + '</div><div class="cp-product-vendor">' + esc(c.vendor || '') + '</div>' +
-              (c.clientPrice || c.totalSelling ? '<div class="cp-product-price cp-price">' + formatMoney(parseFloat(c.clientPrice || c.totalSelling) || 0) + '</div>' : '') +
-              '<div style="margin-top:6px;">' + clipApprovalBadgeHtml(c) + '</div>' + act + clipLinkedDocPillsHtml(c, projectId, { forRoomBoard: true }) +
-              '</div></div>';
-          });
-          html += '</div></div>';
-        });
-        html += '</div>';
+        html += '</div></div>';
       }
       var _cpActFeed = activity.slice().sort(function(a, b) {
         return String(b.timestamp || b.createdAt || '').localeCompare(String(a.timestamp || a.createdAt || ''));
@@ -76968,7 +77570,6 @@ async function renderBoardsTab(T, proj) {
                         <div class="cv-card-price">${c.clientPrice ? formatMoney(c.clientPrice) : (c.totalSelling ? formatMoney(c.totalSelling) : '')}</div>
                         <div class="cv-card-details">${esc(c.category || '')}${c.finish ? ' · '+esc(c.finish) : ''}${c.dimensions ? ' · '+esc(c.dimensions) : ''}</div>
                         <div style="margin-top:8px;">${clipApprovalBadgeHtml(c)}</div>
-                        ${clipLinkedDocPillsHtml(c, projectId, { forRoomBoard: true })}
                       </div>
                     </div>
                   `).join('')}
@@ -77278,11 +77879,6 @@ async function renderBoardsTab(T, proj) {
       const statusRaw = String(d.status || 'pending').toLowerCase();
       const statusLabel = statusRaw === 'approved' ? 'Approved' : (statusRaw === 'declined' ? 'Declined' : 'Pending');
       const statusColor = statusRaw === 'approved' ? '#2E7D4F' : (statusRaw === 'declined' ? '#B84545' : '#8A6A2D');
-      const docs = [
-        d.pr ? 'PR ' + d.pr : '',
-        d.inv ? 'INV ' + d.inv : '',
-        d.po ? 'PO ' + d.po : ''
-      ].filter(Boolean);
       const details = [
         d.category ? ['Category', d.category] : null,
         d.room ? ['Room', d.room] : null,
@@ -77300,8 +77896,7 @@ async function renderBoardsTab(T, proj) {
         '<div class="cv-modal-body">' +
           '<div class="cv-modal-title">' + esc(d.title) + '</div>' +
           '<div class="cv-modal-vendor">' + esc(d.vendor) + (d.sku ? ' · ' + esc(d.sku) : '') + '</div>' +
-          '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;"><span style="display:inline-block;padding:3px 10px;border:1px solid rgba(196,164,100,0.25);background:rgba(196,164,100,0.14);color:' + statusColor + ';font-size:11px;font-weight:700;text-transform:uppercase;">' + statusLabel + '</span>' +
-          (docs.length ? '<span style="font-size:11px;color:#5C6B80;">Linked: ' + esc(docs.join(' · ')) + '</span>' : '<span style="font-size:11px;color:#9CA3AF;">No linked proposal/invoice/PO yet</span>') + '</div>' +
+          '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;"><span style="display:inline-block;padding:3px 10px;border:1px solid rgba(196,164,100,0.25);background:rgba(196,164,100,0.14);color:' + statusColor + ';font-size:11px;font-weight:700;text-transform:uppercase;">' + statusLabel + '</span></div>' +
           (price ? '<div class="cv-modal-price cv-card-price">' + price + '</div>' : '') +
           (d.projectId && d.clipId ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">' +
             '<button type="button" class="cp-btn cp-btn-primary" style="padding:6px 12px;font-size:11px;" onclick="clientSetRoomBoardStatus(\'' + escAttr(d.projectId) + '\',\'' + escAttr(d.clipId) + '\',\'approved\')">Approve</button>' +
@@ -77319,6 +77914,8 @@ async function renderBoardsTab(T, proj) {
       status = String(status || '').toLowerCase().trim();
       if (!projectId || !clipId) return;
       if (status !== 'approved' && status !== 'declined' && status !== 'pending') return;
+      var card = document.querySelector('.cp-room-board-card[data-clip-id="' + String(clipId).replace(/"/g, '') + '"]');
+      var prevStatus = card ? String(card.getAttribute('data-status') || 'pending') : '';
       try {
         await db.collection('boards').doc(projectId).collection('clips').doc(clipId).update({
           clientSelectionStatus: status,
@@ -77330,11 +77927,12 @@ async function renderBoardsTab(T, proj) {
         if (modal) modal.remove();
         showToast('Selection ' + status);
         if (typeof renderClientPortal === 'function' && typeof USE_NEW_PORTAL !== 'undefined' && USE_NEW_PORTAL) {
-          await renderClientPortal(projectId);
+          void renderClientPortal(projectId);
         } else if (typeof renderClientView === 'function') {
           renderClientView(projectId);
         }
       } catch (e) {
+        if (card && prevStatus) card.setAttribute('data-status', prevStatus);
         await cchAlert('Could not update item decision: ' + (e && e.message ? e.message : e), 'Client Room Board');
       }
     };
@@ -79848,23 +80446,36 @@ async function renderBoardsTab(T, proj) {
       const data = doc.data();
       const items = data.items || [];
       if (!items[lineIdx] || (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(items[lineIdx]))) return;
+      var prevStatus = getProposalLineApprovalStatus(items[lineIdx]);
       items[lineIdx].lineApprovalStatus = 'approved';
       items[lineIdx].approved = true;
       items[lineIdx].declined = false;
-      await db.collection('boards').doc(projectId).collection('proposals').doc(propId).update({
-        items: items,
-        updatedAt: new Date().toISOString(),
-        clientApprovedTotalAt: firebase.firestore.FieldValue.delete()
+      _cchPaintClientLineApprovalToggle(projectId, propId, lineIdx, 'approved', items);
+      try {
+        await db.collection('boards').doc(projectId).collection('proposals').doc(propId).update({
+          items: items,
+          updatedAt: new Date().toISOString(),
+          clientApprovedTotalAt: firebase.firestore.FieldValue.delete()
+        });
+      } catch (eWrite) {
+        items[lineIdx].lineApprovalStatus = prevStatus;
+        items[lineIdx].approved = prevStatus === 'approved';
+        items[lineIdx].declined = prevStatus === 'declined';
+        _cchPaintClientLineApprovalToggle(projectId, propId, lineIdx, prevStatus, items);
+        if (typeof cchAlert === 'function') await cchAlert('Could not save that approval. Please try again.', 'Proposal');
+        return;
+      }
+      Promise.resolve().then(async function() {
+        try {
+          var projDoc = await db.collection('boards').doc(projectId).get();
+          var projName = projDoc.exists ? (projDoc.data().name || projectId) : projectId;
+          var itemName = items[lineIdx].title || items[lineIdx].name || 'Item';
+          var propNum = data.proposalNum || data.name || propId.substring(0, 8);
+          var lineLabel = String(lineIdx + 1);
+          await appendClientProposalActivity(projectId, propId, 'client_line_approved', 'Client approved line ' + lineLabel + ': ' + itemName);
+          await logClientPortalActivity('line_approved', 'Client approved line ' + lineLabel + ' on ' + propNum + ': ' + itemName, projectId, projName, { proposalId: propId, lineIdx: lineIdx });
+        } catch (_eAct) {}
       });
-      var projDoc = await db.collection('boards').doc(projectId).get();
-      var projName = projDoc.exists ? (projDoc.data().name || projectId) : projectId;
-      var itemName = items[lineIdx].title || items[lineIdx].name || 'Item';
-      var propNum = data.proposalNum || data.name || propId.substring(0, 8);
-      var lineLabel = String(lineIdx + 1);
-      await appendClientProposalActivity(projectId, propId, 'client_line_approved', 'Client approved line ' + lineLabel + ': ' + itemName);
-      await logClientPortalActivity('line_approved', 'Client approved line ' + lineLabel + ' on ' + propNum + ': ' + itemName, projectId, projName, { proposalId: propId, lineIdx: lineIdx });
-
-      if (USE_NEW_PORTAL) await renderClientPortal(projectId, propId); else renderClientView(projectId);
     }
 
     async function clientDeclineLine(projectId, propId, lineIdx) {
@@ -79873,23 +80484,67 @@ async function renderBoardsTab(T, proj) {
       const data = doc.data();
       const items = data.items || [];
       if (!items[lineIdx] || (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(items[lineIdx]))) return;
+      var prevStatus = getProposalLineApprovalStatus(items[lineIdx]);
       items[lineIdx].lineApprovalStatus = 'declined';
       items[lineIdx].declined = true;
       items[lineIdx].approved = false;
-      await db.collection('boards').doc(projectId).collection('proposals').doc(propId).update({
-        items: items,
-        updatedAt: new Date().toISOString(),
-        clientApprovedTotalAt: firebase.firestore.FieldValue.delete()
+      _cchPaintClientLineApprovalToggle(projectId, propId, lineIdx, 'declined', items);
+      try {
+        await db.collection('boards').doc(projectId).collection('proposals').doc(propId).update({
+          items: items,
+          updatedAt: new Date().toISOString(),
+          clientApprovedTotalAt: firebase.firestore.FieldValue.delete()
+        });
+      } catch (eWrite) {
+        items[lineIdx].lineApprovalStatus = prevStatus;
+        items[lineIdx].approved = prevStatus === 'approved';
+        items[lineIdx].declined = prevStatus === 'declined';
+        _cchPaintClientLineApprovalToggle(projectId, propId, lineIdx, prevStatus, items);
+        if (typeof cchAlert === 'function') await cchAlert('Could not save that decline. Please try again.', 'Proposal');
+        return;
+      }
+      Promise.resolve().then(async function() {
+        try {
+          var projDoc = await db.collection('boards').doc(projectId).get();
+          var projName = projDoc.exists ? (projDoc.data().name || projectId) : projectId;
+          var itemName = items[lineIdx].title || items[lineIdx].name || 'Item';
+          var propNum = data.proposalNum || data.name || propId.substring(0, 8);
+          var lineLabel = String(lineIdx + 1);
+          await appendClientProposalActivity(projectId, propId, 'client_line_declined', 'Client declined line ' + lineLabel + ': ' + itemName);
+          await logClientPortalActivity('line_declined', 'Client declined line ' + lineLabel + ' on ' + propNum + ': ' + itemName, projectId, projName, { proposalId: propId, lineIdx: lineIdx });
+        } catch (_eAct) {}
       });
-      var projDoc = await db.collection('boards').doc(projectId).get();
-      var projName = projDoc.exists ? (projDoc.data().name || projectId) : projectId;
-      var itemName = items[lineIdx].title || items[lineIdx].name || 'Item';
-      var propNum = data.proposalNum || data.name || propId.substring(0, 8);
-      var lineLabel = String(lineIdx + 1);
-      await appendClientProposalActivity(projectId, propId, 'client_line_declined', 'Client declined line ' + lineLabel + ': ' + itemName);
-      await logClientPortalActivity('line_declined', 'Client declined line ' + lineLabel + ' on ' + propNum + ': ' + itemName, projectId, projName, { proposalId: propId, lineIdx: lineIdx });
+    }
 
-      if (USE_NEW_PORTAL) await renderClientPortal(projectId, propId); else renderClientView(projectId);
+    function _cchPaintClientLineApprovalToggle(projectId, propId, lineIdx, status, items) {
+      var wrap = document.querySelector('[data-cch-cp-appr-idx="' + lineIdx + '"]');
+      var tr = wrap && wrap.closest ? wrap.closest('tr') : null;
+      if (wrap && wrap.parentNode) {
+        wrap.parentNode.innerHTML = cpProposalLineApprovalToggleHtml(projectId, propId, lineIdx, status);
+      }
+      if (tr) {
+        if (status === 'declined') tr.classList.add('cp-prop-line-declined');
+        else tr.classList.remove('cp-prop-line-declined');
+      }
+      var pending = 0, approved = 0;
+      (items || []).forEach(function(it) {
+        if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it)) return;
+        var s = typeof getProposalLineApprovalStatus === 'function' ? getProposalLineApprovalStatus(it) : 'pending';
+        if (s === 'approved') approved++;
+        else if (s !== 'declined') pending++;
+      });
+      var canFinal = pending === 0 && approved > 0;
+      document.querySelectorAll('.cv-approve-btn').forEach(function(btn) {
+        if (canFinal) {
+          btn.style.opacity = '';
+          btn.style.pointerEvents = '';
+          btn.removeAttribute('disabled');
+        } else {
+          btn.style.opacity = '0.45';
+          btn.style.pointerEvents = 'none';
+          btn.setAttribute('disabled', 'disabled');
+        }
+      });
     }
 
     window.clientApproveProposal = clientApproveProposal;
@@ -80754,6 +81409,11 @@ async function renderBoardsTab(T, proj) {
       var doc = await db.collection('boards').doc(projectId).collection('clips').doc(clipId).get();
       if (!doc.exists) { showToast('Product not found', 'error'); return; }
       var clip = { id: doc.id, ...doc.data() };
+      try {
+        if (typeof enrichClipsWithProjectDocLinks === 'function') {
+          await enrichClipsWithProjectDocLinks(projectId, [clip], {});
+        }
+      } catch (_eEnrichClip) {}
 
       var boardName = '';
       var roomListForModal = [];
@@ -80777,6 +81437,9 @@ async function renderBoardsTab(T, proj) {
       var libProduct = typeof _libFindProductForClip === 'function' ? _libFindProductForClip(clip) : null;
 
       var _specOpen = _clipSpecUrlFromDoc(clip);
+      var _clipPageUrl = (typeof cchLineProductSourceUrl === 'function')
+        ? cchLineProductSourceUrl(clip)
+        : String(clip.productUrl || clip.pageUrl || clip.sourceUrl || clip.clippedFromUrl || clip.vendorUrl || clip.url || clip.link || '').trim();
       function clipPrefillGallery(libProduct) {
         // Use clip gallery only — do not follow libraryProductId redirect inside _normalizeClipImagesForTear
         var _imgNorm = _normalizeClipImagesForTear(Object.assign({}, clip, { libraryProductId: null, linkedLibraryProductId: null }));
@@ -80792,7 +81455,7 @@ async function renderBoardsTab(T, proj) {
           _heroIdx = Math.max(0, Math.min(parseInt(lp.heroImageIndex, 10) || 0, Math.max(0, _imgs.length - 1)));
         }
         if (!_imgs.length) {
-          var _clipBaseFb = String(clip.productUrl || clip.pageUrl || clip.vendorUrl || clip.clippedFromUrl || '').trim();
+          var _clipBaseFb = _clipPageUrl || String(clip.productUrl || clip.pageUrl || clip.vendorUrl || clip.clippedFromUrl || clip.sourceUrl || '').trim();
           var _fb = _resolveImgSrc(String(clip.imageUrl || '').trim(), _clipBaseFb);
           if (_fb) { _imgs = [_fb]; _heroUrl = _fb; _heroIdx = 0; }
         }
@@ -80803,24 +81466,36 @@ async function renderBoardsTab(T, proj) {
 
       if (libProduct) {
         var gLib = clipPrefillGallery(libProduct);
+        var _libPageUrl = (typeof cchLineProductSourceUrl === 'function') ? cchLineProductSourceUrl(libProduct) : String(libProduct.productUrl || libProduct.vendorUrl || '').trim();
+        var _winUrl = _clipPageUrl || _libPageUrl;
         var _clipWins = {
           title: clip.title || libProduct.title || '',
           sku: clip.sku || libProduct.sku || '',
           category: clip.category || libProduct.category || '',
           vendor: clip.vendor || libProduct.vendor || '',
           manufacturer: clip.manufacturer || libProduct.manufacturer || '',
-          productUrl: clip.productUrl || clip.pageUrl || libProduct.productUrl || '',
-          vendorUrl: clip.vendorUrl || clip.pageUrl || clip.productUrl || libProduct.vendorUrl || '',
+          showroomVendor: clip.showroomVendor || '',
+          productUrl: _winUrl,
+          vendorUrl: _winUrl,
+          pageUrl: clip.pageUrl || _winUrl,
+          sourceUrl: clip.sourceUrl || '',
+          clippedFromUrl: clip.clippedFromUrl || '',
+          url: clip.url || '',
+          link: clip.link || '',
+          houzzUrl: clip.houzzUrl || '',
+          canonicalUrl: clip.canonicalUrl || '',
           room: clip.room || libProduct.room || '',
           costPrice: parseMoney(clip.unitCost || clip.cost) || libProduct.costPrice,
           sellPrice: parseMoney(clip.clientPrice || clip.unitSellingPrice) || libProduct.sellPrice,
+          sellingQty: clip.qty || clip.sellingQuantity || 1,
+          markupPct: clip.markupPct,
           clientDescription: clip.clientDescription || clip.description || libProduct.clientDescription || '',
           description: clip.notes || clip.description || libProduct.description || '',
           dimensions: clip.dimensions || libProduct.dimensions || '',
           finish: clip.finish || libProduct.finish || '',
           materials: clip.materials || libProduct.materials || ''
         };
-        showNewProductModal(Object.assign({}, libProduct, _clipWins, {
+        showNewProductModal(cchPrefillFromLinkedDocPricing(clip, Object.assign({}, libProduct, _clipWins, {
           imageUrl: gLib.heroUrl || libProduct.imageUrl || '',
           images: gLib.imgs.length ? gLib.imgs : _coerceGalleryUrlList(libProduct).slice(),
           heroImageIndex: gLib.imgs.length ? gLib.heroIdx : (parseInt(libProduct.heroImageIndex, 10) || 0),
@@ -80832,7 +81507,7 @@ async function renderBoardsTab(T, proj) {
           __modalTitle: 'Edit room board item',
           _clipProjectId: projectId,
           _clipDocId: clipId
-        }));
+        })));
         return;
       }
 
@@ -80842,13 +81517,14 @@ async function renderBoardsTab(T, proj) {
         title: clip.title || '',
         vendor: clip.vendor || '',
         manufacturer: clip.manufacturer || '',
+        showroomVendor: clip.showroomVendor || '',
         category: clip.category || '',
         sku: clip.sku || '',
         imageUrl: gClip.heroUrl || clip.imageUrl || '',
         images: gClip.imgs,
         heroImageIndex: gClip.imgs.length ? gClip.heroIdx : 0,
         costPrice: parseMoney(clip.unitCost || clip.cost) || null,
-        sellPrice: parseMoney(clip.clientPrice || clip.unitSellingPrice || clip.totalSelling) || null,
+        sellPrice: parseMoney(clip.clientPrice || clip.unitSellingPrice) || null,
         retailPrice: parseMoney(clip.retailPrice) || null,
         markupPct: clip.markupPct,
         sellingQty: clip.qty || clip.sellingQuantity || 1,
@@ -80858,8 +81534,15 @@ async function renderBoardsTab(T, proj) {
         dimensions: clip.dimensions || '',
         finish: clip.finish || '',
         materials: clip.materials || '',
-        vendorUrl: clip.vendorUrl || clip.productUrl || clip.pageUrl || '',
-        productUrl: clip.productUrl || clip.pageUrl || '',
+        vendorUrl: _clipPageUrl,
+        productUrl: _clipPageUrl,
+        pageUrl: clip.pageUrl || _clipPageUrl,
+        sourceUrl: clip.sourceUrl || '',
+        clippedFromUrl: clip.clippedFromUrl || '',
+        url: clip.url || '',
+        link: clip.link || '',
+        houzzUrl: clip.houzzUrl || '',
+        canonicalUrl: clip.canonicalUrl || '',
         specUrl: _specOpen,
         specLink: _specOpen || String(clip.specLink || clip.specUrl || '').trim(),
         room: clip.room || '',
@@ -80870,7 +81553,7 @@ async function renderBoardsTab(T, proj) {
         _clipProjectId: projectId,
         _clipDocId: clipId
       };
-      showNewProductModal(prefill);
+      showNewProductModal(typeof cchPrefillFromLinkedDocPricing === 'function' ? cchPrefillFromLinkedDocPricing(clip, prefill) : prefill);
       return;
 
       // ===== LEGACY CLIP DETAIL BELOW (kept for reference) =====
@@ -81204,7 +81887,12 @@ async function renderBoardsTab(T, proj) {
 
     async function saveClipDetail(projectId, clipId) {
       const _val = function(id) { var el = document.getElementById(id); return el ? el.value.trim() || null : null; };
-      const _num = function(id) { var el = document.getElementById(id); var v = el ? parseFloat(el.value) : NaN; return isNaN(v) ? null : v; };
+      const _num = function(id) {
+        var el = document.getElementById(id);
+        if (!el) return null;
+        var v = parseFloat(String(el.value).replace(/[$,\s]/g, ''));
+        return isNaN(v) ? null : v;
+      };
 
       const updates = {
         title: _val('cdTitle'),
@@ -81214,10 +81902,10 @@ async function renderBoardsTab(T, proj) {
         status: _val('cdStatus'),
         // Pricing
         qty: _num('cdQty'),
-        cost: _val('cdCost'),
+        cost: _num('cdCost'),
         markupPct: _num('cdMarkup'),
-        shipping: _val('cdShipping'),
-        clientPrice: _val('cdClientPrice'),
+        shipping: _num('cdShipping'),
+        clientPrice: _num('cdClientPrice'),
         taxable: _val('cdTaxable'),
         // Purchase
         purchaseQuantity: _num('cdPurchaseQty'),
@@ -81245,9 +81933,9 @@ async function renderBoardsTab(T, proj) {
 
       // Calculate and save totalSelling so downstream consumers get correct values
       const savedQty = _num('cdQty') || 1;
-      const savedClientPrice = parseFloat(_val('cdClientPrice')) || 0;
+      const savedClientPrice = _num('cdClientPrice') || 0;
       updates.totalSelling = (savedClientPrice * savedQty).toFixed(2);
-      updates.sellPrice = _val('cdClientPrice'); // normalize sell price field too
+      updates.sellPrice = _num('cdClientPrice'); // WO-118: number, same as clientPrice
 
       if (window._cdImgState && Array.isArray(window._cdImgState.images)) {
         updates.images = window._cdImgState.images.slice();
@@ -84466,10 +85154,45 @@ async function renderBoardsTab(T, proj) {
 
     function _specBookNn(v) { return (v && String(v) !== 'null' ? String(v).trim() : ''); }
 
+    function _specBookPushDoc(docs, name, url, type) {
+      url = String(url || '').trim();
+      if (!url || !/^https?:\/\//i.test(url)) return;
+      if (docs.some(function(d) { return d.url === url; })) return;
+      docs.push({ name: name || 'Document', url: url, type: type || 'file' });
+    }
+
+    function _specBookLineTag(src, clip) {
+      var t = '';
+      if (typeof cchLineTagText === 'function') {
+        t = cchLineTagText(src) || (clip ? cchLineTagText(clip) : '') || '';
+      }
+      if (!t && src) {
+        t = String(src.lineTag || src.lineTagCode || src.fixtureTag || src.itemCode || src.tag || '').trim();
+      }
+      if (!t && clip) {
+        t = String(clip.lineTag || clip.lineTagCode || clip.fixtureTag || clip.itemCode || clip.tag || '').trim();
+      }
+      if (/^\d{4}-\d{2}-\d{2}\b/.test(t)) t = '';
+      return t;
+    }
+
     function _specBookDocsFromProduct(c) {
       var docs = [];
       var su = (typeof _clipSpecUrlFromDoc === 'function') ? _clipSpecUrlFromDoc(c) : String((c && (c.specUrl || c.specLink)) || '').trim();
-      if (su) docs.push({ name: 'Specification', url: su, type: 'spec' });
+      if (su) _specBookPushDoc(docs, 'Specification', su, 'spec');
+      var pd = c && c.productDocs;
+      if (Array.isArray(pd)) {
+        pd.forEach(function(d) {
+          if (d == null) return;
+          if (typeof d === 'string') {
+            _specBookPushDoc(docs, 'Document', d, 'file');
+            return;
+          }
+          var url = String(d.url || d.href || d.specUrl || '').trim();
+          var name = String(d.label || d.name || d.type || 'Document').trim() || 'Document';
+          _specBookPushDoc(docs, name, url, d.type || 'file');
+        });
+      }
       return docs;
     }
 
@@ -84483,6 +85206,7 @@ async function renderBoardsTab(T, proj) {
         vendor: c.vendor || c.manufacturer || '',
         sku: _specBookNn(c.sku) || _specBookNn(c.itemCode) || '',
         modelNum: _specBookNn(c.modelNum) || _specBookNn(c.model) || _specBookNn(c.sku) || '',
+        lineTag: _specBookLineTag(c),
         upc: c.upc || '',
         category: c.category || '',
         room: c.room || c.roomName || '',
@@ -84518,6 +85242,7 @@ async function renderBoardsTab(T, proj) {
           vendor: it.vendor || clip.vendor || clip.manufacturer || '',
           sku: _specBookNn(it.sku) || _specBookNn(clip.sku) || '',
           modelNum: _specBookNn(it.modelNum) || _specBookNn(it.sku) || _specBookNn(clip.modelNum) || _specBookNn(clip.sku) || '',
+          lineTag: _specBookLineTag(it, clip),
           room: it.room || clip.room || clip.roomName || '',
           category: it.category || clip.category || '',
           _source: 'invoice',
@@ -84540,6 +85265,7 @@ async function renderBoardsTab(T, proj) {
         vendor: it.vendor || '',
         sku: _specBookNn(it.sku) || '',
         modelNum: _specBookNn(it.modelNum) || _specBookNn(it.sku) || '',
+        lineTag: _specBookLineTag(it),
         upc: it.upc || '',
         category: it.category || '',
         room: it.room || '',
@@ -84595,6 +85321,24 @@ async function renderBoardsTab(T, proj) {
     }
     window._specBookGetWorkingItems = _specBookGetWorkingItems;
 
+    function _specBookInvoiceLineIsProduct(it) {
+      if (!it || typeof it !== 'object') return false;
+      if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it)) return false;
+      if (typeof cchInvoiceLineIsCreditType === 'function' && cchInvoiceLineIsCreditType(it)) return false;
+      var et = String(it.expenseType || '').toLowerCase();
+      if (et === 'discount' || et === 'retainer_credit') return false;
+      if (typeof invoiceLineIsDesignServicesNoMarkup === 'function' && invoiceLineIsDesignServicesNoMarkup(it)) return false;
+      if (typeof _tearSheetLineIsProduct === 'function') return _tearSheetLineIsProduct(it, 'invoices');
+      if (typeof _disRowIsRoomBoardProduct === 'function') return _disRowIsRoomBoardProduct(it);
+      return true;
+    }
+
+    function _specBookInvoiceIsProductDoc(inv, rawItems) {
+      if (typeof window.cchInvoiceUsesDesignServicesLayout === 'function' && window.cchInvoiceUsesDesignServicesLayout(inv, rawItems)) return false;
+      if (typeof window.cchIsPureDesignServicesInvoice === 'function' && window.cchIsPureDesignServicesInvoice(rawItems)) return false;
+      return true;
+    }
+
     async function _gatherSpecBookData(projId) {
       let clips = [], ideabooks = [];
       try {
@@ -84629,20 +85373,6 @@ async function renderBoardsTab(T, proj) {
         if (key) seen.add(key);
         items.push(_specBookItemFromClip(p, { id: p.id, _source: 'library' }));
       }
-      // Attach existing file docs per item
-      try {
-        const fs = await db.collection('boards').doc(projId).collection('files').get();
-        fs.forEach(d => {
-          const f = d.data();
-          // Try matching by room or item reference
-          items.forEach(it => {
-            if (f.itemId === it.id || (f.room && f.room === it.room && f.category === 'Specifications')) {
-              it.docs.push({ id: d.id, name: f.name || f.fileName || 'Document', url: f.url || f.downloadUrl || '', type: f.type || 'file' });
-              it.hasSpec = true;
-            }
-          });
-        });
-      } catch(e) {}
 
       // Invoices → line items correlated to clips / specUrl (v2.1 primary source)
       var invoices = [];
@@ -84655,16 +85385,14 @@ async function renderBoardsTab(T, proj) {
             : String(inv.invoiceNum || inv.number || d.id).trim();
           var rawItems = inv.items || inv.lineItems || inv.products || inv.lines || [];
           if (!Array.isArray(rawItems)) rawItems = [];
+          if (!_specBookInvoiceIsProductDoc(inv, rawItems)) return;
           var invMeta = { id: d.id, number: num };
           var lines = [];
           rawItems.forEach(function(it, idx) {
-            if (!it || typeof it !== 'object') return;
-            // Skip credit / retainer deduction rows only — keep products + fees that may have specs
-            if (typeof cchInvoiceLineIsCreditType === 'function' && cchInvoiceLineIsCreditType(it)) return;
-            var et = String(it.expenseType || '').toLowerCase();
-            if (et === 'discount' || et === 'retainer_credit') return;
+            if (!_specBookInvoiceLineIsProduct(it)) return;
             lines.push(_specBookItemFromInvoiceLine(it, invMeta, clipById, idx));
           });
+          if (!lines.length) return;
           invoices.push({
             id: d.id,
             number: num,
@@ -84678,6 +85406,31 @@ async function renderBoardsTab(T, proj) {
           return String(b.number || '').localeCompare(String(a.number || ''), undefined, { numeric: true, sensitivity: 'base' });
         });
       } catch (_eInv) {}
+
+      // Attach uploaded spec files to clips AND invoice lines (itemId / clipId)
+      try {
+        const fs = await db.collection('boards').doc(projId).collection('files').get();
+        var _sbAll = items.slice();
+        invoices.forEach(function(inv) {
+          (inv.lines || []).forEach(function(ln) { _sbAll.push(ln); });
+        });
+        fs.forEach(d => {
+          const f = d.data() || {};
+          const fUrl = String(f.url || f.downloadUrl || '').trim();
+          if (!fUrl) return;
+          const fid = String(f.itemId || '').trim();
+          const fclip = String(f.clipId || '').trim();
+          _sbAll.forEach(it => {
+            if (!it.docs) it.docs = [];
+            var match = (fid && (fid === it.id || fid === it.clipId)) || (fclip && it.clipId && fclip === it.clipId);
+            if (!match && f.room && f.room === it.room && String(f.category || '') === 'Specifications') match = true;
+            if (!match) return;
+            if (it.docs.some(function(doc) { return doc.url === fUrl; })) return;
+            it.docs.push({ id: d.id, name: f.name || f.fileName || 'Document', url: fUrl, type: f.type || 'file' });
+            it.hasSpec = true;
+          });
+        });
+      } catch(e) {}
 
       // Extract available rooms and categories
       const rooms = [...new Set(items.map(i => i.room).filter(Boolean))].sort();
@@ -84693,7 +85446,7 @@ async function renderBoardsTab(T, proj) {
       }
       const sb = window._specBook;
       // Gather data on first load / project change / schema bump (must include invoices[])
-      var _sbDataVer = 2;
+      var _sbDataVer = 4;
       if (!window._specBookData || window._specBookDataProjId !== proj.id || window._specBookDataVer !== _sbDataVer || !Array.isArray(window._specBookData.invoices)) {
         window._specBookData = await _gatherSpecBookData(proj.id);
         window._specBookDataProjId = proj.id;
@@ -84792,7 +85545,7 @@ async function renderBoardsTab(T, proj) {
     function _specBookStep1(data, sb) {
       var html = '<div style="max-width:720px;">';
       html += '<h2 style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:28px;font-weight:600;color:#0F1A2E;margin-bottom:6px;">Select Source</h2>';
-      html += '<p style="font-size:14px;color:#6B6760;margin-bottom:20px;">Pull products from an invoice, pick from project Selections, or group by room / category.</p>';
+      html += '<p style="font-size:14px;color:#6B6760;margin-bottom:20px;">Pull products from a <strong>product invoice</strong> (design-services invoices are omitted), pick from project Selections, or group by room / category.</p>';
 
       var modes = [
         { t: 'invoice', label: 'Invoice' },
@@ -84814,9 +85567,9 @@ async function renderBoardsTab(T, proj) {
       var selCount = (data.items || []).filter(function(i) { return i._source === 'clips' || i._source === 'selections'; }).length;
 
       if (sb.sourceType === 'invoice') {
-        html += '<p style="font-size:13px;color:#6B6760;margin:0 0 12px;">Click an invoice to <strong>open its line items</strong> (linked product specs when available). Or check several, then Next.</p>';
+        html += '<p style="font-size:13px;color:#6B6760;margin:0 0 12px;">Click a <strong>product invoice</strong> to open its furnishings. Design-services / hours invoices are not listed.</p>';
         if (!invList.length) {
-          html += '<div style="padding:28px;text-align:center;color:#9E9A8F;font-size:14px;border:1px solid #e8e6e0;">No invoices on this project yet. Use <strong>Selections</strong> to pick items manually, or create an invoice first.</div>';
+          html += '<div style="padding:28px;text-align:center;color:#9E9A8F;font-size:14px;border:1px solid #e8e6e0;">No product invoices on this project. Design-services invoices are omitted. Use <strong>Selections</strong> to pick items, or create a product invoice first.</div>';
         } else {
           var allInv = invList.length > 0 && invList.every(function(inv) { return sb.selectedSources.indexOf(inv.id) >= 0; });
           html += '<label style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #e8e6e0;margin-bottom:4px;cursor:pointer;font-size:13px;font-weight:600;color:#0F1A2E;">' +
@@ -84971,7 +85724,7 @@ async function renderBoardsTab(T, proj) {
     function _specBookStep2(data, sb) {
       const filtered = _specBookGetWorkingItems(data, sb);
       const search = (sb.search || '').toLowerCase();
-      const visible = search ? filtered.filter(i => (i.title+i.vendor+i.sku+i.room+i.category+(i._invoiceNum||'')).toLowerCase().includes(search)) : filtered;
+      const visible = search ? filtered.filter(i => (i.title+i.vendor+i.sku+i.room+i.category+(i.lineTag||'')+(i._invoiceNum||'')).toLowerCase().includes(search)) : filtered;
       const allSelected = visible.length > 0 && visible.every(i => sb.selectedItems.includes(i.id));
       const selectedCount = visible.filter(i => sb.selectedItems.includes(i.id)).length;
 
@@ -85020,6 +85773,7 @@ async function renderBoardsTab(T, proj) {
           html += '<div style="padding:12px 14px;">';
           html += '<div style="font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#0F1A2E;margin-bottom:2px;">' + esc(item.vendor || 'Unknown Vendor') + '</div>';
           html += '<div style="font-size:13px;color:#0F1A2E;font-weight:500;margin-bottom:4px;line-height:1.3;">' + esc(item.title || 'Untitled') + '</div>';
+          if (item.lineTag) html += '<div style="font-size:11px;color:#0F1A2E;font-weight:700;letter-spacing:0.6px;margin-bottom:2px;">TAG #: <span style="color:#C9A96E;">' + esc(item.lineTag) + '</span></div>';
           if (item.modelNum || item.sku) html += '<div style="font-size:11px;color:#9E9A8F;">MODEL #: <span style="font-weight:600;color:#6B6760;">' + esc(item.modelNum || item.sku) + '</span></div>';
           if (item.upc) html += '<div style="font-size:11px;color:#9E9A8F;">UPC #: <span style="font-weight:600;color:#6B6760;">' + esc(item.upc) + '</span></div>';
           // Qty
@@ -85055,6 +85809,7 @@ async function renderBoardsTab(T, proj) {
           html += '<div style="font-size:13px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#0F1A2E;">' + esc(item.vendor || 'Unknown Vendor') + '</div>';
           html += '<div style="font-size:14px;color:#0F1A2E;font-weight:500;margin:2px 0;">' + esc(item.title || 'Untitled') + '</div>';
           let meta = [];
+          if (item.lineTag) meta.push('TAG #: ' + esc(item.lineTag));
           if (item.modelNum || item.sku) meta.push('MODEL #: ' + esc(item.modelNum || item.sku));
           if (item.upc) meta.push('UPC #: ' + esc(item.upc));
           if (meta.length) html += '<div style="font-size:11px;color:#9E9A8F;margin-top:2px;">' + meta.join(' &nbsp;\u00B7&nbsp; ') + '</div>';
@@ -85090,7 +85845,7 @@ async function renderBoardsTab(T, proj) {
       const data = window._specBookData;
       const filtered = _specBookGetWorkingItems(data, sb);
       const search = (sb.search || '').toLowerCase();
-      const visible = search ? filtered.filter(i => (i.title+i.vendor+i.sku+i.room+i.category+(i._invoiceNum||'')).toLowerCase().includes(search)) : filtered;
+      const visible = search ? filtered.filter(i => (i.title+i.vendor+i.sku+i.room+i.category+(i.lineTag||'')+(i._invoiceNum||'')).toLowerCase().includes(search)) : filtered;
       if (checked) {
         visible.forEach(i => { if (!sb.selectedItems.includes(i.id)) sb.selectedItems.push(i.id); });
       } else {
@@ -85181,7 +85936,7 @@ async function renderBoardsTab(T, proj) {
           item.hasSpec = true;
           await db.collection('boards').doc(projId).collection('files').add({
             name: file.name, url: url, type: file.type, category: 'Specifications',
-            itemId: itemId, room: item.room, uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
+            itemId: itemId, clipId: item.clipId || '', room: item.room, uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
           });
         } catch(e) { showToast('Upload failed: ' + e.message, 'error'); }
       }
@@ -85258,7 +86013,7 @@ async function renderBoardsTab(T, proj) {
           if (item.imageUrl) html += '<img src="' + esc(item.imageUrl) + '" style="max-width:44px;max-height:44px;object-fit:contain;" onerror="this.parentElement.innerHTML=\'??\'">';
           else html += '\u25C7';
           html += '</div>';
-          html += '<div style="flex:1;"><div style="font-size:13px;font-weight:600;color:#0F1A2E;">' + esc(item.title || 'Untitled') + '</div>';
+          html += '<div style="flex:1;"><div style="font-size:13px;font-weight:600;color:#0F1A2E;">' + (item.lineTag ? '<span style="color:#C9A96E;margin-right:8px;">' + esc(item.lineTag) + '</span>' : '') + esc(item.title || 'Untitled') + '</div>';
           html += '<div style="font-size:11px;color:#9E9A8F;">' + esc(item.vendor) + (item.sku ? ' · ' + esc(item.sku) : '') + '</div></div>';
           if (hasDocs) {
             html += '<div style="font-size:12px;color:#0F1A2E;font-weight:600;">' + item.docs.length + ' docs</div>';
@@ -85356,12 +86111,98 @@ async function renderBoardsTab(T, proj) {
     }
     window._specBookConfirmExport = _specBookConfirmExport;
 
-    function _specBookExport(mode) {
+    function _specBookDocIsImage(doc) {
+      var t = String((doc && doc.type) || '').toLowerCase();
+      var n = String((doc && (doc.name || doc.url)) || '').toLowerCase();
+      if (t.indexOf('image/') === 0) return true;
+      return /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i.test(n);
+    }
+    function _specBookDocIsPdf(doc) {
+      var t = String((doc && doc.type) || '').toLowerCase();
+      var n = String((doc && (doc.name || doc.url)) || '').toLowerCase();
+      if (t.indexOf('pdf') >= 0) return true;
+      return /\.pdf(\?|#|$)/i.test(n);
+    }
+    async function _specBookPdfPagesAsImages(url) {
+      url = String(url || '').trim();
+      if (!url) return [];
+      var pdfjs = (typeof cpPortalEnsurePdfJs === 'function') ? await cpPortalEnsurePdfJs() : null;
+      if (!pdfjs) return [];
+      var pdf = null;
+      try {
+        if (typeof cpPortalLoadPdfBytes === 'function') {
+          var bytes = await cpPortalLoadPdfBytes(url);
+          if (bytes) pdf = await pdfjs.getDocument({ data: bytes }).promise;
+        }
+      } catch (_eBytes) {}
+      if (!pdf) {
+        pdf = await pdfjs.getDocument({ url: url, withCredentials: false, disableRange: true, disableStream: true }).promise;
+      }
+      var out = [];
+      var n = pdf.numPages || 0;
+      for (var p = 1; p <= n; p++) {
+        var page = await pdf.getPage(p);
+        var viewport = page.getViewport({ scale: 2 });
+        var canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
+        out.push(canvas.toDataURL('image/jpeg', 0.86));
+      }
+      return out;
+    }
+    function _specBookExportDocPage(projName, gName, today, item, caption, innerHtml, pageNum) {
+      var tagBit = item.lineTag ? esc(item.lineTag) + ' · ' : '';
+      return '<div class="page" style="display:flex;flex-direction:column;">' +
+        '<div class="page-header"><div class="logo-block"><div class="logo-cch">CCH</div><div class="logo-sub">Design Inc.</div></div>' +
+        '<div class="project-info"><div class="proj-name">' + esc(projName) + '</div><div class="proj-meta">' + tagBit + esc(gName) + ' · ' + today + '</div></div></div>' +
+        '<div class="page-body" style="flex:1;min-height:0;padding:12px 20px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;">' +
+        (caption ? '<div style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#9E9A8F;margin-bottom:8px;align-self:flex-start;">' + esc(caption) + (item.lineTag ? ' · TAG ' + esc(item.lineTag) : '') + '</div>' : '') +
+        innerHtml +
+        '</div>' +
+        '<div class="page-footer"><span>CCH Design Inc. · www.cchdesign.com · (949) 497-7979</span><span>Page ' + pageNum + '</span></div></div>';
+    }
+    async function _specBookSupportingDocPages(item, projName, gName, today, pageNum) {
+      var html = '';
+      var docs = (item && item.docs) || [];
+      for (var di = 0; di < docs.length; di++) {
+        var doc = docs[di];
+        var url = String(doc.url || '').trim();
+        if (!url) continue;
+        var caption = doc.name || 'Technical document';
+        if (_specBookDocIsImage(doc)) {
+          html += _specBookExportDocPage(projName, gName, today, item, caption,
+            '<img src="' + esc(url) + '" style="max-width:100%;max-height:100%;object-fit:contain;">', pageNum);
+          pageNum++;
+          continue;
+        }
+        if (_specBookDocIsPdf(doc)) {
+          var imgs = [];
+          try { imgs = await _specBookPdfPagesAsImages(url); } catch (_ePdf) { imgs = []; }
+          if (imgs.length) {
+            for (var pi = 0; pi < imgs.length; pi++) {
+              html += _specBookExportDocPage(projName, gName, today, item, caption + (imgs.length > 1 ? ' (' + (pi + 1) + '/' + imgs.length + ')' : ''),
+                '<img src="' + imgs[pi] + '" style="max-width:100%;max-height:100%;object-fit:contain;">', pageNum);
+              pageNum++;
+            }
+            continue;
+          }
+        }
+        html += _specBookExportDocPage(projName, gName, today, item, caption,
+          '<div style="text-align:center;padding:24px;"><div style="font-size:14px;color:#0F1A2E;margin-bottom:8px;">' + esc(caption) + '</div>' +
+          '<a href="' + esc(url) + '" style="font-size:13px;color:#C9A96E;">Open original document</a></div>', pageNum);
+        pageNum++;
+      }
+      return { html: html, pageNum: pageNum };
+    }
+
+    async function _specBookExport(mode) {
       const sb = window._specBook;
       const data = window._specBookData;
       const proj = window._currentProject;
       const selected = _specBookResolveByIds(data, sb.selectedItems);
       if (selected.length === 0) { showToast('No items selected', 'error'); return; }
+      if (typeof showToast === 'function') showToast('Building spec book…', 'info');
 
       const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
       const projName = proj.name || proj.title || 'Project';
@@ -85410,7 +86251,7 @@ async function renderBoardsTab(T, proj) {
       // Product pages
 
       // Product pages
-      groupNames.forEach(gName => {
+      for (const gName of groupNames) {
         // Room divider
         if (eo.roomDividers) {
           pages += '<div class="page" style="display:flex;flex-direction:column;">' +
@@ -85425,11 +86266,11 @@ async function renderBoardsTab(T, proj) {
         }
 
         if (eo.cutSheets) {
-          groups[gName].forEach(item => {
-            tocEntries.push({ name: item.title || 'Untitled', page: pageNum, vendor: item.vendor, isGroup: false });
+          for (const item of groups[gName]) {
+            tocEntries.push({ name: (item.lineTag ? item.lineTag + ' — ' : '') + (item.title || 'Untitled'), page: pageNum, vendor: item.vendor, isGroup: false });
 
             pages += '<div class="page"><div class="page-header"><div class="logo-block"><div class="logo-cch">CCH</div><div class="logo-sub">Design Inc.</div></div>' +
-              '<div class="project-info"><div class="proj-name">' + esc(projName) + '</div><div class="proj-meta">' + esc(gName) + ' · ' + today + '</div></div></div>';
+              '<div class="project-info"><div class="proj-name">' + esc(projName) + '</div><div class="proj-meta">' + (item.lineTag ? esc(item.lineTag) + ' · ' : '') + esc(gName) + ' · ' + today + '</div></div></div>';
 
             // Body — image grid left, details right
             pages += '<div class="page-body">';
@@ -85465,7 +86306,7 @@ async function renderBoardsTab(T, proj) {
 
             // Detail column
             pages += '<div class="detail-col">';
-            pages += '<div class="product-title">' + esc(item.title || 'Untitled') + '</div>';
+            pages += '<div class="product-title">' + (item.lineTag ? '<span style="color:#C4A464;margin-right:10px;">' + esc(item.lineTag) + '</span>' : '') + esc(item.title || 'Untitled') + '</div>';
             pages += '<div class="product-room">' + esc(item.vendor || '') + (item.finish ? ' · ' + esc(item.finish) : '') + '</div>';
 
             // Description
@@ -85530,9 +86371,14 @@ async function renderBoardsTab(T, proj) {
 
             pages += '<div class="page-footer"><span>CCH Design Inc. · www.cchdesign.com · (949) 497-7979</span><span>Page ' + pageNum + '</span></div></div>';
             pageNum++;
-          });
+            if (eo.supportingDocs) {
+              var extraDocs = await _specBookSupportingDocPages(item, projName, gName, today, pageNum);
+              pages += extraDocs.html;
+              pageNum = extraDocs.pageNum;
+            }
+          }
         }
-      });
+      }
 
       // Pricing summary page
       if (eo.pricing && sb.pricingMode !== 'none') {
@@ -86395,8 +87241,8 @@ async function renderBoardsTab(T, proj) {
 
   </script>
   <script src="cch-invoice-tax-rules.js?v=20260520prod"></script>
-  <script src="cch-functions.js?v=20260812wr1"></script>
-  <script src="cch-design-board.js?v=20260801db65"></script>
+  <script src="cch-functions.js?v=20260820sr1"></script>
+  <script src="cch-design-board.js?v=20260821pr1"></script>
   <script src="cch-client-activity.js?v=20260806ca2"></script>
   <script src="cch-client-pepper.js?v=20260812pepper"></script>
   <script src="cch-client-ideas.js?v=20260807ci091b"></script>
@@ -86409,9 +87255,9 @@ async function renderBoardsTab(T, proj) {
   <script src="cch-voice-profile.js?v=20260713voice1"></script>
   <script src="cch-progress-updates.js?v=20260714pu18"></script>
   <script src="cch-client-board.js?v=1774994684878"></script>
-  <script src="cch-line-icons.js?v=20260709wr1"></script>
+  <script src="cch-line-icons.js?v=20260821wo026"></script>
   <script src="cch-invoice-redesign.js?v=20260817size1"></script>
-  <script src="cch-proposals-invoices-fix.js?v=20260818additem1"></script>
+  <script src="cch-proposals-invoices-fix.js?v=20260820place2"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
   <script src="cch-airtable-push.js?v=20260630a"></script>
   <script src="cch-po-bill-variance.js?v=20260816send2"></script>

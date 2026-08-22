@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <!-- CCH_CLIENT_BUILD 9.9.251 cp-portal-phone-wo121-2026-08-21 -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>CCH Design — Client Portal</title>
@@ -3638,7 +3639,7 @@ function cpProposalLineApprovalToggleHtml(projectId, proposalId, lineIdx, la) {
       var base = 'font-family:\'DM Sans\',sans-serif;font-size:13px;font-weight:500;padding:8px 16px;min-height:34px;line-height:1.2;cursor:pointer;border:none;margin:0;box-sizing:border-box;transition:background-color 150ms ease;flex:1;min-width:88px;text-align:center;';
       var leftStyle = base + (leftOn ? 'background:#0A1F3D;color:#FFFFFF;' : 'background:#FFFFFF;color:#0A1F3D;') + 'border-right:1px solid #E2E2E2;';
       var rightStyle = base + (rightOn ? 'background:#0A1F3D;color:#FFFFFF;' : 'background:#FFFFFF;color:#0A1F3D;');
-      return '<div class="cp-appr-toggle" role="group" aria-label="Approve or decline this line" style="display:inline-flex;border:1px solid #E2E2E2;border-radius:0;overflow:hidden;vertical-align:middle;box-shadow:none;">' +
+      return '<div class="cp-appr-toggle" data-cch-cp-appr-idx="' + lineIdx + '" role="group" aria-label="Approve or decline this line" style="display:inline-flex;border:1px solid #E2E2E2;border-radius:0;overflow:hidden;vertical-align:middle;box-shadow:none;">' +
         '<button type="button" style="' + leftStyle + '" onclick="clientApproveLine(\'' + pid + '\',\'' + prid + '\',' + lineIdx + ')">Approve</button>' +
         '<button type="button" style="' + rightStyle + '" onclick="clientDeclineLine(\'' + pid + '\',\'' + prid + '\',' + lineIdx + ')">Decline</button>' +
         '</div>';
@@ -4900,39 +4901,8 @@ function clipApprovalBadgeHtml(clip) {
     }
 
 function clipLinkedDocPillsHtml(clip, projectId, opts) {
-      opts = opts || {};
-      var forRoomBoard = !!opts.forRoomBoard;
-      var out = [];
-      var seen = {};
-      function add(label, value, href, style) {
-        var v = String(value || '').trim();
-        if (!v) return;
-        var key = label + '|' + v;
-        if (seen[key]) return;
-        seen[key] = true;
-        var st = style || 'font-size:10px;color:#5C6B80;background:#F8F8F8;border:1px solid #E2E2E2;padding:2px 6px;';
-        if (href) out.push('<a href="' + escAttr(href) + '" onclick="event.stopPropagation();navigate(\'' + escAttr(href) + '\');return false;" style="font-size:10px;color:#0F1A2E;background:#F4F6FA;border:1px solid rgba(15,26,46,0.12);padding:2px 6px;text-decoration:none;">' + esc(label + ' ' + v) + '</a>');
-        else out.push('<span style="' + st + '">' + esc(label + ' ' + v) + '</span>');
-      }
-      var hid = String(clip.houzzId || clip.houzzProductId || clip.catalogId || '').trim();
-      var lid = String(clip.libraryProductId || clip.linkedLibraryProductId || '').trim();
-      if (hid) add('Houzz', hid, '', 'font-size:10px;color:#1B5E20;background:#E6F4EA;border:1px solid rgba(27,94,32,0.2);padding:2px 6px;font-family:ui-monospace,monospace;');
-      if (lid) add('Lib', lid.length > 14 ? lid.slice(0, 12) + '…' : lid, '', 'font-size:10px;color:#0D47A1;background:#E3F2FD;border:1px solid rgba(13,71,161,0.2);padding:2px 6px;font-family:ui-monospace,monospace;');
-      add('PR', clip.proposalNum || clip.houzzProposal, '');
-      add('INV', clip.invoiceNum || clip.houzzInvoice, '');
-      if (!forRoomBoard) {
-        add('PO', clip.poNum || clip.purchaseOrderNum, '');
-      }
-      if (projectId) {
-        var pid = String(projectId);
-        add('PR', clip.proposalId, '#/project/' + pid + '/proposal/' + String(clip.proposalId));
-        add('INV', clip.invoiceId, '#/project/' + pid + '/invoice/' + String(clip.invoiceId));
-        if (!forRoomBoard) {
-          add('PO', clip.poId || clip.purchaseOrderId, '#/project/' + pid + '/po/' + String(clip.poId || clip.purchaseOrderId));
-        }
-      }
-      if (!out.length) return '';
-      return '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">' + out.join('') + '</div>';
+      // Client portal must never emit Lib/PR/INV/PO/Houzz IDs. Studio Room Boards keep pills in index.html.
+      return '';
     }
 
 function boardClipIsHidden(c) {
@@ -8172,11 +8142,11 @@ function cpBuildSingleProposalReviewHtml(projectId, p, opts) {
             '</div></div>';
           html += '<tr' + (rowCls ? ' class="' + rowCls + '"' : '') + '>' +
             '<td>' + itemInner + '</td>' +
-            '<td style="text-align:center;" class="cp-prem-money">' + _qty + '</td>' +
-            '<td class="r cp-prem-money">' + formatMoney(_unitPrice) + '</td>' +
-            '<td class="r ship cp-prem-money">' + (_ship > 0 ? formatMoney(_ship) : '<span style="color:#5C6B80;">\u2014</span>') + '</td>' +
-            '<td style="text-align:center;" class="cp-prem-money">' + (_taxable ? '<span style="color:#5C6B80;">\u2713</span>' : '\u2014') + '</td>' +
-            '<td class="r total-cell cp-prem-money" style="font-weight:600;">' + formatMoney(_lineTotal) + '</td>' +
+            '<td data-cp-label="Qty" style="text-align:center;" class="cp-prem-money">' + _qty + '</td>' +
+            '<td data-cp-label="Price" class="r cp-prem-money">' + formatMoney(_unitPrice) + '</td>' +
+            '<td data-cp-label="Shipping" class="r ship cp-prem-money">' + (_ship > 0 ? formatMoney(_ship) : '<span style="color:#5C6B80;">\u2014</span>') + '</td>' +
+            '<td data-cp-label="Tax" style="text-align:center;" class="cp-prem-money">' + (_taxable ? '<span style="color:#5C6B80;">\u2713</span>' : '\u2014') + '</td>' +
+            '<td data-cp-label="Total" class="r total-cell cp-prem-money" style="font-weight:600;">' + formatMoney(_lineTotal) + '</td>' +
             '<td class="cp-prem-decision-cell">' + decisionCell + '</td></tr>';
         }
 
@@ -8530,6 +8500,7 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
         } catch (e2) {}
       }
 
+      if (activePage === 'progress') {
       try {
         var teById = {};
         var teProjectName = String((proj.name || proj.projectName || '')).trim();
@@ -8545,6 +8516,7 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
           });
         });
       } catch (e) {}
+      }
 
       if (!isOwner) {
         for (var _cpi = 0; _cpi < proposals.length; _cpi++) {
@@ -8862,6 +8834,21 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
         '.cp-prem-doc .cp-prem-group-row { background:#F4F6FA; font-weight:700; padding:10px 8px !important; border-bottom:1px solid #E8ECF3; font-size:11px; text-transform:uppercase; letter-spacing:2px; color:#C4A464; }' +
         '.cp-prem-doc .cp-prop-line-declined .cp-prem-item-title, .cp-prem-doc .cp-prop-line-declined .cp-prem-item-desc, .cp-prem-doc .cp-prop-line-declined .cp-prem-money { text-decoration:line-through; color:#6B7280; }' +
         '.cp-prem-doc .cp-prem-decision-cell { vertical-align:middle !important; }' +
+        '@media (max-width:900px){' +
+        '.cp-prem-doc .cp-prem-items-section{padding:14px 12px 8px;}' +
+        '.cp-prem-doc .cp-prem-items-table,.cp-prem-doc .cp-prem-items-table thead,.cp-prem-doc .cp-prem-items-table tbody,.cp-prem-doc .cp-prem-items-table tr,.cp-prem-doc .cp-prem-items-table th,.cp-prem-doc .cp-prem-items-table td,.cp-prem-doc .cp-prem-items-table colgroup,.cp-prem-doc .cp-prem-items-table col{display:block;width:100%;}' +
+        '.cp-prem-doc .cp-prem-items-table thead{display:none;}' +
+        '.cp-prem-doc .cp-prem-items-table{table-layout:auto;border-collapse:separate;border-spacing:0;}' +
+        '.cp-prem-doc .cp-prem-items-table tr{border:1px solid #E2E2E2;margin:0 0 12px;padding:12px;background:#FFFFFF;}' +
+        '.cp-prem-doc .cp-prem-items-table td{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:1px solid #F0F0F0;padding:8px 0;text-align:right !important;word-break:normal;overflow-wrap:anywhere;}' +
+        '.cp-prem-doc .cp-prem-items-table td:first-child{display:block;text-align:left !important;border-bottom:1px solid #E2E2E2;padding-bottom:12px;}' +
+        '.cp-prem-doc .cp-prem-items-table td::before{content:attr(data-cp-label);font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#5C6B80;flex-shrink:0;text-align:left;}' +
+        '.cp-prem-doc .cp-prem-items-table td:first-child::before,.cp-prem-doc .cp-prem-decision-cell::before{content:none;}' +
+        '.cp-prem-doc .cp-prem-item-grid{grid-template-columns:minmax(0,1fr) !important;}' +
+        '.cp-prem-doc .cp-prop-line-thumb img{width:100%;max-height:200px;object-fit:cover;}' +
+        '.cp-prem-doc .cp-prem-decision-cell{display:block !important;padding-top:12px;border-bottom:none;}' +
+        '.cp-prem-doc .cp-appr-toggle{display:flex !important;width:100%;}' +
+        '}' +
         '.cp-inv-card { margin-bottom: 16px; padding: 20px; }' +
         '.cp-inv-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }' +
         '.cp-inv-num { font-weight: 700; font-size: 16px; }' +
@@ -8941,7 +8928,19 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
         '.cp-hours-table th,.cp-hours-table td { padding:10px 12px;border-bottom:1px solid var(--cp-border-light);font-size:12px; }' +
         '.cp-hours-table tfoot td { font-weight:700;border-top:1px solid var(--cp-border); }' +
         '.cp-prop-num-hit { cursor:pointer; color:#C4A464; font-weight:700; text-decoration:underline; text-underline-offset:2px; background:none; border:none; font:inherit; padding:0; font-family:\"Playfair Display\",Georgia,serif; font-size:16px; }' +
-        '@media (max-width: 900px) {' +
+        '@media (max-width: 1180px) {' +
+          '.cp-left-sidebar { width:148px; min-width:148px; }' +
+          '.cp-sb-logo { padding:16px 12px 18px; }' +
+          '.cp-sb-logo-top { font-size:11px; letter-spacing:0.08em; }' +
+          '.cp-sb-nav { padding:10px 0; }' +
+          '.cp-sb-item { padding:8px 10px; gap:6px; font-size:12px; }' +
+          '.cp-sb-icon { width:14px; font-size:12px; }' +
+          '.cp-sb-foot { padding:12px 10px; font-size:10px; }' +
+          '.cp-page-pad { padding:20px 16px 40px; }' +
+          '.cp-action-grid-3 { grid-template-columns:1fr !important; gap:12px; }' +
+          '.cp-rooms-grid, .cp-rooms-home-bleed .cp-rooms-grid { grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); }' +
+        '}' +
+        '@media (max-width: 640px) {' +
           '.cp-shell-row { flex-direction:column; }' +
           '.cp-left-sidebar { width:100%; min-width:0; border-right:none; border-bottom:1px solid #E2E2E2; }' +
           '.cp-sb-nav { display:flex; flex-wrap:wrap; gap:4px; padding:8px 12px; max-height:none; }' +
@@ -9990,12 +9989,12 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
             var _cpGalN = (typeof cpPortalClipGalleryUrls === 'function') ? cpPortalClipGalleryUrls(c).length : 0;
             html += '<div class="cp-card cp-product-card cp-room-board-card" role="button" tabindex="0" onclick="cvShowProduct(this)"' + _cpLbAttr + ' data-title="'+escAttr(c.title||'Untitled')+'" data-vendor="'+escAttr(c.vendor||c.manufacturer||'')+'" data-price="'+(c.clientPrice||c.totalSelling||'')+'" data-img="'+_escImgSrcAttr(_cpCardImg)+'" data-sku="'+escAttr(c.sku||'')+'" data-category="'+escAttr(c.category||'')+'" data-finish="'+escAttr(c.finish||'')+'" data-dims="'+escAttr(c.dimensions||'')+'" data-room="'+escAttr(c.room||'')+'" data-clip-id="'+escAttr(c.id||'')+'" data-project-id="'+escAttr(projectId)+'" data-status="'+escAttr(getClipApprovalStatus(c))+'" data-pr="'+escAttr(c.proposalNum||c.houzzProposal||'')+'" data-inv="'+escAttr(c.invoiceNum||c.houzzInvoice||'')+'" data-po="'+escAttr(c.poNum||c.purchaseOrderNum||'')+'">' +
               '<div style="position:relative;">' +
-              (_cpCardImg ? '<img class="cp-product-img" src="'+_escImgSrcAttr(_cpCardImg)+'" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div class="cp-product-img" style="display:flex;align-items:center;justify-content:center;font-size:32px;color:#C4A464;">🪑</div>') +
+              (_cpCardImg ? '<img class="cp-product-img" src="'+_escImgSrcAttr(_cpCardImg)+'" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div class="cp-product-img" style="display:flex;align-items:center;justify-content:center;font-size:32px;color:#C4A464;">🪑</div>') +
               (_cpGalN > 1 ? '<span style="position:absolute;bottom:8px;right:8px;background:rgba(10,31,61,0.82);color:#fff;font-size:10px;font-weight:600;padding:3px 8px;letter-spacing:0.04em;">' + _cpGalN + ' photos</span>' : '') +
               '</div>' +
               '<div class="cp-product-body"><div class="cp-product-title">' + esc(c.title || 'Untitled') + '</div><div class="cp-product-vendor">' + esc(c.vendor || '') + '</div>' +
               (c.clientPrice || c.totalSelling ? '<div class="cp-product-price cp-price">' + formatMoney(parseFloat(c.clientPrice || c.totalSelling) || 0) + '</div>' : '') +
-              '<div style="margin-top:6px;">' + clipApprovalBadgeHtml(c) + '</div>' + act + clipLinkedDocPillsHtml(c, projectId, { forRoomBoard: true }) +
+              '<div style="margin-top:6px;">' + clipApprovalBadgeHtml(c) + '</div>' + act +
               '</div></div>';
           });
           html += '</div>';
@@ -10003,7 +10002,7 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
         html += '</div>';
       } else {
         html += '<div class="cp-sec-label-jx" style="color:#C8A97E;">Action Required</div>';
-        html += '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin-bottom:40px;font-family:\'DM Sans\',sans-serif;" class="cp-action-grid-3">';
+        html += '<div class="cp-action-grid-3" style="margin-bottom:40px;font-family:\'DM Sans\',sans-serif;">';
         html += '<div style="border:1px solid #E2E2E2;padding:24px 28px;min-width:0;overflow:hidden;">' +
           '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">' +
           '<div style="font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:#0A1F3D;">Decisions Needed</div>' +
@@ -10167,52 +10166,18 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
         html += '</div></div>';
       }
 
-      // --- Your Rooms (tile tap expands inline; "Full room page" opens dedicated room board route)
+      // --- Your Rooms (tile opens the dedicated room board page — do not dump every product image on Home)
       if (rooms.length > 0) {
         html += '<div id="cp-anchor-rooms" class="cp-section cp-section-block cp-rooms-home-bleed"><div class="cp-section-label">YOUR ROOMS</div><div class="cp-rooms-grid">';
         rooms.forEach(function(rm, ri) {
           var cover = roomCovers[rm];
           var _roomDeepHome = '#/clientview/' + projectId + '/rooms/' + encodeURIComponent(rm);
           html += '<div class="cp-card cp-room-card" onclick=' + cpPortalNavigateOnclickAttr(_roomDeepHome) + '>' +
-            (cover ? '<img class="cp-room-img" src="'+escAttr(cover)+'" onerror="this.style.display=\'none\'">' : '<div class="cp-room-img" style="display:flex;align-items:center;justify-content:center;font-size:36px;color:#C4A464;">🏠</div>') +
+            (cover ? '<img class="cp-room-img" src="'+escAttr(cover)+'" loading="lazy" decoding="async" onerror="this.style.display=\'none\'">' : '<div class="cp-room-img" style="display:flex;align-items:center;justify-content:center;font-size:36px;color:#C4A464;">🏠</div>') +
             '<div class="cp-room-overlay"><div class="cp-room-name">' + esc(rm) + '</div><div class="cp-room-count">' + byRoom[rm].length + ' item' + (byRoom[rm].length !== 1 ? 's' : '') + '</div></div>' +
           '</div>';
         });
-        html += '</div>';
-        rooms.forEach(function(rm, ri) {
-          var _rDeepH = '#/clientview/' + projectId + '/rooms/' + encodeURIComponent(rm);
-          var _list = byRoom[rm] || [];
-          html += '<div class="cp-expand-room" id="cpRoom'+ri+'">' +
-            '<div class="cp-section-label" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;">' + esc(rm) +
-            '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 10px;font-size:11px;" onclick=' + cpPortalNavigateOnclickAttr(_rDeepH) + '>Full room page</button></div>';
-          html += '<div class="cp-products-grid">';
-          _list.forEach(function(c) {
-            var _cpCardImg = cpPortalClipCardImageUrl(c);
-            var st = getClipApprovalStatus(c);
-            var act = '';
-            if (st === 'pending') {
-              act = '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;" onclick="event.stopPropagation()">' +
-                '<button type="button" class="cp-btn cp-btn-primary" style="padding:6px 12px;font-size:11px;" onclick=' + cpPortalOnclickAttr('void window.clientSetRoomBoardStatus(' + JSON.stringify(projectId) + ',' + JSON.stringify(c.id) + ',' + JSON.stringify('approved') + ')') + '>Approve</button>' +
-                '<button type="button" class="cp-btn cp-btn-outline" style="padding:6px 12px;font-size:11px;" onclick=' + cpPortalOnclickAttr('void window.clientSetRoomBoardStatus(' + JSON.stringify(projectId) + ',' + JSON.stringify(c.id) + ',' + JSON.stringify('declined') + ')') + '>Decline</button></div>';
-            } else {
-              act = '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center;" onclick="event.stopPropagation()">' +
-                '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 10px;font-size:10px;" onclick=' + cpPortalOnclickAttr('void window.clientSetRoomBoardStatus(' + JSON.stringify(projectId) + ',' + JSON.stringify(c.id) + ',' + JSON.stringify('pending') + ')') + '>Undo decision</button></div>';
-            }
-            var _cpLbAttrH = cpPortalClipLbDataAttr(c);
-            var _cpGalNH = cpPortalClipGalleryUrls(c).length;
-            html += '<div class="cp-card cp-product-card cp-room-board-card" role="button" tabindex="0" onclick="cvShowProduct(this)"' + _cpLbAttrH + ' data-title="'+escAttr(c.title||'Untitled')+'" data-vendor="'+escAttr(c.vendor||c.manufacturer||'')+'" data-price="'+(c.clientPrice||c.totalSelling||'')+'" data-img="'+_escImgSrcAttr(_cpCardImg)+'" data-sku="'+escAttr(c.sku||'')+'" data-category="'+escAttr(c.category||'')+'" data-finish="'+escAttr(c.finish||'')+'" data-dims="'+escAttr(c.dimensions||'')+'" data-room="'+escAttr(c.room||'')+'" data-clip-id="'+escAttr(c.id||'')+'" data-project-id="'+escAttr(projectId)+'" data-status="'+escAttr(getClipApprovalStatus(c))+'" data-pr="'+escAttr(c.proposalNum||c.houzzProposal||'')+'" data-inv="'+escAttr(c.invoiceNum||c.houzzInvoice||'')+'" data-po="'+escAttr(c.poNum||c.purchaseOrderNum||'')+'">' +
-              '<div style="position:relative;">' +
-              (_cpCardImg ? '<img class="cp-product-img" src="'+_escImgSrcAttr(_cpCardImg)+'" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '<div class="cp-product-img" style="display:flex;align-items:center;justify-content:center;font-size:32px;color:#C4A464;">🪑</div>') +
-              (_cpGalNH > 1 ? '<span style="position:absolute;bottom:8px;right:8px;background:rgba(10,31,61,0.82);color:#fff;font-size:10px;font-weight:600;padding:3px 8px;">' + _cpGalNH + ' photos</span>' : '') +
-              '</div>' +
-              '<div class="cp-product-body"><div class="cp-product-title">' + esc(c.title || 'Untitled') + '</div><div class="cp-product-vendor">' + esc(c.vendor || '') + '</div>' +
-              (c.clientPrice || c.totalSelling ? '<div class="cp-product-price cp-price">' + formatMoney(parseFloat(c.clientPrice || c.totalSelling) || 0) + '</div>' : '') +
-              '<div style="margin-top:6px;">' + clipApprovalBadgeHtml(c) + '</div>' + act + clipLinkedDocPillsHtml(c, projectId, { forRoomBoard: true }) +
-              '</div></div>';
-          });
-          html += '</div></div>';
-        });
-        html += '</div>';
+        html += '</div></div>';
       }
       var _cpActFeed = activity.slice().sort(function(a, b) {
         return String(b.timestamp || b.createdAt || '').localeCompare(String(a.timestamp || a.createdAt || ''));
@@ -10521,11 +10486,6 @@ function cvShowProduct(card) {
       const statusRaw = String(d.status || 'pending').toLowerCase();
       const statusLabel = statusRaw === 'approved' ? 'Approved' : (statusRaw === 'declined' ? 'Declined' : 'Pending');
       const statusColor = statusRaw === 'approved' ? '#2E7D4F' : (statusRaw === 'declined' ? '#B84545' : '#8A6A2D');
-      const docs = [
-        d.pr ? 'PR ' + d.pr : '',
-        d.inv ? 'INV ' + d.inv : '',
-        d.po ? 'PO ' + d.po : ''
-      ].filter(Boolean);
       const details = [
         d.category ? ['Category', d.category] : null,
         d.room ? ['Room', d.room] : null,
@@ -10543,8 +10503,7 @@ function cvShowProduct(card) {
         '<div class="cv-modal-body">' +
           '<div class="cv-modal-title">' + esc(d.title) + '</div>' +
           '<div class="cv-modal-vendor">' + esc(d.vendor) + (d.sku ? ' · ' + esc(d.sku) : '') + '</div>' +
-          '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;"><span style="display:inline-block;padding:3px 10px;border:1px solid rgba(196,164,100,0.25);background:rgba(196,164,100,0.14);color:' + statusColor + ';font-size:11px;font-weight:700;text-transform:uppercase;">' + statusLabel + '</span>' +
-          (docs.length ? '<span style="font-size:11px;color:#5C6B80;">Linked: ' + esc(docs.join(' · ')) + '</span>' : '<span style="font-size:11px;color:#9CA3AF;">No linked proposal/invoice/PO yet</span>') + '</div>' +
+          '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;"><span style="display:inline-block;padding:3px 10px;border:1px solid rgba(196,164,100,0.25);background:rgba(196,164,100,0.14);color:' + statusColor + ';font-size:11px;font-weight:700;text-transform:uppercase;">' + statusLabel + '</span></div>' +
           (price ? '<div class="cv-modal-price cv-card-price">' + price + '</div>' : '') +
           (d.projectId && d.clipId ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">' +
             '<button type="button" class="cp-btn cp-btn-primary" style="padding:6px 12px;font-size:11px;" onclick="clientSetRoomBoardStatus(\'' + escAttr(d.projectId) + '\',\'' + escAttr(d.clipId) + '\',\'approved\')">Approve</button>' +
@@ -10562,6 +10521,8 @@ window.clientSetRoomBoardStatus = async function(projectId, clipId, status) {
       status = String(status || '').toLowerCase().trim();
       if (!projectId || !clipId) return;
       if (status !== 'approved' && status !== 'declined' && status !== 'pending') return;
+      var card = document.querySelector('.cp-room-board-card[data-clip-id="' + String(clipId).replace(/"/g, '') + '"]');
+      var prevStatus = card ? String(card.getAttribute('data-status') || 'pending') : '';
       try {
         await db.collection('boards').doc(projectId).collection('clips').doc(clipId).update({
           clientSelectionStatus: status,
@@ -10573,11 +10534,12 @@ window.clientSetRoomBoardStatus = async function(projectId, clipId, status) {
         if (modal) modal.remove();
         showToast('Selection ' + status);
         if (typeof renderClientPortal === 'function' && typeof USE_NEW_PORTAL !== 'undefined' && USE_NEW_PORTAL) {
-          await renderClientPortal(projectId);
+          void renderClientPortal(projectId);
         } else if (typeof renderClientView === 'function') {
           renderClientView(projectId);
         }
       } catch (e) {
+        if (card && prevStatus) card.setAttribute('data-status', prevStatus);
         await cchAlert('Could not update item decision: ' + (e && e.message ? e.message : e), 'Client Room Board');
       }
     };
@@ -11975,23 +11937,36 @@ async function clientApproveLine(projectId, propId, lineIdx) {
       const data = doc.data();
       const items = data.items || [];
       if (!items[lineIdx] || (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(items[lineIdx]))) return;
+      var prevStatus = getProposalLineApprovalStatus(items[lineIdx]);
       items[lineIdx].lineApprovalStatus = 'approved';
       items[lineIdx].approved = true;
       items[lineIdx].declined = false;
-      await db.collection('boards').doc(projectId).collection('proposals').doc(propId).update({
-        items: items,
-        updatedAt: new Date().toISOString(),
-        clientApprovedTotalAt: firebase.firestore.FieldValue.delete()
+      _cchPaintClientLineApprovalToggle(projectId, propId, lineIdx, 'approved', items);
+      try {
+        await db.collection('boards').doc(projectId).collection('proposals').doc(propId).update({
+          items: items,
+          updatedAt: new Date().toISOString(),
+          clientApprovedTotalAt: firebase.firestore.FieldValue.delete()
+        });
+      } catch (eWrite) {
+        items[lineIdx].lineApprovalStatus = prevStatus;
+        items[lineIdx].approved = prevStatus === 'approved';
+        items[lineIdx].declined = prevStatus === 'declined';
+        _cchPaintClientLineApprovalToggle(projectId, propId, lineIdx, prevStatus, items);
+        if (typeof cchAlert === 'function') await cchAlert('Could not save that approval. Please try again.', 'Proposal');
+        return;
+      }
+      Promise.resolve().then(async function() {
+        try {
+          var projDoc = await db.collection('boards').doc(projectId).get();
+          var projName = projDoc.exists ? (projDoc.data().name || projectId) : projectId;
+          var itemName = items[lineIdx].title || items[lineIdx].name || 'Item';
+          var propNum = data.proposalNum || data.name || propId.substring(0, 8);
+          var lineLabel = String(lineIdx + 1);
+          await appendClientProposalActivity(projectId, propId, 'client_line_approved', 'Client approved line ' + lineLabel + ': ' + itemName);
+          await logClientPortalActivity('line_approved', 'Client approved line ' + lineLabel + ' on ' + propNum + ': ' + itemName, projectId, projName, { proposalId: propId, lineIdx: lineIdx });
+        } catch (_eAct) {}
       });
-      var projDoc = await db.collection('boards').doc(projectId).get();
-      var projName = projDoc.exists ? (projDoc.data().name || projectId) : projectId;
-      var itemName = items[lineIdx].title || items[lineIdx].name || 'Item';
-      var propNum = data.proposalNum || data.name || propId.substring(0, 8);
-      var lineLabel = String(lineIdx + 1);
-      await appendClientProposalActivity(projectId, propId, 'client_line_approved', 'Client approved line ' + lineLabel + ': ' + itemName);
-      await logClientPortalActivity('line_approved', 'Client approved line ' + lineLabel + ' on ' + propNum + ': ' + itemName, projectId, projName, { proposalId: propId, lineIdx: lineIdx });
-
-      if (USE_NEW_PORTAL) await renderClientPortal(projectId, propId); else renderClientView(projectId);
     }
 
 async function clientDeclineLine(projectId, propId, lineIdx) {
@@ -12000,23 +11975,67 @@ async function clientDeclineLine(projectId, propId, lineIdx) {
       const data = doc.data();
       const items = data.items || [];
       if (!items[lineIdx] || (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(items[lineIdx]))) return;
+      var prevStatus = getProposalLineApprovalStatus(items[lineIdx]);
       items[lineIdx].lineApprovalStatus = 'declined';
       items[lineIdx].declined = true;
       items[lineIdx].approved = false;
-      await db.collection('boards').doc(projectId).collection('proposals').doc(propId).update({
-        items: items,
-        updatedAt: new Date().toISOString(),
-        clientApprovedTotalAt: firebase.firestore.FieldValue.delete()
+      _cchPaintClientLineApprovalToggle(projectId, propId, lineIdx, 'declined', items);
+      try {
+        await db.collection('boards').doc(projectId).collection('proposals').doc(propId).update({
+          items: items,
+          updatedAt: new Date().toISOString(),
+          clientApprovedTotalAt: firebase.firestore.FieldValue.delete()
+        });
+      } catch (eWrite) {
+        items[lineIdx].lineApprovalStatus = prevStatus;
+        items[lineIdx].approved = prevStatus === 'approved';
+        items[lineIdx].declined = prevStatus === 'declined';
+        _cchPaintClientLineApprovalToggle(projectId, propId, lineIdx, prevStatus, items);
+        if (typeof cchAlert === 'function') await cchAlert('Could not save that decline. Please try again.', 'Proposal');
+        return;
+      }
+      Promise.resolve().then(async function() {
+        try {
+          var projDoc = await db.collection('boards').doc(projectId).get();
+          var projName = projDoc.exists ? (projDoc.data().name || projectId) : projectId;
+          var itemName = items[lineIdx].title || items[lineIdx].name || 'Item';
+          var propNum = data.proposalNum || data.name || propId.substring(0, 8);
+          var lineLabel = String(lineIdx + 1);
+          await appendClientProposalActivity(projectId, propId, 'client_line_declined', 'Client declined line ' + lineLabel + ': ' + itemName);
+          await logClientPortalActivity('line_declined', 'Client declined line ' + lineLabel + ' on ' + propNum + ': ' + itemName, projectId, projName, { proposalId: propId, lineIdx: lineIdx });
+        } catch (_eAct) {}
       });
-      var projDoc = await db.collection('boards').doc(projectId).get();
-      var projName = projDoc.exists ? (projDoc.data().name || projectId) : projectId;
-      var itemName = items[lineIdx].title || items[lineIdx].name || 'Item';
-      var propNum = data.proposalNum || data.name || propId.substring(0, 8);
-      var lineLabel = String(lineIdx + 1);
-      await appendClientProposalActivity(projectId, propId, 'client_line_declined', 'Client declined line ' + lineLabel + ': ' + itemName);
-      await logClientPortalActivity('line_declined', 'Client declined line ' + lineLabel + ' on ' + propNum + ': ' + itemName, projectId, projName, { proposalId: propId, lineIdx: lineIdx });
+    }
 
-      if (USE_NEW_PORTAL) await renderClientPortal(projectId, propId); else renderClientView(projectId);
+function _cchPaintClientLineApprovalToggle(projectId, propId, lineIdx, status, items) {
+      var wrap = document.querySelector('[data-cch-cp-appr-idx="' + lineIdx + '"]');
+      var tr = wrap && wrap.closest ? wrap.closest('tr') : null;
+      if (wrap && wrap.parentNode) {
+        wrap.parentNode.innerHTML = cpProposalLineApprovalToggleHtml(projectId, propId, lineIdx, status);
+      }
+      if (tr) {
+        if (status === 'declined') tr.classList.add('cp-prop-line-declined');
+        else tr.classList.remove('cp-prop-line-declined');
+      }
+      var pending = 0, approved = 0;
+      (items || []).forEach(function(it) {
+        if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it)) return;
+        var s = typeof getProposalLineApprovalStatus === 'function' ? getProposalLineApprovalStatus(it) : 'pending';
+        if (s === 'approved') approved++;
+        else if (s !== 'declined') pending++;
+      });
+      var canFinal = pending === 0 && approved > 0;
+      document.querySelectorAll('.cv-approve-btn').forEach(function(btn) {
+        if (canFinal) {
+          btn.style.opacity = '';
+          btn.style.pointerEvents = '';
+          btn.removeAttribute('disabled');
+        } else {
+          btn.style.opacity = '0.45';
+          btn.style.pointerEvents = 'none';
+          btn.setAttribute('disabled', 'disabled');
+        }
+      });
     }
 
 async function _loadTeamsConfig() {
@@ -12186,7 +12205,7 @@ async function logActivity(type, action, description, projectId, projectName, me
       auth.onAuthStateChanged(function(u) { currentUser = u || null; _cchBootOnce(); });
     } catch (e) { console.warn('[client portal] auth listener', e); }
     setTimeout(_cchBootOnce, 1600); // never block clients on auth
-    console.info('[CCH Client Portal] lightweight build 20260728cp-room-cover');
+    console.info('[CCH Client Portal] lightweight build 20260821wo121-phone');
   </script>
   <script src="cch-notes-format.js?v=20260802n1"></script>
   <script src="cch-voice-profile.js?v=20260713voice1"></script>

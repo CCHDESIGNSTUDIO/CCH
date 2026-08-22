@@ -42,16 +42,15 @@
     'lighting': 'Lighting',
     'Mirrors & Accessories': 'Accessories',
     'mirror': 'Mirror',
-    'Floor Covering': 'Flooring',
-    'floor': 'Flooring',
-    'Stone & Tile': 'Tile & Stone',
-    'Wall': 'Wall Covering',
+    'Flooring': 'Floor Covering',
+    'floor': 'Floor Covering',
+    'Tile & Stone': 'Stone & Tile',
     'Window': 'Windows',
-    'Appliances  & Plumbing': 'Plumbing & Appliances',
-    'Kitchen and Bath': 'Plumbing & Appliances',
+    'Appliances  & Plumbing': 'Appliances & Plumbing',
+    'Plumbing & Appliances': 'Appliances & Plumbing',
+    'Kitchen and Bath': 'Appliances & Plumbing',
     'Cushions': 'Bedding & Pillows',
     'Architecural': 'Architectural',
-    'Florals': 'Accessories',
     'Hardware': 'Cabinet Hardware',
     'Cabinet Hardware': 'Cabinet Hardware',
     'Window Hardware': 'Window Hardware',
@@ -109,8 +108,11 @@
   function _normalizeSingleCategorySegment(raw) {
     var s = String(raw || '').trim().replace(/\s+/g, ' ');
     if (!s) return '';
-    if (CATEGORY_REMAP[s]) return CATEGORY_REMAP[s];
     var sl = s.toLowerCase();
+    for (var m = 0; m < MASTER.length; m++) {
+      if (MASTER[m] === s || MASTER[m].toLowerCase() === sl) return MASTER[m];
+    }
+    if (CATEGORY_REMAP[s]) return CATEGORY_REMAP[s];
     var keys = Object.keys(CATEGORY_REMAP);
     for (var i = 0; i < keys.length; i++) {
       if (keys[i].toLowerCase() === sl) return CATEGORY_REMAP[keys[i]];

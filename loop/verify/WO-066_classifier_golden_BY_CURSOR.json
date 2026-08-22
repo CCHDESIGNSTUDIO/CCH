@@ -1,0 +1,32 @@
+{
+  "doc": "FABLE_DECISION_ds-invoice-expenses_CW_Jul30 — classifier contract (type + billingCategory only)",
+  "note": "HTML/screenshot golden of a staging-native DS invoice is Fable's verify step after staging deploy. This JSON locks the classifier rules so title-regex cannot return.",
+  "rules": {
+    "expense_product_expenseTypes": ["expense", "other_expense", "shipping", "handling", "freight"],
+    "expense_product_billingCategories": [
+      "t&e",
+      "travel & entertainment",
+      "travel and entertainment",
+      "reimbursable expense",
+      "reimbursable",
+      "print & post",
+      "print and post",
+      "handling & packing",
+      "packing fee",
+      "shipping & handling",
+      "freight & delivery"
+    ],
+    "prepaid_tax_expenseType": "sales_tax",
+    "never_classify_from": ["title", "description", "name"]
+  },
+  "cases": [
+    { "it": { "expenseType": "service", "title": "Freight reimbursement" }, "expect": "service" },
+    { "it": { "expenseType": "expense", "title": "Design hours" }, "expect": "expense_product" },
+    { "it": { "expenseType": "shipping", "title": "Anything" }, "expect": "expense_product" },
+    { "it": { "expenseType": "sales_tax", "title": "Pre-Paid Sales Tax" }, "expect": "prepaid_tax" },
+    { "it": { "expenseType": "product", "title": "Chair" }, "expect": "product" },
+    { "it": { "billingCategory": "T&E", "title": "Uber" }, "expect": "expense_product" },
+    { "it": { "billingCategory": "Reimbursable", "title": "Print shop" }, "expect": "expense_product" },
+    { "it": { "title": "Shipping and handling" }, "expect": "service" }
+  ]
+}

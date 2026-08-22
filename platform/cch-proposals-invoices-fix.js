@@ -847,6 +847,8 @@
         cchPropMoreItem(publishLabel, publishJs) +
         cchPropMoreItem('Document timeline', "toggleDocTimeline('" + projectId + "','proposals','" + proposalId + "')") +
         cchPropMoreItem('Tear Sheets', tearJs) +
+        cchPropMoreItem('Place this document on Room Boards', "cchPlaceDocLinesOnRoomBoards('" + projectId + "','proposals','" + proposalId + "')") +
+        cchPropMoreItem('Check all documents on Room Boards', "cchPlaceDocLinesOnRoomBoards('" + projectId + "','','',true)") +
         invBtn +
         cchPropMoreItem('Generate POs by Vendor', "generatePOsFromDoc('" + projectId + "','proposals','" + proposalId + "')") +
         cchPropMoreItem('Duplicate proposal', "duplicateProposalAsCopy('" + projectId + "','" + proposalId + "')") +
@@ -860,6 +862,8 @@
         cchPropMoreItem(publishLabel, publishJs) +
         cchPropMoreItem('Document timeline', "toggleDocTimeline('" + projectId + "','proposals','" + proposalId + "')") +
         cchPropMoreItem('Tear Sheets', tearJs) +
+        cchPropMoreItem('Place this document on Room Boards', "cchPlaceDocLinesOnRoomBoards('" + projectId + "','proposals','" + proposalId + "')") +
+        cchPropMoreItem('Check all documents on Room Boards', "cchPlaceDocLinesOnRoomBoards('" + projectId + "','','',true)") +
         invBtn +
         cchPropMoreItem('Generate POs by Vendor', "generatePOsFromDoc('" + projectId + "','proposals','" + proposalId + "')") +
         cchPropMoreItem('Duplicate proposal', "duplicateProposalAsCopy('" + projectId + "','" + proposalId + "')") +
@@ -934,6 +938,7 @@
       setTopbarActions(
         '<button class="btn btn-primary btn-sm" onclick="navigate(\'#/project/' + projectId + '/proposal/' + proposalId + '/edit\')">Edit Proposal</button>' +
         approveForClientBtn +
+        (typeof cchPlaceOnRoomBoardsBtnHtml === 'function' ? cchPlaceOnRoomBoardsBtnHtml(projectId, 'proposals', proposalId) : '') +
         '<button class="btn btn-primary btn-sm" onclick="sendProposalToClient(\'' + projectId + '\',\'' + proposalId + '\')">📧 Email client</button>' +
         convertGold +
         tearBtn +
@@ -946,6 +951,7 @@
         '<button class="btn btn-secondary btn-sm" onclick="previewDocument(\'proposal\',\'' + projectId + '\',\'' + proposalId + '\')">\uD83D\uDC41\uFE0F Preview</button>' +
         '<button class="btn btn-primary btn-sm" onclick="' + addItemOnclick + '">+ Add item</button>' +
         approveForClientBtn +
+        (typeof cchPlaceOnRoomBoardsBtnHtml === 'function' ? cchPlaceOnRoomBoardsBtnHtml(projectId, 'proposals', proposalId) : '') +
         '<button class="btn btn-primary btn-sm" onclick="sendProposalToClient(\'' + projectId + '\',\'' + proposalId + '\')">📧 Email client</button>' +
         '<span class="btn btn-sm" style="border:1px dashed rgba(27,51,82,0.22);color:var(--gray-500);cursor:default;pointer-events:none;font-size:11px;white-space:nowrap;" title="Line changes save to the proposal as you edit">💾 Auto-save</span>' +
         tearBtn +
@@ -2683,6 +2689,9 @@
         html += '<button type="button" class="btn btn-secondary btn-sm" style="color:#B91C1C;border-color:rgba(185,28,28,0.4);font-weight:600;" onclick="discardTimeTrackerInvoiceDraft(\'' + pj + '\',\'' + dj + '\')" title="Delete this draft and release linked time entries back to Time Ledger">Discard draft</button>';
       }
       html += '<button class="btn btn-primary btn-sm" onclick="cchEnterDocEditMode(\'' + pj + '\',\'' + dj + '\',\'invoice\')" style="background:#1B3352;color:#EDE8E0;">\u270F\uFE0F Edit line items</button>';
+      if (typeof window.cchPlaceOnRoomBoardsBtnHtml === 'function') {
+        html += window.cchPlaceOnRoomBoardsBtnHtml(projectId, 'invoices', docId);
+      }
 
       var more = '';
       var pubLabel = docData.published ? '🔒 Unpublish from dashboard' : '🌐 Publish to client dashboard';
@@ -2702,6 +2711,8 @@
         ? cchDocMoreItem('Unlock auto-sync on open', "cchLockInvoiceNoAutoGroup('" + pj + "','" + dj + "',true)")
         : cchDocMoreItem('Lock line order (no auto-sync)', "cchLockInvoiceNoAutoGroup('" + pj + "','" + dj + "')");
       more += cchDocMoreItem('📦 Generate POs by vendor', "generatePOsFromDoc('" + pj + "','invoices','" + dj + "')");
+      more += cchDocMoreItem('Place this document on Room Boards', "cchPlaceDocLinesOnRoomBoards('" + pj + "','invoices','" + dj + "')");
+      more += cchDocMoreItem('Check all documents on Room Boards', "cchPlaceDocLinesOnRoomBoards('" + pj + "','','',true)");
       more += cchDocMoreDivider();
       if (!invVoidEarly) {
         if (qbRealId) {
@@ -2831,6 +2842,8 @@
     more += cchDocMoreItem('\uD83D\uDC41 Preview', previewJs);
     more += cchDocMoreItem('➕ Add items', "openDocItemsSidebar({mode:'docEdit'})");
     if (type === 'invoice' || type === 'proposal') {
+      more += cchDocMoreItem('Place this document on Room Boards', "cchPlaceDocLinesOnRoomBoards('" + pj + "','" + collection + "','" + dj + "')");
+      more += cchDocMoreItem('Check all documents on Room Boards', "cchPlaceDocLinesOnRoomBoards('" + pj + "','','',true)");
       more += cchDocMoreItem('📌 Link to Room Boards', "docEditExplicitLinkToRoomBoards()");
       more += cchDocMoreItem('Auto-link clips on save (legacy)', 'cchToggleDocSaveAutoLinkRoomBoard()');
       more += cchDocMoreItem('🖼 Refresh images', "refreshDocumentLineImagesFromClips('" + type + "','" + pj + "','" + dj + "')");

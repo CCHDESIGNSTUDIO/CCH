@@ -849,6 +849,102 @@ function cchVendorTypeFilterOptions(vendors, selected) {
   }).join('');
 }
 
+function cchVendorIsShowroom(v) {
+  v = v || {};
+  var typ = String(v.type || v.vendorType || '').trim();
+  var typLc = typ.toLowerCase();
+  if (typ === 'Showroom') return true;
+  if (typLc.indexOf('showroom') >= 0) return true;
+  if (String(v.category || '').trim() === 'Showroom') return true;
+  return false;
+}
+
+function cchVendorIsContractor(v) {
+  v = v || {};
+  var typ = String(v.type || v.vendorType || '').trim();
+  var typLc = typ.toLowerCase();
+  var cat = String(v.category || '').trim();
+  var catLc = cat.toLowerCase();
+  if (typ === 'Contractors & Subs') return true;
+  if (cat === 'Subcontractor' || cat === 'Contractors & Subs') return true;
+  if (typLc === 'contractor' || typLc === 'subcontractor' || typLc === 'contractors') return true;
+  if (catLc === 'contractor' || catLc === 'subcontractor' || catLc === 'contractors') return true;
+  if (typLc.indexOf('contractor') >= 0 || typLc.indexOf('subcontractor') >= 0) return true;
+  return false;
+}
+
+function cchRefreshVendorKindList(cat) {
+  var page = String((location.hash || '').replace(/^#\//, '')).split('/')[0];
+  if (page === 'showrooms' && typeof renderShowrooms === 'function') return renderShowrooms();
+  if (page === 'contractors' && typeof renderContractors === 'function') return renderContractors();
+  if (page === 'workrooms' && typeof renderWorkrooms === 'function') return renderWorkrooms();
+  if (page === 'deliveryreceivers' && typeof renderDeliveryReceivers === 'function') return renderDeliveryReceivers();
+  if (cat === 'Showroom' && typeof renderShowrooms === 'function') return renderShowrooms();
+  if ((cat === 'Subcontractor' || cat === 'Contractors & Subs') && typeof renderContractors === 'function') return renderContractors();
+  if (cat === 'Workroom' && typeof renderWorkrooms === 'function') return renderWorkrooms();
+  if (cat === 'Delivery / Receiver' && typeof renderDeliveryReceivers === 'function') return renderDeliveryReceivers();
+  if (typeof renderVendors === 'function') return renderVendors();
+}
+
+function cchVendorKindSearchHit(v, q) {
+  q = String(q || '').toLowerCase();
+  if (!q) return true;
+  return (v.name || '').toLowerCase().indexOf(q) >= 0 ||
+    (v.type || '').toLowerCase().indexOf(q) >= 0 ||
+    (v.description || '').toLowerCase().indexOf(q) >= 0 ||
+    (v.contact || '').toLowerCase().indexOf(q) >= 0 ||
+    (v.email || '').toLowerCase().indexOf(q) >= 0 ||
+    (v.tags || '').toLowerCase().indexOf(q) >= 0 ||
+    (v.phone || '').toLowerCase().indexOf(q) >= 0;
+}
+
+function cchVendorKindTableHtml(opts) {
+  opts = opts || {};
+  var title = opts.title || '';
+  var blurb = opts.blurb || '';
+  var query = opts.query || '';
+  var items = opts.items || [];
+  var catHint = opts.catHint || 'Vendor';
+  var searchPh = opts.searchPlaceholder || 'Search...';
+  var emptyIcon = opts.emptyIcon || '◇';
+  var emptyText = opts.emptyText || 'None yet.';
+  var newLabel = opts.newLabel || ('+ New ' + catHint);
+  var viewFn = opts.viewFn || 'renderVendorsView';
+  var filtered = items;
+  if (query) {
+    filtered = items.filter(function(v) { return cchVendorKindSearchHit(v, query); });
+  }
+  if (items.length === 0) {
+    return '<h1 class="page-title">' + esc(title) + '</h1><p style="color:var(--gray-400);margin-bottom:20px;">' + esc(blurb) + '</p>' +
+      '<div class="empty-state"><div class="empty-icon">' + emptyIcon + '</div><div class="empty-text">' + esc(emptyText) + '</div>' +
+      '<button class="btn btn-primary" onclick="showNewVendorModal(null,\'' + catHint + '\')">' + esc(newLabel) + '</button></div>';
+  }
+  var rows = filtered.map(function(v) {
+    return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="showNewVendorModal(\'' + v.id + '\',\'' + catHint + '\')">' +
+      '<td style="padding:10px 12px;font-weight:600;">' + esc(v.name || '') + '</td>' +
+      '<td style="padding:10px 12px;font-size:12px;color:var(--gray-600);white-space:nowrap;">' + esc(String(v.type || '').trim() || '—') + '</td>' +
+      '<td style="padding:10px 12px;font-size:12px;color:var(--gray-500);">' + esc(v.description || '') + '</td>' +
+      '<td style="padding:10px 12px;">' + esc(v.contact || '') + '</td>' +
+      '<td style="padding:10px 12px;">' + esc(v.phone || '') + (v.email ? '<br><span style="font-size:11px;color:var(--gray-400);">' + esc(v.email) + '</span>' : '') + '</td>' +
+      '<td style="padding:10px 12px;font-size:11px;color:var(--gray-400);">' + esc(v.tags || '') + '</td>' +
+      '<td style="padding:10px 8px;"><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();showNewVendorModal(\'' + v.id + '\',\'' + catHint + '\')">Edit</button></td></tr>';
+  }).join('');
+  return '<h1 class="page-title">' + esc(title) + '</h1>' +
+    '<p style="color:var(--gray-400);margin-bottom:16px;">' + esc(blurb) + '</p>' +
+    '<div style="display:flex;gap:12px;margin-bottom:16px;"><input type="text" class="form-input" placeholder="' + esc(searchPh) + '" value="' + esc(query || '') + '" oninput="' + viewFn + '(this.value)" style="max-width:400px;"></div>' +
+    '<p style="color:var(--gray-400);margin-bottom:12px;font-size:13px;">Showing ' + filtered.length + ' of ' + items.length + '</p>' +
+    '<div class="card" style="overflow:hidden;">' +
+    '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+    '<thead><tr style="border-bottom:2px solid var(--gray-200);">' +
+    '<th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Name</th>' +
+    '<th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Type</th>' +
+    '<th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Description</th>' +
+    '<th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Contact</th>' +
+    '<th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Phone / Email</th>' +
+    '<th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Tags</th>' +
+    '<th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+
 async function renderVendors() {
   setBreadcrumb([{ label: 'Vendors' }]);
   setTopbarActions('<button class="btn btn-primary" onclick="showNewVendorModal(null,\'Vendor\')">+ New Vendor</button>');
@@ -978,6 +1074,8 @@ async function showNewVendorModal(existingId, categoryHint) {
   var currentType = String(v.type || '').trim();
   if (!currentType && cat === 'Workroom') currentType = 'Workroom';
   else if (!currentType && cat === 'Delivery / Receiver') currentType = 'Delivery (Receivers, installers, freight, etc.)';
+  else if (!currentType && cat === 'Showroom') currentType = 'Showroom';
+  else if (!currentType && (cat === 'Subcontractor' || cat === 'Contractors & Subs')) currentType = 'Contractors & Subs';
   else if (!currentType) currentType = 'Vendor / Manufacturer';
   var typeSelectOpts = cchVendorTypeSelectOptions(currentType);
   var title = (existingId ? 'Edit ' : 'New ') + cat;
@@ -1100,7 +1198,8 @@ async function saveVendor(existingId, category) {
     if (typeof window._invalidateShipToContactsCache === 'function') window._invalidateShipToContactsCache();
     if (typeof showToast === 'function') showToast('Saved ' + name, 'success');
     closeModal();
-    if (cat === 'Workroom') {
+    if (typeof cchRefreshVendorKindList === 'function') cchRefreshVendorKindList(cat);
+    else if (cat === 'Workroom') {
       if (typeof window.renderWorkrooms === 'function') window.renderWorkrooms();
       else if (typeof renderWorkrooms === 'function') renderWorkrooms();
     } else if (cat === 'Delivery / Receiver') {
@@ -1122,7 +1221,8 @@ async function deleteVendor(id, category) {
     await db.collection('vendors').doc(id).delete();
     if (typeof window._invalidateShipToContactsCache === 'function') window._invalidateShipToContactsCache();
     closeModal();
-    if (category === 'Workroom') renderWorkrooms();
+    if (typeof cchRefreshVendorKindList === 'function') cchRefreshVendorKindList(category);
+    else if (category === 'Workroom') renderWorkrooms();
     else if (category === 'Delivery / Receiver') renderDeliveryReceivers();
     else renderVendors();
   } catch(e) { if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Delete vendor'); }
@@ -1536,6 +1636,79 @@ function renderVendorInfoTab() {
   html += '<div style="margin-top:20px;"><button class="btn btn-primary" onclick="showNewVendorModal(\'' + vid + '\',\'Vendor\')">✏️ Edit Vendor</button></div></div>';
   C.innerHTML = html;
 }
+
+async function cchLoadVendorsForKindPage(pred) {
+  var snap = await db.collection('vendors').get();
+  var items = [];
+  snap.forEach(function(d) {
+    var row = Object.assign({ id: d.id }, d.data());
+    if (pred(row)) items.push(row);
+  });
+  items.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+  return items;
+}
+
+async function renderShowrooms() {
+  setBreadcrumb([{ label: 'Showrooms' }]);
+  setTopbarActions('<button class="btn btn-primary" onclick="showNewVendorModal(null,\'Showroom\')">+ New Showroom</button>');
+  var T = document.getElementById('contentArea');
+  T.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Loading...</div>';
+  try {
+    window._allShowrooms = await cchLoadVendorsForKindPage(cchVendorIsShowroom);
+    renderShowroomsView('');
+  } catch (e) {
+    T.innerHTML = '<div class="empty-state"><div class="empty-text">Error: ' + esc(e.message) + '</div></div>';
+  }
+}
+window.renderShowrooms = renderShowrooms;
+
+function renderShowroomsView(query) {
+  var T = document.getElementById('contentArea');
+  T.innerHTML = cchVendorKindTableHtml({
+    title: 'Showrooms',
+    blurb: 'Trade showrooms (Type = Showroom). Manufacturers stay on Vendors.',
+    query: query,
+    items: window._allShowrooms || [],
+    catHint: 'Showroom',
+    searchPlaceholder: 'Search showrooms...',
+    emptyIcon: '🏛',
+    emptyText: 'No showrooms yet. Add one, or set Type = Showroom on a vendor.',
+    newLabel: '+ New Showroom',
+    viewFn: 'renderShowroomsView'
+  });
+}
+window.renderShowroomsView = renderShowroomsView;
+
+async function renderContractors() {
+  setBreadcrumb([{ label: 'Subcontractors' }]);
+  setTopbarActions('<button class="btn btn-primary" onclick="showNewVendorModal(null,\'Subcontractor\')">+ New Subcontractor</button>');
+  var T = document.getElementById('contentArea');
+  T.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Loading...</div>';
+  try {
+    window._allContractors = await cchLoadVendorsForKindPage(cchVendorIsContractor);
+    renderContractorsView('');
+  } catch (e) {
+    T.innerHTML = '<div class="empty-state"><div class="empty-text">Error: ' + esc(e.message) + '</div></div>';
+  }
+}
+window.renderContractors = renderContractors;
+
+function renderContractorsView(query) {
+  var T = document.getElementById('contentArea');
+  T.innerHTML = cchVendorKindTableHtml({
+    title: 'Subcontractors',
+    blurb: 'Installers and trade subs (Type = Contractors & Subs).',
+    query: query,
+    items: window._allContractors || [],
+    catHint: 'Subcontractor',
+    searchPlaceholder: 'Search subcontractors...',
+    emptyIcon: '🔧',
+    emptyText: 'No subcontractors yet. Add one, or set Type = Contractors & Subs on a vendor.',
+    newLabel: '+ New Subcontractor',
+    viewFn: 'renderContractorsView'
+  });
+}
+window.renderContractorsView = renderContractorsView;
 
 // ==================== WORKROOMS ====================
 async function renderWorkrooms() {

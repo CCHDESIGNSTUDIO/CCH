@@ -1,8 +1,8 @@
 # CCH Studio — Known Issues
 
-**Last updated:** August 2, 2026  
+**Last updated:** August 19, 2026  
 **Maintainer:** Cynthia Holloway  
-**Last revised by:** Cursor (Aug 2, 2026 — Pepper/notes incident + PEPPER-1)
+**Last revised by:** Claude (Aug 19, 2026 — CLIP-3 DATA LOSS: finish select wipes clip, no save prompt)
 
 Tracked regressions and open bugs. For prioritized work order see `CURRENT_PRIORITIES.md`.
 
@@ -78,3 +78,82 @@ See `CURRENT_PRIORITIES.md` (Tearsheets blank, Product Library UI, RESOLVE/APPLY
 
 - Add a row when a regression is confirmed; remove or mark fixed after staging verification.
 - Link to `CURRENT_PRIORITIES.md` for scheduling, not duplicate priority ordering here.
+
+---
+
+## Clips / Selections — Aug 19, 2026
+
+| # | Issue | Root cause (grounded) | State |
+|---|--------|----------------------|-------|
+| CLIP-1 | Saved proposal lines produce **no clips** — Selections shows nothing. Reported by Cynthia on **PRO-3024**, Aug 19. | `cchRunDocLineClipEnsureAfterSave()` at `platform/index.html:13954` sets `var dry = !cchDocLineClipEnsureWritesEnabled();`. The gate at `13485` returns `true` only when env is staging, else `return false`. On **production the ensure runs dryRun:true and `persistLineLinks:false`** — it computes what it would create and creates nothing. | OPEN — this is board Decision #2 (WO-113 Part 2 / WO-045 durability), gate default-OFF since Jul 27. Needs Cynthia's GO to enable prod writes. |
+| CLIP-2 | Costs reported missing alongside CLIP-1 on PRO-3024. | **Not yet grounded.** Candidates: clip pricing backfill never applying markup ($0 cost + $0 clientPrice), and the copy-to-room carry that writes price as 0. Must confirm whether costs are absent on the proposal doc itself or only in the Selections view. | OPEN — needs one diagnostic from Cynthia |
+
+**Not caused by the 9.9.227 deploy.** The Aug 18 production delta was 52 lines in `index.html` + 17 in `client.html`, none of which touch clip, cost, or selections code (verified by diffing the pre-deploy production file against local).
+
+---
+
+## 🔴 CLIP-3 — ACTIVE DATA LOSS — Aug 19, 2026
+
+**Reported by Cynthia, Aug 19:** selecting a different **finish** wipes the entire clip, with **no prompt to save first**.
+
+**Severity: highest open item.** This destroys work in progress with no confirmation step and no undo. Unlike CLIP-1 (clips not created — nothing lost) this loses data the user already entered.
+
+**Status: NOT root-caused.** Do not attempt a fix until the exact surface is identified — there are at least four finish-bearing code paths and picking the wrong one risks another regression:
+
+| Location | What it is |
+|---|---|
+| `platform/index.html:39589` | doc-edit line **Finish** text input → `docEditFieldChange(this)` |
+| `platform/index.html:64913, 65306, 65370, 67074, 67080` | library product **finishOptions** picker |
+| `platform/index.html:12918, 15122, 35096, 35971, 82220, 82276` | assorted `.finish =` assignments (copy / import / print paths) |
+
+**Ruled out:** `_libraryFinishSave()` at `64240` — it only closes the modal and re-renders (`showProductDetail` / `renderLibraryView`). No writes, no deletes. Not the wipe.
+
+**Related:** `selDupKeyForItem()` at `18118` has **no finish component** — key precedence is `lib:` id → `url:` → `title|vendor`. Same product URL in two finishes collapses to one key. Whether that dedupe is what "wipes" the clip is **unconfirmed**.
+
+**Next step:** need the exact screen + control from Cynthia before touching code. Any fix requires a dry-run and typed GO (Rule 7).
+
+### CLIP-3 root cause — CONFIRMED Aug 19 (Cynthia + code)
+
+**Cynthia's domain facts:** the vendor URL is **identical for every finish** (finish is chosen on the page, not in the link), and **every finish has its own SKU**.
+
+**Therefore:** URL can never distinguish finishes. SKU is the only discriminator that exists.
+
+**The defect:** `selDupKeyForItem()` at `platform/index.html:18118` keys in this order —
+`lib:<libraryProductId>` → `url:<normalized url>` → `title|vendor`.
+**SKU is not in the key.** Verified: `sku` occurs 173× in `index.html`, and in **zero** dedupe/match expressions.
+
+So two clips of the same product in different finishes produce an identical key → treated as the same product → the second overwrites the first.
+
+**Fix direction (needs spec + Cynthia GO, do not code blind):**
+1. Put **SKU ahead of URL** in the key: if two items have different non-empty SKUs, they are different products, full stop.
+2. Only fall back to URL / title|vendor when SKU is absent on both.
+3. Add the confirm step Cynthia asked for: "This product exists — update it, or add as a new finish?"
+4. ⚠️ Changing this key changes what the Selections merge treats as duplicate **firm-wide**. Dry-run the split count before shipping anywhere.
+
+**Still unconfirmed:** whether the collapse is display-time (rows hidden, data intact) or write-time (data overwritten). `selDupKeyForItem` sits in the SELECTIONS TAB block, which suggests display. If display-only, Cynthia's five re-clips are still in Firestore. `_scripts/inspect-pro3024-costs_BY_CLAUDE_2026-08-19.js` answers this — it prints every line with its computed key.
+
+**Both mechanisms are live (corrected Aug 19):** the vendor URL **does** vary by finish. But `cchNormalizeProductUrlForDedup` (`27630`) sets `u.search = ''`, discarding the query string — so when a vendor encodes the finish as `?finish=…` / `?variant=…`, two genuinely different URLs normalize to one identical key. If the vendor encodes finish in the **path** instead, the URL key survives and the collapse comes from elsewhere.
+
+**Why SKU is still the fix, not the normalizer:** preserving query strings would repair only the vendors who use them, and would wrongly split URLs that carry tracking params (`?utm_source=…`). SKU is vendor-independent and Cynthia confirms it is unique per finish. Key on SKU first; treat URL as a fallback only.
+
+---
+
+## 🔴 MONEY-1 — 5,375 documents store money as unparseable strings (Aug 19, 2026)
+
+**Found by Claude, Aug 19, while chasing CLIP-2.** Scanned 19,879 documents across all board `clips` subcollections plus `products` and `productLibrary`.
+
+**5,375 documents hold at least one money field as a `$`-prefixed string** (e.g. `cost = "$1985.00"`). `parseFloat("$1985.00")` is `NaN`, and every consumer coerces that to `0` — so the value is present in Firestore and reads as zero in every total, margin, report and export.
+
+| Field | `$`-string | number | empty |
+|---|---|---|---|
+| `clientPrice` | **5,039** | 8,226 | 1,285 |
+| `cost` | **1,586** | 11,726 | 4,830 |
+| `retailPrice` | 1 | 190 | 376 |
+
+**Worst boards:** park-city 2,009 · shimano-westridge-lane 1,134 · katke-puerto-vallarta 585 · cloud-mustang 430 · cch 330 · johnny 296 · cloud-huntington-beach 246 · katke-graceland-dr 182 · bradbury-high-drive 145.
+
+**Fix:** strip `$` and `,`, parse to Number, write back. Dry-run manifest → diff → typed GO (Rule 7). Preserve any value that fails to parse rather than zeroing it.
+
+**Scope note:** this is **NOT** the cause of the Aug 19 Rolling Hills hardware cost loss — cloud-rolling-hills has only 7 affected documents, and Cynthia's missing hardware costs are `null`, not strings. Separate defect, tracked as CLIP-2.
+
+**Repro script:** `_scripts/count-string-costs_BY_CLAUDE_2026-08-19.js` (read-only).

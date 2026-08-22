@@ -63,6 +63,11 @@
       return { blocked: false };
     }
 
+    // Cindy Aug 20: proposal/invoice line prices must update the linked room-board clip. Library still blocked below.
+    if (operation === 'pushDocLinePricesToLinkedClip') {
+      return { blocked: false };
+    }
+
     if (operation === 'pushLibraryPrices' || operation === 'scheduleLibraryAutoSync' ||
         operation === 'syncProductToClipsFromDoc' || operation === 'clipHydrateOnOpen' ||
         operation === 'applyLibraryToLinePersist' || operation === 'spawnClipFromDocLine') {
@@ -183,6 +188,6 @@
   global.cchRunAsLibraryEdit = cchRunAsLibraryEdit;
 
   try {
-    console.info('[cch-doc-isolation] loaded v20260603d — cchNoBackSyncFromDoc()=', cchNoBackSyncFromDoc());
+    console.info('[cch-doc-isolation] loaded v20260820price1 — cchNoBackSyncFromDoc()=', cchNoBackSyncFromDoc());
   } catch (_bootLog) {}
 })(typeof window !== 'undefined' ? window : global);
