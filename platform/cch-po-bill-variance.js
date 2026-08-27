@@ -4,7 +4,7 @@
 (function() {
   'use strict';
 
-  /** Scenario A/D: QuickBooks gets vendor Bill lines only — PO and payments stay in Studio (Houzz bill-only). */
+  /** Scenario A/D: Studio payments never push to QB. Purchase Order still pushes so the vendor Bill can LinkedTxn to it (Houzz matching). */
   window.CCH_PO_QB_BILL_ONLY = true;
 
   /** Studio Pay bill / payments[] never push to QB — QB confirms via BillPayment webhook only. */
@@ -24,7 +24,17 @@
   window.cchPoQbBillPushBlockedHtml = function() {
     if (window.cchPoQbBillPushAllowed()) return '';
     return '<p style="font-size:11px;color:#5C6B80;margin:8px 0 0;max-width:480px;padding:8px 10px;border:1px solid rgba(196,164,100,0.25);background:rgba(196,164,100,0.06);">' +
-      'QuickBooks bill push is <strong>disabled on staging</strong>. Receive and edit vendor bills here; push to QB from production.</p>';
+      'QuickBooks PO/bill push is <strong>disabled on staging</strong>. Receive and edit here; push to QB from production.</p>';
+  };
+
+  /** Production only — same gate as vendor bills (staging must not hit live QuickBooks). */
+  window.cchPoCanPushPoToQb = function(po, canPushQB) {
+    if (!canPushQB) return false;
+    if (typeof window.cchPoQbBillPushAllowed === 'function' && !window.cchPoQbBillPushAllowed()) return false;
+    po = po || {};
+    if (po.qbPushPending) return false;
+    var id = typeof window.getQbId === 'function' ? window.getQbId(po) : String(po.qbDocId || '').trim();
+    return !id;
   };
 
   /** Houzz/QB Bill ref: PO-9016 → BL-9016 (Studio bill #; vendor paper inv # is a separate column). */
@@ -67,8 +77,8 @@
     if (!window.cchPoQbBillOnlyMode()) return '';
     po = po || {};
     var bill = po.bill || {};
-    var label = 'Bill-only';
-    var tip = 'QuickBooks: push the vendor bill (PO + extras), not the PO.';
+    var label = 'PO+Bill';
+    var tip = 'QuickBooks: push the Purchase Order, then the vendor bill linked to that PO. Match the bank feed to the Bill.';
     var bg = 'rgba(27,51,82,0.1)';
     var color = '#1B3352';
     if (bill.qbBillId) {
@@ -105,9 +115,9 @@
         (blRef ? '<span style="font-size:9px;color:#1B3352;font-weight:600;font-family:monospace;">' + esc(blRef) + '</span>' : '') +
         '</span>';
     }
-    if (legQb && typeof window.qbCellBadge === 'function') {
+    if (legQb) {
       return window.qbCellBadge(legQb, po.qbStatus, po) +
-        '<span style="font-size:9px;color:#5C6B80;display:block;margin-top:3px;" title="Older PO synced to QB as PO — new bills use Bill-only">Legacy PO</span>';
+        '<span style="font-size:9px;color:#5C6B80;display:block;margin-top:3px;" title="Purchase Order in QuickBooks — vendor bill links to this PO for matching">QB PO</span>';
     }
     if (bill.received) {
       return '<span style="font-size:10px;color:#92400E;font-weight:600;display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;" title="Vendor bill in Studio — push creates QB Bill ' + escAttr(blRef || '') + '">' +
@@ -119,8 +129,8 @@
       return window.qbCellBadge(null, po.qbStatus, po) +
         '<span style="font-size:9px;color:#5C6B80;display:block;margin-top:3px;" title="Houzz paid — import All Transactions XLSX for numeric QB id if needed">Houzz paid</span>';
     }
-    return '<span style="font-size:10px;color:#5C6B80;font-weight:600;display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;" title="Receive vendor bill in Studio' + (window.cchPoQbBillPushAllowed && !window.cchPoQbBillPushAllowed() ? ' — QB push on production only' : '') + '">' +
-      '<span>Bill-only</span>' +
+    return '<span style="font-size:10px;color:#5C6B80;font-weight:600;display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;" title="Send PO (pushes Purchase Order) then receive vendor bill' + (window.cchPoQbBillPushAllowed && !window.cchPoQbBillPushAllowed() ? ' — QB push on production only' : '') + '">' +
+      '<span>PO+Bill</span>' +
       (blRef ? '<span style="font-size:9px;color:#9CA3AF;font-family:monospace;">→ ' + esc(blRef) + (window.cchPoQbBillPushAllowed && !window.cchPoQbBillPushAllowed() ? ' (prod)' : '') + '</span>' : '') +
       '</span>';
   };
@@ -225,12 +235,13 @@
     if (qbBillId) {
       var stale = (typeof cchPoBillNeedsQbSync === 'function') && cchPoBillNeedsQbSync(bill);
       var linkedTip = bill.qbLinkedExisting ? ' · linked existing QB bill' : '';
+      var poTip = legQb ? ' · PO ' + legQb : '';
       return dot('#5FA56B',
-        (stale ? 'In QuickBooks (edited in Studio — re-push to update) · ' : 'Pushed to QuickBooks · ') + (blRef || qbBillId) + linkedTip,
+        (stale ? 'In QuickBooks (edited in Studio — re-push to update) · ' : 'Pushed to QuickBooks · ') + (blRef || qbBillId) + linkedTip + poTip,
         'QB');
     }
-    if (legQb && !window.cchPoQbBillOnlyMode()) {
-      return dot('#5FA56B', 'In QuickBooks (legacy) · ' + legQb, 'QB');
+    if (legQb) {
+      return dot('#5FA56B', 'Purchase Order in QuickBooks · ' + legQb + (bill.received ? ' · vendor bill not yet pushed' : ''), 'PO');
     }
     // RED — a push was attempted and failed
     if (pushErr) {
@@ -610,6 +621,36 @@
     return 'draft';
   };
 
+  /** Open / needs-action PO — same rule as All POs `#/allpos/pending` and the dashboard Open POs card. */
+  window.cchPoIsOpen = function(po) {
+    if (!po) return false;
+    var st = String(po.status || '').toLowerCase();
+    var paySt = String(po.paymentStatus || '').toLowerCase();
+    if (st === 'received' || st === 'cancelled' || st === 'installed' || st === 'paid' || st === 'closed' || st === 'delivered') return false;
+    if (paySt === 'paid') return false;
+    return true;
+  };
+
+  window.cchUpdatePoNavBadge = function(posList) {
+    var badge = document.getElementById('cchPoNavBadge');
+    if (!badge) return;
+    var all = posList || window._cachedPOs || [];
+    var n = 0;
+    var i;
+    for (i = 0; i < all.length; i++) {
+      if (window.cchPoIsOpen(all[i])) n++;
+    }
+    if (n > 0) {
+      badge.textContent = n > 99 ? '99+' : String(n);
+      badge.style.display = '';
+      badge.title = n + ' open purchase order' + (n === 1 ? '' : 's') + ' (not received / paid / closed)';
+    } else {
+      badge.textContent = '';
+      badge.style.display = 'none';
+      badge.title = '';
+    }
+  };
+
   window.cchPoIsLocked = function(doc) {
     if (!doc) return false;
     if (doc.poLocked === true) return true;
@@ -911,6 +952,89 @@
     return '<span role="button" tabindex="0" title="Change shipping / receiving status" style="cursor:pointer;display:inline-block;" ' +
       'onclick="event.stopPropagation();cchPoOpenStatusModal(\'' + escJs(opts.projectId) + '\',\'' + escJs(opts.poId) + '\')">' +
       inner + '</span>';
+  };
+
+  /** Project / All POs list ETA — same save path as Order Management. No Airtable write. */
+  window.cchPoListEtaIso = function(po) {
+    po = po || {};
+    if (typeof window.cchOmPoEtaDateIso === 'function') {
+      return String(window.cchOmPoEtaDateIso(po) || '').trim();
+    }
+    var e = po.eta || (po.bill && po.bill.etaDate) || '';
+    return e ? String(e).slice(0, 10) : '';
+  };
+
+  window.cchPoListEtaInputHtml = function(projectId, poId, po) {
+    var pid = escJs(projectId);
+    var poid = escJs(poId);
+    var val = window.cchPoListEtaIso(po);
+    return '<input type="date" class="form-input" style="font-size:11px;padding:4px 6px;width:128px;" ' +
+      'value="' + escAttr(val) + '" onclick="event.stopPropagation()" ' +
+      'onchange="window.cchPoSaveListEtaDate(\'' + pid + '\',\'' + poid + '\',this)" ' +
+      'title="Expected delivery — saves on this PO in Studio. Airtable later.">';
+  };
+
+  window.cchPoSaveListEtaDate = async function(projectId, poId, el) {
+    if (typeof window.cchOmSaveEtaDate === 'function') {
+      return window.cchOmSaveEtaDate(projectId, poId, el);
+    }
+    var val = String(el && el.value || '').trim();
+    if (el) el.disabled = true;
+    try {
+      var patch = { updatedAt: new Date().toISOString() };
+      if (val) patch.eta = val;
+      else patch.eta = firebase.firestore.FieldValue.delete();
+      await firebase.firestore().collection('boards').doc(projectId)
+        .collection('purchaseOrders').doc(poId).update(patch);
+      if (typeof window.showToast === 'function') window.showToast('Saved', 'success');
+    } catch (e) {
+      if (typeof window.showToast === 'function') window.showToast(e.message || 'Could not save ETA', 'error');
+    } finally {
+      if (el) el.disabled = false;
+    }
+  };
+
+  window.cchPoListReceivedCheckHtml = function(projectId, poId, po) {
+    po = po || {};
+    var goodsIn = typeof window.cchPoIsReceivedForClose === 'function' &&
+      window.cchPoIsReceivedForClose(po, po.items || []);
+    var cancelled = String(po.status || '').toLowerCase() === 'cancelled' ||
+      String(po.shippingStatus || '').toLowerCase() === 'cancelled';
+    var title = cancelled
+      ? 'Cancelled PO'
+      : 'Mark goods received on this PO. Studio only — does not write to Airtable yet.';
+    return '<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--gray-600);cursor:' +
+      (cancelled ? 'not-allowed' : 'pointer') + ';margin-left:6px;white-space:nowrap;" ' +
+      'onclick="event.stopPropagation()" title="' + escAttr(title) + '">' +
+      '<input type="checkbox" style="accent-color:var(--gold);cursor:' + (cancelled ? 'not-allowed' : 'pointer') + ';" ' +
+      (goodsIn ? 'checked ' : '') +
+      (cancelled ? 'disabled ' : '') +
+      'onchange="event.stopPropagation();window.cchPoSaveListReceived(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\',this)">' +
+      'Received</label>';
+  };
+
+  window.cchPoSaveListReceived = async function(projectId, poId, el) {
+    var on = !!(el && el.checked);
+    if (el) el.disabled = true;
+    try {
+      if (on) {
+        await window.cchPoSetFulfillmentStatus(projectId, poId, 'Received', {});
+      } else {
+        await window.cchPoSetFulfillmentStatus(projectId, poId, 'Pending', {});
+      }
+    } catch (e) {
+      if (el) el.checked = !on;
+      if (typeof window.showToast === 'function') window.showToast(e.message || 'Could not save Received', 'error');
+      if (el) el.disabled = false;
+    }
+  };
+
+  window.cchPoListShippingCellHtml = function(projectId, poId, po) {
+    var badge = typeof window.cchPoShippingStatusBadgeHtml === 'function'
+      ? window.cchPoShippingStatusBadgeHtml(po, { projectId: projectId, poId: poId, clickable: true })
+      : '—';
+    return '<span style="display:inline-flex;align-items:center;flex-wrap:wrap;gap:2px;">' +
+      badge + window.cchPoListReceivedCheckHtml(projectId, poId, po) + '</span>';
   };
 
   window.cchPoFulfillmentStatusBadgeHtml = function(doc, opts) {
@@ -2124,6 +2248,7 @@
       trackingNumber: String(bill.trackingNumber || '').trim(),
       trackingCarrier: String(bill.trackingCarrier || '').trim(),
       etaDate: String(bill.etaDate || '').trim(),
+      receivedDate: String(bill.receivedDate || '').trim(),
       shipmentNotes: String(bill.shipmentNotes || '').trim()
     };
   }
@@ -2146,6 +2271,7 @@
     if (g.estimatedShipDate) parts.push(cchPoMiniDateLine('Est ship', g.estimatedShipDate));
     if (g.actualShipDate) parts.push(cchPoMiniDateLine('Shipped', g.actualShipDate));
     if (g.etaDate) parts.push(cchPoMiniDateLine('ETA', g.etaDate));
+    if (g.receivedDate) parts.push(cchPoMiniDateLine('Received', g.receivedDate));
     if (!parts.length) return '';
     return parts.join('');
   };
@@ -2162,6 +2288,7 @@
     if (grp) {
       return {
         etaDate: String(item.etaDate || grp.etaDate || '').trim(),
+        receivedDate: String(item.receivedDate || grp.receivedDate || '').trim(),
         confirmedDate: String(grp.confirmedDate || '').trim(),
         estimatedShipDate: String(item.estimatedShipDate || grp.estimatedShipDate || '').trim(),
         actualShipDate: String(item.actualShipDate || grp.actualShipDate || '').trim(),
@@ -2174,6 +2301,7 @@
     }
     return {
       etaDate: String(item.etaDate || bill.etaDate || '').trim(),
+      receivedDate: String(item.receivedDate || bill.receivedDate || '').trim(),
       confirmedDate: String(item.confirmedDate || '').trim(),
       estimatedShipDate: String(item.estimatedShipDate || '').trim(),
       actualShipDate: String(item.actualShipDate || '').trim(),
@@ -2187,18 +2315,19 @@
 
   window.cchPoLineEtaHtml = function(doc, item, lineIdx, poItems) {
     var meta = window.cchPoLineEtaMetaForItem(doc, item, lineIdx, poItems);
-    var hasDates = !!(meta.estimatedShipDate || meta.actualShipDate || meta.etaDate);
-    if (!hasDates && !meta.trackingNumber && !meta.lineShipStatus) {
+    var hasDates = !!(meta.estimatedShipDate || meta.actualShipDate || meta.etaDate || meta.receivedDate);
+    if (!hasDates && !meta.trackingNumber && !meta.lineShipStatus && !meta.status) {
       return '<span style="font-size:11px;color:#9CA3AF;" title="Set on Confirm order or Vendor invoices → Edit">—</span>';
     }
     var html = '';
-    if (meta.lineShipStatus) {
-      var _lc = meta.lineShipStatus.toLowerCase();
-      var _lcShip = (_lc === 'shipped' || _lc === 'delivered' || _lc === 'received');
-      var _lcBack = (_lc === 'back ordered');
+    var shipLabel = String(meta.lineShipStatus || meta.status || '').trim();
+    if (shipLabel) {
+      var _lc = shipLabel.toLowerCase();
+      var _lcShip = (_lc === 'shipped' || _lc === 'delivered' || _lc === 'received' || _lc === 'in transit' || _lc === 'at receiver' || _lc === 'at workroom');
+      var _lcBack = (_lc === 'back ordered' || _lc === 'on hold');
       var _bg = _lcShip ? 'rgba(46,125,50,0.12)' : (_lcBack ? 'rgba(180,83,9,0.12)' : 'rgba(15,26,46,0.08)');
       var _fg = _lcShip ? '#1B5E20' : (_lcBack ? '#B45309' : '#1B3352');
-      html += '<span style="display:inline-block;font-size:10px;font-weight:600;padding:1px 6px;border-radius:3px;background:' + _bg + ';color:' + _fg + ';margin-bottom:2px;">' + esc(meta.lineShipStatus) + '</span>';
+      html += '<span style="display:inline-block;font-size:10px;font-weight:600;padding:1px 6px;border-radius:3px;background:' + _bg + ';color:' + _fg + ';margin-bottom:2px;">' + esc(shipLabel) + '</span>';
     }
     var timeline = window.cchPoLineEtaTimelineHtml(meta);
     if (timeline) html += timeline;
@@ -2236,7 +2365,9 @@
       '<div><label class="form-label">Tracking #</label>' +
       '<input type="text" id="cchBillTrackingNum" class="form-input" value="' + escAttr(meta.trackingNumber || '') + '" placeholder="9400…"></div>' +
       '<div><label class="form-label">ETA date <span style="font-weight:400;color:#9CA3AF;">(expected delivery)</span></label>' +
-      '<input type="date" id="cchBillEtaDate" class="form-input" value="' + escAttr(meta.etaDate || '') + '"></div>' +
+      '<input type="date" id="cchBillEtaDate" class="form-input" value="' + escAttr(String(meta.etaDate || '').slice(0, 10)) + '"></div>' +
+      '<div><label class="form-label">Received date <span style="font-weight:400;color:#9CA3AF;">(goods in)</span></label>' +
+      '<input type="date" id="cchBillReceivedDate" class="form-input" value="' + escAttr(String(meta.receivedDate || '').slice(0, 10)) + '" title="When these items arrived at the receiver, workroom, or job site. Does not close the whole PO."></div>' +
       '<div style="grid-column:1/-1;"><label class="form-label">Notes</label>' +
       '<textarea id="cchBillShipmentNotes" class="form-textarea" rows="2" placeholder="Ship window, receiver instructions, vendor message…" style="min-height:52px;font-size:12px;">' + esc(meta.shipmentNotes || '') + '</textarea></div>';
     return '<div id="cchBillVendorInvoiceHeader" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;padding:10px;background:rgba(27,51,82,0.04);border-radius:4px;border:1px solid rgba(27,51,82,0.1);">' +
@@ -2262,20 +2393,22 @@
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
           '<div><label class="form-label">Carrier</label><input type="text" class="form-input cch-bill-vig-carrier" value="' + escAttr(g.trackingCarrier || '') + '" placeholder="USPS…"></div>' +
           '<div><label class="form-label">Tracking #</label><input type="text" class="form-input cch-bill-vig-tracking" value="' + escAttr(g.trackingNumber || '') + '" placeholder="9400…"></div>' +
-          '<div><label class="form-label">ETA date</label><input type="date" class="form-input cch-bill-vig-eta" value="' + escAttr(g.etaDate || '') + '"></div>' +
+          '<div><label class="form-label">ETA date</label><input type="date" class="form-input cch-bill-vig-eta" value="' + escAttr(String(g.etaDate || '').slice(0, 10)) + '"></div>' +
+          '<div><label class="form-label">Received date <span style="font-weight:400;color:#9CA3AF;">(goods in)</span></label>' +
+          '<input type="date" class="form-input cch-bill-vig-received" value="' + escAttr(String(g.receivedDate || '').slice(0, 10)) + '" title="When this shipment arrived. Does not close the whole PO if other lines are still open."></div>' +
           '<div style="grid-column:1/-1;"><label class="form-label">Notes</label>' +
           '<textarea class="form-textarea cch-bill-vig-notes" rows="2" placeholder="Ship window, instructions…" style="min-height:48px;font-size:12px;">' + esc(g.notes || '') + '</textarea></div>' +
         '</div></div>';
     }).join('');
     return '<div style="margin-bottom:14px;">' +
       '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#00796B;margin:0 0 8px;">Shipment · per vendor invoice</div>' +
-      '<p style="font-size:11px;color:#5C6B80;margin:0 0 10px;line-height:1.45;">Tracking, ETA, and notes for each vendor invoice when the PO has multiple shipments.</p>' +
+      '<p style="font-size:11px;color:#5C6B80;margin:0 0 10px;line-height:1.45;">Tracking, ETA, and received date for each vendor invoice when the PO has multiple shipments. Received date does not close the whole PO.</p>' +
       rows + '</div>';
   }
 
   function cchPoHasBillShipmentMeta(meta) {
     meta = meta || {};
-    return !!(meta.trackingNumber || meta.trackingCarrier || meta.etaDate || meta.shipmentNotes);
+    return !!(meta.trackingNumber || meta.trackingCarrier || meta.etaDate || meta.receivedDate || meta.shipmentNotes);
   }
   var _hasBillShipmentMeta = cchPoHasBillShipmentMeta;
 
@@ -2726,6 +2859,7 @@
     var trackEl = document.getElementById('cchBillTrackingNum');
     var carrierEl = document.getElementById('cchBillTrackingCarrier');
     var etaEl = document.getElementById('cchBillEtaDate');
+    var recvEl = document.getElementById('cchBillReceivedDate');
     var notesEl = document.getElementById('cchBillShipmentNotes');
     return {
       vendorInvoiceNumber: invEl ? String(invEl.value || '').trim() : '',
@@ -2734,6 +2868,7 @@
       trackingNumber: trackEl ? String(trackEl.value || '').trim() : '',
       trackingCarrier: carrierEl ? String(carrierEl.value || '').trim() : '',
       etaDate: etaEl ? String(etaEl.value || '').trim() : '',
+      receivedDate: recvEl ? String(recvEl.value || '').trim() : '',
       shipmentNotes: notesEl ? String(notesEl.value || '').trim() : ''
     };
   }
@@ -2746,12 +2881,14 @@
       var carrierEl = row.querySelector('.cch-bill-vig-carrier');
       var trackEl = row.querySelector('.cch-bill-vig-tracking');
       var etaEl = row.querySelector('.cch-bill-vig-eta');
+      var recvEl = row.querySelector('.cch-bill-vig-received');
       var notesEl = row.querySelector('.cch-bill-vig-notes');
       out.push({
         id: id,
         trackingCarrier: carrierEl ? String(carrierEl.value || '').trim() : '',
         trackingNumber: trackEl ? String(trackEl.value || '').trim() : '',
         etaDate: etaEl ? String(etaEl.value || '').trim() : '',
+        receivedDate: recvEl ? String(recvEl.value || '').trim() : '',
         notes: notesEl ? String(notesEl.value || '').trim() : ''
       });
     });
@@ -2773,6 +2910,7 @@
         trackingNumber: p.trackingNumber,
         trackingCarrier: p.trackingCarrier,
         etaDate: p.etaDate,
+        receivedDate: p.receivedDate,
         notes: p.notes,
         updatedAt: new Date().toISOString()
       });
@@ -3362,6 +3500,94 @@
   /* ---- Receiver assignment (a PO is uploaded/sent to a receiver; the link lives on po.receiver) ---- */
   window._cchReceiversCache = window._cchReceiversCache || null;
 
+  window.cchPoShipToFirstLabel = function(raw) {
+    raw = String(raw || '').trim();
+    if (!raw) return '';
+    return raw.split('\n')[0].split(/[·\u00b7]/)[0].split(',')[0].trim();
+  };
+
+  /** Client home / job site / pickup — not a receiving party. Workroom, CCH, VH, DMS stay. */
+  window.cchPoShipToIsNonReceiver = function(raw) {
+    var s = String(raw || '').trim();
+    if (!s) return true;
+    var label = window.cchPoShipToFirstLabel(s).toLowerCase();
+    if (!label || label === 'client' || label === 'customer' || label === 'n/a' || label === 'na' || label === 'none' || label === 'tbd') return true;
+    if (label === 'receiver' || label === 'workroom' || label.indexOf('(none yet') >= 0) return true;
+    if (label === 'vendor direct to client' || label === 'will call / pickup' || /^will call/.test(label)) return true;
+    if (label.indexOf('client home') === 0 || /job site/.test(label) || label === 'jobsite') return true;
+    return false;
+  };
+
+  window.cchPoMatchReceiverContact = function(shipToVal, contact) {
+    if (!contact || shipToVal == null) return false;
+    var s = String(shipToVal).trim();
+    if (!s) return false;
+    var low = s.toLowerCase();
+    var rn = String(contact.name || '').trim();
+    if (!rn) return false;
+    if (low === rn.toLowerCase()) return true;
+    if (contact.addr && s === contact.addr) return true;
+    if (contact.legacyAddr && s === contact.legacyAddr) return true;
+    if (contact.displayText && s === contact.displayText) return true;
+    var nlen = rn.length;
+    if (s.indexOf(rn) === 0 && (s.length === nlen || /[\s\u00b7\u2014\n,]/.test(s.charAt(nlen)))) return true;
+    var label = window.cchPoShipToFirstLabel(s);
+    if (label && label.toLowerCase() === rn.toLowerCase()) return true;
+    return false;
+  };
+
+  /** Receiver = Ship To name on every PO (first line before ·). Not client / job site / pickup. */
+  window.cchPoShipToReceiverName = function(doc) {
+    doc = doc || {};
+    var raw = String(doc.shipTo || doc.deliverTo || '').trim();
+    if (!raw) {
+      var items = doc.items || [];
+      var seen = {};
+      var fromLines = [];
+      items.forEach(function(it) {
+        var s = String((it && (it.shipTo || it.deliverTo)) || '').trim();
+        if (s && !seen[s]) { seen[s] = true; fromLines.push(s); }
+      });
+      if (fromLines.length === 1) raw = fromLines[0];
+    }
+    if (!raw || window.cchPoShipToIsNonReceiver(raw)) return '';
+    var lists = [];
+    if (window._cchReceiversCache && window._cchReceiversCache.length) lists = lists.concat(window._cchReceiversCache);
+    if (window._cchShipToReceivers && window._cchShipToReceivers.length) lists = lists.concat(window._cchShipToReceivers);
+    if (window._cchShipToWorkrooms && window._cchShipToWorkrooms.length) lists = lists.concat(window._cchShipToWorkrooms);
+    var i;
+    for (i = 0; i < lists.length; i++) {
+      if (window.cchPoMatchReceiverContact(raw, lists[i])) return String(lists[i].name || '').trim();
+    }
+    var label = window.cchPoShipToFirstLabel(raw);
+    if (/^workroom:/i.test(label)) label = label.replace(/^workroom:\s*/i, '');
+    if (/^receiver:/i.test(label)) label = label.replace(/^receiver:\s*/i, '');
+    return label;
+  };
+
+  window.cchPoResolvedReceiverName = function(doc) {
+    doc = doc || {};
+    var have = String(doc.receiver || '').trim();
+    if (have) return have;
+    return window.cchPoShipToReceiverName(doc) || '';
+  };
+
+  window.cchPoRememberReceiver = function(name, email) {
+    name = String(name || '').trim();
+    if (!name) return;
+    window._cchReceiversCache = window._cchReceiversCache || [];
+    var low = name.toLowerCase();
+    var i;
+    for (i = 0; i < window._cchReceiversCache.length; i++) {
+      if (String(window._cchReceiversCache[i].name || '').toLowerCase() === low) {
+        if (email && !window._cchReceiversCache[i].email) window._cchReceiversCache[i].email = String(email).trim();
+        return;
+      }
+    }
+    window._cchReceiversCache.push({ name: name, email: String(email || '').trim(), phone: '' });
+    window._cchReceiversCache.sort(function(a, b) { return a.name.localeCompare(b.name); });
+  };
+
   /** Load receiver contacts once (Vendors type/category receiver/freight + Team role receiver), cached. */
   window.cchPoLoadReceivers = async function(force) {
     if (window._cchReceiversCache && !force) return window._cchReceiversCache;
@@ -3397,6 +3623,18 @@
         if (String(t.role || '').trim().toLowerCase() === 'receiver') add(t.name || t.company, t);
       });
     } catch (_e) {}
+    try {
+      var shipList = window._cchShipToReceivers || [];
+      for (var si = 0; si < shipList.length; si++) {
+        add(shipList[si] && shipList[si].name, shipList[si] || {});
+      }
+    } catch (_eShip) {}
+    try {
+      var wrList = window._cchShipToWorkrooms || [];
+      for (var wi = 0; wi < wrList.length; wi++) {
+        add(wrList[wi] && wrList[wi].name, wrList[wi] || {});
+      }
+    } catch (_eWr) {}
     out.sort(function(a, b) { return a.name.localeCompare(b.name); });
     window._cchReceiversCache = out;
     return out;
@@ -3539,25 +3777,88 @@
       window.cchPoReceiverOptionsHtml(selected) + '</select>';
   };
 
-  window.cchPoSaveReceiver = async function(projectId, poId, value) {
+  window.cchPoSaveReceiver = async function(projectId, poId, value, opts) {
+    opts = opts || {};
     value = String(value || '').trim();
     try {
+      var patch = { receiver: value, updatedAt: new Date().toISOString() };
+      if (opts.receiverEmail) patch.receiverEmail = String(opts.receiverEmail).trim();
       await firebase.firestore().collection('boards').doc(projectId)
         .collection('purchaseOrders').doc(poId)
-        .update({ receiver: value, updatedAt: new Date().toISOString() });
+        .update(patch);
       if (window._omPosCache && Array.isArray(window._omPosCache.pos)) {
         for (var i = 0; i < window._omPosCache.pos.length; i++) {
           var p = window._omPosCache.pos[i];
-          if (p && p.projectId === projectId && p.id === poId) { p.receiver = value; break; }
+          if (p && p.projectId === projectId && p.id === poId) {
+            p.receiver = value;
+            if (opts.receiverEmail) p.receiverEmail = patch.receiverEmail;
+            break;
+          }
         }
       }
-      if (typeof window.showToast === 'function') {
+      if (!opts.quiet && typeof window.showToast === 'function') {
         window.showToast(value ? ('Receiver: ' + value) : 'Receiver cleared', 'success');
       }
     } catch (e) {
+      if (opts.quiet) { console.warn('cchPoSaveReceiver', e); return; }
       if (typeof window.cchAlert === 'function') await window.cchAlert(e.message || e, 'Receiver');
       else console.warn('cchPoSaveReceiver', e);
     }
+  };
+
+  /** Fill sidebar Receiver from Ship To, then Airtable PO row if still empty. Persist once (no toast). */
+  window.cchPoFillReceiverFromShipToAndAirtable = function(projectId, poId, docData) {
+    docData = docData || {};
+    var have = String(docData.receiver || '').trim();
+    var local = window.cchPoShipToReceiverName(docData) || '';
+    var selected = have || local;
+    if (selected) window.cchPoRememberReceiver(selected, docData.receiverEmail);
+    var k = String(projectId || '') + '/' + String(poId || '');
+    window._cchPoReceiverFillOnce = window._cchPoReceiverFillOnce || {};
+    if (k !== '/' && !window._cchPoReceiverFillOnce[k]) {
+      window._cchPoReceiverFillOnce[k] = true;
+      if (!have && local) {
+        docData.receiver = local;
+        window.cchPoSaveReceiver(projectId, poId, local, { quiet: true });
+      }
+      var poNum = String(docData.number || docData.poNumber || '').trim();
+      var needAt = (!have && !local) || !String(docData.receiverEmail || '').trim();
+      if (needAt && poNum && typeof window.cchLookupAirtablePoReceiver === 'function') {
+        window.cchLookupAirtablePoReceiver(poNum).then(function(hit) {
+          if (!hit) return;
+          var atName = String(hit.name || '').trim();
+          var atEmail = String(hit.email || '').trim();
+          var atType = String(hit.shipToType || '').toLowerCase();
+          var useName = atName;
+          if (useName && window.cchPoShipToIsNonReceiver(useName)) useName = '';
+          if (!useName && /receiv|warehouse/.test(atType) && atName) useName = atName;
+          if (useName) window.cchPoRememberReceiver(useName, atEmail);
+          var cur = String(docData.receiver || '').trim();
+          if (!cur && useName) {
+            docData.receiver = useName;
+            window.cchPoSaveReceiver(projectId, poId, useName, { quiet: true, receiverEmail: atEmail });
+            var sel = document.querySelector('.cch-po-shipping-lane .cch-po-receiver-select');
+            if (sel) {
+              var found = false;
+              for (var oi = 0; oi < sel.options.length; oi++) {
+                if (sel.options[oi].value === useName) { found = true; break; }
+              }
+              if (!found) {
+                var opt = document.createElement('option');
+                opt.value = useName;
+                opt.textContent = useName;
+                sel.appendChild(opt);
+              }
+              sel.value = useName;
+            }
+          } else if (cur && atEmail && !String(docData.receiverEmail || '').trim()) {
+            docData.receiverEmail = atEmail;
+            window.cchPoSaveReceiver(projectId, poId, cur, { quiet: true, receiverEmail: atEmail });
+          }
+        });
+      }
+    }
+    return selected;
   };
 
   if (typeof firebase !== 'undefined' && firebase.firestore) {
@@ -3568,9 +3869,12 @@
     docData = docData || {};
     poItems = poItems || docData.items || [];
 
+    var recSel = (typeof window.cchPoFillReceiverFromShipToAndAirtable === 'function')
+      ? window.cchPoFillReceiverFromShipToAndAirtable(projectId, poId, docData)
+      : String(docData.receiver || '').trim();
     var receiverRowHtml = '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">' +
       '<label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#5C6B80;white-space:nowrap;">Receiver</label>' +
-      window.cchPoReceiverSelectHtml(projectId, poId, docData.receiver) +
+      window.cchPoReceiverSelectHtml(projectId, poId, recSel) +
       '<span style="font-size:10px;color:#9CA3AF;">Where this PO ships — used for Airtable + shipment notification</span>' +
       '</div>';
 
@@ -3627,10 +3931,13 @@
       var parts = [];
       if (g.trackingNumber) parts.push('Tracking ' + esc(g.trackingNumber));
       if (g.trackingCarrier) parts.push(esc(g.trackingCarrier));
-      if (g.etaDate && typeof window.cchPoFormatEtaDate === 'function') {
-        parts.push('ETA ' + esc(window.cchPoFormatEtaDate(g.etaDate)));
-      } else if (g.etaDate) {
-        parts.push('ETA ' + esc(String(g.etaDate).slice(0, 10)));
+      if (g.etaDate) {
+        parts.push('ETA ' + esc(typeof window.cchPoFormatEtaDate === 'function'
+          ? window.cchPoFormatEtaDate(g.etaDate) : String(g.etaDate).slice(0, 10)));
+      }
+      if (g.receivedDate) {
+        parts.push('Received ' + esc(typeof window.cchPoFormatEtaDate === 'function'
+          ? window.cchPoFormatEtaDate(g.receivedDate) : String(g.receivedDate).slice(0, 10)));
       }
       return parts;
     }
@@ -3785,6 +4092,7 @@
     if (g.estimatedShipDate) parts.push(cchPoMiniDateLine('Est ship', g.estimatedShipDate));
     if (g.actualShipDate) parts.push(cchPoMiniDateLine('Shipped', g.actualShipDate));
     if (g.etaDate) parts.push(cchPoMiniDateLine('ETA', g.etaDate));
+    if (g.receivedDate) parts.push(cchPoMiniDateLine('Received', g.receivedDate));
     var estF = parseFloat(g.estimatedFreight);
     var actF = parseFloat(g.actualFreight);
     if (!isNaN(estF) && estF > 0.005) {
@@ -3919,6 +4227,7 @@
           trackingNumber: String(g.trackingNumber || '').trim(),
           trackingCarrier: String(g.trackingCarrier || '').trim(),
           etaDate: String(g.etaDate || '').trim(),
+          receivedDate: String(g.receivedDate || '').trim(),
           notes: String(g.notes || '').trim(),
           attachmentName: String(g.attachmentName || '').trim(),
           label: String(g.label || '').trim()
@@ -3959,6 +4268,7 @@
       trackingNumber: String(g.trackingNumber || '').trim(),
       trackingCarrier: String(g.trackingCarrier || '').trim(),
       etaDate: String(g.etaDate || '').trim(),
+      receivedDate: String(g.receivedDate || '').trim(),
       notes: String(g.notes || '').trim(),
       attachmentName: String(g.attachmentName || '').trim(),
       label: String(g.label || '').trim()
@@ -4014,6 +4324,7 @@
       trackingNumber: String(bill.trackingNumber || '').trim(),
       trackingCarrier: String(bill.trackingCarrier || '').trim(),
       etaDate: String(bill.etaDate || '').trim(),
+      receivedDate: String(bill.receivedDate || '').trim(),
       notes: String(bill.shipmentNotes || '').trim(),
       attachmentName: '',
       label: '',
@@ -4536,6 +4847,7 @@
         trackingNumber: grp.trackingNumber || '',
         trackingCarrier: grp.trackingCarrier || '',
         etaDate: grp.etaDate || '',
+        receivedDate: grp.receivedDate || '',
         shipmentNotes: grp.notes || ''
       };
     }
@@ -4548,6 +4860,7 @@
         trackingNumber: String(bill.trackingNumber || '').trim(),
         trackingCarrier: String(bill.trackingCarrier || '').trim(),
         etaDate: String(bill.etaDate || '').trim(),
+        receivedDate: String(bill.receivedDate || '').trim(),
         shipmentNotes: String(bill.shipmentNotes || '').trim()
       };
     }
@@ -5185,6 +5498,7 @@
         '<div><label class="form-label">Est. ship date</label><input type="date" id="cchVigEstShipDate" class="form-input" value="' + escAttr(existing ? existing.estimatedShipDate : '') + '" title="Vendor promised ship — before CC charge"></div>' +
         '<div><label class="form-label">Actual ship date</label><input type="date" id="cchVigActualShipDate" class="form-input" value="' + escAttr(existing ? existing.actualShipDate : '') + '" title="Left vendor / CC charged"></div>' +
         '<div><label class="form-label">Delivery ETA</label><input type="date" id="cchVigEtaDate" class="form-input" value="' + escAttr(existing ? existing.etaDate : '') + '" title="Expected delivery to client/receiver"></div>' +
+        '<div><label class="form-label">Received date</label><input type="date" id="cchVigReceivedDate" class="form-input" value="' + escAttr(existing ? String(existing.receivedDate || '').slice(0, 10) : '') + '" title="When these items arrived. Does not close the whole PO."></div>' +
         '<div><label class="form-label">Carrier <span style="font-weight:400;color:#9CA3AF;">(optional)</span></label><input type="text" id="cchVigCarrier" class="form-input" value="' + escAttr(existing ? existing.trackingCarrier : '') + '" placeholder="USPS, FedEx…"></div>' +
         '<div style="grid-column:1/-1;"><label class="form-label">Tracking #</label><input type="text" id="cchVigTracking" class="form-input" value="' + escAttr(existing ? existing.trackingNumber : '') + '" placeholder="9400…"></div>' +
         '<div style="grid-column:1/-1;"><label class="form-label">Notes</label>' +
@@ -5222,6 +5536,7 @@
     var tracking = String(document.getElementById('cchVigTracking') && document.getElementById('cchVigTracking').value || '').trim();
     tracking = tracking.replace(/^tracking:\s*/i, '').trim();
     var etaDate = String(document.getElementById('cchVigEtaDate') && document.getElementById('cchVigEtaDate').value || '').trim();
+    var receivedDate = String(document.getElementById('cchVigReceivedDate') && document.getElementById('cchVigReceivedDate').value || '').trim();
     var confirmedDate = String(document.getElementById('cchVigConfirmedDate') && document.getElementById('cchVigConfirmedDate').value || '').trim();
     var estimatedShipDate = String(document.getElementById('cchVigEstShipDate') && document.getElementById('cchVigEstShipDate').value || '').trim();
     var actualShipDate = String(document.getElementById('cchVigActualShipDate') && document.getElementById('cchVigActualShipDate').value || '').trim();
@@ -5285,6 +5600,7 @@
       trackingNumber: tracking,
       trackingCarrier: carrier,
       etaDate: etaDate,
+      receivedDate: receivedDate,
       notes: notes,
       attachmentName: attName,
       label: '',
@@ -5497,6 +5813,20 @@
         console.warn('[cchPoSendToVendor] notification write:', notifErr);
       }
       if (typeof window.showToast === 'function') window.showToast('PO sent to vendor — lines locked', 'success');
+      if (typeof window.cchPoQbBillPushAllowed === 'function' && window.cchPoQbBillPushAllowed()
+          && typeof window.pushDocToQB === 'function') {
+        var alreadyQb = typeof window.getQbId === 'function' ? window.getQbId(d) : d.qbDocId;
+        if (!alreadyQb) {
+          try {
+            await window.pushDocToQB('po', projectId, poId);
+          } catch (qbPoErr) {
+            console.warn('[cchPoSendToVendor] QuickBooks PO push:', qbPoErr);
+            if (typeof window.showToast === 'function') {
+              window.showToast('PO sent. QuickBooks Purchase Order push failed — use Push PO to QuickBooks.', 'warning');
+            }
+          }
+        }
+      }
       // Open Outlook/mail after lock — prompt for To, then mailto (does not undo send if canceled).
       if (typeof window.cchPoEmailVendor === 'function') {
         try { await window.cchPoEmailVendor(projectId, poId); } catch (_eMail) {
@@ -5536,7 +5866,7 @@
       viRows = cchPoDefaultVendorInvoiceRows();
     }
     var billInvMeta = isAdd
-      ? { vendorInvoiceNumber: '', vendorInvoiceDate: '', trackingNumber: '', trackingCarrier: '', etaDate: '', shipmentNotes: '' }
+      ? { vendorInvoiceNumber: '', vendorInvoiceDate: '', trackingNumber: '', trackingCarrier: '', etaDate: '', receivedDate: '', shipmentNotes: '' }
       : cchPoBillVendorInvoiceMeta(b, viRows);
     if (!isAdd && !_hasBillShipmentMeta(billInvMeta)) {
       var _singleGrp = window.cchPoVendorInvoiceGroups(d, d.items || []);
@@ -5544,6 +5874,7 @@
         billInvMeta.trackingNumber = _singleGrp[0].trackingNumber || '';
         billInvMeta.trackingCarrier = _singleGrp[0].trackingCarrier || '';
         billInvMeta.etaDate = _singleGrp[0].etaDate || '';
+        billInvMeta.receivedDate = _singleGrp[0].receivedDate || '';
         billInvMeta.shipmentNotes = _singleGrp[0].notes || '';
       }
     }
@@ -5738,6 +6069,7 @@
       trackingNumber: billInvMeta.trackingNumber || '',
       trackingCarrier: billInvMeta.trackingCarrier || '',
       etaDate: billInvMeta.etaDate || '',
+      receivedDate: billInvMeta.receivedDate || '',
       shipmentNotes: billInvMeta.shipmentNotes || '',
       vendorInvoices: vendorInvoices,
       poTotalAtSend: poAtSend,
@@ -7663,28 +7995,9 @@
     });
   }
 
-  /** Block legacy pushDocToQB('po') — bill-only workflow. */
+  /** PO push is required so QB Bills can LinkedTxn to the Purchase Order. Payments still never push. */
   function cchPoInstallBillOnlyPushGuard() {
-    if (window._cchPoBillOnlyPushGuardInstalled) return;
-    var orig = window.pushDocToQB;
-    if (typeof orig !== 'function') return;
-    window._cchPoBillOnlyPushGuardInstalled = true;
-    window.pushDocToQB = async function(docType, projectId, docId, btnEl, sendEmail) {
-      if (docType === 'po' && window.cchPoQbBillOnlyMode()) {
-        var hasBill = false;
-        try {
-          var snap = await firebase.firestore().collection('boards').doc(projectId)
-            .collection('purchaseOrders').doc(docId).get();
-          hasBill = snap.exists && snap.data().bill && snap.data().bill.received;
-        } catch (_e) { /* ignore */ }
-        var msg = hasBill
-          ? 'QuickBooks uses the vendor bill only.\n\nUse **Edit bill** or **+ Add vendor invoice** to update amounts, then **Sync bill to QuickBooks**.'
-          : 'Use **Receive vendor bill** to record the first vendor invoice (PO lines + freight/tax). Push to QuickBooks from the bill bar.\n\nPOs stay in Studio for ordering and variance.';
-        if (typeof window.cchAlert === 'function') await window.cchAlert(msg, 'Bill-only QuickBooks workflow');
-        return;
-      }
-      return orig.apply(this, arguments);
-    };
+    return;
   }
   cchPoInstallBillOnlyPushGuard();
   setTimeout(cchPoInstallBillOnlyPushGuard, 0);

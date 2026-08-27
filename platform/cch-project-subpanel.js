@@ -2,7 +2,7 @@
 // Houzz-style project sub-panel — panel #2 only. Does NOT touch the CCH Studio rail (#1).
 // Spec: Docs/NAV_SPEC_FOR_CURSOR.png + Docs/NAV_SUBPANEL_SPEC_CW_Jul11_v1.2.html
 // Feature-flagged: OFF only when localStorage cchNavPanel=0. Admin default ON all hosts.
-// Build 20260806sp15 — Client activity under Client (opens slide-over)
+// Build 20260826sp16 — Purchase Orders open-count badge (same rule as firm-wide All POs)
 
 (function() {
   'use strict';
@@ -11,7 +11,7 @@
   window._cchProjSubPanelLoaded = true;
 
   var PANEL_W = 216;
-  var spState = { projId: null, woCount: 0, filesBadge: 0 };
+  var spState = { projId: null, woCount: 0, filesBadge: 0, poOpenCount: 0 };
   /** Bumped on every afterRender / setNav — stale spLoadCounts must not re-open panel after Tabs. */
   var _spRenderGen = 0;
 
@@ -153,6 +153,7 @@
     spState.projId = projId;
     spState.woCount = 0;
     spState.filesBadge = 0;
+    spState.poOpenCount = 0;
     try {
       var database = (typeof db !== 'undefined' && db) || firebase.firestore();
       var woSnap = await database.collection('boards').doc(projId).collection('workOrders').limit(200).get();
@@ -168,6 +169,25 @@
       });
       spState.filesBadge = n;
     } catch (e) {}
+    try {
+      var database3 = (typeof db !== 'undefined' && db) || firebase.firestore();
+      var poSnap = await database3.collection('boards').doc(projId).collection('purchaseOrders').limit(500).get();
+      var openN = 0;
+      poSnap.forEach(function(d) {
+        var po = d.data() || {};
+        po.id = d.id;
+        if (typeof window.cchPoIsOpen === 'function') {
+          if (window.cchPoIsOpen(po)) openN++;
+        } else {
+          var st = String(po.status || '').toLowerCase();
+          var paySt = String(po.paymentStatus || '').toLowerCase();
+          if (st === 'received' || st === 'cancelled' || st === 'installed' || st === 'paid' || st === 'closed' || st === 'delivered') return;
+          if (paySt === 'paid') return;
+          openN++;
+        }
+      });
+      spState.poOpenCount = openN;
+    } catch (ePo) {}
   }
 
   function spInjectStyles() {
@@ -285,7 +305,10 @@
 
     html += '<div class="cch-sp-grp">Money</div>';
     html += spItem('Invoices', 'invoices');
-    html += spItem('Purchase Orders', 'pos');
+    html += spItem('Purchase Orders', 'pos', {
+      badge: spState.poOpenCount,
+      title: 'Open POs — not received / paid / closed'
+    });
     html += spItem('Bill Variances', 'discrepancies');
     if (isAdmin) html += spItem('Financials', 'financials');
 

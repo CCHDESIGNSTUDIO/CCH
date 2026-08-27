@@ -14,6 +14,7 @@ const PO = {
   vendor: 'fldVn8PVjfmNBVAvd',
   shipTo: 'fldQJbWEKb0Thi0fs',
   receiverEmail: 'Receiver Email',
+  receiverEmailId: 'fldZV8NnuOUBCMmqU',
   client: 'fldrQTqPYNGYcXj0l',
   project: 'fldsHArDlNKaiaqRZ',
   shipToType: 'fldjVFlumus08RBuc',
@@ -273,6 +274,36 @@ async function listExistingKeys(pat, tableId, fieldId, dryRun) {
     await sleep(AIRTABLE_THROTTLE_MS);
   } while (offset);
   return keys;
+}
+
+/** Read receiver name + email from the Airtable PO row (Studio never pulled these before). */
+async function lookupAirtablePoReceiver({ pat, poNumber }) {
+  const num = str(poNumber);
+  if (!pat || !num) return null;
+  const formula = '{fldATxqfNhq3CkpWK}="' + num.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+  const url = new URL('https://api.airtable.com/v0/' + BASE + '/' + TBL_PO);
+  url.searchParams.set('filterByFormula', formula);
+  url.searchParams.set('returnFieldsByFieldId', 'true');
+  url.searchParams.set('maxRecords', '1');
+  const res = await fetch(url, { headers: { Authorization: 'Bearer ' + pat } });
+  const text = await res.text();
+  if (!res.ok) throw new Error('Airtable lookup ' + res.status + ': ' + text.slice(0, 400));
+  const json = text ? JSON.parse(text) : {};
+  const rec = (json.records && json.records[0]) || null;
+  if (!rec) return null;
+  const f = rec.fields || {};
+  const shipTo = str(f[PO.shipTo]);
+  const name = cleanReceiverName({ receiver: '' }, shipTo) || shipTo;
+  const email = str(f[PO.receiverEmailId] || f[PO.receiverEmail]);
+  const shipToType = str(f[PO.shipToType]);
+  if (!name && !email) return null;
+  return {
+    name: name || '',
+    email: email || '',
+    shipTo: shipTo || '',
+    shipToType: shipToType || '',
+    recordId: rec.id || ''
+  };
 }
 
 function chunk(arr, n) {
@@ -625,6 +656,7 @@ async function pushPOsToAirtable(opts) {
 
 module.exports = {
   pushPOsToAirtable,
+  lookupAirtablePoReceiver,
   BASE,
   TBL_PO,
   TBL_LINES,

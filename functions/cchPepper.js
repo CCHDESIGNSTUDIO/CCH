@@ -39,6 +39,9 @@ const PRESET_FRAMES = {
   whats_next: () => "What needs attention today? Be PROACTIVE (assistant mindset): (1) open AR / draft invoices (2) proposals to send or waiting on client (3) unbilled time (4) PO missing confirmation / ETA / bills (5) goods not received (6) decisions/tasks/Follow-Ups. Name doc numbers from the digests. Do not invent. Draft only.",
   unbilled_time: () => "Using the unbilled time digest below, summarize billable hours ready to invoice for this project. Group by person if possible. Draft staff-only notes only. Do not create an invoice. If the digest says none found, say so plainly.",
   vendor_status_followup: (input) => `Draft a short vendor-facing status follow-up email body (no subject line). Ask for confirmation and/or ETA as needed. Ground in the PO / open-PO / PROJECT MONEY chase digest below. ${input || ""} Keep it warm and brief. Never invent PO numbers or ETAs not in the digest.`,
+  daily_brief: () => "Produce a DAILY staff brief for the signed-in person. Use MY AGENDA / FIRM-WIDE STAFF DIGEST. Stay scoped to that person unless they asked All Team. Shape: money first (open AR, drafts to send, unbilled), then chase (PO confirmation / ETA / bills), then ONE next step. Short. Numbers only from the digest. If a bucket is missing, say so. Never guess. Draft-only. Never claim you emailed, invoiced, or pushed to QuickBooks.",
+  weekly_brief: () => "Produce a WEEKLY staff brief (Monday framing: here's your week). Use MY AGENDA / FIRM-WIDE STAFF DIGEST. Cover last 7 days plus the coming week IF those sections exist in the digest. Same money loop as daily, in short sections and bullets. Person-scoped unless All Team. If the digest has no last-7 or coming-week rollup, say that plainly and use today's plate only — never invent a week of numbers. Draft-only. Never claim you emailed, invoiced, or pushed to QuickBooks.",
+  monthly_brief: () => "Produce a MONTHLY staff brief for the current calendar month. Use MY AGENDA / FIRM-WIDE STAFF DIGEST. Same buckets as daily (money, chase, next step), not a dump of every line. Person-scoped unless All Team. If the digest has no calendar-month rollup, say so instead of guessing month totals. Numbers only from the digest. Draft-only. Never claim you emailed, invoiced, or pushed to QuickBooks.",
 };
 
 function buildSystemPrompt() {
@@ -100,6 +103,14 @@ function buildSystemPrompt() {
     "- Timely sync uses production Studio only (cch-platform.web.app), not staging.",
     "- Platform overview (human-readable): https://cch-platform.web.app/CCH_Studio_Platform_Overview.html",
     "- If you are unsure of a platform detail, say so. Do not guess.",
+    "",
+    "BRIEF CADENCE (staff briefs — shape, not extra facts):",
+    "- Daily = today's plate for the signed-in person: money first, then chase, then one next step. Short.",
+    "- Weekly = last 7 days + what's on the plate for the coming week. Monday framing: \"here's your week.\" Same money loop. Short sections, bullets.",
+    "- Monthly = calendar month. Same buckets, not a dump of every line.",
+    "- Always person-scoped unless they ask All Team.",
+    "- Numbers only from the digest. If a bucket is missing, say so. Never guess.",
+    "- Draft-only. Never claim you emailed, invoiced, or pushed to QuickBooks.",
   ].join("\n");
 }
 

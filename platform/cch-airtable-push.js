@@ -57,6 +57,21 @@
     }
   };
 
+  /** Read receiver name/email from the Airtable PO row. Silent on miss / undeployed function. */
+  window.cchLookupAirtablePoReceiver = async function(poNumber) {
+    poNumber = String(poNumber || '').trim();
+    if (!poNumber) return null;
+    if (typeof window.cchCanPushToAirtable === 'function' && !window.cchCanPushToAirtable()) return null;
+    try {
+      var fn = firebase.functions().httpsCallable('lookupAirtablePoReceiver');
+      var res = await fn({ poNumber: poNumber });
+      var data = res && res.data ? res.data : {};
+      return data.receiver || null;
+    } catch (_e) {
+      return null;
+    }
+  };
+
   window.cchAirtablePushBtnHtml = function(opts) {
     opts = opts || {};
     if (!window.cchCanPushToAirtable()) return '';

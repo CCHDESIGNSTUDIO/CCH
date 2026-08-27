@@ -1033,6 +1033,16 @@
     .nav-icon { font-size: 13px; width: 18px; text-align: center; opacity: 0.78; }
     .nav-item.active .nav-icon { opacity: 1; }
     .nav-label { letter-spacing: 0.2px; }
+    .sidebar .nav-badge {
+      margin-left: auto;
+      background: #E86F45;
+      color: #fff;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 7px;
+      line-height: 1.4;
+      flex-shrink: 0;
+    }
     /* Pinterest / Style Library: accent on border + icon only; label matches other nav items */
     .sidebar .nav-item[data-page="pinterest"] .nav-label,
     .sidebar .nav-item[data-page="designerlibrary"] .nav-label { color: inherit !important; }
@@ -1253,7 +1263,31 @@
     }
     #proposalPrintArea .proposal-table-wrap .prop-item-cell strong {
       display: block;
+      font-size: 13px;
+    }
+    #proposalPrintArea .proposal-table-wrap .prop-item-desc {
+      display: block;
       font-size: 12px;
+      color: #5C6B80;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    #proposalPrintArea .proposal-table-wrap .prop-room-cell,
+    #proposalPrintArea .proposal-table-wrap th.prop-room-th {
+      width: 76px;
+      max-width: 90px;
+      overflow: hidden;
+      word-wrap: break-word;
+      font-size: 11px;
+    }
+    #proposalPrintArea .proposal-table-wrap .prop-tag-cell,
+    #proposalPrintArea .proposal-table-wrap th.prop-tag-th {
+      width: 40px;
+      max-width: 44px;
+      overflow: hidden;
+      text-align: center;
+      white-space: nowrap;
     }
     #proposalPrintArea .proposal-table-wrap .prop-sticky-actions,
     #invoiceManageArea .proposal-table-wrap .prop-sticky-actions {
@@ -1280,6 +1314,9 @@
       border-bottom: 2px solid #1B3352;
       padding-top: 8px !important;
       padding-bottom: 6px !important;
+    }
+    #proposalPrintArea .proposal-table-wrap tbody > tr.prop-room-group-row:not(:first-child) td {
+      padding-top: 28px !important;
     }
     #proposalPrintArea .proposal-table-wrap .prop-room-group-row .prop-room-label {
       font-size: 11px;
@@ -3505,8 +3542,8 @@
         <button class="nav-item" data-page="allinvoices">
           <span class="nav-icon">◈</span><span class="nav-label">Invoices</span>
         </button>
-        <button class="nav-item" data-page="allpos">
-          <span class="nav-icon">◈</span><span class="nav-label">Purchase Orders</span>
+        <button class="nav-item" data-page="allpos" title="Open POs (not received / paid / closed)" onclick="event.stopImmediatePropagation();navigate('#/allpos/pending')">
+          <span class="nav-icon">◈</span><span class="nav-label">Purchase Orders</span><span class="nav-badge" id="cchPoNavBadge" style="display:none;"></span>
         </button>
         <button class="nav-item" data-page="allffe" onclick="event.stopImmediatePropagation();navigate('#/allffe')" title="Furnishings schedule across projects — filter by project and category">
           <span class="nav-icon">🛋️</span><span class="nav-label">FFE Schedule</span>
@@ -4292,7 +4329,7 @@
     window.buildFinancialHealthBarHtml = buildFinancialHealthBarHtml;
 
     // -- Platform Version --
-    const CCH_BUILD = { version: '9.9.251', date: '2026-08-21', tag: 'cp-portal-phone-wo121-2026-08-21' };
+      const CCH_BUILD = { version: '9.9.281', date: '2026-08-27', tag: 'bundle-restack-orphans-2026-08-27' };
     window.CCH_BUILD = CCH_BUILD;
 
     /** ASCII-safe UI glyphs — always \u escapes so Windows re-encodes cannot turn them into '?'. */
@@ -5198,6 +5235,16 @@
           return;
         }
         window._cchAuthBootStarted = true;
+        // Firm-wide open-PO badge: do not wait for Dashboard / All POs (that's when follow-up drops).
+        if (!isClientRoute) {
+          setTimeout(function() {
+            try {
+              if (typeof loadPOsOnlyFast === 'function') {
+                loadPOsOnlyFast().catch(function(ePoNav) { console.warn('[po-nav] badge preload', ePoNav); });
+              }
+            } catch (ePoNav2) {}
+          }, 0);
+        }
         // Load saved rates before first render — never block login if settings read fails or navigate throws
         loadSavedRates().then(function() {
           window._cchAuthBootDone = true;
@@ -5914,6 +5961,62 @@
         '<button type="button" data-mode="manage" class="' + (m === 'manage' ? 'active' : '') + '" style="' + baseSt + (m === 'manage' ? activeSt : inactiveSt) + '" onclick="setProposalLandingViewModeUI(\'' + pid + '\',\'' + prid + '\',\'manage\',this)">Manage</button>' +
         '</span>';
     }
+    window._proposalLineShowFilter = window._proposalLineShowFilter || {};
+    function getProposalLineShowFilter(projectId, proposalId) {
+      var k = proposalLandingModeKey(projectId, proposalId);
+      var v = window._proposalLineShowFilter[k];
+      if (!v || typeof v !== 'object') return { approved: true, pending: true, all: false };
+      return {
+        approved: v.all ? true : v.approved !== false,
+        pending: v.all ? true : v.pending !== false,
+        all: !!v.all
+      };
+    }
+    function proposalLinePassesShowFilter(item, filter) {
+      if (!item) return false;
+      if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(item)) return true;
+      var st = (typeof getProposalLineApprovalStatus === 'function') ? getProposalLineApprovalStatus(item) : 'pending';
+      if (filter && filter.all) return true;
+      if (st === 'declined') return false;
+      if (st === 'approved') return !!(filter && filter.approved);
+      return !!(filter && filter.pending);
+    }
+    function setProposalLineShowFilterUI(projectId, proposalId, which, checked) {
+      var k = proposalLandingModeKey(projectId, proposalId);
+      var v = getProposalLineShowFilter(projectId, proposalId);
+      if (which === 'all') {
+        v.all = !!checked;
+        if (v.all) { v.approved = true; v.pending = true; }
+      } else if (which === 'approved' || which === 'pending') {
+        v[which] = !!checked;
+        v.all = false;
+      }
+      window._proposalLineShowFilter[k] = v;
+      var hash = String(window.location.hash || '');
+      if (hash.indexOf('/clientview/') >= 0 && typeof renderClientPortal === 'function') {
+        void renderClientPortal(projectId, proposalId);
+        return;
+      }
+      if (typeof renderProposalDetail === 'function') renderProposalDetail(projectId, proposalId);
+    }
+    window.setProposalLineShowFilterUI = setProposalLineShowFilterUI;
+    function buildProposalLineShowFilterHtml(projectId, proposalId) {
+      var f = getProposalLineShowFilter(projectId, proposalId);
+      var pid = escAttr(projectId);
+      var prid = escAttr(proposalId);
+      function box(key, lab, on) {
+        return '<label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#0A1F3D;cursor:pointer;user-select:none;font-weight:600;">' +
+          '<input type="checkbox"' + (on ? ' checked' : '') + ' onclick="event.stopPropagation()" onchange="setProposalLineShowFilterUI(\'' + pid + '\',\'' + prid + '\',\'' + key + '\',this.checked)">' +
+          lab + '</label>';
+      }
+      return '<span class="cch-prop-line-show" style="display:inline-flex;align-items:center;gap:12px;flex-wrap:wrap;padding:4px 10px;border:1px solid rgba(10,31,61,0.14);background:#fff;">' +
+        '<span style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#5C6B80;">Show</span>' +
+        box('approved', 'Approved', !!f.approved) +
+        box('pending', 'Pending', !!f.pending) +
+        box('all', 'All', !!f.all) +
+        '</span>';
+    }
+
     (function _cchWrapTopbarForProposalLandingPhase1() {
       var _origSetTopbar = setTopbarActions;
       window.setTopbarActions = function(html) {
@@ -6841,10 +6944,12 @@
 
       // Snapshot counts
       const unpaidInvoices = allInvoices.filter(i => _normStatus(i.status) !== 'paid' && _sumInvoiceAmount(i) > 0);
-      const pendingPOs = allPOs.filter(po => {
+      const pendingPOs = allPOs.filter(function(po) {
+        if (typeof window.cchPoIsOpen === 'function') return window.cchPoIsOpen(po);
         var s = _normStatus(po.status);
         return !s || s === 'draft' || s === 'pending' || s === 'sent';
       });
+      if (typeof window.cchUpdatePoNavBadge === 'function') window.cchUpdatePoNavBadge(allPOs);
       const awaitingApproval = allProposals.filter(pr => proposalNeedsClientReview(pr));
       const totalProposalValue = allProposals.filter(pr => pr.status !== 'Invoiced' && pr.status !== 'Converted').reduce((s, pr) => s + (parseFloat(pr.total || pr.amount) || 0), 0);
 
@@ -6931,7 +7036,7 @@
       const weekValue = weekBillable * userRate;
 
       // Unlogged activity from Smart Time
-      const unloggedCaptures = (window._pendingCaptures || []).filter(c => c.date === todayStr && !c._dismissed && !c._logged);
+      const unloggedCaptures = (window._pendingCaptures || []).filter(c => c && c.date === todayStr && !c._dismissed && !c._logged);
       const unloggedHours = unloggedCaptures.reduce((s,c) => s + ((parseFloat(c.duration) || 0) / 3600), 0);
 
       // Period-filtered time by project (for Revenue Impact + Time by Project)
@@ -7193,7 +7298,7 @@
             for (var udi = 0; udi < 7; udi++) {
               var chkStr = chk.getFullYear() + '-' + String(chk.getMonth()+1).padStart(2,'0') + '-' + String(chk.getDate()).padStart(2,'0');
               var hasLogs = myTimeEntries.some(function(t) { return t.date === chkStr; });
-              var hasCaps = (window._pendingCaptures || []).some(function(c) { return c.date === chkStr && !c._dismissed && !c._logged; });
+              var hasCaps = (window._pendingCaptures || []).some(function(c) { return c && c.date === chkStr && !c._dismissed && !c._logged; });
               var hasBuckets = (window._dayBuckets && window._dayBuckets[chkStr] || []).some(function(b) { return !b.logged && b.items && b.items.length > 0; });
               if ((hasCaps || hasBuckets) && !hasLogs) uDays.push(chkStr);
               chk.setDate(chk.getDate() - 1);
@@ -7637,7 +7742,7 @@
             for (var udi = 0; udi < 7; udi++) {
               var chkStr = chk.getFullYear() + '-' + String(chk.getMonth()+1).padStart(2,'0') + '-' + String(chk.getDate()).padStart(2,'0');
               var hasLogs = myTimeEntries.some(function(t) { return t.date === chkStr; });
-              var hasCaps = (window._pendingCaptures || []).some(function(c) { return c.date === chkStr && !c._dismissed && !c._logged; });
+              var hasCaps = (window._pendingCaptures || []).some(function(c) { return c && c.date === chkStr && !c._dismissed && !c._logged; });
               var hasBuckets = (window._dayBuckets && window._dayBuckets[chkStr] || []).some(function(b) { return !b.logged && b.items && b.items.length > 0; });
               if ((hasCaps || hasBuckets) && !hasLogs) uDays.push(chkStr);
               chk.setDate(chk.getDate() - 1);
@@ -10373,18 +10478,25 @@
 
     function proposalInsertLineIntoExistingBundle(items, fromIdx, targetGid) {
       var line = items[fromIdx];
-      if (!line || isProposalGroupHeaderItem(line)) return false;
-      if (line.groupId === targetGid) return 'already';
-      var moved = Object.assign({}, line);
-      moved.groupId = targetGid;
-      if (moved.lineKind === 'group') delete moved.lineKind;
-      items.splice(fromIdx, 1);
+      if (!line || isProposalGroupHeaderItem(line) || !targetGid) return false;
       var headerIdx = -1;
+      var headerRoom = '';
       for (var i = 0; i < items.length; i++) {
         if (isProposalGroupHeaderItem(items[i]) && items[i].groupId === targetGid) {
           headerIdx = i;
+          headerRoom = String(items[i].room || '').trim();
           break;
         }
+      }
+      if (headerIdx < 0) return false;
+      var moved = Object.assign({}, line);
+      moved.groupId = targetGid;
+      if (moved.lineKind === 'group') delete moved.lineKind;
+      if (headerRoom) moved.room = headerRoom;
+      items.splice(fromIdx, 1);
+      headerIdx = -1;
+      for (i = 0; i < items.length; i++) {
+        if (isProposalGroupHeaderItem(items[i]) && items[i].groupId === targetGid) { headerIdx = i; break; }
       }
       if (headerIdx < 0) return false;
       var insertAt = headerIdx + 1;
@@ -10395,7 +10507,7 @@
       return true;
     }
 
-    function proposalChooseBundleTarget(headers) {
+    function proposalChooseBundleTarget(headers, preferredGroupId) {
       headers = headers || [];
       return new Promise(function(resolve) {
         var mc = document.getElementById('modalContainer');
@@ -10404,10 +10516,17 @@
         wrap.className = 'modal-overlay';
         wrap.style.zIndex = '1300';
         wrap.style.background = 'rgba(0,0,0,0.45)';
-        var opts = '<option value="__new__">+ New bundle</option>';
+        var selected = '';
+        if (preferredGroupId && headers.some(function(h) { return h.groupId === preferredGroupId; })) {
+          selected = preferredGroupId;
+        } else if (headers.length) {
+          selected = headers[0].groupId;
+        }
+        var opts = '';
         headers.forEach(function(h) {
-          opts += '<option value="' + escAttr(h.groupId) + '">' + esc(h.title) + (h.count ? ' (' + h.count + ' line' + (h.count === 1 ? '' : 's') + ')' : '') + '</option>';
+          opts += '<option value="' + escAttr(h.groupId) + '"' + (h.groupId === selected ? ' selected' : '') + '>' + esc(h.title) + (h.count ? ' (' + h.count + ' line' + (h.count === 1 ? '' : 's') + ')' : '') + '</option>';
         });
+        opts += '<option value="__new__"' + (selected ? '' : ' selected') + '>+ New bundle</option>';
         wrap.innerHTML =
           '<div style="width:min(460px,92vw);background:#fff;border:1px solid #E2E2E2;box-shadow:0 20px 60px rgba(0,0,0,0.25);">' +
             '<div style="padding:14px 16px;border-bottom:1px solid #E2E2E2;display:flex;align-items:center;justify-content:space-between;">' +
@@ -10456,6 +10575,7 @@
         if (sel) sel.addEventListener('change', syncNewName);
         syncNewName();
         setTimeout(function() {
+          if (!sel || sel.value !== '__new__') return;
           var nameInput = document.getElementById('proposalBundleNewName');
           if (nameInput) { try { nameInput.focus(); nameInput.select(); } catch (e) {} }
         }, 20);
@@ -10470,7 +10590,23 @@
         var items = doc.data().items || [];
         if (!items[idx] || isProposalGroupHeaderItem(items[idx])) { await cchAlert('Choose a product line.', 'Add to bundle'); return; }
         var headers = proposalBundleHeaders(items);
-        var target = await proposalChooseBundleTarget(headers);
+        var preferred = '';
+        function _bundleRoomKey(s) {
+          return String(s || '').toLowerCase().replace(/[''`]/g, '').replace(/^(\w+)s\s+/, '$1 ').replace(/\s+/g, ' ').trim();
+        }
+        var roomKey = _bundleRoomKey(items[idx].room);
+        var lineGid = items[idx].groupId;
+        if (roomKey) {
+          for (var hi = 0; hi < headers.length; hi++) {
+            if (headers[hi].groupId && headers[hi].groupId === lineGid) continue;
+            var ht = _bundleRoomKey(headers[hi].title);
+            if (ht && (ht === roomKey || ht.indexOf(roomKey) >= 0 || roomKey.indexOf(ht) >= 0)) {
+              preferred = headers[hi].groupId;
+              break;
+            }
+          }
+        }
+        var target = await proposalChooseBundleTarget(headers, preferred);
         if (!target) return;
         var title = target.title || 'New bundle';
         if (target.mode === 'existing') {
@@ -10481,8 +10617,8 @@
             if (!ok) return;
           }
           var moved = proposalInsertLineIntoExistingBundle(items, idx, target.groupId);
-          if (moved === 'already') { showToast('Line is already in "' + title + '"'); return; }
           if (!moved) { await cchAlert('Could not add line to that bundle.', 'Add to bundle'); return; }
+          showToast('Added to bundle: ' + title);
         } else {
           var gid = 'grp_' + Date.now();
           var childLine = items[idx];
@@ -10521,12 +10657,6 @@
         var _pgNotesBody = typeof cchLineNotesBodyText === 'function'
           ? cchLineNotesBodyText(item)
           : (typeof cchLineExplicitNotesText === 'function' ? cchLineExplicitNotesText(item) : String(item.lineNotes || '').trim());
-        var _piTearBtn = collection === 'proposals'
-          ? '<button type="button" class="btn btn-secondary" onclick="generateTearSheetsFromDoc(\'' + escAttr(projectId) + '\',\'proposals\',\'' + escAttr(docId) + '\',\'' + escAttr(boardName) + '\')">📄 Tear Sheet</button>'
-          : '';
-        var _piDeleteOnclick = collection === 'proposals'
-          ? 'removeProposalItem(\'' + escAttr(projectId) + '\',\'' + escAttr(docId) + '\',' + idx + ',{lineEditor:true})'
-          : 'docEditRemoveItemFromModal(' + idx + ')';
         document.getElementById('modalContainer').innerHTML = `
           <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
             <div class="modal clip-detail-modal" style="width:min(960px,96vw);max-width:96vw;">
@@ -10660,6 +10790,244 @@
       } catch (e) { await cchAlert('Duplicate failed: ' + e.message, 'Duplicate proposal'); }
     }
 
+    function _proposalImportFreshId() {
+      if (typeof crypto !== 'undefined' && crypto.randomUUID) return 'li_' + crypto.randomUUID();
+      return 'li_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+    }
+    function _proposalImportBlocks(items) {
+      items = coerceProposalDocItemsArray(items);
+      var blocks = [];
+      var i = 0;
+      while (i < items.length) {
+        var it = items[i];
+        if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it)) {
+          var len = (typeof proposalDragBlockLength === 'function') ? proposalDragBlockLength(items, i) : 1;
+          if (len < 1) len = 1;
+          var idxs = [];
+          var nProd = 0;
+          for (var j = i; j < i + len && j < items.length; j++) {
+            idxs.push(j);
+            if (!isProposalGroupHeaderItem(items[j])) nProd++;
+          }
+          blocks.push({ start: i, idxs: idxs, isGroup: true, title: it.title || it.name || 'Bundle', count: nProd });
+          i += len;
+        } else {
+          blocks.push({ start: i, idxs: [i], isGroup: false, title: it.title || it.name || 'Item', count: 1 });
+          i++;
+        }
+      }
+      return blocks;
+    }
+    function _proposalImportSanitizeLine(src, groupMap) {
+      var copy = JSON.parse(JSON.stringify(src || {}));
+      copy.id = _proposalImportFreshId();
+      copy.lineApprovalStatus = 'pending';
+      copy.approved = false;
+      copy.declined = false;
+      delete copy.invoicedOnInvoiceId;
+      delete copy.invoicedAt;
+      delete copy.linkedInvoiceId;
+      if (copy.groupId) {
+        if (!groupMap[copy.groupId]) groupMap[copy.groupId] = 'gimp_' + _proposalImportFreshId();
+        copy.groupId = groupMap[copy.groupId];
+      }
+      return copy;
+    }
+    function _proposalImportClose() {
+      var el = document.getElementById('cchPropImportOverlay');
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+      window._proposalImportState = null;
+    }
+    function _proposalImportPaint() {
+      var st = window._proposalImportState;
+      var overlay = document.getElementById('cchPropImportOverlay');
+      if (!st || !overlay) return;
+      var body = overlay.querySelector('[data-import-body]');
+      if (!body) return;
+      if (!st.sourceId) {
+        if (!st.sources || !st.sources.length) {
+          body.innerHTML = '<div style="padding:8px 0;font-size:13px;color:#6B7280;">No other proposals in this project.</div>';
+          return;
+        }
+        body.innerHTML = st.sources.map(function(s) {
+          return '<button type="button" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:0 0 8px;border:1px solid #E2E2E2;background:#fff;cursor:pointer;color:#0A1F3D;" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'#fff\'" onclick="window._proposalImportPickSource(\'' + escAttr(s.id) + '\')">' +
+            '<div style="font-weight:700;font-size:13px;">' + esc(s.num) + '</div>' +
+            '<div style="font-size:11px;color:#6B7280;margin-top:2px;">' + esc(s.status) + ' \u00B7 ' + s.lineCount + ' line' + (s.lineCount === 1 ? '' : 's') + ' \u00B7 ' + formatMoney(s.total) + '</div>' +
+            '</button>';
+        }).join('');
+        return;
+      }
+      var src = st.sourceDoc || {};
+      var items = coerceProposalDocItemsArray(src.items);
+      var blocks = _proposalImportBlocks(items);
+      st.blocks = blocks;
+      if (!st.checked) {
+        st.checked = {};
+        blocks.forEach(function(b) { st.checked[b.start] = true; });
+      }
+      var rows = blocks.map(function(b) {
+        var on = !!st.checked[b.start];
+        var amt = 0;
+        b.idxs.forEach(function(ix) {
+          var row = items[ix];
+          if (!row) return;
+          if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(row)) return;
+          amt += (typeof proposalLineClientTotal === 'function') ? proposalLineClientTotal(row) : (parseFloat(row.amount) || 0);
+        });
+        var lab = b.isGroup ? (b.title + ' (' + b.count + ' line' + (b.count === 1 ? '' : 's') + ')') : b.title;
+        return '<label style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #F0F0F0;cursor:pointer;font-size:13px;color:#0A1F3D;">' +
+          '<input type="checkbox"' + (on ? ' checked' : '') + ' onchange="window._proposalImportToggleBlock(' + b.start + ',this.checked)" style="margin-top:3px;">' +
+          '<span style="flex:1;min-width:0;"><span style="font-weight:' + (b.isGroup ? '700' : '500') + ';">' + esc(lab) + '</span>' +
+          '<span style="float:right;font-family:ui-monospace,monospace;color:#5C6B80;">' + formatMoney(amt) + '</span></span></label>';
+      }).join('');
+      body.innerHTML =
+        '<div style="font-size:12px;color:#6B7280;margin-bottom:10px;">From <strong style="color:#0A1F3D;">' + esc(src.proposalNum || src.name || st.sourceId) + '</strong>. Groups move as a block. Source is not changed.</div>' +
+        '<div style="margin-bottom:8px;">' +
+          '<button type="button" class="btn btn-secondary btn-sm" onclick="window._proposalImportSetAll(true)">Select all</button> ' +
+          '<button type="button" class="btn btn-secondary btn-sm" onclick="window._proposalImportSetAll(false)">Select none</button> ' +
+          '<button type="button" class="btn btn-secondary btn-sm" onclick="window._proposalImportPickSource(null)">\u2190 Other proposal</button>' +
+        '</div>' +
+        '<div style="max-height:min(52vh,420px);overflow:auto;border:1px solid #E2E2E2;padding:4px 12px;">' +
+        (rows || '<div style="padding:12px 0;color:#6B7280;font-size:13px;">That proposal has no line items.</div>') +
+        '</div>';
+    }
+    window._proposalImportPickSource = async function(sourceId) {
+      var st = window._proposalImportState;
+      if (!st) return;
+      if (!sourceId) {
+        st.sourceId = null;
+        st.sourceDoc = null;
+        st.checked = null;
+        st.blocks = null;
+        _proposalImportPaint();
+        return;
+      }
+      try {
+        var snap = await db.collection('boards').doc(st.projectId).collection('proposals').doc(sourceId).get();
+        if (!snap.exists) { await cchAlert('That proposal is no longer available.', 'Import lines'); return; }
+        st.sourceId = sourceId;
+        st.sourceDoc = Object.assign({ id: snap.id }, snap.data() || {});
+        st.checked = null;
+        _proposalImportPaint();
+      } catch (e) {
+        await cchAlert('Could not load that proposal: ' + ((e && e.message) || e), 'Import lines');
+      }
+    };
+    window._proposalImportToggleBlock = function(start, checked) {
+      var st = window._proposalImportState;
+      if (!st || !st.checked) return;
+      st.checked[start] = !!checked;
+    };
+    window._proposalImportSetAll = function(on) {
+      var st = window._proposalImportState;
+      if (!st || !st.blocks) return;
+      st.checked = {};
+      st.blocks.forEach(function(b) { st.checked[b.start] = !!on; });
+      _proposalImportPaint();
+    };
+    async function _proposalImportCommit() {
+      var st = window._proposalImportState;
+      if (!st) return;
+      if (!st.sourceId || !st.sourceDoc) { await cchAlert('Pick a proposal first.', 'Import lines'); return; }
+      var targetSnap = await db.collection('boards').doc(st.projectId).collection('proposals').doc(st.targetId).get();
+      if (!targetSnap.exists) { await cchAlert('This proposal is no longer available.', 'Import lines'); return; }
+      var targetData = targetSnap.data() || {};
+      var lock = (typeof proposalDesignerLineEditLocked === 'function') ? proposalDesignerLineEditLocked(targetData) : { locked: false };
+      if (lock && lock.locked) { await cchAlert(lock.why || 'This proposal cannot be edited.', 'Import lines'); return; }
+      var srcItems = coerceProposalDocItemsArray((st.sourceDoc && st.sourceDoc.items) || []);
+      var blocks = st.blocks || _proposalImportBlocks(srcItems);
+      var pickedIdx = {};
+      blocks.forEach(function(b) {
+        if (!st.checked || !st.checked[b.start]) return;
+        b.idxs.forEach(function(ix) { pickedIdx[ix] = true; });
+      });
+      var ordered = [];
+      srcItems.forEach(function(it, ix) { if (pickedIdx[ix]) ordered.push(it); });
+      if (!ordered.length) { await cchAlert('Select at least one line to import.', 'Import lines'); return; }
+      var groupMap = {};
+      var clones = ordered.map(function(it) { return _proposalImportSanitizeLine(it, groupMap); });
+      var destItems = coerceProposalDocItemsArray(targetData.items).slice();
+      clones.forEach(function(it) { destItems.push(it); });
+      var total = (typeof proposalStoredTotalFromItems === 'function') ? proposalStoredTotalFromItems(destItems) : 0;
+      var srcNum = st.sourceDoc.proposalNum || st.sourceDoc.name || st.sourceId;
+      var nProd = clones.filter(function(it) { return !(typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it)); }).length;
+      try {
+        await db.collection('boards').doc(st.projectId).collection('proposals').doc(st.targetId).update({
+          items: destItems,
+          total: total,
+          updatedAt: new Date().toISOString()
+        });
+        if (typeof logDocActivity === 'function') {
+          logDocActivity(st.projectId, 'proposals', st.targetId, 'item_added', 'Imported ' + nProd + ' line(s) from ' + srcNum);
+        }
+        if (typeof invalidateSearchCache === 'function') invalidateSearchCache();
+        var pid = st.projectId, tid = st.targetId;
+        _proposalImportClose();
+        showToast('Imported ' + nProd + ' line' + (nProd === 1 ? '' : 's') + ' from ' + srcNum);
+        if (typeof renderProposalDetail === 'function') renderProposalDetail(pid, tid);
+      } catch (e) {
+        await cchAlert('Import failed: ' + ((e && e.message) || e), 'Import lines');
+      }
+    }
+    async function openProposalImportLinesModal(projectId, proposalId) {
+      projectId = String(projectId || '').trim();
+      proposalId = String(proposalId || '').trim();
+      if (!projectId || !proposalId) return;
+      try {
+        var targetSnap = await db.collection('boards').doc(projectId).collection('proposals').doc(proposalId).get();
+        if (!targetSnap.exists) { await cchAlert('This proposal is no longer available.', 'Import lines'); return; }
+        var targetData = targetSnap.data() || {};
+        var lock = (typeof proposalDesignerLineEditLocked === 'function') ? proposalDesignerLineEditLocked(targetData) : { locked: false };
+        if (lock && lock.locked) { await cchAlert(lock.why || 'This proposal cannot be edited.', 'Import lines'); return; }
+        var snap = await db.collection('boards').doc(projectId).collection('proposals').limit(200).get();
+        var sources = [];
+        snap.forEach(function(d) {
+          if (d.id === proposalId) return;
+          var data = d.data() || {};
+          var items = coerceProposalDocItemsArray(data.items);
+          sources.push({
+            id: d.id,
+            num: data.proposalNum || data.name || d.id,
+            status: data.status || 'Draft',
+            lineCount: (typeof countProposalProductLines === 'function') ? countProposalProductLines(items) : items.length,
+            total: parseFloat(data.total) || 0,
+            createdAt: data.createdAt || data.updatedAt || ''
+          });
+        });
+        sources.sort(function(a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
+        _proposalImportClose();
+        window._proposalImportState = { projectId: projectId, targetId: proposalId, sources: sources, sourceId: null, sourceDoc: null, checked: null, blocks: null };
+        var mc = document.getElementById('modalContainer');
+        if (!mc) { await cchAlert('Could not open the import dialog.', 'Import lines'); return; }
+        var wrap = document.createElement('div');
+        wrap.id = 'cchPropImportOverlay';
+        wrap.className = 'modal-overlay';
+        wrap.style.zIndex = '1300';
+        wrap.style.background = 'rgba(0,0,0,0.45)';
+        wrap.innerHTML =
+          '<div style="width:min(560px,94vw);max-height:90vh;overflow:hidden;display:flex;flex-direction:column;background:#fff;border:1px solid #E2E2E2;box-shadow:0 20px 60px rgba(0,0,0,0.25);">' +
+            '<div style="padding:14px 16px;border-bottom:1px solid #E2E2E2;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">' +
+              '<div style="font-size:14px;font-weight:600;color:#0A1F3D;">Import lines</div>' +
+              '<button type="button" data-close style="border:none;background:none;font-size:20px;line-height:1;color:#6B7280;cursor:pointer;">&times;</button>' +
+            '</div>' +
+            '<div data-import-body style="padding:16px;overflow:auto;flex:1;"></div>' +
+            '<div style="padding:12px 16px;border-top:1px solid #E2E2E2;display:flex;justify-content:flex-end;gap:8px;flex-shrink:0;">' +
+              '<button type="button" data-cancel style="padding:8px 14px;border:1px solid #0A1F3D;background:#FFFFFF;color:#0A1F3D;cursor:pointer;">Cancel</button>' +
+              '<button type="button" data-ok style="padding:8px 14px;border:1px solid #0A1F3D;background:#0A1F3D;color:#FFFFFF;cursor:pointer;">Import selected</button>' +
+            '</div>' +
+          '</div>';
+        wrap.addEventListener('click', function(e) { if (e.target === wrap) _proposalImportClose(); });
+        wrap.querySelector('[data-close]').addEventListener('click', _proposalImportClose);
+        wrap.querySelector('[data-cancel]').addEventListener('click', _proposalImportClose);
+        wrap.querySelector('[data-ok]').addEventListener('click', function() { void _proposalImportCommit(); });
+        mc.appendChild(wrap);
+        _proposalImportPaint();
+      } catch (e) {
+        await cchAlert('Could not open Import lines: ' + ((e && e.message) || e), 'Import lines');
+      }
+    }
+    window.openProposalImportLinesModal = openProposalImportLinesModal;
+
     async function closeProposalAsLegacy(projectId, proposalId) {
       if (!(await showConfirmModal({
         title: 'Close legacy proposal',
@@ -10710,6 +11078,52 @@
       }
       return len;
     }
+    function proposalIsBundleMember(row, gid) {
+      if (!row || !gid) return false;
+      if (isProposalGroupHeaderItem(row)) return row.groupId === gid;
+      return row.groupId === gid;
+    }
+    function proposalExtractBundleByGid(items, gid) {
+      if (!gid) return null;
+      var header = null;
+      var kids = [];
+      var i;
+      for (i = 0; i < items.length; i++) {
+        var row = items[i];
+        if (isProposalGroupHeaderItem(row) && row.groupId === gid) header = row;
+        else if (!isProposalGroupHeaderItem(row) && row.groupId === gid) kids.push(row);
+      }
+      if (!header) return null;
+      for (i = items.length - 1; i >= 0; i--) {
+        if (proposalIsBundleMember(items[i], gid)) items.splice(i, 1);
+      }
+      return [header].concat(kids);
+    }
+    function proposalBundleLastIndex(items, gid) {
+      var last = -1;
+      var i;
+      for (i = 0; i < items.length; i++) {
+        if (proposalIsBundleMember(items[i], gid)) last = i;
+      }
+      return last;
+    }
+    function proposalBundleHeaderIndex(items, gid) {
+      var i;
+      for (i = 0; i < items.length; i++) {
+        if (isProposalGroupHeaderItem(items[i]) && items[i].groupId === gid) return i;
+      }
+      return -1;
+    }
+    function proposalLineIsConsecutiveUnderHeader(items, lineIdx, gid) {
+      var h = proposalBundleHeaderIndex(items, gid);
+      if (h < 0 || lineIdx <= h) return false;
+      var i;
+      for (i = h + 1; i < items.length; i++) {
+        if (isProposalGroupHeaderItem(items[i]) || items[i].groupId !== gid) return false;
+        if (i === lineIdx) return true;
+      }
+      return false;
+    }
     function proposalRowDragStart(projectId, proposalId, idx) {
       window._proposalRowDrag = { projectId: projectId, proposalId: proposalId, fromIdx: idx };
     }
@@ -10731,11 +11145,83 @@
         var dragSource = items[fromIdx];
         if (isProposalGroupHeaderItem(dropTarget) && dragSource && !isProposalGroupHeaderItem(dragSource)) {
           var added = proposalInsertLineIntoExistingBundle(items, fromIdx, dropTarget.groupId);
-          if (added === 'already') { showToast('Line is already in this bundle'); return; }
           if (!added) { showToast('Could not add line to bundle', 'error'); return; }
           var bundleTotal = proposalStoredTotalFromItems(items);
           await docRef.update({ items: items, total: bundleTotal, updatedAt: new Date().toISOString() });
           showToast('Added to bundle: ' + (dropTarget.title || 'Bundle'));
+          renderProposalDetail(projectId, proposalId);
+          return;
+        }
+        /* Product lines move alone. Expanding to the whole bundle made in-bundle reorder a no-op. */
+        if (dragSource && !isProposalGroupHeaderItem(dragSource)) {
+          var destGidJoin = (dropTarget && !isProposalGroupHeaderItem(dropTarget) && dropTarget.groupId) ? dropTarget.groupId : '';
+          if (destGidJoin && !proposalLineIsConsecutiveUnderHeader(items, fromIdx, destGidJoin)) {
+            var joined = proposalInsertLineIntoExistingBundle(items, fromIdx, destGidJoin);
+            if (!joined) { showToast('Could not add line to bundle', 'error'); return; }
+            var joinTotal = proposalStoredTotalFromItems(items);
+            await docRef.update({ items: items, total: joinTotal, updatedAt: new Date().toISOString() });
+            var joinTitle = 'Bundle';
+            var jh = proposalBundleHeaderIndex(items, destGidJoin);
+            if (jh >= 0) joinTitle = items[jh].title || joinTitle;
+            showToast('Added to bundle: ' + joinTitle);
+            renderProposalDetail(projectId, proposalId);
+            return;
+          }
+          var line = items.splice(fromIdx, 1)[0];
+          var insertBefore = toIdx > fromIdx ? toIdx - 1 : toIdx;
+          if (insertBefore < 0) insertBefore = 0;
+          if (insertBefore > items.length) insertBefore = items.length;
+          var dest = (insertBefore < items.length) ? items[insertBefore] : null;
+          var prev = (insertBefore > 0) ? items[insertBefore - 1] : null;
+          if (dest && !isProposalGroupHeaderItem(dest) && dest.groupId) {
+            line.groupId = dest.groupId;
+            if (dest.room) line.room = dest.room;
+          } else if (prev && isProposalGroupHeaderItem(prev) && prev.groupId) {
+            line.groupId = prev.groupId;
+            if (prev.room) line.room = prev.room;
+          } else if (prev && prev.groupId && !isProposalGroupHeaderItem(prev)) {
+            line.groupId = prev.groupId;
+            if (prev.room) line.room = prev.room;
+          } else {
+            delete line.groupId;
+          }
+          items.splice(insertBefore, 0, line);
+          var lineTotal = proposalStoredTotalFromItems(items);
+          await docRef.update({ items: items, total: lineTotal, updatedAt: new Date().toISOString() });
+          showToast('Order updated');
+          renderProposalDetail(projectId, proposalId);
+          return;
+        }
+        /* Bundle header: move the whole bundle as one block. Never splice into the middle of another bundle. */
+        if (isProposalGroupHeaderItem(dragSource) && dragSource.groupId) {
+          var movingGid = dragSource.groupId;
+          if (dropTarget && dropTarget.groupId === movingGid) return;
+          var dropOnHeader = !!(dropTarget && isProposalGroupHeaderItem(dropTarget));
+          var destGid = (dropTarget && dropTarget.groupId) ? dropTarget.groupId : '';
+          var dropRef = dropTarget;
+          var block = proposalExtractBundleByGid(items, movingGid);
+          if (!block || !block.length) { showToast('Could not move bundle', 'error'); return; }
+          var insertAt = items.length;
+          if (destGid && destGid !== movingGid) {
+            if (dropOnHeader) {
+              var destHead = proposalBundleHeaderIndex(items, destGid);
+              insertAt = destHead < 0 ? items.length : destHead;
+            } else {
+              var destLast = proposalBundleLastIndex(items, destGid);
+              insertAt = destLast < 0 ? items.length : destLast + 1;
+            }
+          } else if (dropRef) {
+            var di = items.indexOf(dropRef);
+            insertAt = di < 0 ? items.length : di + 1;
+          }
+          if (insertAt < 0) insertAt = 0;
+          if (insertAt > items.length) insertAt = items.length;
+          for (var bi = 0; bi < block.length; bi++) {
+            items.splice(insertAt + bi, 0, block[bi]);
+          }
+          var bundleMoveTotal = proposalStoredTotalFromItems(items);
+          await docRef.update({ items: items, total: bundleMoveTotal, updatedAt: new Date().toISOString() });
+          showToast('Bundle moved');
           renderProposalDetail(projectId, proposalId);
           return;
         }
@@ -10842,7 +11328,6 @@
         var dragSource = items[fromIdx];
         if (isProposalGroupHeaderItem(dropTarget) && dragSource && !isProposalGroupHeaderItem(dragSource)) {
           var added = proposalInsertLineIntoExistingBundle(items, fromIdx, dropTarget.groupId);
-          if (added === 'already') { showToast('Line is already in this bundle'); return; }
           if (!added) { showToast('Could not add line to bundle', 'error'); return; }
           var bundleTotal = typeof invoiceComputedGrandTotal === 'function'
             ? invoiceComputedGrandTotal(Object.assign({}, doc.data(), { items: items }))
@@ -22018,7 +22503,7 @@
       })();
 
       // Period filter for project overview
-      window._projPeriod = window._projPeriod || 'all';
+      window._projPeriod = window._projPeriod || 'year';
       var _pNow = new Date();
       var _pWeekStart = new Date(_pNow); _pWeekStart.setDate(_pWeekStart.getDate() - _pWeekStart.getDay());
       var _pPeriodStarts = {
@@ -23959,7 +24444,7 @@
             '</div>' +
             '<div style="display:flex;align-items:center;gap:12px;">' +
               (groupTotal > 0 ? '<span style="font-size:13px;font-weight:600;color:var(--gold);font-family:var(--font-mono);">' + formatMoney(groupTotal) + '</span>' : '') +
-              '<div class="action-menu-wrap" style="position:relative;"><button onclick="event.stopPropagation();toggleActionMenu(this)" style="background:none;border:1px solid var(--gray-200);color:var(--gray-400);padding:4px 8px;font-size:14px;cursor:pointer;border-radius:4px;line-height:1;" title="More actions">\u22EE</button><div class="action-dropdown" style="display:none;right:0;left:auto;min-width:190px;"><a onclick="event.stopPropagation();openDocItemsSidebar({mode:\'selections\',projectId:\'' + escAttr(projId) + '\',roomPrefill:\'' + escAttr(rm) + '\'});closeAllMenus()">⭐ Add item to this room</a><a onclick="event.stopPropagation();renameRoom(\'' + escAttr(projId) + '\',\'' + escAttr(rm) + '\');closeAllMenus()">✏️ Rename</a><a onclick="event.stopPropagation();uploadRoomCover(\'' + escAttr(projId) + '\',\'' + escAttr(rm) + '\',this);closeAllMenus()">📷 Set Cover</a><a onclick="event.stopPropagation();void hideRoomBoardSection(\'' + escAttr(projId) + '\',\'' + escAttr(rm) + '\');closeAllMenus()">👁 Hide board</a><a onclick="event.stopPropagation();deleteRoom(\'' + escAttr(projId) + '\',\'' + escAttr(rm) + '\');closeAllMenus()" style="color:#E53935;">🗑️ Delete</a></div></div>' +
+              '<div class="action-menu-wrap" style="position:relative;"><button onclick="event.stopPropagation();toggleActionMenu(this)" style="background:none;border:1px solid var(--gray-200);color:var(--gray-400);padding:4px 8px;font-size:14px;cursor:pointer;border-radius:4px;line-height:1;" title="More actions">\u22EE</button><div class="action-dropdown" style="display:none;right:0;left:auto;min-width:190px;"><a onclick="event.stopPropagation();openDocItemsSidebar({mode:\'selections\',projectId:\'' + escJsStr(projId) + '\',roomPrefill:\'' + escJsStr(rm) + '\'});closeAllMenus()">⭐ Add item to this room</a><a onclick="event.stopPropagation();renameRoom(\'' + escJsStr(projId) + '\',\'' + escJsStr(rm) + '\');closeAllMenus()">✏️ Rename</a><a onclick="event.stopPropagation();uploadRoomCover(\'' + escJsStr(projId) + '\',\'' + escJsStr(rm) + '\',this);closeAllMenus()">📷 Set Cover</a><a onclick="event.stopPropagation();void hideRoomBoardSection(\'' + escJsStr(projId) + '\',\'' + escJsStr(rm) + '\');closeAllMenus()">👁 Hide board</a><a onclick="event.stopPropagation();deleteRoom(\'' + escJsStr(projId) + '\',\'' + escJsStr(rm) + '\');closeAllMenus()" style="color:#E53935;">🗑️ Delete</a></div></div>' +
             '</div>' +
           '</div>' +
           '<div id="rb-sec-' + rmKey + '" style="' + (isCollapsed ? 'display:none;' : '') + 'padding:16px 0 24px;">' +
@@ -24282,7 +24767,7 @@ async function renderBoardsTab(T, proj) {
                     <button class="btn btn-primary btn-sm" style="font-size:10px;padding:3px 10px;" onclick="bulkMoveClipsToRoom('${escAttr(proj.id)}', document.getElementById('bulkMoveRoomSelect').value)">Move</button>
                   </div>
                 ` : ''}
-                <div class="action-menu-wrap" style="position:relative;" onclick="event.stopPropagation()"><button onclick="toggleActionMenu(this)" style="background:none;border:1px solid var(--gray-200);color:var(--gray-400);padding:4px 8px;font-size:14px;cursor:pointer;border-radius:4px;line-height:1;" title="More actions">\u22EE</button><div class="action-dropdown" style="display:none;right:0;left:auto;min-width:190px;"><a onclick="openDocItemsSidebar({mode:'selections',projectId:'${escAttr(proj.id)}',roomPrefill:'${escAttr(rm)}'});closeAllMenus()">⭐ Add item to this room</a><a onclick="renameRoom('${escAttr(proj.id)}','${escAttr(rm)}');closeAllMenus()">✏️ Rename</a><a onclick="uploadRoomCover('${escAttr(proj.id)}','${escAttr(rm)}',this);closeAllMenus()">📷 Set Cover</a><a onclick="deleteRoom('${escAttr(proj.id)}','${escAttr(rm)}');closeAllMenus()" style="color:#E53935;">🗑️ Delete</a></div></div>
+                <div class="action-menu-wrap" style="position:relative;" onclick="event.stopPropagation()"><button onclick="toggleActionMenu(this)" style="background:none;border:1px solid var(--gray-200);color:var(--gray-400);padding:4px 8px;font-size:14px;cursor:pointer;border-radius:4px;line-height:1;" title="More actions">\u22EE</button><div class="action-dropdown" style="display:none;right:0;left:auto;min-width:190px;"><a onclick="openDocItemsSidebar({mode:'selections',projectId:'${escJsStr(proj.id)}',roomPrefill:'${escJsStr(rm)}'});closeAllMenus()">⭐ Add item to this room</a><a onclick="renameRoom('${escJsStr(proj.id)}','${escJsStr(rm)}');closeAllMenus()">✏️ Rename</a><a onclick="uploadRoomCover('${escJsStr(proj.id)}','${escJsStr(rm)}',this);closeAllMenus()">📷 Set Cover</a><a onclick="deleteRoom('${escJsStr(proj.id)}','${escJsStr(rm)}');closeAllMenus()" style="color:#E53935;">🗑️ Delete</a></div></div>
               </div>
             </div>
             <div id="rb-sec-tbl-${rmKey}" style="${isCollapsed ? 'display:none;' : ''}">
@@ -26653,18 +27138,125 @@ async function renderBoardsTab(T, proj) {
     // -- Board Edit/Delete Functions --
 
     async function renameRoom(projectId, oldName) {
+      oldName = String(oldName || '').trim();
       var newName = await cchPrompt('Rename room "' + oldName + '" to:', oldName, 'Rename Room');
+      if (newName == null) return;
+      newName = String(newName || '').trim();
       if (!newName || newName === oldName) return;
+      var oldKey = oldName.toLowerCase();
+      function _swapRoomEntry(entry) {
+        if (typeof entry === 'string') {
+          return String(entry).trim().toLowerCase() === oldKey ? newName : entry;
+        }
+        if (entry && typeof entry === 'object') {
+          var copy = Object.assign({}, entry);
+          ['name', 'room', 'title', 'displayName', 'label'].forEach(function(k) {
+            if (copy[k] != null && String(copy[k]).trim().toLowerCase() === oldKey) copy[k] = newName;
+          });
+          return copy;
+        }
+        return entry;
+      }
+      function _dedupeRoomList(list) {
+        var out = [];
+        var seen = {};
+        (list || []).forEach(function(entry) {
+          var label = (typeof entry === 'string')
+            ? String(entry).trim()
+            : String((entry && (entry.name || entry.room || entry.title)) || '').trim();
+          var k = label.toLowerCase();
+          if (!k || seen[k]) return;
+          seen[k] = true;
+          out.push(entry);
+        });
+        return out;
+      }
+      async function _commitBatchIfAny(ops) {
+        if (!ops || !ops.length) return;
+        for (var i = 0; i < ops.length; i += 400) {
+          var batch = db.batch();
+          ops.slice(i, i + 400).forEach(function(fn) { fn(batch); });
+          await batch.commit();
+        }
+      }
       try {
-        // Update all clips in this room
-        var snap = await db.collection('boards').doc(projectId).collection('clips').where('room', '==', oldName).get();
-        var batch = db.batch();
-        snap.forEach(function(d) { batch.update(d.ref, { room: newName }); });
-        await batch.commit();
+        var ops = [];
+        var snap = await db.collection('boards').doc(projectId).collection('clips').get();
+        snap.forEach(function(d) {
+          var rm = String((d.data() || {}).room || '').trim();
+          if (rm.toLowerCase() === oldKey) {
+            ops.push(function(batch) { batch.update(d.ref, { room: newName }); });
+          }
+        });
+        await _commitBatchIfAny(ops);
+
+        var boardDoc = await db.collection('boards').doc(projectId).get();
+        var bd = boardDoc.exists ? (boardDoc.data() || {}) : {};
+        var patch = { updatedAt: new Date().toISOString() };
+        var needsBoard = false;
+        if (Array.isArray(bd.rooms)) {
+          patch.rooms = _dedupeRoomList(bd.rooms.map(_swapRoomEntry));
+          needsBoard = true;
+        }
+        if (Array.isArray(bd.projectRoomList) && bd.projectRoomList.length) {
+          patch.projectRoomList = _dedupeRoomList(bd.projectRoomList.map(_swapRoomEntry));
+          needsBoard = true;
+        }
+        if (typeof bd.projectRoomsText === 'string' && bd.projectRoomsText.trim()) {
+          patch.projectRoomsText = bd.projectRoomsText.split(/\r?\n/).map(function(line) {
+            return String(line).trim().toLowerCase() === oldKey ? newName : line;
+          }).join('\n');
+          needsBoard = true;
+        }
+        if (needsBoard) await db.collection('boards').doc(projectId).update(patch);
+
+        var rmSnap = await db.collection('boards').doc(projectId).collection('roomMeta').get();
+        var metaOps = [];
+        var newMetaId = _roomMetaDocIdFromName(newName);
+        rmSnap.forEach(function(d) {
+          var data = d.data() || {};
+          var nm = String(data.name || d.id || '').trim();
+          if (nm.toLowerCase() !== oldKey) return;
+          var next = Object.assign({}, data, { name: newName, updatedAt: new Date().toISOString() });
+          if (d.id === newMetaId) {
+            metaOps.push(function(batch) { batch.set(d.ref, next, { merge: true }); });
+          } else {
+            var dest = db.collection('boards').doc(projectId).collection('roomMeta').doc(newMetaId || d.id);
+            metaOps.push(function(batch) {
+              batch.set(dest, next, { merge: true });
+              batch.delete(d.ref);
+            });
+          }
+        });
+        await _commitBatchIfAny(metaOps);
+
+        var colls = ['proposals', 'invoices', 'purchaseOrders'];
+        for (var ci = 0; ci < colls.length; ci++) {
+          var dsnap = await db.collection('boards').doc(projectId).collection(colls[ci]).get();
+          var docOps = [];
+          dsnap.forEach(function(dd) {
+            var data = dd.data() || {};
+            var items = Array.isArray(data.items) ? data.items : [];
+            var hit = false;
+            var nextItems = items.map(function(it) {
+              if (!it || String(it.room || '').trim().toLowerCase() !== oldKey) return it;
+              hit = true;
+              return Object.assign({}, it, { room: newName });
+            });
+            if (hit) {
+              docOps.push(function(batch) {
+                batch.update(dd.ref, { items: nextItems, updatedAt: new Date().toISOString() });
+              });
+            }
+          });
+          await _commitBatchIfAny(docOps);
+        }
+
+        if (window._cchRoomsCache && window._cchRoomsCache[projectId]) delete window._cchRoomsCache[projectId];
         await logBoardUpdate(projectId, newName, 'room board renamed from "' + oldName + '"', { boardKind: 'room', oldName: oldName, newName: newName });
         showToast('Renamed "' + oldName + '" to "' + newName + '"');
         renderProjectDetail(projectId);
-      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+      } catch (e) { showToast('Error: ' + e.message, 'error'); }
     }
 
     async function _removeProjectRoomRecords(projectId, roomName) {
@@ -30949,8 +31541,8 @@ async function renderBoardsTab(T, proj) {
                     <td class="po-vendor-col" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;" title="${escAttr(po.vendor && String(po.vendor).trim() !== String(po._displayVendor || '').trim() ? ('Stored vendor: ' + po.vendor) : '')}">${esc(po._displayVendor || '\u2014')}</td>
                     <td class="col-status" onclick="event.stopPropagation()">${typeof cchPoProcurementStatusBadgeHtml==='function'?cchPoProcurementStatusBadgeHtml(po,{projectId:proj.id,poId:po.id,clickable:true}):(typeof cchPoFulfillmentStatusBadgeHtml==='function'?cchPoFulfillmentStatusBadgeHtml(po,{projectId:proj.id,poId:po.id,clickable:true}):('<span class="badge badge-'+(po.status||'draft').toLowerCase()+'">'+esc(po.status||'Draft')+'</span>'))}</td>
                     <td style="font-size:11px;white-space:nowrap;" onclick="event.stopPropagation()">${typeof cchPoListBillWorkflowHtml==='function'?cchPoListBillWorkflowHtml(po):'\u2014'}</td>
-                    <td style="font-size:11px;white-space:nowrap;" onclick="event.stopPropagation()">${typeof cchPoShippingStatusBadgeHtml==='function'?cchPoShippingStatusBadgeHtml(po,{projectId:proj.id,poId:po.id,clickable:true}):'\u2014'}</td>
-                    <td class="col-date" style="font-size:12px;color:var(--gray-500);white-space:nowrap;" title="Expected delivery">${esc(_poEtaLabel)}</td>
+                    <td style="font-size:11px;white-space:nowrap;" onclick="event.stopPropagation()">${typeof cchPoListShippingCellHtml==='function'?cchPoListShippingCellHtml(proj.id,po.id,po):(typeof cchPoShippingStatusBadgeHtml==='function'?cchPoShippingStatusBadgeHtml(po,{projectId:proj.id,poId:po.id,clickable:true}):'\u2014')}</td>
+                    <td class="col-date" style="font-size:12px;color:var(--gray-500);white-space:nowrap;" title="Expected delivery" onclick="event.stopPropagation()">${typeof cchPoListEtaInputHtml==='function'?cchPoListEtaInputHtml(proj.id,po.id,po):esc(_poEtaLabel)}</td>
                     <td class="col-date">${formatDate(po.issueDate || po.orderDate || po.poDate || po.date || po.createdAt)}</td>
                     <td class="col-amount">${formatMoney(typeof cchPoListPoTotal==='function'?cchPoListPoTotal(po):(po.total||0))}</td>
                     ${typeof cchPoListAllPosFinancialCellsHtml==='function'?cchPoListAllPosFinancialCellsHtml(po, 'padding:10px 14px;font-size:13px;'):'<td class="col-amount">\u2014</td><td class="col-amount">\u2014</td><td class="col-amount">\u2014</td><td class="col-amount">\u2014</td>'}
@@ -30968,7 +31560,7 @@ async function renderBoardsTab(T, proj) {
                           <a onclick="window._forceEditMode=true;navigate('${_poOpenHash}');closeAllMenus()">→ Edit PO</a>
                           <a onclick="previewPO('${proj.id}','${escAttr(po.id)}');closeAllMenus()">🖨️ Preview / Print</a>
                           <a onclick="linkDocModal('${proj.id}','purchaseOrders','${escAttr(po.id)}');closeAllMenus()">📂 Attach from Files</a>
-                          ${_canPushQB && !getQbId(po) && !(typeof window.cchPoQbBillOnlyMode==='function'&&window.cchPoQbBillOnlyMode()) ? '<a onclick="event.stopPropagation();pushDocToQB(\'po\',\'' + proj.id + '\',\'' + escAttr(po.id) + '\');closeAllMenus()">📤 Push to QuickBooks</a>' : ''}
+                          ${(typeof window.cchPoCanPushPoToQb==='function' ? window.cchPoCanPushPoToQb(po,_canPushQB) : (_canPushQB && !getQbId(po) && !(typeof window.cchPoQbBillOnlyMode==='function'&&window.cchPoQbBillOnlyMode()))) ? '<a onclick="event.stopPropagation();pushDocToQB(\'po\',\'' + proj.id + '\',\'' + escAttr(po.id) + '\');closeAllMenus()">📤 Push PO to QuickBooks</a>' : ''}
                           <a onclick="setQBSynced('${proj.id}','purchaseOrders','${escAttr(po.id)}');closeAllMenus()">${getQbId(po) ? '↻ Update QB ID' : '📤 Mark QB Synced'}</a>
                           <a onclick="poPromptStatusChange('${proj.id}','${escAttr(po.id)}');closeAllMenus()">📋 Change Status</a>
                           <div class="divider"></div>
@@ -33816,8 +34408,9 @@ async function renderBoardsTab(T, proj) {
           ' <button type="button" class="btn btn-sm" style="padding:2px 8px;font-size:11px;border-radius:50%;min-width:22px;line-height:1.1;border:1px solid rgba(15,26,46,0.15);background:#fff;color:#0F1A2E;" title="' + _gateHelp + '">\u00D7</button>';
         var pe = escAttr(projectId);
         var pre = escAttr(proposalId);
+        var _showFilterHtml = buildProposalLineShowFilterHtml(projectId, proposalId);
         if (_plManage) {
-          _bulkBarHtml = '<div style="margin-bottom:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;" onclick="event.stopPropagation()">' + _countsOnly +
+          _bulkBarHtml = '<div style="margin-bottom:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;" onclick="event.stopPropagation()">' + _countsOnly + _showFilterHtml +
             '<div class="prop-bulk-wrap" style="position:relative;display:inline-block;">' +
             '<button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation();togglePropBulkDd(this)">Bulk Actions ?</button>' +
             '<div class="prop-bulk-dd" style="display:none;position:absolute;left:0;top:100%;margin-top:4px;min-width:260px;background:#fff;border:1px solid rgba(15,26,46,0.12);box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:130;padding:4px 0;" onclick="event.stopPropagation()">' +
@@ -33834,7 +34427,7 @@ async function renderBoardsTab(T, proj) {
         } else {
           _bulkBarHtml = '<div style="margin-bottom:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;font-size:12px;color:var(--gray-600);">' +
             '<span style="padding:4px 10px;background:#ECFDF5;border:1px solid #6EE7B7;color:#065F46;font-weight:700;font-size:11px;">Client portal columns · no vendor / shipping / trade cost</span>' +
-            '<span style="font-weight:600;color:var(--navy);margin-right:4px;">Client view</span>' + _countsOnly +
+            '<span style="font-weight:600;color:var(--navy);margin-right:4px;">Client view</span>' + _countsOnly + _showFilterHtml +
             '</div>';
         }
       }
@@ -33974,9 +34567,56 @@ async function renderBoardsTab(T, proj) {
             var _docGroupMode = (typeof cchDocGroupModeForData === 'function') ? cchDocGroupModeForData(prop, 'proposal') : 'room';
             var _propLineLayout = (!_isProposalEditMode && typeof cchProposalLineLayoutGet === 'function')
               ? cchProposalLineLayoutGet(pid, prid) : 'document';
+            var _showF = (!_isProposalEditMode && typeof getProposalLineShowFilter === 'function')
+              ? getProposalLineShowFilter(pid, prid) : { approved: true, pending: true, all: true };
+            var _visibleIdx = {};
+            items.forEach(function(it, i) {
+              if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it)) return;
+              if (_isProposalEditMode || proposalLinePassesShowFilter(it, _showF)) _visibleIdx[i] = true;
+            });
+            items.forEach(function(it, i) {
+              if (typeof isProposalGroupHeaderItem !== 'function' || !isProposalGroupHeaderItem(it)) return;
+              var gid = it.groupId;
+              var any = false;
+              items.forEach(function(x, j) {
+                if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(x)) return;
+                if (gid && x.groupId === gid && _visibleIdx[j]) any = true;
+              });
+              if (any) _visibleIdx[i] = true;
+            });
+            var _hasBundles = items.some(function(it) {
+              return typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it);
+            });
+            var _bundleTotals = {};
+            items.forEach(function(it, i) {
+              if (!it || !_visibleIdx[i]) return;
+              if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it)) return;
+              var _bgid = String(it.groupId || '');
+              if (!_bgid) return;
+              var _ba = (typeof proposalLineClientTotal === 'function') ? proposalLineClientTotal(it) : (parseFloat(it.amount) || 0);
+              _bundleTotals[_bgid] = (_bundleTotals[_bgid] || 0) + (parseFloat(_ba) || 0);
+            });
             var _renderQueue = [];
-            if (_isProposalEditMode || _propLineLayout === 'flat' || _propLineLayout === 'document') {
+            /* Bundles: document order + named headers (same as Preview/PDF). Do not fold into a room total. */
+            if (_isProposalEditMode || _propLineLayout === 'flat' || _propLineLayout === 'document' || _hasBundles) {
+              var _lastRoomKey = null;
               for (var _ri = 0; _ri < items.length; _ri++) {
+                if (!_isProposalEditMode && !_visibleIdx[_ri]) continue;
+                var _itQ = items[_ri];
+                var _isHdrQ = typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(_itQ);
+                var _rkQ = String((_itQ && _itQ.room) || '').trim() || 'General';
+                if (_hasBundles && !_isProposalEditMode && _propLineLayout !== 'flat') {
+                  if (_isHdrQ) {
+                    var _hrQ = String((_itQ && _itQ.room) || '').trim();
+                    if (_hrQ && _hrQ !== _lastRoomKey) {
+                      _renderQueue.push({ kind: 'section', key: _hrQ, total: 0, hideMoney: true });
+                      _lastRoomKey = _hrQ;
+                    }
+                  } else if (_rkQ !== _lastRoomKey) {
+                    _renderQueue.push({ kind: 'section', key: _rkQ, total: 0, hideMoney: true });
+                    _lastRoomKey = _rkQ;
+                  }
+                }
                 _renderQueue.push({ kind: 'item', idx: _ri });
               }
             } else {
@@ -33987,15 +34627,18 @@ async function renderBoardsTab(T, proj) {
               _groupKeys.forEach(function(_gk) {
                 var _catItems = _grouped[_gk] || [];
                 var _catTotal = 0;
-                _catItems.forEach(function(_ci) {
-                  if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(_ci)) return;
-                  if (getProposalLineApprovalStatus(_ci) === 'declined') return;
-                  _catTotal += (typeof proposalLineClientTotal === 'function') ? proposalLineClientTotal(_ci) : (parseFloat(_ci.amount) || 0);
-                });
-                _renderQueue.push({ kind: 'section', key: _gk, total: _catTotal });
+                var _catVisible = [];
                 _catItems.forEach(function(_ci) {
                   var _ix = (_ci._idx != null) ? _ci._idx : items.indexOf(_ci);
-                  if (_ix >= 0) _renderQueue.push({ kind: 'item', idx: _ix });
+                  if (_ix < 0 || !_visibleIdx[_ix]) return;
+                  _catVisible.push(_ix);
+                  if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(_ci)) return;
+                  _catTotal += (typeof proposalLineClientTotal === 'function') ? proposalLineClientTotal(_ci) : (parseFloat(_ci.amount) || 0);
+                });
+                if (!_catVisible.length) return;
+                _renderQueue.push({ kind: 'section', key: _gk, total: _catTotal });
+                _catVisible.forEach(function(_ix) {
+                  _renderQueue.push({ kind: 'item', idx: _ix });
                 });
               });
             }
@@ -34010,7 +34653,7 @@ async function renderBoardsTab(T, proj) {
                   '<td colspan="' + propTableColspan + '" style="padding:8px 0 6px;vertical-align:middle;">' +
                   '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">' +
                   '<span class="prop-room-label">' + esc(_rqEntry.key) + '</span>' +
-                  '<span class="prop-room-subtotal">' + formatMoney(_rqEntry.total) + '</span>' +
+                  (_rqEntry.hideMoney ? '' : '<span class="prop-room-subtotal">' + formatMoney(_rqEntry.total) + '</span>') +
                   '</div></td></tr>'
                 );
                 continue;
@@ -34018,6 +34661,7 @@ async function renderBoardsTab(T, proj) {
               var idx = _rqEntry.idx;
               var item = items[idx];
               if (!item) continue;
+              if (!_isProposalEditMode && !_visibleIdx[idx]) continue;
               if (isProposalGroupHeaderItem(item)) {
                 section++;
                 sub = 0;
@@ -34037,6 +34681,7 @@ async function renderBoardsTab(T, proj) {
                     '<button type="button" title="' + (collapsed ? 'Expand group' : 'Collapse group') + '" onclick="event.stopPropagation();toggleProposalGroupCollapse(\'' + escAttr(pid) + '\',\'' + escAttr(prid) + '\',\'' + escAttr(gid) + '\')" style="width:30px;height:30px;margin-right:4px;border:1px solid rgba(15,26,46,0.2);background:#fff;color:var(--navy);font-size:16px;font-weight:700;cursor:pointer;vertical-align:middle;border-radius:2px;line-height:1;">' + (collapsed ? '+' : '-') + '</button>' +
                     '<span draggable="true" style="cursor:grab;color:var(--gray-500);padding:4px 8px 4px 2px;user-select:none;display:inline-block;" title="Drag here to move group" ondragstart="proposalRowDragStart(\'' + escAttr(pid) + '\',\'' + escAttr(prid) + '\',' + idx + ')">\u22EE\u22EE</span>' +
                     '<div style="flex:1;min-width:240px;">' + groupDisplayHtml + '</div>' +
+                    '<span class="prop-room-subtotal" style="margin-left:auto;font-weight:700;">' + formatMoney(_bundleTotals[String(gid)] || 0) + '</span>' +
                     '<button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation();editProposalGroup(\'' + escAttr(pid) + '\',\'' + escAttr(prid) + '\',' + idx + ')">Edit bundle image / description</button>' +
                     '<label style="font-size:11px;margin-left:8px;cursor:pointer;white-space:nowrap;user-select:none;color:var(--gray-600);"><input type="checkbox" ' + (item.hideFromClient ? 'checked ' : '') + 'onclick="event.stopPropagation()" onchange="setProposalGroupHideFromClient(\'' + escAttr(pid) + '\',\'' + escAttr(prid) + '\',' + idx + ',this.checked)" style="vertical-align:middle;margin-right:4px;">Hide from client</label>' +
                     '<button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation();removeProposalCustomGroup(\'' + escAttr(pid) + '\',\'' + escAttr(prid) + '\',' + idx + ')">Ungroup</button>' +
@@ -34052,6 +34697,7 @@ async function renderBoardsTab(T, proj) {
                     '<button type="button" title="' + (collapsed ? 'Expand group' : 'Collapse group') + '" onclick="event.stopPropagation();toggleProposalGroupCollapse(\'' + escAttr(pid) + '\',\'' + escAttr(prid) + '\',\'' + escAttr(gid) + '\')" style="width:30px;height:30px;margin-right:4px;border:1px solid rgba(15,26,46,0.2);background:#fff;color:var(--navy);font-size:16px;font-weight:700;cursor:pointer;vertical-align:middle;border-radius:2px;line-height:1;">' + (collapsed ? '+' : '-') + '</button>' +
                     (_plManage ? '<span draggable="true" style="cursor:grab;color:var(--gray-500);padding:4px 8px 4px 2px;user-select:none;display:inline-block;" title="Drag here to move group" ondragstart="proposalRowDragStart(\'' + escAttr(pid) + '\',\'' + escAttr(prid) + '\',' + idx + ')">\u22EE\u22EE</span>' : '') +
                     '<div style="flex:1;min-width:240px;">' + groupDisplayHtml + '</div>' +
+                    '<span class="prop-room-subtotal" style="margin-left:auto;font-weight:700;">' + formatMoney(_bundleTotals[String(gid)] || 0) + '</span>' +
                     (_plManage ? '<button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation();editProposalGroup(\'' + escAttr(pid) + '\',\'' + escAttr(prid) + '\',' + idx + ')">Edit bundle</button>' : '') +
                     (item.hideFromClient ? '<span style="font-size:11px;color:var(--gray-500);">(hidden from client)</span>' : '') +
                     '</div>' +
@@ -34121,8 +34767,8 @@ async function renderBoardsTab(T, proj) {
               })();
               var lineTagTxt = typeof cchLineTagExplicit === 'function' ? cchLineTagExplicit(item) : (typeof cchLineTagText === 'function' ? cchLineTagText(item) : '');
               var clientNoteTxt = typeof cchLineExplicitNotesText === 'function' ? cchLineExplicitNotesText(item) : String(item.lineNotes || '').trim();
-              var tagCellEdit = '<td style="text-align:center;padding:4px;width:52px;vertical-align:middle;"><input class="form-input" style="font-size:11px;font-weight:700;padding:3px 4px;width:100%;max-width:48px;text-align:center;box-sizing:border-box;" value="' + escAttr(lineTagTxt) + '" maxlength="32" placeholder="\u2014" title="Optional: L39, A, B, trim\u2026" onchange="updateProposalItemField(\'' + escAttr(pid) + '\',\'' + escAttr(prid) + '\',' + idx + ',\'lineTag\',this.value)"></td>';
-              var tagCellView = '<td style="text-align:center;padding:4px;font-size:12px;font-weight:700;color:var(--navy);width:52px;vertical-align:middle;">' + esc(lineTagTxt || '\u2014') + '</td>';
+              var tagCellEdit = '<td class="prop-tag-cell" style="text-align:center;padding:4px;width:40px;vertical-align:middle;"><input class="form-input" style="font-size:11px;font-weight:700;padding:3px 4px;width:100%;max-width:40px;text-align:center;box-sizing:border-box;" value="' + escAttr(lineTagTxt) + '" maxlength="32" placeholder="\u2014" title="Optional: L39, A, B, trim\u2026" onchange="updateProposalItemField(\'' + escAttr(pid) + '\',\'' + escAttr(prid) + '\',' + idx + ',\'lineTag\',this.value)"></td>';
+              var tagCellView = '<td class="prop-tag-cell" style="text-align:center;padding:4px;font-size:12px;font-weight:700;color:var(--navy);width:40px;vertical-align:middle;">' + esc(lineTagTxt || '\u2014') + '</td>';
               var noteBtnHtml = '<button type="button" class="btn btn-sm" style="padding:4px 7px;font-size:10px;line-height:1.1;min-width:58px;color:#0F1A2E;border:1px solid rgba(15,26,46,0.12);background:#fff;" title="' + escAttr(clientNoteTxt ? clientNoteTxt : 'Add line-item notes shown under the description') + '" onclick="event.stopPropagation();toggleProposalLineNotes(' + idx + ')">' + (clientNoteTxt ? 'Notes \u00B7' : '+ Notes') + '</button>';
               var noteRowHtml = '<tr id="propLineNotesRow' + idx + '" class="prop-line-notes-row" style="display:none;background:#F4F6FA;">' +
                 '<td colspan="' + propTableColspan + '" style="padding:10px 12px;border-top:1px solid rgba(15,26,46,0.08);border-bottom:1px solid rgba(15,26,46,0.08);">' +
@@ -34136,7 +34782,7 @@ async function renderBoardsTab(T, proj) {
                   '</div>' +
                   '<div style="font-size:10px;color:var(--gray-500);margin-top:6px;line-height:1.35;">This is the line-item note section under the product description. It is separate from the item description and image editor.</div>' +
                 '</td></tr>';
-              var itemDescCell = '<td class="prop-item-cell" title="' + itemTitleTip + '"><strong style="font-size:12px;display:block;margin-bottom:2px;">' + esc(item.title || 'Untitled') + '</strong><span style="font-size:11px;color:var(--gray-400);line-height:1.35;">' + esc((item.description || '').substring(0,100)) + (item.description && item.description.length > 100 ? '—' : '') + '</span>' + (item.shipTo ? '<br><span style="font-size:10px;color:var(--teal);margin-top:2px;display:inline-block;">\uD83D\uDCCD ' + esc(item.shipTo) + '</span>' : '') + '</td>';
+              var itemDescCell = '<td class="prop-item-cell" title="' + itemTitleTip + '"><strong style="font-size:13px;display:block;margin-bottom:4px;">' + esc(item.title || 'Untitled') + '</strong><span class="prop-item-desc">' + esc(item.description || '') + '</span>' + (item.shipTo ? '<br><span style="font-size:10px;color:var(--teal);margin-top:2px;display:inline-block;">\uD83D\uDCCD ' + esc(item.shipTo) + '</span>' : '') + '</td>';
               if (_isProposalEditMode) {
                 rows.push(
                   '<tr style="' + trStyle + '"' + hideDataAttr + ' data-idx="' + idx + '"' +
@@ -34148,7 +34794,7 @@ async function renderBoardsTab(T, proj) {
                   '<td style="padding:4px;width:54px;">' + thumbHtml + '</td>' +
                   itemDescCell +
                   '<td style="font-size:12px;padding:4px;"><input class="form-input" style="font-size:11px;padding:3px 4px;width:100%;min-width:0;box-sizing:border-box;" value="' + escAttr(item.vendor || '') + '" onchange="updateProposalItemField(\'' + escAttr(pid) + '\',\'' + escAttr(prid) + '\',' + idx + ',\'vendor\',this.value)"></td>' +
-                  '<td style="font-size:12px;padding:4px;"><select class="form-input" style="font-size:10px;padding:2px 2px;max-width:100%;width:100%;min-width:0;box-sizing:border-box;" onchange="updateProposalItemRoom(\'' + escAttr(pid) + '\',\'' + escAttr(prid) + '\',' + idx + ',this.value)">' + roomOpts + '</select></td>' +
+                  '<td class="prop-room-cell" style="font-size:12px;padding:4px;"><select class="form-input" style="font-size:10px;padding:2px 2px;max-width:100%;width:100%;min-width:0;box-sizing:border-box;" onchange="updateProposalItemRoom(\'' + escAttr(pid) + '\',\'' + escAttr(prid) + '\',' + idx + ',this.value)">' + roomOpts + '</select></td>' +
                   tagCellEdit +
                   '<td style="text-align:center;padding:4px;width:64px;vertical-align:middle;">' + noteBtnHtml + '</td>' +
                   '<td class="amount" style="font-size:12px;padding:4px;"><input type="text" inputmode="decimal" class="form-input cch-no-spin" style="font-size:11px;padding:3px;width:100%;max-width:44px;text-align:right;box-sizing:border-box;" value="' + qty + '" onchange="updateProposalItemField(\'' + escAttr(pid) + '\',\'' + escAttr(prid) + '\',' + idx + ',\'qty\',this.value)"></td>' +
@@ -34185,7 +34831,7 @@ async function renderBoardsTab(T, proj) {
                   '<td style="padding:4px;width:54px;">' + thumbHtml + '</td>' +
                   itemDescCell +
                   '<td style="font-size:12px;padding:4px;">' + esc(item.vendor || '\u2014') + '</td>' +
-                  '<td style="font-size:12px;padding:4px;">' + esc(curRoom || '\u2014') + '</td>' +
+                  '<td class="prop-room-cell" style="font-size:11px;padding:4px;width:76px;max-width:90px;">' + esc(curRoom || '\u2014') + '</td>' +
                   tagCellView +
                   '<td style="text-align:center;padding:4px;width:64px;vertical-align:middle;">' + noteBtnHtml + '</td>' +
                   '<td class="amount" style="font-size:12px;padding:4px;text-align:right;">' + esc(String(qty)) + '</td>' +
@@ -34205,7 +34851,7 @@ async function renderBoardsTab(T, proj) {
                   '<td style="font-size:11px;font-weight:600;color:var(--gray-500);text-align:center;width:32px;">' + esc(numLabel) + '</td>' +
                   '<td style="padding:6px;width:' + _thumbCellW + 'px;min-width:' + _thumbCellW + 'px;vertical-align:middle;">' + thumbHtml + '</td>' +
                   itemDescCell +
-                  '<td style="font-size:12px;padding:4px;">' + esc(curRoom || '\u2014') + '</td>' +
+                  '<td class="prop-room-cell" style="font-size:11px;padding:4px;width:76px;max-width:90px;">' + esc(curRoom || '\u2014') + '</td>' +
                   tagCellView +
                   '<td style="text-align:center;padding:4px;width:64px;vertical-align:middle;">' + noteBtnHtml + '</td>' +
                   '<td class="amount" style="font-size:12px;padding:4px;text-align:right;" title="Client price each">' + (clientPrice > 0 ? formatMoney(unitClientPrice) : '—') + '</td>' +
@@ -34238,10 +34884,10 @@ async function renderBoardsTab(T, proj) {
               '<th style="width:28px;" title="Select rows to group"></th>' +
               '<th style="width:32px;font-size:9px;">#</th>' +
               '<th style="width:54px;font-size:9px;">IMG</th>' +
-              '<th style="font-size:11px;width:22%;">ITEM</th>' +
+              '<th style="font-size:11px;width:28%;">ITEM</th>' +
               '<th style="font-size:11px;width:11%;">VENDOR</th>' +
-              '<th style="width:10%;font-size:11px;">ROOM</th>' +
-              '<th style="width:52px;font-size:9px;text-align:center;" title="Optional: fixture code, fabric/trim letter, builder label">Tag</th>' +
+              '<th class="prop-room-th" style="width:76px;font-size:11px;">ROOM</th>' +
+              '<th class="prop-tag-th" style="width:40px;font-size:9px;text-align:center;" title="Optional: fixture code, fabric/trim letter, builder label">Tag</th>' +
               '<th style="width:64px;font-size:9px;" title="Line notes under description">Notes</th>' +
               '<th class="amount" style="font-size:11px;width:5%;">QTY</th>' +
               '<th class="amount" style="font-size:11px;width:7%;">COST</th>' +
@@ -34257,10 +34903,10 @@ async function renderBoardsTab(T, proj) {
               '<th style="width:28px;font-size:9px;" title="Select"></th>' +
               '<th style="width:32px;font-size:9px;">#</th>' +
               '<th style="width:54px;font-size:9px;">IMG</th>' +
-              '<th style="font-size:11px;width:20%;">ITEM</th>' +
+              '<th style="font-size:11px;width:32%;">ITEM</th>' +
               '<th style="font-size:11px;width:10%;">VENDOR</th>' +
-              '<th style="width:9%;font-size:11px;">ROOM</th>' +
-              '<th style="width:52px;font-size:9px;text-align:center;" title="Optional: fixture code, fabric/trim letter, builder label">Tag</th>' +
+              '<th class="prop-room-th" style="width:76px;font-size:11px;">ROOM</th>' +
+              '<th class="prop-tag-th" style="width:40px;font-size:9px;text-align:center;" title="Optional: fixture code, fabric/trim letter, builder label">Tag</th>' +
               '<th style="width:64px;font-size:9px;" title="Line notes under description">Notes</th>' +
               '<th class="amount" style="font-size:11px;width:5%;">QTY</th>' +
               '<th class="amount" style="font-size:11px;width:7%;" title="Client price each">PRICE</th>' +
@@ -34273,9 +34919,9 @@ async function renderBoardsTab(T, proj) {
               : '<thead><tr>' +
               '<th style="width:32px;font-size:9px;">#</th>' +
               '<th style="width:142px;min-width:142px;font-size:9px;">IMG</th>' +
-              '<th style="font-size:11px;width:28%;">ITEM</th>' +
-              '<th style="width:12%;font-size:11px;">ROOM</th>' +
-              '<th style="width:52px;font-size:9px;text-align:center;" title="Optional: fixture code, fabric/trim letter, builder label">TAG</th>' +
+              '<th style="font-size:11px;width:40%;">ITEM</th>' +
+              '<th class="prop-room-th" style="width:76px;font-size:11px;">ROOM</th>' +
+              '<th class="prop-tag-th" style="width:40px;font-size:9px;text-align:center;" title="Optional: fixture code, fabric/trim letter, builder label">TAG</th>' +
               '<th style="width:64px;font-size:9px;" title="Line notes under description">NOTES</th>' +
               '<th class="amount" style="font-size:11px;width:8%;" title="Client price each">PRICE</th>' +
               '<th class="amount" style="font-size:11px;width:5%;">QTY</th>' +
@@ -34288,7 +34934,9 @@ async function renderBoardsTab(T, proj) {
             if (!_isProposalEditMode) {
               var _layoutLabel = (_propLineLayout === 'flat')
                 ? 'Flat list (document order)'
-                : ('Grouped by ' + (_docGroupMode === 'category' ? 'category' : 'room') + ' — matches print / PDF');
+                : (_hasBundles
+                  ? 'Grouped by bundle — matches print / PDF'
+                  : ('Grouped by ' + (_docGroupMode === 'category' ? 'category' : 'room') + ' — matches print / PDF'));
               var _grpRoomOn = _propLineLayout !== 'flat' && _docGroupMode === 'room';
               var _grpCatOn = _propLineLayout !== 'flat' && _docGroupMode === 'category';
               _groupBarHtml = '<div style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;background:var(--gray-50);border:1px solid rgba(15,26,46,0.08);border-radius:4px;">' +
@@ -35075,7 +35723,11 @@ async function renderBoardsTab(T, proj) {
     window._invalidateShipToContactsCache = _invalidateShipToContactsCache;
 
     async function _loadShipToContacts(forceReload) {
-      if (!forceReload && _shipToReceivers != null && _shipToWorkrooms != null) return;
+      if (!forceReload && _shipToReceivers != null && _shipToWorkrooms != null) {
+        window._cchShipToReceivers = _shipToReceivers;
+        window._cchShipToWorkrooms = _shipToWorkrooms;
+        return;
+      }
       _shipToReceivers = [];
       _shipToWorkrooms = [];
       var wrSeen = {};
@@ -35142,6 +35794,8 @@ async function renderBoardsTab(T, proj) {
       if (!_shipToWorkrooms.length && !_shipToReceivers.length) {
         console.warn('[ship-to] No workrooms or receivers loaded — add under Vendors → Workrooms / Delivery Receivers, or Team & Contacts.');
       }
+      window._cchShipToReceivers = _shipToReceivers;
+      window._cchShipToWorkrooms = _shipToWorkrooms;
     }
 
     function docEditRefreshShipToDropdowns() {
@@ -40649,6 +41303,13 @@ async function renderBoardsTab(T, proj) {
       if (elS) {
         _docEdit.docData.shipTo = elS.value.trim();
         if (elAddr && document.activeElement === elS) docEditUpdatePOShipToResolvedPreview();
+        var recFromShip = (typeof window.cchPoShipToReceiverName === 'function')
+          ? window.cchPoShipToReceiverName({ shipTo: _docEdit.docData.shipTo })
+          : '';
+        if (recFromShip) _docEdit.docData.receiver = recFromShip;
+        else if (typeof window.cchPoShipToIsNonReceiver === 'function' && window.cchPoShipToIsNonReceiver(_docEdit.docData.shipTo)) {
+          _docEdit.docData.receiver = '';
+        }
       }
       if (elAddr) _docEdit.docData.shipToAddress = elAddr.value.trim();
       if (elD && elD.value && /^\d{4}-\d{2}-\d{2}$/.test(elD.value.trim())) {
@@ -46897,7 +47558,15 @@ async function renderBoardsTab(T, proj) {
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
             <div style="font-size:12px;font-weight:700;color:#0F1A2E;letter-spacing:0.3px;">QuickBooks</div>
             ${!getQbId(docData) && type === 'invoice' ? (docData.qbPushPending ? '<span style="font-size:11px;color:#92400E;font-weight:600;">⏳ Queued for QuickBooks\u2026</span>' : (_canPushQB ? '<button class="btn btn-sm" style="background:#60A5FA;color:white;border:none;font-size:11px;padding:3px 12px;" onclick="pushDocToQB(\'invoice\',\'' + projectId + '\',\'' + docId + '\')">Push to QB</button>' : '<span style="font-size:11px;color:var(--gray-400);">QB push not available</span>')) : ''}
-            ${type === 'po' && typeof window.cchPoQbBillOnlyMode === 'function' && window.cchPoQbBillOnlyMode() ? (docData.bill && docData.bill.qbBillId ? '<span style="font-size:11px;color:#2E7D32;font-weight:600;">✅ QB Bill synced</span>' : '<span style="font-size:11px;color:#5C6B80;">Receive vendor bill on PO → auto-pushes first invoice to QB</span>') : (!getQbId(docData) && type === 'po' ? (docData.qbPushPending ? '<span style="font-size:11px;color:#92400E;font-weight:600;">⏳ Queued…</span>' : (_canPushQB ? '<button class="btn btn-sm" style="background:#60A5FA;color:white;border:none;font-size:11px;padding:3px 12px;" onclick="pushDocToQB(\'po\',\'' + projectId + '\',\'' + docId + '\')">Push to QB</button>' : '<span style="font-size:11px;color:var(--gray-400);">QB push not available</span>')) : '')}
+            ${getQbId(docData)
+              ? '<span style="font-size:11px;color:#2E7D32;font-weight:600;">✅ QB PO synced' + (docData.bill && docData.bill.qbBillId ? ' · Bill synced' : '') + '</span>'
+              : (docData.qbPushPending
+                ? '<span style="font-size:11px;color:#92400E;font-weight:600;">⏳ Queued…</span>'
+                : ((typeof window.cchPoCanPushPoToQb === 'function' ? window.cchPoCanPushPoToQb(docData, _canPushQB) : _canPushQB)
+                  ? '<button class="btn btn-sm" style="background:#60A5FA;color:white;border:none;font-size:11px;padding:3px 12px;" onclick="pushDocToQB(\'po\',\'' + projectId + '\',\'' + docId + '\')">Push PO to QB</button>'
+                  : (docData.bill && docData.bill.qbBillId
+                    ? '<span style="font-size:11px;color:#2E7D32;font-weight:600;">✅ QB Bill synced</span>'
+                    : '<span style="font-size:11px;color:#5C6B80;">Send PO → Purchase Order in QB; vendor bill (incl. freight/tax) links to that PO</span>')))}
           </div>
           ${docData.qbPushLastError && !getQbId(docData) ? '<div style="margin-top:10px;font-size:11px;color:#B91C1C;line-height:1.4;padding:8px;background:rgba(185,28,28,0.06);border-radius:4px;"><strong>Last QB sync error:</strong> ' + esc(String(docData.qbPushLastError)) + '</div>' : ''}
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -49580,7 +50249,7 @@ async function renderBoardsTab(T, proj) {
     }
     function _ensureLedgerYtdDefault() {
       if (window._tlSkipYtdDefault || window._tlForceFullTimeFetch) return;
-      if (!timeFilter.dateFrom && !timeFilter.dateTo && (smartTimeTab === 'ledger' || smartTimeTab === 'reconciliation')) {
+      if (!timeFilter.dateFrom && !timeFilter.dateTo) {
         timeFilter.dateFrom = _timeLedgerYearStart();
       }
     }
@@ -49600,7 +50269,7 @@ async function renderBoardsTab(T, proj) {
     };
     let timeFilter = { project: '', projectBoardId: '', member: '', client: '', dateFrom: '', dateTo: '', billable: '', invoiced: '', service: '' };
     let timeViewMode = 'list'; // 'list', 'weekly', 'monthly'
-    let smartTimeTab = 'activity'; // 'activity', 'reconciliation', 'ledger'
+    let smartTimeTab = 'activity'; // 'activity', 'summaries', 'reconciliation', 'ledger'
     let timeLedgerSort = { field: 'date', dir: 'desc' }; // sortable columns
 
     window.toggleTimeLedgerSort = function(field) {
@@ -52062,7 +52731,7 @@ async function renderBoardsTab(T, proj) {
         tab = 'activity';
       }
       smartTimeTab = tab;
-      if (tab === 'ledger' || tab === 'reconciliation') _ensureLedgerYtdDefault();
+      _ensureLedgerYtdDefault();
       if (!window._timeViewEmbedTarget) {
         timeFilter.project = '';
         timeFilter.projectBoardId = '';
@@ -52170,6 +52839,20 @@ async function renderBoardsTab(T, proj) {
           for (var _di = 1; _di <= _lastD; _di++) {
             var _ds = _cy + '-' + String(_cm + 1).padStart(2, '0') + '-' + String(_di).padStart(2, '0');
             if (scanDates.indexOf(_ds) < 0) scanDates.push(_ds);
+          }
+        }
+        if (smartTimeTab === 'agent') {
+          var _ad = String(window._agentViewDate || '').trim();
+          if (/^\d{4}-\d{2}-\d{2}$/.test(_ad) && scanDates.indexOf(_ad) < 0) scanDates.push(_ad);
+          var _am = String(window._agentViewMonth || '').trim();
+          if (/^\d{4}-\d{2}$/.test(_am)) {
+            var _ay = parseInt(_am.slice(0, 4), 10);
+            var _amo = parseInt(_am.slice(5, 7), 10) - 1;
+            var _aLast = new Date(_ay, _amo + 1, 0).getDate();
+            for (var _adi = 1; _adi <= _aLast; _adi++) {
+              var _ads = _am + '-' + String(_adi).padStart(2, '0');
+              if (scanDates.indexOf(_ads) < 0) scanDates.push(_ads);
+            }
           }
         }
         var allSuggestions = [];
@@ -53718,6 +54401,7 @@ async function renderBoardsTab(T, proj) {
       var _contractorScope = !canInvoiceFromAllMembersTime();
       var _projOrClientSelected = !!(timeFilter.project || timeFilter.client);
       return timeEntries.filter(t => {
+        if (!t) return false;
         // Contractor (e.g. Vanessa): other members' rows appear ONLY when a project or client is
         // selected (project-scoped invoicing). With no project/client filter the view stays own-only.
         if (_contractorScope && !_projOrClientSelected && !ledgerEntryBelongsToCurrentUser(t)) return false;
@@ -53810,6 +54494,7 @@ async function renderBoardsTab(T, proj) {
         <!-- TAB BAR -->
         <div class="smart-time-tabs">
           <div class="${tabClass('activity')}" onclick="_timeTabSwitch('activity')">Smart Time</div>
+          <div class="${tabClass('summaries')}" onclick="_timeTabSwitch('summaries')">Summaries</div>
           ${canAccessTimeAgentTab() ? `<div class="${tabClass('agent')}" onclick="_timeTabSwitch('agent')">Time Agent</div>` : ''}
           <div class="${tabClass('reconciliation')}" onclick="_timeTabSwitch('reconciliation')">Time Reconciliation</div>
           <div class="${tabClass('ledger')}" onclick="_timeTabSwitch('ledger')">Time Ledger</div>
@@ -53831,6 +54516,9 @@ async function renderBoardsTab(T, proj) {
         `;
         var heroContainer = document.getElementById('timelineHeroContainer');
         renderTimeTimelineView(heroContainer, filtered, ledgerFull);
+
+      } else if (smartTimeTab === 'summaries') {
+        renderSmartTimeSummaryView(TC, ledgerFull);
 
       } else if (smartTimeTab === 'agent') {
         if (!canAccessTimeAgentTab()) {
@@ -54144,6 +54832,31 @@ async function renderBoardsTab(T, proj) {
      * CURSOR_TimeAgentPage — Agent-focused review: sort by member/project, source badges, manual notes.
      * Reads _pendingCaptures (after autoScanCaptures). Does not change Timely sync.
      */
+    window._agentRerender = function() {
+      var t = document.getElementById('smartTimeTabContent');
+      if (t && typeof renderTimeAgentView === 'function') renderTimeAgentView(t);
+    };
+    window._agentSetDate = function(val) {
+      var v = String(val || '').trim().slice(0, 10);
+      window._agentViewDate = /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '';
+      if (window._agentViewDate) {
+        window._agentViewMonth = window._agentViewDate.slice(0, 7);
+        if (typeof _tlDay !== 'undefined') _tlDay = window._agentViewDate;
+      }
+      autoScanCaptures().then(window._agentRerender);
+    };
+    window._agentSetMonth = function(ym) {
+      var m = String(ym || '').trim().slice(0, 7);
+      window._agentViewMonth = /^\d{4}-\d{2}$/.test(m) ? m : '';
+      window._agentViewDate = '';
+      autoScanCaptures().then(window._agentRerender);
+    };
+    window._agentClearDate = function() {
+      window._agentViewDate = '';
+      window._agentViewMonth = '';
+      autoScanCaptures().then(window._agentRerender);
+    };
+
     function renderTimeAgentView(container) {
       if (!container) return;
       if (!canAccessTimeAgentTab()) {
@@ -54153,12 +54866,19 @@ async function renderBoardsTab(T, proj) {
       if (!window._agentSortMode) window._agentSortMode = 'time';
       if (!window._agentMemberFilter) window._agentMemberFilter = 'all';
       if (typeof window._agentShowTimely !== 'boolean') window._agentShowTimely = false;
+      if (window._agentProjectFilter == null) window._agentProjectFilter = '';
+      if (window._agentViewDate == null) window._agentViewDate = '';
+      if (window._agentViewMonth == null) window._agentViewMonth = '';
       var sortMode = window._agentSortMode;
       var memberFilter = window._agentMemberFilter;
       var showTimely = window._agentShowTimely;
+      var projectFilter = String(window._agentProjectFilter || '').trim();
+      var viewDate = String(window._agentViewDate || '').trim();
+      var viewMonth = String(window._agentViewMonth || '').trim();
       var seeAll = canSeeAllDesktopCaptures();
       var myLabel = (typeof currentMemberName === 'function' && currentMemberName()) || '';
       var myFirst = myLabel ? myLabel.split(' ')[0].toLowerCase() : '';
+      var todayStr = (typeof dateStr === 'function') ? dateStr(new Date()) : new Date().toISOString().slice(0, 10);
       // Non-owner: always own captures only (ignore All-members UI state)
       if (!seeAll) memberFilter = 'mine';
 
@@ -54181,15 +54901,37 @@ async function renderBoardsTab(T, proj) {
 
       var memberNames = [];
       var seenM = {};
+      (typeof TEAM_MEMBERS !== 'undefined' ? TEAM_MEMBERS : []).forEach(function(m) {
+        var lab = String(m || '').trim();
+        if (lab && !seenM[lab.toLowerCase()]) { seenM[lab.toLowerCase()] = true; memberNames.push(lab); }
+      });
+      if (myLabel && !seenM[myLabel.toLowerCase()]) { seenM[myLabel.toLowerCase()] = true; memberNames.unshift(myLabel); }
       rows.forEach(function(r) {
-        var m = String(r.c.member || '').trim() || '(unassigned)';
-        if (!seenM[m]) { seenM[m] = true; memberNames.push(m); }
+        var m = String(r.c.member || '').trim();
+        if (!m) return;
+        if (!seenM[m.toLowerCase()]) { seenM[m.toLowerCase()] = true; memberNames.push(m); }
       });
       memberNames.sort();
       if (seeAll && memberFilter !== 'all' && memberFilter !== 'mine') {
+        var filterFirst = String(memberFilter).split(' ')[0].toLowerCase();
         rows = rows.filter(function(r) {
-          var m = String(r.c.member || '').trim() || '(unassigned)';
-          return m === memberFilter;
+          var m = String(r.c.member || '').toLowerCase();
+          return m === String(memberFilter).toLowerCase() || (filterFirst && m.indexOf(filterFirst) >= 0);
+        });
+      }
+      if (viewDate && /^\d{4}-\d{2}-\d{2}$/.test(viewDate)) {
+        rows = rows.filter(function(r) { return r.c && String(r.c.date || '') === viewDate; });
+      } else if (viewMonth && /^\d{4}-\d{2}$/.test(viewMonth)) {
+        rows = rows.filter(function(r) { return r.c && String(r.c.date || '').slice(0, 7) === viewMonth; });
+      } else {
+        var ytdStart = (typeof _timeLedgerYearStart === 'function') ? _timeLedgerYearStart() : (new Date().getFullYear() + '-01-01');
+        rows = rows.filter(function(r) { return r.c && String(r.c.date || '') >= ytdStart; });
+      }
+      if (projectFilter) {
+        rows = rows.filter(function(r) {
+          var fake = { project: r.c.projectName || r.c.project || '' };
+          if (typeof _timeEntryMatchesProjectFilter === 'function') return _timeEntryMatchesProjectFilter(fake, projectFilter);
+          return String(fake.project).toLowerCase() === projectFilter.toLowerCase();
         });
       }
 
@@ -54280,6 +55022,26 @@ async function renderBoardsTab(T, proj) {
         var on = sortMode === mode;
         return '<button type="button" onclick="window._agentSortMode=\'' + mode + '\';renderTimeAgentView(document.getElementById(\'smartTimeTabContent\'))" style="padding:6px 12px;font-size:11px;font-weight:600;border:1px solid ' + (on ? 'var(--gold)' : 'var(--border,#eee)') + ';background:' + (on ? 'var(--gold)' : 'white') + ';color:' + (on ? 'white' : 'var(--navy)') + ';cursor:pointer;">' + label + '</button>';
       };
+      var selStyle = 'padding:6px 10px;font-size:12px;border:1px solid var(--border,#eee);background:#fff;color:#0F1A2E;';
+      var agentProjects = (window._captureProjectList && window._captureProjectList.length)
+        ? window._captureProjectList.slice()
+        : ((typeof buildTimeLedgerProjectDropdownList === 'function') ? buildTimeLedgerProjectDropdownList(timeEntries, window._timeLedgerBoardsCache || []) : []);
+      var projectSelect = '<select onchange="window._agentProjectFilter=this.value;renderTimeAgentView(document.getElementById(\'smartTimeTabContent\'))" style="' + selStyle + 'min-width:160px;" title="Filter by project">' +
+        '<option value="">All projects</option>' +
+        agentProjects.map(function(p) {
+          var lab = (typeof _timeLedgerProjectOptionLabel === 'function') ? _timeLedgerProjectOptionLabel(p, window._timeLedgerBoardsCache || []) : p;
+          return '<option value="' + escAttr(p) + '"' + (projectFilter === p ? ' selected' : '') + '>' + esc(lab) + '</option>';
+        }).join('') +
+      '</select>';
+      var memberSelect = seeAll
+        ? ('<select onchange="window._agentMemberFilter=this.value;renderTimeAgentView(document.getElementById(\'smartTimeTabContent\'))" style="' + selStyle + 'min-width:150px;" title="Filter by person">' +
+          '<option value="all"' + (memberFilter === 'all' ? ' selected' : '') + '>All members</option>' +
+          memberNames.map(function(m) {
+            var on = memberFilter === m || (myFirst && memberFilter !== 'all' && String(m).toLowerCase().indexOf(myFirst) === 0 && String(memberFilter).toLowerCase().indexOf(myFirst) === 0);
+            return '<option value="' + escAttr(m) + '"' + (on ? ' selected' : '') + '>' + esc(m) + '</option>';
+          }).join('') +
+          '</select>')
+        : '<span style="font-size:12px;font-weight:600;color:#0F1A2E;padding:6px 10px;border:1px solid rgba(15,26,46,0.12);background:#F8F9FB;">' + esc(myLabel || 'My captures') + '</span>';
 
       container.innerHTML =
         '<div style="margin-bottom:8px;">' +
@@ -54289,15 +55051,14 @@ async function renderBoardsTab(T, proj) {
               '<div style="font-size:12px;color:var(--gray-500);margin-top:2px;">Desktop agent captures · sort · notes · WO-112 source badges</div>' +
             '</div>' +
             '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">' +
+              '<input type="date" value="' + escAttr(viewDate) + '" max="' + escAttr(todayStr) + '" onchange="_agentSetDate(this.value)" style="' + selStyle + '" title="Jump to date">' +
+              '<input type="month" value="' + escAttr(viewMonth) + '" max="' + escAttr(todayStr.slice(0, 7)) + '" onchange="_agentSetMonth(this.value)" style="' + selStyle + '" title="Jump to month">' +
+              ((viewDate || viewMonth) ? '<button type="button" class="btn btn-sm btn-secondary" onclick="_agentClearDate()">YTD</button>' : '<span style="font-size:11px;color:var(--gray-500);">YTD</span>') +
               sortBtn('time', 'By time') +
               sortBtn('project', 'By project') +
               (seeAll ? sortBtn('member', 'By member') : '') +
-              (seeAll
-                ? ('<select onchange="window._agentMemberFilter=this.value;renderTimeAgentView(document.getElementById(\'smartTimeTabContent\'))" style="padding:6px 10px;font-size:12px;border:1px solid var(--border,#eee);">' +
-                  '<option value="all"' + (memberFilter === 'all' ? ' selected' : '') + '>All members</option>' +
-                  memberNames.map(function(m) { return '<option value="' + escAttr(m) + '"' + (memberFilter === m ? ' selected' : '') + '>' + esc(m) + '</option>'; }).join('') +
-                  '</select>')
-                : '<span style="font-size:12px;font-weight:600;color:#0F1A2E;padding:6px 10px;border:1px solid rgba(15,26,46,0.12);background:#F8F9FB;">' + esc(myLabel || 'My captures') + '</span>') +
+              memberSelect +
+              projectSelect +
               '<label style="font-size:11px;color:var(--gray-600);display:inline-flex;align-items:center;gap:4px;cursor:pointer;">' +
                 '<input type="checkbox" ' + (showTimely ? 'checked' : '') + ' onchange="window._agentShowTimely=this.checked;renderTimeAgentView(document.getElementById(\'smartTimeTabContent\'))"> Show Timely' +
               '</label>' +
@@ -55925,7 +56686,7 @@ async function renderBoardsTab(T, proj) {
     // -- AI suggest projects for captures --
     async function _tlAISuggestCaptures() {
       if (_tlAIRunning) return;
-      var caps = (window._pendingCaptures || []).filter(function(c) { return c.date === _tlDay && !c._dismissed; });
+      var caps = (window._pendingCaptures || []).filter(function(c) { return c && c.date === _tlDay && !c._dismissed; });
       if (caps.length === 0) return;
 
       // Get project list
@@ -56696,12 +57457,12 @@ async function renderBoardsTab(T, proj) {
         <span style="width:11px;height:11px;border-radius:2px;background:#e0e0e0;border:1px dashed #bbb;display:inline-block;flex-shrink:0;"></span>
         Unassigned
       </span>`;
-      var capCount = (window._pendingCaptures||[]).filter(c => c.date === _tlDay && !c._dismissed).length;
+      var capCount = (window._pendingCaptures||[]).filter(c => c && c.date === _tlDay && !c._dismissed).length;
       if (capCount > 0) {
         var scanTime = window._capturesLastScan ? window._capturesLastScan.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'}) : '';
         html += `<span style="display:inline-flex;align-items:center;gap:5px;margin-left:8px;font-size:12px;color:var(--gold);">
           <span style="width:11px;height:11px;border-radius:2px;background:#1976D218;border:1px dashed #1976D2;display:inline-block;flex-shrink:0;"></span>
-          ?? ${capCount} captures${scanTime ? ' · scanned ' + scanTime : ''} <span style="color:#0F1A2E;font-size:10px;">${(window._pendingCaptures||[]).some(c => c.date === _tlDay && c.startTime && !c._dismissed) ? '(? timestamped)' : '(times estimated)'}</span>
+          ?? ${capCount} captures${scanTime ? ' · scanned ' + scanTime : ''} <span style="color:#0F1A2E;font-size:10px;">${(window._pendingCaptures||[]).some(c => c && c.date === _tlDay && c.startTime && !c._dismissed) ? '(? timestamped)' : '(times estimated)'}</span>
           <a href="#" onclick="event.preventDefault();autoScanCaptures();return false;" style="color:var(--gold);font-size:11px;text-decoration:none;margin-left:4px;">🔄 Rescan</a>
           <a href="#" onclick="event.preventDefault();window._captureShowAll=!window._captureShowAll;autoScanCaptures();return false;" style="color:${window._captureShowAll?'#e53935':'var(--gold)'};font-size:11px;text-decoration:none;margin-left:8px;">${window._captureShowAll?'👥 All':'👤 Mine'}</a>
         </span>`;
@@ -56763,7 +57524,7 @@ async function renderBoardsTab(T, proj) {
         // Count total available captures per app for the day
         var dayAppTotals = {};
         (window._pendingCaptures || []).forEach(function(c) {
-          if (c.date === _tlDay && !c._dismissed) {
+          if (c && c.date === _tlDay && !c._dismissed) {
             var appName = (typeof _normalizeAppName === 'function') ? _normalizeAppName(c.app || 'Unknown') : (c.app || 'Unknown');
             var domain = '';
             if (appName.match(/^[a-z0-9][-a-z0-9]*\.[a-z]/i)) domain = appName.toLowerCase().replace(/^www\./, '');
@@ -58619,12 +59380,934 @@ async function renderBoardsTab(T, proj) {
       });
     };
 
+    if (!window._stSummaryPeriod) window._stSummaryPeriod = 'weekly';
+
+    function _stPersonScopedEntries(admin) {
+      var myName = typeof currentMemberName === 'function' ? currentMemberName() : '';
+      var allEntries = (timeEntries || []).filter(function(t) {
+        if (!t) return false;
+        if (timeFilter.member && timeFilter.member !== '__all__') {
+          var filterFirst = timeFilter.member.split(' ')[0].toLowerCase();
+          var entryFirst = (t.member || '').split(' ')[0].toLowerCase();
+          var entryEmail = (t.team || '').toLowerCase();
+          return entryFirst === filterFirst || (t.member || '').toLowerCase().includes(filterFirst) || entryEmail.includes(filterFirst);
+        }
+        if (timeFilter.member === '__all__') return true;
+        if (admin && myName) {
+          var myFirst = myName.split(' ')[0].toLowerCase();
+          var myEmail = (currentUser && currentUser.email) ? currentUser.email.toLowerCase() : '';
+          var entryMemberLower = (t.member || '').toLowerCase();
+          return entryMemberLower.includes(myFirst) || (!t.member && t.team && t.team.toLowerCase() === myEmail);
+        }
+        return true;
+      });
+      if (timeFilter.projectBoardId) {
+        allEntries = allEntries.filter(function(t) { return _timeEntryMatchesBoardIdFilter(t, timeFilter.projectBoardId); });
+      } else if (timeFilter.project) {
+        allEntries = allEntries.filter(function(t) { return _timeEntryMatchesProjectFilter(t, timeFilter.project); });
+      }
+      return allEntries;
+    }
+
+    function _stSummaryAnchorDate() {
+      var today = dateStr(new Date());
+      var a = String(window._stSummaryAnchor || '').trim().slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(a) || a > today) return today;
+      return a;
+    }
+
+    function _stSummaryRange(period, anchor) {
+      var today = dateStr(new Date());
+      var end = String(anchor || today).slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(end) || end > today) end = today;
+      var endDt = new Date(end + 'T12:00:00');
+      var startDt;
+      var rangeEnd = end;
+      var label;
+      if (period === 'weekly') {
+        startDt = (typeof getWeekStart === 'function') ? getWeekStart(new Date(endDt)) : new Date(endDt);
+        var weekEndDt = new Date(startDt.getFullYear(), startDt.getMonth(), startDt.getDate() + 6);
+        rangeEnd = dateStr(weekEndDt);
+        if (rangeEnd > today) rangeEnd = today;
+        var thisWeekStart = (typeof getWeekStart === 'function') ? dateStr(getWeekStart(new Date(today + 'T12:00:00'))) : today;
+        if (dateStr(startDt) === thisWeekStart && rangeEnd === today) {
+          label = 'Week to Date';
+        } else {
+          label = 'Week of ' + startDt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+      } else if (period === 'monthly') {
+        startDt = new Date(endDt.getFullYear(), endDt.getMonth(), 1);
+        var lastDt = new Date(endDt.getFullYear(), endDt.getMonth() + 1, 0);
+        rangeEnd = dateStr(lastDt);
+        if (rangeEnd > today) rangeEnd = today;
+        var now = new Date();
+        if (endDt.getFullYear() === now.getFullYear() && endDt.getMonth() === now.getMonth() && rangeEnd === today) {
+          label = 'Month to Date';
+        } else {
+          label = startDt.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        }
+      } else {
+        startDt = new Date(endDt);
+        rangeEnd = end;
+        label = (end === today) ? 'Day to Date' : startDt.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
+      }
+      return { start: dateStr(startDt), end: rangeEnd, label: label };
+    }
+
+    window._stSetSummaryPeriod = function(p) {
+      window._stSummaryPeriod = (p === 'weekly' || p === 'monthly') ? p : 'daily';
+      renderTimeView();
+    };
+
+    window._stSetSummaryAnchor = function(val) {
+      var today = dateStr(new Date());
+      var v = String(val || '').trim().slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) v = today;
+      if (v > today) v = today;
+      window._stSummaryAnchor = v;
+      renderTimeView();
+    };
+
+    window._stSetSummaryMonth = function(ym) {
+      window._stSummaryPeriod = 'monthly';
+      var today = dateStr(new Date());
+      var parts = String(ym || '').split('-');
+      var y = parseInt(parts[0], 10);
+      var m = parseInt(parts[1], 10);
+      if (!y || !m) {
+        window._stSummaryAnchor = today;
+        renderTimeView();
+        return;
+      }
+      var last = dateStr(new Date(y, m, 0));
+      window._stSummaryAnchor = (last > today) ? today : last;
+      renderTimeView();
+    };
+
+    window._stSummaryGoToday = function() {
+      window._stSummaryAnchor = dateStr(new Date());
+      renderTimeView();
+    };
+
+    function _stSummaryPersonKey() {
+      var m = String((timeFilter && timeFilter.member) || '').toLowerCase();
+      if (m === '__all__') return '';
+      if (m.indexOf('vanessa') >= 0 || m.indexOf('holliday') >= 0) return 'vanessa';
+      if (m.indexOf('cindy') >= 0 || m.indexOf('cynthia') >= 0 || m.indexOf('holloway') >= 0) return 'cindy';
+      if (typeof activitySignedInPersonKey === 'function') return activitySignedInPersonKey();
+      return '';
+    }
+
+    function _stWtdEnsureCss() {
+      if (document.getElementById('stWtdCss')) return;
+      var s = document.createElement('style');
+      s.id = 'stWtdCss';
+      s.textContent =
+        '.st-wtd{--navy:#0F1A2E;--gold:#C4A464;--gold-soft:#E8DCC4;--cream:#FBF9F4;--line:#E4E0D8;--ink:#1B2333;--muted:#5C6B80;--green:#2E6B4F;--amber:#B07A2E;font-family:"DM Sans",system-ui,sans-serif;color:var(--ink);background:var(--cream);margin:0 -8px;}' +
+        '.st-wtd .st-wtd-hero{background:var(--navy);color:#fff;padding:28px 24px 22px}' +
+        '.st-wtd .st-wtd-hero-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}' +
+        '.st-wtd .st-wtd-eyebrow{font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--gold);margin-bottom:8px}' +
+        '.st-wtd .st-wtd-hero h1{font-family:"Playfair Display",Georgia,serif;font-weight:500;font-size:32px;margin:0;color:#fff}' +
+        '.st-wtd .st-wtd-range{color:rgba(255,255,255,.7);margin-top:8px;font-size:14px}' +
+        '.st-wtd .st-wtd-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);margin-top:22px}' +
+        '.st-wtd .st-wtd-kpi{background:#fff;padding:14px 16px}' +
+        '.st-wtd .st-wtd-kpi .n{font-family:"Playfair Display",Georgia,serif;font-size:24px;color:var(--navy)}' +
+        '.st-wtd .st-wtd-kpi .l{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:3px}' +
+        '.st-wtd .st-wtd-body{max-width:880px;margin:0 auto;padding:8px 24px 40px}' +
+        '.st-wtd .st-wtd-body h2{font-family:"Playfair Display",Georgia,serif;font-weight:500;font-size:20px;color:var(--navy);margin:28px 0 6px;padding-bottom:8px;border-bottom:2px solid var(--gold)}' +
+        '.st-wtd .st-wtd-bar{display:grid;grid-template-columns:150px 1fr 62px;align-items:center;gap:12px;margin:9px 0;font-size:14px}' +
+        '.st-wtd .st-wtd-track{background:#EFEBE2;height:16px;position:relative}' +
+        '.st-wtd .st-wtd-fill{background:var(--navy);height:16px}' +
+        '.st-wtd .st-wtd-fill.b{background:var(--gold)}' +
+        '.st-wtd .st-wtd-bar .v{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}' +
+        '.st-wtd .st-wtd-bar .lab{color:var(--navy);font-weight:500}' +
+        '.st-wtd table{width:100%;border-collapse:collapse;margin-top:12px;font-size:14px;background:#fff;border:1px solid var(--line)}' +
+        '.st-wtd th{background:var(--navy);color:#fff;text-align:left;font-weight:500;font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:9px 13px}' +
+        '.st-wtd td{padding:9px 13px;border-top:1px solid var(--line)}' +
+        '.st-wtd td.r{text-align:right;font-variant-numeric:tabular-nums}' +
+        '.st-wtd td.when,.st-wtd .st-wtd-when{white-space:nowrap;color:var(--muted);font-size:12.5px}' +
+        '.st-wtd tr:nth-child(even) td{background:#FCFBF8}' +
+        '.st-wtd .st-wtd-muted{font-size:12.5px;color:var(--muted);margin-top:8px}' +
+        '.st-wtd .st-wtd-empty{font-size:13.5px;color:var(--muted);margin-top:10px}' +
+        '.st-wtd .st-wtd-recon{background:#FBF6EC;border:1px solid var(--gold-soft);padding:14px 18px;margin-top:14px;font-size:14px}' +
+        '.st-wtd .st-wtd-card{background:#fff;border:1px solid var(--line);border-left:3px solid var(--gold);padding:15px 17px;margin-top:12px}' +
+        '.st-wtd .st-wtd-card.green{border-left-color:var(--green)}' +
+        '.st-wtd .st-wtd-card.amber{border-left-color:var(--amber)}' +
+        '.st-wtd .st-wtd-card h3{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--gold);margin:0 0 9px}' +
+        '.st-wtd .st-wtd-card ul{list-style:none;margin:0;padding:0;font-size:13.5px}' +
+        '.st-wtd .st-wtd-card li{padding:4px 0 4px 15px;position:relative}' +
+        '.st-wtd .st-wtd-card li:before{content:"";position:absolute;left:0;top:10px;width:5px;height:5px;background:var(--gold);border-radius:50%}' +
+        '.st-wtd .paid{color:var(--green);font-weight:600}' +
+        '.st-wtd .flag{color:var(--amber);font-weight:600}' +
+        '.st-wtd .st-wtd-two{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:28px}' +
+        '.st-wtd .st-wtd-chips{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}' +
+        '.st-wtd .st-wtd-chip{padding:7px 16px;font-size:13px;font-weight:600}' +
+        '.st-wtd .st-wtd-chip.done{background:#E7F0EA;color:var(--green)}' +
+        '.st-wtd .st-wtd-chip.prog{background:#FBF6EC;color:var(--amber)}' +
+        '.st-wtd .st-wtd-chip.open{background:#EFEBE2;color:var(--muted)}' +
+        '.st-wtd .st-wtd-foot{margin-top:28px;padding-top:14px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);text-align:center}' +
+        '.st-wtd .st-wtd-cal{height:30px;padding:4px 8px;border:1px solid rgba(196,164,100,.55);background:#fff;color:#0F1A2E;font-size:12px;font-family:inherit;cursor:pointer}' +
+        '.st-wtd .st-wtd-today{height:30px;padding:4px 12px;border:1px solid var(--gold);background:transparent;color:var(--gold);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}' +
+        '@media(max-width:640px){.st-wtd .st-wtd-two{grid-template-columns:1fr}.st-wtd .st-wtd-kpis{grid-template-columns:1fr 1fr}.st-wtd .st-wtd-bar{grid-template-columns:1fr 48px}}';
+      document.head.appendChild(s);
+    }
+
+    function _stWtdDay(val) {
+      if (val == null || val === '') return '';
+      if (typeof val.toDate === 'function') {
+        try { return dateStr(val.toDate()); } catch (_e) { /* */ }
+      }
+      if (typeof val.seconds === 'number') {
+        try { return dateStr(new Date(val.seconds * 1000)); } catch (_e2) { /* */ }
+      }
+      var s = String(val);
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+      var d = new Date(s);
+      if (!isNaN(d.getTime())) return dateStr(d);
+      return '';
+    }
+
+    function _stWtdInRange(val, start, end) {
+      var d = _stWtdDay(val);
+      return !!(d && d >= start && d <= end);
+    }
+
+    function _stWtdAnyInRange(obj, keys, start, end) {
+      for (var i = 0; i < keys.length; i++) {
+        if (_stWtdInRange(obj && obj[keys[i]], start, end)) return true;
+      }
+      return false;
+    }
+
+    function _stWtdDateObj(val) {
+      if (val == null || val === '') return null;
+      if (typeof val.toDate === 'function') {
+        try { return val.toDate(); } catch (_e) { return null; }
+      }
+      if (typeof val.seconds === 'number') {
+        try { return new Date(val.seconds * 1000); } catch (_e2) { return null; }
+      }
+      var s = String(val).trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s + 'T12:00:00');
+      var d = new Date(s);
+      if (!isNaN(d.getTime())) return d;
+      return null;
+    }
+
+    function _stWtdWhen(val) {
+      var d = _stWtdDateObj(val);
+      if (!d) return '—';
+      var s = String(val == null ? '' : val);
+      var dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(s);
+      var day = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      if (dateOnly) return day;
+      var tm = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      if (d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0 && !/T\d{2}:[1-9]|T\d{2}:\d[1-9]/.test(s)) {
+        return day;
+      }
+      return day + ' · ' + tm;
+    }
+
+    function _stWtdFirstWhen(obj, keys) {
+      if (!obj) return '';
+      for (var i = 0; i < keys.length; i++) {
+        if (obj[keys[i]]) return obj[keys[i]];
+      }
+      return '';
+    }
+
+    function _stWtdClock(t) {
+      t = t || {};
+      function fmtT(ts) {
+        if (!ts) return '';
+        var d = _stWtdDateObj(ts);
+        if (d) return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        var m = String(ts).match(/T?(\d{1,2}):(\d{2})/);
+        if (!m) return '';
+        var hh = parseInt(m[1], 10);
+        var mm = m[2];
+        var ap = hh >= 12 ? 'PM' : 'AM';
+        if (hh > 12) hh -= 12;
+        if (hh === 0) hh = 12;
+        return hh + ':' + mm + ' ' + ap;
+      }
+      if (t.startTime && t.endTime) return fmtT(t.startTime) + '\u2013' + fmtT(t.endTime);
+      if (t.startTime) return fmtT(t.startTime);
+      return '';
+    }
+
+    function _stWtdRangeLine(start, end, liveThru) {
+      var a = new Date(start + 'T12:00:00');
+      var b = new Date(end + 'T12:00:00');
+      var left = a.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+      var right = b.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
+      if (liveThru) {
+        var thru = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        if (start === end) return right + ' · through ' + thru;
+        return left + ' – ' + right + ' · through ' + thru;
+      }
+      if (start === end) return right;
+      return left + ' – ' + right;
+    }
+
+    function _stWtdInternalName(name) {
+      var p = String(name || '').toLowerCase();
+      if (typeof _isNonBillableProject === 'function' && _isNonBillableProject(name)) return true;
+      return /studio\s*\/\s*admin|cch admin|internal|overhead/.test(p);
+    }
+
+    function _stWtdParentPid(doc) {
+      try { return doc.ref.parent.parent.id; } catch (_e) { return ''; }
+    }
+
+    function _stWtdDocNum(d, kind) {
+      d = d || {};
+      if (kind === 'invoice') return String(d.invoiceNum || d.number || d.num || '').trim();
+      if (kind === 'proposal') return String(d.proposalNum || d.number || d.num || '').trim();
+      return String(d.number || d.num || d.poNum || d.poNumber || '').trim();
+    }
+
+    function _stWtdHouzzDoc(d) {
+      d = d || {};
+      var n = _stWtdDocNum(d, 'invoice') || _stWtdDocNum(d, 'po');
+      if (/^IN-\d+/i.test(n) && !/^INV-/i.test(n)) return true;
+      if (typeof window.cchOmIsHouzzSourcePo === 'function' && window.cchOmIsHouzzSourcePo(d)) return true;
+      return false;
+    }
+
+    function _stWtdMoney(n) {
+      var v = (typeof parseMoney === 'function') ? parseMoney(n) : (parseFloat(n) || 0);
+      if (!v) return '—';
+      return (typeof formatMoney === 'function') ? formatMoney(v) : ('$' + v.toFixed(0));
+    }
+
+    function _stWtdEmpty(msg) {
+      return '<div class="st-wtd-empty">' + esc(msg) + '</div>';
+    }
+
+    function _stWtdTable(headers, rows, rightLast) {
+      if (!rows || !rows.length) return '';
+      var h = '<table><tr>' + headers.map(function(x, i) {
+        return '<th' + (rightLast && i === headers.length - 1 ? ' class="r"' : '') + '>' + esc(x) + '</th>';
+      }).join('') + '</tr>';
+      rows.forEach(function(r) {
+        h += '<tr>' + r.map(function(cell, i) {
+          var raw = cell;
+          var isHtml = raw && typeof raw === 'object' && raw.html;
+          var txt = isHtml ? raw.html : esc(String(raw == null ? '' : raw));
+        var cls = [];
+        if (i === 0 && /when|date/i.test(headers[0] || '')) cls.push('when');
+        if (rightLast && i === r.length - 1) cls.push('r');
+        return '<td' + (cls.length ? ' class="' + cls.join(' ') + '"' : '') + '>' + txt + '</td>';
+        }).join('') + '</tr>';
+      });
+      return h + '</table>';
+    }
+
+    async function _stWtdCg(database, name, limit) {
+      var out = [];
+      if (!database) return out;
+      try {
+        var snap = await database.collectionGroup(name).limit(limit || 250).get();
+        snap.forEach(function(d) {
+          var row = Object.assign({ id: d.id, projectId: _stWtdParentPid(d) }, d.data() || {});
+          out.push(row);
+        });
+      } catch (e) {
+        console.warn('[stWtd] collectionGroup ' + name, e);
+      }
+      return out;
+    }
+
+    async function _stFetchActivityRange(start, end) {
+      var rows = [];
+      var database = (typeof db !== 'undefined' && db) || (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore());
+      if (!database) return rows;
+      try {
+        var snap = await database.collection('activity').orderBy('timestamp', 'desc').limit(500).get();
+        snap.forEach(function(d) { rows.push(Object.assign({ id: d.id }, d.data() || {})); });
+      } catch (e1) {
+        try {
+          var snap2 = await database.collection('activity').limit(500).get();
+          snap2.forEach(function(d) { rows.push(Object.assign({ id: d.id }, d.data() || {})); });
+        } catch (e2) {
+          console.warn('[stSummary] activity load', e2);
+        }
+      }
+      var lo = start;
+      var hi = end + 'T23:59:59';
+      return rows.filter(function(a) {
+        var ts = String(a.timestamp || a.createdAt || '');
+        if (!ts || ts < lo || ts > hi) return false;
+        if (typeof activityLooksLikeHouzz === 'function' && activityLooksLikeHouzz(a)) return false;
+        return true;
+      });
+    }
+
+    function renderSmartTimeSummaryView(container, admin) {
+      if (!container) return;
+      _stWtdEnsureCss();
+      var period = window._stSummaryPeriod || 'weekly';
+      if (period !== 'daily' && period !== 'monthly') period = 'weekly';
+      var todayStr = dateStr(new Date());
+      var anchor = _stSummaryAnchorDate();
+      var range = _stSummaryRange(period, anchor);
+      var myName = typeof currentMemberName === 'function' ? currentMemberName() : '';
+      var who = (timeFilter.member === '__all__')
+        ? 'All Team'
+        : (timeFilter.member || (myName ? myName.split(' ')[0] : 'You'));
+      var allEntries = _stPersonScopedEntries(admin);
+      var inRange = allEntries.filter(function(t) {
+        var d = String(t.date || '');
+        return d >= range.start && d <= range.end;
+      });
+      var totalHrs = inRange.reduce(function(s, t) { return s + (parseFloat(t.hours) || 0); }, 0);
+      var billableHrs = inRange.filter(function(t) {
+        return (typeof _isBillableEntry === 'function') ? _isBillableEntry(t) : t.billable !== false;
+      }).reduce(function(s, t) { return s + (parseFloat(t.hours) || 0); }, 0);
+      var chip = function(key, lab) {
+        var on = period === key;
+        return '<button type="button" class="tl-view-btn' + (on ? ' active' : '') + '" onclick="_stSetSummaryPeriod(\'' + key + '\')">' + lab + '</button>';
+      };
+      var memberSelector = '';
+      if (admin && typeof TEAM_MEMBERS !== 'undefined' && TEAM_MEMBERS.length) {
+        var currentFilter = timeFilter.member || '';
+        var myFirstName = myName ? myName.split(' ')[0].toLowerCase() : '';
+        memberSelector = '<select class="st-wtd-cal" style="min-width:160px;" onchange="timeFilter.member=this.value;renderTimeView()" title="Person">' +
+          '<option value="__all__"' + (currentFilter === '__all__' ? ' selected' : '') + '>All Team</option>' +
+          TEAM_MEMBERS.map(function(m) {
+            var isMe = myFirstName && String(m).toLowerCase().indexOf(myFirstName) === 0;
+            var on = currentFilter === m || (!currentFilter && currentFilter !== '__all__' && isMe);
+            return '<option value="' + escAttr(m) + '"' + (on ? ' selected' : '') + '>' + esc(m) + '</option>';
+          }).join('') +
+        '</select>';
+      }
+      var summaryProjects = (typeof buildTimeLedgerProjectDropdownList === 'function')
+        ? buildTimeLedgerProjectDropdownList(timeEntries, window._timeLedgerBoardsCache || [])
+        : [];
+      var projectSelector = '<select class="st-wtd-cal" style="min-width:170px;" onchange="timeFilter.project=this.value;timeFilter.projectBoardId=\'\';renderTimeView()" title="Project">' +
+        '<option value="">All projects</option>' +
+        summaryProjects.map(function(p) {
+          var lab = (typeof _timeLedgerProjectOptionLabel === 'function') ? _timeLedgerProjectOptionLabel(p, window._timeLedgerBoardsCache || []) : p;
+          return '<option value="' + escAttr(p) + '"' + (timeFilter.project === p ? ' selected' : '') + '>' + esc(lab) + '</option>';
+        }).join('') +
+      '</select>';
+      container.innerHTML =
+        '<div class="st-wtd" id="stWtdRoot">' +
+          '<header class="st-wtd-hero"><div class="st-wtd-hero-top">' +
+            '<div>' +
+              '<div class="st-wtd-eyebrow">CCH Design · ' + esc(who) + '</div>' +
+              '<h1>' + esc(range.label) + '</h1>' +
+              '<div class="st-wtd-range">' + esc(_stWtdRangeLine(range.start, range.end, range.end === todayStr)) + '</div>' +
+            '</div>' +
+            '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;">' +
+              '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+                '<div class="tl-view-toggle">' + chip('daily', 'Daily') + chip('weekly', 'Weekly') + chip('monthly', 'Monthly') + '</div>' +
+                '<input type="date" class="st-wtd-cal" id="stSummaryDate" value="' + escAttr(anchor) + '" max="' + escAttr(todayStr) + '" onchange="_stSetSummaryAnchor(this.value)" title="Jump to date">' +
+                '<input type="month" class="st-wtd-cal" id="stSummaryMonth" value="' + escAttr(anchor.slice(0, 7)) + '" max="' + escAttr(todayStr.slice(0, 7)) + '" onchange="_stSetSummaryMonth(this.value)" title="Jump to month">' +
+                (anchor !== todayStr ? '<button type="button" class="st-wtd-today" onclick="_stSummaryGoToday()">Today</button>' : '') +
+              '</div>' +
+              '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+                memberSelector +
+                projectSelector +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="st-wtd-kpis">' +
+            '<div class="st-wtd-kpi"><div class="n">' + totalHrs.toFixed(1) + '</div><div class="l">Hours logged</div></div>' +
+            '<div class="st-wtd-kpi"><div class="n">' + billableHrs.toFixed(1) + '</div><div class="l">Billable</div></div>' +
+            '<div class="st-wtd-kpi"><div class="n" id="stWtdProjKpi">…</div><div class="l">Active projects</div></div>' +
+            '<div class="st-wtd-kpi"><div class="n" id="stWtdInvKpi">…</div><div class="l">Invoiced this ' + (period === 'monthly' ? 'mo' : (period === 'daily' ? 'day' : 'wk')) + '</div></div>' +
+          '</div>' +
+        '</header>' +
+        '<div class="st-wtd-body" id="stWtdBody"><div class="st-wtd-empty">Loading live week…</div></div>' +
+        '</div>';
+      window._stSummaryGen = (window._stSummaryGen || 0) + 1;
+      var gen = window._stSummaryGen;
+      void _stFillSummaryActivityList(container, {
+        gen: gen,
+        range: range,
+        inRange: inRange,
+        admin: admin,
+        pk: _stSummaryPersonKey(),
+        who: who,
+        period: period,
+        totalHrs: totalHrs,
+        billableHrs: billableHrs,
+        todayStr: todayStr,
+        anchor: anchor
+      });
+    }
+
+    async function _stFillSummaryActivityList(container, opts) {
+      opts = opts || {};
+      var body = document.getElementById('stWtdBody');
+      if (!body) return;
+      var start = opts.range.start;
+      var end = opts.range.end;
+      var pk = opts.pk || '';
+      var inRange = opts.inRange || [];
+      var database = (typeof db !== 'undefined' && db) || (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore());
+
+      var byProj = {};
+      inRange.forEach(function(t) {
+        var name = String(t.project || t.projectName || 'Unassigned').trim() || 'Unassigned';
+        if (!byProj[name]) byProj[name] = { name: name, hours: 0, billable: 0, id: t.projectId || t.boardId || '' };
+        var hrs = parseFloat(t.hours) || 0;
+        byProj[name].hours += hrs;
+        if ((typeof _isBillableEntry === 'function') ? _isBillableEntry(t) : t.billable !== false) byProj[name].billable += hrs;
+        if (!byProj[name].id && (t.projectId || t.boardId)) byProj[name].id = t.projectId || t.boardId;
+      });
+      var projList = Object.keys(byProj).map(function(k) { return byProj[k]; }).sort(function(a, b) { return b.hours - a.hours; });
+      var activeN = projList.filter(function(p) { return p.hours > 0; }).length;
+      var projKpi = document.getElementById('stWtdProjKpi');
+      if (projKpi) projKpi.textContent = String(activeN);
+
+      var maxHrs = projList.length ? projList[0].hours : 1;
+      var barsHtml = '';
+      if (!projList.length) {
+        barsHtml = _stWtdEmpty('No hours in this period for ' + (opts.who || 'this person') + '.');
+      } else {
+        projList.forEach(function(p) {
+          var pct = Math.max(2, Math.round((p.hours / (maxHrs || 1)) * 100));
+          var gold = p.billable >= p.hours * 0.5 && !_stWtdInternalName(p.name);
+          barsHtml += '<div class="st-wtd-bar"><span class="lab">' + esc(p.name) + '</span><span class="st-wtd-track"><span class="st-wtd-fill' + (gold ? ' b' : '') + '" style="width:' + pct + '%"></span></span><span class="v">' + p.hours.toFixed(1) + 'h</span></div>';
+        });
+        barsHtml += '<p class="st-wtd-muted">Gold = billable to client · Navy = internal / non-billable. Studio and admin time is never billed to a client.</p>';
+        var hourRows = inRange.slice().sort(function(a, b) {
+          return String(b.date || '').localeCompare(String(a.date || '')) || String(b.startTime || '').localeCompare(String(a.startTime || ''));
+        }).map(function(t) {
+          var clock = _stWtdClock(t);
+          return [
+            _stWtdWhen(t.date || t.startTime || t.createdAt),
+            clock || '—',
+            t.project || t.projectName || 'Unassigned',
+            (parseFloat(t.hours) || 0).toFixed(1) + 'h'
+          ];
+        });
+        if (hourRows.length) {
+          barsHtml += _stWtdTable(['Date', 'Time', 'Project', 'Hours'], hourRows.slice(0, 40), true);
+        }
+      }
+
+      var acts = [];
+      try { acts = await _stFetchActivityRange(start, end); } catch (eAct) { console.warn('[stWtd] activity', eAct); }
+      if (opts.gen !== window._stSummaryGen) return;
+
+      var staffActs = acts.filter(function(a) {
+        if (typeof activityIsClientSourced === 'function' && activityIsClientSourced(a)) return false;
+        if (pk && typeof activityMatchesPerson === 'function') return activityMatchesPerson(a, pk);
+        return true;
+      });
+      var clientActs = acts.filter(function(a) {
+        return typeof activityIsClientSourced === 'function' && activityIsClientSourced(a);
+      });
+      var touched = {};
+      inRange.forEach(function(t) { if (t.projectId) touched[t.projectId] = true; if (t.boardId) touched[t.boardId] = true; });
+      staffActs.forEach(function(a) { if (a.projectId) touched[a.projectId] = true; });
+      var touchedIds = Object.keys(touched);
+      if (pk && touchedIds.length) {
+        clientActs = clientActs.filter(function(a) { return !a.projectId || touched[a.projectId]; });
+      }
+
+      var timelyHrs = 0;
+      var timelyLoaded = false;
+      try {
+        if (database) {
+          var tSnap = await database.collection('timelyEntries').orderBy('date', 'desc').limit(800).get();
+          timelyLoaded = true;
+          tSnap.forEach(function(d) {
+            var e = d.data() || {};
+            var dt = _stWtdDay(e.date);
+            if (!dt || dt < start || dt > end) return;
+            var mem = String(e.member || e.email || '');
+            if (pk === 'cindy' && /vanessa|holliday/i.test(mem)) return;
+            if (pk === 'vanessa' && /cindy|cynthia|holloway/i.test(mem) && !/vanessa|holliday/i.test(mem)) return;
+            var hrs = (typeof getTimelyHours === 'function') ? getTimelyHours(e) : (parseFloat(e.hours) || 0);
+            timelyHrs += hrs;
+          });
+        }
+      } catch (eT) {
+        timelyLoaded = false;
+      }
+      if (opts.gen !== window._stSummaryGen) return;
+
+      var reconHtml;
+      var reconGap = 0;
+      if (!timelyLoaded) {
+        reconHtml = '<div class="st-wtd-recon"><strong>Smart Time vs Timely:</strong> Timely hours for this period are not loaded' +
+          ((typeof CCH_ENV !== 'undefined' && CCH_ENV === 'staging') ? ' (staging has no Timely sync)' : '') +
+          '. Smart Time shows <strong>' + (opts.totalHrs || 0).toFixed(1) + 'h</strong>.</div>';
+      } else {
+        reconGap = Math.round(((opts.totalHrs || 0) - timelyHrs) * 10) / 10;
+        var gapAbs = Math.abs(reconGap);
+        reconHtml = '<div class="st-wtd-recon"><strong>Smart Time vs Timely:</strong> Smart Time shows <strong>' +
+          (opts.totalHrs || 0).toFixed(1) + 'h</strong>, Timely captured <strong>' + timelyHrs.toFixed(1) + 'h</strong>. ' +
+          (gapAbs < 0.05
+            ? 'Hours match for this period.'
+            : '<span class="flag">' + gapAbs.toFixed(1) + 'h to reconcile</span> before time invoices go out.') +
+          '</div>';
+      }
+
+      var invoices = [];
+      var proposals = [];
+      var posAll = [];
+      var workOrders = [];
+      var ideabooks = [];
+      var designBoards = [];
+      var tasks = [];
+      var decisions = [];
+      var sessions = [];
+      try {
+        var packed = await Promise.all([
+          _stWtdCg(database, 'invoices', 300),
+          _stWtdCg(database, 'proposals', 200),
+          _stWtdCg(database, 'purchaseOrders', 300),
+          _stWtdCg(database, 'workOrders', 120),
+          _stWtdCg(database, 'ideabooks', 120),
+          _stWtdCg(database, 'designBoards', 120),
+          _stWtdCg(database, 'tasks', 250),
+          _stWtdCg(database, 'clientDecisions', 200),
+          _stWtdCg(database, 'clientSessions', 200)
+        ]);
+        invoices = packed[0]; proposals = packed[1]; posAll = packed[2];
+        workOrders = packed[3]; ideabooks = packed[4]; designBoards = packed[5];
+        tasks = packed[6]; decisions = packed[7]; sessions = packed[8];
+      } catch (eCg) {
+        console.warn('[stWtd] collections', eCg);
+      }
+      if (opts.gen !== window._stSummaryGen) return;
+
+      var nameById = {};
+      invoices.concat(proposals, posAll, workOrders, ideabooks, designBoards).forEach(function(r) {
+        if (r.projectId && (r.projectName || r.project)) nameById[r.projectId] = r.projectName || r.project;
+      });
+      acts.forEach(function(a) { if (a.projectId && a.projectName) nameById[a.projectId] = a.projectName; });
+      inRange.forEach(function(t) {
+        var id = t.projectId || t.boardId;
+        if (id && (t.project || t.projectName)) nameById[id] = t.project || t.projectName;
+      });
+      function projNameOf(id, fallback) {
+        return nameById[id] || fallback || '—';
+      }
+
+      var moneyRows = [];
+      var seenMoney = {};
+      function pushMoney(num, project, eventHtml, amount, sortKey, when) {
+        var key = String(num || '') + '|' + String(eventHtml || '') + '|' + String(amount || '');
+        if (!num || seenMoney[key]) return;
+        seenMoney[key] = true;
+        moneyRows.push({ num: num, project: project, eventHtml: eventHtml, amount: amount, sortKey: sortKey || '', when: when || '' });
+      }
+      var invoicedSum = 0;
+      var invoicedSeen = {};
+      invoices.forEach(function(inv) {
+        if (_stWtdHouzzDoc(inv)) return;
+        var num = _stWtdDocNum(inv, 'invoice');
+        if (!num) return;
+        var pn = projNameOf(inv.projectId, inv.projectName || inv.project);
+        var tot = (typeof parseMoney === 'function') ? parseMoney(inv.total || inv.amount) : (parseFloat(inv.total) || 0);
+        var st = String(inv.status || '').toLowerCase();
+        var paidDt = inv.qbPaymentDate || inv.datePaid || inv.paidAt || (st === 'paid' ? (inv.updatedAt || inv.date) : '');
+        var sentDt = inv.sentAt || inv.emailedAt || inv.publishedAt || ((st === 'sent' || st === 'emailed') ? (inv.date || inv.updatedAt) : '');
+        var createdDt = inv.date || inv.invoiceDate || inv.createdAt;
+        if (_stWtdInRange(paidDt, start, end) || (st === 'paid' && _stWtdInRange(createdDt, start, end))) {
+          pushMoney(num, pn, '<span class="paid">Paid (via QuickBooks)</span>', tot, '1' + num, paidDt || createdDt);
+          if (!invoicedSeen[num]) { invoicedSeen[num] = true; invoicedSum += tot; }
+        } else if (_stWtdInRange(sentDt, start, end)) {
+          pushMoney(num, pn, 'Sent to client', tot, '2' + num, sentDt);
+          if (!invoicedSeen[num]) { invoicedSeen[num] = true; invoicedSum += tot; }
+        } else if (_stWtdInRange(createdDt, start, end) && (st === 'draft' || !st)) {
+          pushMoney(num, pn, 'Draft', tot, '3' + num, createdDt);
+        }
+      });
+      proposals.forEach(function(pr) {
+        var num = _stWtdDocNum(pr, 'proposal');
+        if (!num || _stWtdHouzzDoc(pr)) return;
+        var pn = projNameOf(pr.projectId, pr.projectName || pr.project);
+        var tot = (typeof parseMoney === 'function') ? parseMoney(pr.total || pr.amount) : (parseFloat(pr.total) || 0);
+        var st = String(pr.status || '').toLowerCase();
+        var sentDt = pr.sentAt || pr.emailedAt || pr.publishedAt || pr.date || pr.createdAt;
+        if (!_stWtdAnyInRange(pr, ['sentAt', 'emailedAt', 'publishedAt', 'date', 'createdAt', 'updatedAt'], start, end)) return;
+        var ev = (st.indexOf('approv') >= 0) ? '<span class="paid">Approved</span>' : 'Sent to client — awaiting approval';
+        if (st === 'draft') ev = 'Draft';
+        pushMoney(num, pn, ev, tot, '4' + num, sentDt || _stWtdFirstWhen(pr, ['updatedAt', 'createdAt', 'date']));
+      });
+      posAll.forEach(function(po) {
+        if (_stWtdHouzzDoc(po)) return;
+        var num = _stWtdDocNum(po, 'po');
+        if (!num) return;
+        if (!_stWtdAnyInRange(po, ['createdAt', 'date', 'issueDate', 'orderDate', 'poDate', 'updatedAt'], start, end)) return;
+        var pn = projNameOf(po.projectId, po.projectName || po.project);
+        pushMoney(num, pn, 'Created', null, '5' + num, _stWtdFirstWhen(po, ['createdAt', 'date', 'issueDate', 'orderDate', 'poDate', 'updatedAt']));
+      });
+      moneyRows.sort(function(a, b) { return String(a.sortKey).localeCompare(String(b.sortKey)); });
+      var invKpi = document.getElementById('stWtdInvKpi');
+      if (invKpi) invKpi.textContent = invoicedSum ? _stWtdMoney(invoicedSum) : '$0';
+      var moneyHtml = moneyRows.length
+        ? _stWtdTable(['When', 'Document', 'Project', 'Event', 'Amount'], moneyRows.map(function(r) {
+            return [_stWtdWhen(r.when), r.num, r.project, { html: r.eventHtml }, r.amount == null ? '—' : _stWtdMoney(r.amount)];
+          }), true)
+        : _stWtdEmpty('No Studio invoices, proposals, or POs dated in this period.');
+
+      var woRows = [];
+      workOrders.forEach(function(w) {
+        if (!_stWtdAnyInRange(w, ['updatedAt', 'createdAt'], start, end)) return;
+        var title = String(w.title || w.name || w.category || w.workOrderNumber || w.workOrder || w.id || 'Work order');
+        if (w.room) title += (title ? ' · ' : '') + w.room;
+        woRows.push([_stWtdWhen(_stWtdFirstWhen(w, ['updatedAt', 'createdAt'])), title, projNameOf(w.projectId, w.projectName || w.project), w.status || 'Updated']);
+      });
+      var builderHtml = woRows.length
+        ? _stWtdTable(['When', 'Custom order', 'Project', 'Status'], woRows.slice(0, 12))
+        : _stWtdEmpty('No work orders updated this period.');
+
+      var pending = [];
+      var awaitN = 0;
+      posAll.forEach(function(po) {
+        if (_stWtdHouzzDoc(po)) return;
+        var open = (typeof window.cchOmIsOpenPo === 'function') ? window.cchOmIsOpenPo(po) : true;
+        if (!open) return;
+        var st = String(po.status || 'Open');
+        var stl = st.toLowerCase();
+        var waiting = /await|confirm|bill|unconfirm/.test(stl) || !(po.poSentAt || po.sentAt);
+        if (waiting) awaitN++;
+        pending.push([
+          _stWtdWhen(_stWtdFirstWhen(po, ['updatedAt', 'poSentAt', 'sentAt', 'createdAt', 'date'])),
+          _stWtdDocNum(po, 'po') || po.id,
+          po.vendor || po.vendorName || '—',
+          waiting ? { html: '<span class="flag">' + esc(st || 'Awaiting') + '</span>' } : st,
+          po.eta || po.shipEta || '—'
+        ]);
+      });
+      pending = pending.slice(0, 16);
+      var poHtml = pending.length
+        ? (_stWtdTable(['When', 'PO', 'Vendor', 'Status', 'ETA'], pending, true) +
+          '<p class="st-wtd-muted">' + pending.length + ' POs open' + (awaitN ? ' · ' + awaitN + ' awaiting confirmation or bill' : '') +
+          '. Purchase orders and vendor costs are internal only, never shown to clients.</p>')
+        : _stWtdEmpty('No open Studio POs.') + '<p class="st-wtd-muted">Purchase orders and vendor costs are internal only, never shown to clients.</p>';
+
+      var inspMap = {};
+      ideabooks.forEach(function(ib) {
+        var imgs = ib.images || ib.items || [];
+        if (!Array.isArray(imgs)) imgs = [];
+        var added = [];
+        var boardWhen = _stWtdFirstWhen(ib, ['updatedAt', 'createdAt']);
+        imgs.forEach(function(im) {
+          if (!im) return;
+          var when = (typeof im === 'object') ? (im.createdAt || im.addedAt || im.timestamp) : null;
+          if (when && !_stWtdInRange(when, start, end)) return;
+          if (!when && !_stWtdAnyInRange(ib, ['updatedAt', 'createdAt'], start, end)) return;
+          var title = (typeof im === 'object') ? (im.title || im.name || im.caption || '') : '';
+          added.push(title || 'image');
+          if (when) boardWhen = when;
+        });
+        if (!added.length) return;
+        var key = (ib.projectId || '') + '|' + (ib.name || ib.title || ib.id);
+        if (!inspMap[key]) inspMap[key] = { project: projNameOf(ib.projectId, ib.projectName), board: ib.name || ib.title || 'Inspiration', items: [], when: boardWhen };
+        inspMap[key].items = inspMap[key].items.concat(added);
+        if (boardWhen) inspMap[key].when = boardWhen;
+      });
+      staffActs.concat(acts).forEach(function(a) {
+        var t = String(a.type || '');
+        var kind = a.meta && a.meta.boardKind;
+        if (t !== 'inspiration' && kind !== 'inspiration') return;
+        var key = (a.projectId || '') + '|act|' + (a.id || a.description);
+        if (inspMap[key]) return;
+        inspMap[key] = {
+          project: a.projectName || projNameOf(a.projectId),
+          board: (a.meta && (a.meta.sectionName || a.meta.boardName)) || 'Inspiration',
+          items: [a.description || a.action || 'updated'],
+          when: a.timestamp || a.createdAt
+        };
+      });
+      var inspRows = Object.keys(inspMap).map(function(k) {
+        var x = inspMap[k];
+        var labels = x.items.filter(Boolean).slice(0, 6).join(', ');
+        return [_stWtdWhen(x.when), x.project, x.board, labels || '—', String(x.items.length)];
+      });
+      var inspCount = inspRows.reduce(function(s, r) { return s + (parseInt(r[4], 10) || 0); }, 0);
+      var inspHtml = inspRows.length
+        ? (_stWtdTable(['When', 'Project', 'Board', 'Items added', 'Count'], inspRows, true) +
+          '<p class="st-wtd-muted">' + inspCount + ' items added to inspiration boards this period, across ' + inspRows.length + ' board' + (inspRows.length === 1 ? '' : 's') + '.</p>')
+        : _stWtdEmpty('No inspiration items added this period.');
+
+      var dbRows = [];
+      designBoards.forEach(function(b) {
+        var created = _stWtdInRange(b.createdAt, start, end);
+        var updated = _stWtdInRange(b.updatedAt, start, end);
+        if (!created && !updated) return;
+        var n = Array.isArray(b.elements) ? b.elements.length : (parseInt(b.itemCount, 10) || 0);
+        var act = created ? ('Created' + (n ? ' · ' + n + ' items' : '')) : ('Updated' + (n ? ' (' + n + ' items)' : ''));
+        if (b.published || b.clientPublished || b.sharedWithClient) act += ' · posted to client';
+        dbRows.push([_stWtdWhen(created ? b.createdAt : (b.updatedAt || b.createdAt)), b.title || b.name || 'Design board', projNameOf(b.projectId, b.projectName), act]);
+      });
+      var dbHtml = dbRows.length
+        ? _stWtdTable(['When', 'Board', 'Project', 'Activity'], dbRows)
+        : _stWtdEmpty('No design boards created or updated this period.');
+
+      var clientBullets = [];
+      clientActs.forEach(function(a) {
+        var title = a.description || ((a.action || '') + ' ' + (a.type || '')).trim();
+        var pn = a.projectName || projNameOf(a.projectId);
+        if (title) clientBullets.push('<li><strong>' + esc(pn) + '</strong> — ' + esc(title) + ' <span class="st-wtd-when">(' + esc(_stWtdWhen(a.timestamp || a.createdAt)) + ')</span></li>');
+      });
+      clientBullets = clientBullets.slice(0, 12);
+      var clientHtml = clientBullets.length
+        ? '<div class="st-wtd-card green"><ul>' + clientBullets.join('') + '</ul></div>'
+        : _stWtdEmpty('No client-authored activity in this period.');
+
+      var decRows = [];
+      decisions.forEach(function(d) {
+        var st = String(d.status || 'open').toLowerCase();
+        var answered = _stWtdAnyInRange(d, ['answeredAt', 'respondedAt', 'updatedAt'], start, end) && (st === 'answered' || st === 'closed' || st === 'approved');
+        var posted = _stWtdAnyInRange(d, ['createdAt', 'updatedAt', 'answeredAt'], start, end);
+        var waiting = (st === 'open' || st === 'changes_requested');
+        if (!posted && !waiting) return;
+        if (!posted && waiting && !_stWtdInRange(d.createdAt, start, end) && !_stWtdInRange(d.updatedAt, start, end)) {
+          /* still-open decisions belong on the weekly digest */
+        }
+        var lab;
+        if (answered || st === 'answered') {
+          lab = { html: '<span class="paid">Answered' + (d.answer || d.response || d.selected ? ' — ' + esc(String(d.answer || d.response || d.selected)) : '') + '</span>' };
+        } else {
+          lab = { html: '<span class="flag">Awaiting client</span>' };
+        }
+        decRows.push([_stWtdWhen(_stWtdFirstWhen(d, ['answeredAt', 'respondedAt', 'updatedAt', 'createdAt'])), d.title || d.name || 'Decision', projNameOf(d.projectId, d.projectName), lab]);
+      });
+      var decHtml = decRows.length
+        ? _stWtdTable(['When', 'Decision', 'Project', 'Status'], decRows.slice(0, 16))
+        : _stWtdEmpty('No client decisions posted or waiting.');
+
+      var sessMap = {};
+      sessions.forEach(function(s) {
+        if (!_stWtdAnyInRange(s, ['lastVisit', 'firstVisit', 'updatedAt'], start, end)) return;
+        var pid = s.projectId || '';
+        if (!sessMap[pid]) sessMap[pid] = { n: 0, last: '', lastRaw: '', tabs: {}, name: projNameOf(pid, s.projectName) };
+        sessMap[pid].n += 1;
+        var lv = _stWtdDay(s.lastVisit || s.firstVisit);
+        if (lv > sessMap[pid].last) {
+          sessMap[pid].last = lv;
+          sessMap[pid].lastRaw = s.lastVisit || s.firstVisit;
+        }
+      });
+      clientActs.forEach(function(a) {
+        var pid = a.projectId || '';
+        if (!sessMap[pid]) sessMap[pid] = { n: 0, last: '', lastRaw: '', tabs: {}, name: a.projectName || projNameOf(pid) };
+        sessMap[pid].n += 1;
+        var day = String(a.timestamp || '').slice(0, 10);
+        if (day > sessMap[pid].last) {
+          sessMap[pid].last = day;
+          sessMap[pid].lastRaw = a.timestamp || a.createdAt;
+        }
+        var act = String(a.action || '');
+        if (act) sessMap[pid].tabs[act] = true;
+      });
+      var portalLis = Object.keys(sessMap).map(function(pid) {
+        var s = sessMap[pid];
+        var tabs = Object.keys(s.tabs).map(function(t) { return t.replace(/_/g, ' '); }).slice(0, 4).join(', ');
+        var lastLab = s.lastRaw ? _stWtdWhen(s.lastRaw) : (s.last ? _stWtdWhen(s.last) : '');
+        return '<li><strong>' + esc(s.name || 'Project') + '</strong> — ' + s.n + ' visit' + (s.n === 1 ? '' : 's') +
+          (lastLab ? ', last seen ' + esc(lastLab) : '') + (tabs ? '. ' + esc(tabs) : '') + '.</li>';
+      });
+      var portalHtml = portalLis.length
+        ? '<div class="st-wtd-card"><ul>' + portalLis.join('') + '</ul></div>'
+        : _stWtdEmpty('No identified portal visits this period.');
+
+      var doneN = 0, progN = 0, openN = 0;
+      var taskRows = [];
+      tasks.forEach(function(t) {
+        var st = String(t.status || 'To Do');
+        if (st === 'Done') {
+          if (_stWtdAnyInRange(t, ['completedAt', 'doneAt', 'updatedAt'], start, end)) {
+            doneN++;
+            taskRows.push([_stWtdWhen(_stWtdFirstWhen(t, ['completedAt', 'doneAt', 'updatedAt'])), t.title || t.name || 'Task', projNameOf(t.projectId, t.projectName), { html: '<span class="paid">Done</span>' }]);
+          }
+          return;
+        }
+        if (st === 'In Progress') {
+          progN++;
+          if (_stWtdAnyInRange(t, ['updatedAt', 'createdAt', 'dueDate'], start, end) || taskRows.length < 8) {
+            taskRows.push([_stWtdWhen(_stWtdFirstWhen(t, ['updatedAt', 'createdAt', 'dueDate'])), t.title || t.name || 'Task', projNameOf(t.projectId, t.projectName), { html: '<span class="flag">In progress</span>' }]);
+          }
+          return;
+        }
+        openN++;
+        var overdue = false;
+        var due = _stWtdDay(t.dueDate);
+        if (due && due < (opts.todayStr || dateStr(new Date()))) overdue = true;
+        if (overdue || _stWtdAnyInRange(t, ['createdAt', 'updatedAt', 'dueDate'], start, end)) {
+          taskRows.push([_stWtdWhen(_stWtdFirstWhen(t, ['dueDate', 'updatedAt', 'createdAt'])), t.title || t.name || 'Task', projNameOf(t.projectId, t.projectName), overdue ? { html: '<span class="flag">Open · overdue</span>' } : 'Open']);
+        }
+      });
+      taskRows = taskRows.slice(0, 12);
+      var taskHtml = '<div class="st-wtd-chips">' +
+        '<span class="st-wtd-chip done">' + doneN + ' Done</span>' +
+        '<span class="st-wtd-chip prog">' + progN + ' In progress</span>' +
+        '<span class="st-wtd-chip open">' + openN + ' Open</span>' +
+        '</div>' +
+        (taskRows.length ? _stWtdTable(['When', 'Task', 'Project', 'Status'], taskRows) : _stWtdEmpty('No tasks in this period.'));
+
+      var highlights = [];
+      if (projList.length) highlights.push(projList[0].name + ' · ' + projList[0].hours.toFixed(1) + 'h logged.');
+      if (invoicedSum) highlights.push('Invoiced ' + _stWtdMoney(invoicedSum) + ' this period.');
+      if (inspCount) highlights.push(inspCount + ' inspiration items added.');
+      if (dbRows.length) highlights.push(dbRows.length + ' design board' + (dbRows.length === 1 ? '' : 's') + ' created or updated.');
+      if (clientBullets.length) highlights.push('Client activity on ' + portalLis.length + ' project' + (portalLis.length === 1 ? '' : 's') + '.');
+      var needs = [];
+      if (Math.abs(reconGap) >= 0.05 && timelyLoaded) needs.push('<span class="flag">Reconcile ' + Math.abs(reconGap).toFixed(1) + 'h</span> Smart Time vs Timely before time invoices.');
+      moneyRows.forEach(function(r) {
+        if (/awaiting approval/i.test(String(r.eventHtml))) needs.push('<span class="flag">' + esc(r.project) + '</span> ' + esc(r.num) + ' awaiting client approval.');
+      });
+      if (awaitN) needs.push('<span class="flag">Vendor ETA</span> chase — ' + awaitN + ' PO' + (awaitN === 1 ? '' : 's') + ' awaiting confirmation or bill.');
+      var hiHtml = '';
+      if (highlights.length) {
+        hiHtml += '<div class="st-wtd-card"><h3>Highlights</h3><ul>' + highlights.slice(0, 5).map(function(x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>';
+      }
+      if (needs.length) {
+        hiHtml += '<div class="st-wtd-card amber"><h3>Needs your attention</h3><ul>' + needs.slice(0, 5).map(function(x) { return '<li>' + x + '</li>'; }).join('') + '</ul></div>';
+      }
+      if (!hiHtml) hiHtml = _stWtdEmpty('Nothing extra to flag this period.');
+      else hiHtml = '<div class="st-wtd-two">' + hiHtml + '</div>';
+
+      window._stWtdLastDigest = {
+        period: opts.period,
+        range: opts.range,
+        who: opts.who,
+        hoursLogged: opts.totalHrs,
+        hoursBillable: opts.billableHrs,
+        timelyHours: timelyLoaded ? timelyHrs : null,
+        invoiced: invoicedSum,
+        projects: projList,
+        generatedAt: new Date().toISOString()
+      };
+
+      if (!document.getElementById('stWtdBody')) return;
+      body.innerHTML =
+        '<h2>Hours by project</h2>' + barsHtml +
+        reconHtml +
+        '<h2>Money movement</h2>' + moneyHtml +
+        '<h2>Order Builder activity</h2>' + builderHtml +
+        '<h2>POs pending</h2>' + poHtml +
+        '<h2>Inspiration added' + (opts.period === 'weekly' ? ' this week' : '') + '</h2>' + inspHtml +
+        '<h2>Design boards</h2>' + dbHtml +
+        '<h2>Client activity</h2>' + clientHtml +
+        '<h2>Client decisions posted</h2>' + decHtml +
+        '<h2>Client portal activity</h2>' + portalHtml +
+        '<h2>Task status</h2>' + taskHtml +
+        hiHtml +
+        '<div class="st-wtd-foot">CCH Design · ' + esc(opts.range.label) + ' · live Studio data · staff only. Client bi-weeklies will reuse these facts later.</div>' +
+        '<div style="margin-top:16px;text-align:center;"><button type="button" class="btn btn-secondary btn-sm" onclick="_tlDay=\'' + (opts.anchor || opts.todayStr || '') + '\';smartTimeTab=\'activity\';renderTimeView();">Open day view</button></div>';
+    }
+    window.renderSmartTimeSummaryView = renderSmartTimeSummaryView;
+
+
         function renderTimeTimelineView(container, filtered, admin) {
       var todayStr = dateStr(new Date());
       // Use filtered entries but without date restriction (timeline has its own day nav)
       // This respects member, project, billable, invoiced filters from toolbar
       var myName = typeof currentMemberName === 'function' ? currentMemberName() : '';
       var allEntries = (timeEntries || []).filter(function(t) {
+        if (!t) return false;
         // Respect member filter from toolbar
         if (timeFilter.member && timeFilter.member !== '__all__') {
           var filterFirst = timeFilter.member.split(' ')[0].toLowerCase();
@@ -58656,7 +60339,7 @@ async function renderBoardsTab(T, proj) {
 
       // Default: prefer today if captures exist, else most recent logged day, else today
       if (!_tlDay) {
-        var capsToday = (window._pendingCaptures || []).filter(function(c){ return c.date === todayStr; });
+        var capsToday = (window._pendingCaptures || []).filter(function(c){ return c && c.date === todayStr; });
         if (capsToday.length > 0) {
           _tlDay = todayStr; // today has captures → show today
         } else {
@@ -58683,7 +60366,7 @@ async function renderBoardsTab(T, proj) {
       var _srcFilter = window._tlSourceFilter || '';
       var totalHrs = dayEntries.reduce(function(s,t) { return s+(parseFloat(t.hours)||0); }, 0);
       var totalBillable = dayEntries.reduce(function(s,t) { return s+(parseFloat(t.total)||0); }, 0);
-      var allCapsToday = (window._pendingCaptures||[]).filter(function(c) { return c.date === _tlDay && !c._dismissed; });
+      var allCapsToday = (window._pendingCaptures||[]).filter(function(c) { return c && c.date === _tlDay && !c._dismissed; });
       // Source filter: 'timely' = Timely Memory captures, 'agent' = desktop agent captures, 'logged' = logged entries only, '' = all
       var filteredCaps = _srcFilter && _srcFilter !== 'logged'
         ? allCapsToday.filter(function(c) { var src = (c.source||'agent'); return src === _srcFilter || src.startsWith(_srcFilter); })
@@ -58761,7 +60444,7 @@ async function renderBoardsTab(T, proj) {
       for (var ud = 0; ud < recentDays; ud++) {
         var checkStr = dateStr(checkDate);
         var dayHasEntries = allEntries.some(function(t) { return t.date === checkStr; });
-        var dayHasCaps = (window._pendingCaptures || []).some(function(c) { return c.date === checkStr && !c._dismissed; });
+        var dayHasCaps = (window._pendingCaptures || []).some(function(c) { return c && c.date === checkStr && !c._dismissed; });
         var dayBuckets = window._dayBuckets[checkStr] || [];
         var dayHasUnloggedBuckets = dayBuckets.some(function(b) { return !b.logged && b.items && b.items.length > 0; });
         if ((dayHasCaps || dayHasUnloggedBuckets) && !dayHasEntries) {
@@ -59067,7 +60750,7 @@ async function renderBoardsTab(T, proj) {
       }
 
       // Auto-categorize captures if we have them and no suggestions yet
-      var dayCapsExist = (window._pendingCaptures || []).some(function(c) { return c.date === _tlDay && !c._dismissed; });
+      var dayCapsExist = (window._pendingCaptures || []).some(function(c) { return c && c.date === _tlDay && !c._dismissed; });
       if (dayCapsExist && Object.keys(_tlCaptureSuggestions).length === 0 && !_tlAIRunning) {
         // AI auto-categorize disabled on deployed site (needs API key)
       }
@@ -59101,7 +60784,7 @@ async function renderBoardsTab(T, proj) {
         var h = Math.floor(hrs), m = Math.round((hrs - h) * 60);
         if (h > 0 && m > 0) return h + 'h ' + m + 'm'; if (h > 0) return h + 'h'; return m + 'm';
       }
-      var pendingCaps = (window._pendingCaptures || []).filter(function(c) { return c.date === _tlDay && !c._dismissed; });
+      var pendingCaps = (window._pendingCaptures || []).filter(function(c) { return c && c.date === _tlDay && !c._dismissed; });
       var totalCapHrs = pendingCaps.reduce(function(s, c) { return s + (parseFloat(c.minutes) || 0); }, 0) / 60;
       var rowsHtml = '';
       if (sorted.length === 0) {
@@ -70581,6 +72264,7 @@ async function renderBoardsTab(T, proj) {
       _poOnlyLoadingPromise = _doLoadPOsOnlyFast().finally(function() { _poOnlyLoadingPromise = null; });
       return _poOnlyLoadingPromise;
     }
+    window.loadPOsOnlyFast = loadPOsOnlyFast;
 
     async function _doLoadPOsOnlyFast() {
       const projSnap = await getCachedBoards();
@@ -70637,6 +72321,7 @@ async function renderBoardsTab(T, proj) {
       window._cachedProjNames = _cachedProjNames;
       window._cachedProjList = _cachedProjList;
       window._finCacheIsPartialPOs = true;
+      if (typeof window.cchUpdatePoNavBadge === 'function') window.cchUpdatePoNavBadge();
 
       // Background: pull archived/completed project POs (still no proposals/invoices) so the list fills in
       if (archivedPids.length) {
@@ -70656,6 +72341,7 @@ async function renderBoardsTab(T, proj) {
           if (h.indexOf('allpos') >= 0 && typeof renderAllPOs === 'function') {
             renderAllPOs({ silentRefresh: true });
           }
+          if (typeof window.cchUpdatePoNavBadge === 'function') window.cchUpdatePoNavBadge();
         }).catch(function() {});
       }
     }
@@ -70864,12 +72550,13 @@ async function renderBoardsTab(T, proj) {
       window._cachedProjList = _cachedProjList;
       window._cachedInvoices = _cachedInvoices;
       window._cachedProposals = _cachedProposals;
+      if (typeof window.cchUpdatePoNavBadge === 'function') window.cchUpdatePoNavBadge();
     }
 
     // Shared time period filter for Proposals/Invoices/POs
-    var _finTimePeriod = { proposals: 'all', invoices: 'all', pos: 'all' };
+    var _finTimePeriod = { proposals: 'ytd', invoices: 'ytd', pos: 'ytd' };
     function _finPeriodFilter(items, page, dateField) {
-      var period = _finTimePeriod[page] || 'all';
+      var period = _finTimePeriod[page] || 'ytd';
       if (period === 'all') return items;
       var now = new Date();
       var cutoff;
@@ -70891,7 +72578,7 @@ async function renderBoardsTab(T, proj) {
       var labels = { week: 'This Week', month: 'This Month', ytd: 'YTD', all: 'All Time' };
       return '<div style="display:flex;gap:0;border:1px solid rgba(196,164,100,0.15);border-radius:0;overflow:hidden;margin-bottom:16px;">' +
         periods.map(function(p) {
-          var isActive = (_finTimePeriod[page] || 'all') === p;
+          var isActive = (_finTimePeriod[page] || 'ytd') === p;
           return '<button onclick="_finTimePeriod.' + page + '=\'' + p + '\';' + renderFn + '()" style="padding:8px 18px;font-size:11px;font-weight:600;letter-spacing:0.5px;border:none;cursor:pointer;' +
             (isActive ? 'background:#C4A464;color:#0F1A2E;' : 'background:transparent;color:var(--gray-400);') + '">' + labels[p] + '</button>';
         }).join('') +
@@ -71611,26 +73298,27 @@ async function renderBoardsTab(T, proj) {
         const projList = _cachedProjList;
         const statuses = [...new Set(all.map(p => (typeof window.cchPoProcurementStatusLabel === 'function' ? window.cchPoProcurementStatusLabel(p) : (p.status || 'Draft'))))].sort();
         const vendors = poVendorNamesForToolbar(all);
-        let periodFiltered = _finPeriodFilter(all, 'pos', 'date');
+        let periodFiltered;
         if (window._posListPreset === 'pending' || window._posListPreset === 'needs-action') {
-          periodFiltered = periodFiltered.filter(function(po) {
-            var st = (po.status || '').toLowerCase();
-            var paySt = (po.paymentStatus || '').toLowerCase();
-            if (st === 'received' || st === 'cancelled' || st === 'installed' || st === 'paid' || st === 'closed' || st === 'delivered') return false;
-            if (paySt === 'paid') return false;
-            return true;
+          periodFiltered = all.filter(function(po) {
+            return typeof window.cchPoIsOpen === 'function' ? window.cchPoIsOpen(po) : true;
           });
+        } else {
+          periodFiltered = _finPeriodFilter(all, 'pos', 'date');
         }
         const filtered = applySortFilter(periodFiltered, 'pos');
         window._allPosFilteredExport = filtered.slice();
         const _finSearchFocus = typeof window.cchCaptureListSearchFocus === 'function' ? window.cchCaptureListSearchFocus('finSearch-pos') : null;
-        const openPOs = filtered.filter(p => {
-          const st = (p.status || '').toLowerCase();
-          const paySt = (p.paymentStatus || '').toLowerCase();
-          if (st === 'received' || st === 'cancelled' || st === 'installed' || st === 'paid' || st === 'closed' || st === 'delivered') return false;
-          if (paySt === 'paid') return false;
-          return true;
+        const openPOs = filtered.filter(function(p) {
+          return typeof window.cchPoIsOpen === 'function' ? window.cchPoIsOpen(p) : (function() {
+            var st = (p.status || '').toLowerCase();
+            var paySt = (p.paymentStatus || '').toLowerCase();
+            if (st === 'received' || st === 'cancelled' || st === 'installed' || st === 'paid' || st === 'closed' || st === 'delivered') return false;
+            if (paySt === 'paid') return false;
+            return true;
+          })();
         });
+        if (typeof window.cchUpdatePoNavBadge === 'function') window.cchUpdatePoNavBadge();
         const totalAll = filtered.reduce(function(s, p) {
           return s + (typeof window.cchPoListPoTotal === 'function' ? window.cchPoListPoTotal(p) : (parseFloat(p.total) || 0));
         }, 0);
@@ -71730,7 +73418,7 @@ async function renderBoardsTab(T, proj) {
                     <td style="${tdStyle}text-align:center;white-space:nowrap;" onclick="event.stopPropagation()">${typeof window.cchOmBillsCellHtml==='function'?window.cchOmBillsCellHtml(po):(typeof cchPoListBillWorkflowHtml==='function'?cchPoListBillWorkflowHtml(po):'\u2014')}</td>
                     <td style="${tdStyle}text-align:center;white-space:nowrap;" onclick="event.stopPropagation()">${typeof cchPoListShippingStatusHtml==='function'?cchPoListShippingStatusHtml(po):'\u2014'}</td>
                     <td style="${tdStyle}font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escAttr(shipToLabel)}">${shipToLabel ? esc(shipToLabel) : '\u2014'}</td>
-                    <td style="${tdStyle}color:var(--gray-500);font-size:12px;">${esc(po.eta||'\u2014')}</td>
+                    <td style="${tdStyle}color:var(--gray-500);font-size:12px;" onclick="event.stopPropagation()">${typeof cchPoListEtaInputHtml==='function'?cchPoListEtaInputHtml(po.projectId,po.id,po):esc(po.eta||'\u2014')}</td>
                     <td style="${tdStyle}text-align:right;font-weight:600;font-family:monospace;">$${((typeof cchPoListPoTotal==='function'?cchPoListPoTotal(po):(parseFloat(po.total)||0))).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
                     ${typeof cchPoListAllPosFinancialCellsHtml==='function'?cchPoListAllPosFinancialCellsHtml(po, tdStyle):'<td style="'+tdStyle+'">—</td><td style="'+tdStyle+'">—</td><td style="'+tdStyle+'">—</td><td style="'+tdStyle+'">—</td>'}
                     <td style="${tdStyle}text-align:center;" onclick="event.stopPropagation()">${typeof cchPoQbDotCellHtml==='function'?cchPoQbDotCellHtml(po):(typeof cchPoQbListCellHtml==='function'?cchPoQbListCellHtml(po):qbCellBadge(getQbId(po), po.qbStatus, po))}</td>
@@ -71752,7 +73440,7 @@ async function renderBoardsTab(T, proj) {
                           <a onclick="updatePOStatus('${po.projectId}','${po.id}','Installed');closeAllMenus()">→ Installed</a>
                           <div class="divider"></div>
                           <a onclick="emailVendorPO('${po.projectId}','${po.id}');closeAllMenus()">Email to Vendor</a>
-                          ${_canPushQBGlobal && !getQbId(po) && !(typeof window.cchPoQbBillOnlyMode==='function'&&window.cchPoQbBillOnlyMode()) ? '<a onclick="event.stopPropagation();pushDocToQB(\'po\',\'' + po.projectId + '\',\'' + po.id + '\');closeAllMenus()">📤 Push to QuickBooks</a>' : ''}
+                          ${(typeof window.cchPoCanPushPoToQb==='function' ? window.cchPoCanPushPoToQb(po,_canPushQBGlobal) : (_canPushQBGlobal && !getQbId(po) && !(typeof window.cchPoQbBillOnlyMode==='function'&&window.cchPoQbBillOnlyMode()))) ? '<a onclick="event.stopPropagation();pushDocToQB(\'po\',\'' + po.projectId + '\',\'' + po.id + '\');closeAllMenus()">📤 Push PO to QuickBooks</a>' : ''}
                           <a onclick="setQBSynced('${po.projectId}','purchaseOrders','${po.id}');closeAllMenus()">${getQbId(po) ? 'Update QB ID' : 'Mark QB Synced'}</a>
                           <div class="divider"></div>
                           <a class="danger" onclick="deleteDoc('${po.projectId}','purchaseOrders','${po.id}');closeAllMenus()">Delete</a>
@@ -74816,7 +76504,10 @@ async function renderBoardsTab(T, proj) {
         (_propDocTag ? '<div style="font-size:12px;color:#6B7280;margin-top:4px;line-height:1.4;">' + esc(_propDocTag) + '</div>' : '') +
         '</div><div class="cp-prop-total cp-price" style="font-size:14px;flex-shrink:0;margin-left:12px;">' + formatMoney(grand) + '</div></div>' +
         '<div class="cp-prop-progress" style="margin:0 14px;"><div class="cp-prop-progress-fill" style="width:' + pct + '%;"></div></div>' +
-        '<div style="padding:6px 14px 8px;font-size:10px;color:#5C6B80;">' + appr + ' approved · ' + dec + ' declined · ' + pend + ' pending</div>';
+        '<div style="padding:6px 14px 8px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:10px;color:#5C6B80;">' +
+        '<span>' + appr + ' approved · ' + dec + ' declined · ' + pend + ' pending</span>' +
+        (typeof buildProposalLineShowFilterHtml === 'function' ? buildProposalLineShowFilterHtml(projectId, p.id) : '') +
+        '</div>';
 
       if (visibleProducts.length > 0) {
         var proj = opts.proj || {};
@@ -74859,6 +76550,11 @@ async function renderBoardsTab(T, proj) {
           _rowCopy._idx = idx;
           _portalItems.push(_rowCopy);
         });
+        var _showF = (typeof getProposalLineShowFilter === 'function')
+          ? getProposalLineShowFilter(projectId, p.id) : { approved: true, pending: true, all: false };
+        if (typeof proposalLinePassesShowFilter === 'function') {
+          _portalItems = _portalItems.filter(function(it) { return proposalLinePassesShowFilter(it, _showF); });
+        }
         var _docGroupMode = (typeof window.cchDocGroupModeForData === 'function') ? window.cchDocGroupModeForData(p, 'proposal') : 'room';
         var _grouped = (typeof window.cchGroupDocumentItems === 'function') ? window.cchGroupDocumentItems(_portalItems, 'proposal', _docGroupMode) : null;
         var _groupKeys = (_grouped && typeof window.cchOrderedDocumentGroupKeys === 'function')
@@ -74927,7 +76623,9 @@ async function renderBoardsTab(T, proj) {
           '</div>' +
           '<div class="cp-prem-items-section">';
 
-        if (_grouped && _groupKeys.length) {
+        if (!_portalItems.length) {
+          html += '<div style="padding:8px 14px 16px;font-size:12px;color:#5C6B80;">Declined items are hidden. Check All to review them.</div>';
+        } else if (_grouped && _groupKeys.length) {
           _groupKeys.forEach(function(roomKey) {
             var catItems = _grouped[roomKey] || [];
             if (!catItems.length) return;
@@ -80525,6 +82223,19 @@ async function renderBoardsTab(T, proj) {
       if (tr) {
         if (status === 'declined') tr.classList.add('cp-prop-line-declined');
         else tr.classList.remove('cp-prop-line-declined');
+        var _sf = (typeof getProposalLineShowFilter === 'function') ? getProposalLineShowFilter(projectId, propId) : { approved: true, pending: true, all: false };
+        var _fake = { lineApprovalStatus: status };
+        var _pass = (typeof proposalLinePassesShowFilter !== 'function') || proposalLinePassesShowFilter(_fake, _sf);
+        tr.style.display = _pass ? '' : 'none';
+        var _sec = tr.closest ? tr.closest('.cp-prem-room-section') : null;
+        if (_sec) {
+          var _rows = _sec.querySelectorAll('tbody tr');
+          var _any = false;
+          for (var _ri = 0; _ri < _rows.length; _ri++) {
+            if (_rows[_ri].style.display !== 'none') { _any = true; break; }
+          }
+          _sec.style.display = _any ? '' : 'none';
+        }
       }
       var pending = 0, approved = 0;
       (items || []).forEach(function(it) {
@@ -87246,8 +88957,8 @@ async function renderBoardsTab(T, proj) {
   <script src="cch-client-activity.js?v=20260806ca2"></script>
   <script src="cch-client-pepper.js?v=20260812pepper"></script>
   <script src="cch-client-ideas.js?v=20260807ci091b"></script>
-  <script src="cch-pepper.js?v=20260817reach1"></script>
-  <script src="cch-project-subpanel.js?v=20260806sp15"></script>
+  <script src="cch-pepper.js?v=20260821wo119"></script>
+  <script src="cch-project-subpanel.js?v=20260826sp16"></script>
   <script src="cch-followups.js?v=20260726fu9"></script>
   <script src="cch-staff-chat.js?v=20260811sc090"></script>
   <script src="cch-bugs-requests.js?v=20260811fb147"></script>
@@ -87257,11 +88968,12 @@ async function renderBoardsTab(T, proj) {
   <script src="cch-client-board.js?v=1774994684878"></script>
   <script src="cch-line-icons.js?v=20260821wo026"></script>
   <script src="cch-invoice-redesign.js?v=20260817size1"></script>
-  <script src="cch-proposals-invoices-fix.js?v=20260820place2"></script>
+  <script src="cch-proposals-invoices-fix.js?v=20260827pdfcols4"></script>
+  <script src="cch-vendor-bid-import.js?v=20260827vbid1"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
-  <script src="cch-airtable-push.js?v=20260630a"></script>
-  <script src="cch-po-bill-variance.js?v=20260816send2"></script>
-  <script src="cch-order-management.js?v=20260726om37"></script>
+  <script src="cch-airtable-push.js?v=20260824recv1"></script>
+  <script src="cch-po-bill-variance.js?v=20260826listrecv1"></script>
+  <script src="cch-order-management.js?v=20260825pobill1"></script>
   <script src="cch-po-vendor-comms.js?v=20260816send2"></script>
   <script src="cch-ffe-procurement.js?v=ffeprod2"></script>
   <script src="cch-contractor-access.js?v=20260814ca5"></script>

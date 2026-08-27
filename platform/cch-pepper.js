@@ -18,7 +18,7 @@
   var FIRM = 'CCH Design Inc.';
   var PEPPER_DECISION_ACTIONS = { line_approved: 1, line_declined: 1, proposal_total_approved: 1 };
 
-  var BUILD = '20260817reach1';
+  var BUILD = '20260821wo119';
 
   /** Cap digest size — huge firm digests can trip callable/gateway failures. */
   function pepperCapDigest(text, maxChars) {
@@ -1247,6 +1247,9 @@
 
   var PRESETS = [
     { key: 'my_agenda', label: "What's on my agenda" },
+    { key: 'daily_brief', label: 'Daily brief' },
+    { key: 'weekly_brief', label: 'Weekly brief' },
+    { key: 'monthly_brief', label: 'Monthly brief' },
     { key: 'summarize_status', label: 'Summarize status' },
     { key: 'whats_next', label: "What needs attention today" },
     { key: 'unbilled_time', label: 'Unbilled time' },
@@ -2138,6 +2141,24 @@
           } catch (eAg) {
             console.warn('[cchPepper] my agenda', eAg);
             appendMsg(log, 'Pepper', 'I couldn\'t build your agenda just now. Try again in a moment.');
+          }
+          return;
+        }
+        if (p.key === 'daily_brief' || p.key === 'weekly_brief' || p.key === 'monthly_brief') {
+          appendMsg(log, 'You', p.label);
+          appendMsg(log, 'Pepper', 'Pulling your plate…');
+          try {
+            var cadenceBrief = await buildMyAgendaBrief({});
+            var cadenceFirm = await buildFirmWideStaffDigest({});
+            send({
+              action: p.key,
+              input: 'Staff tapped ' + p.label + '. Use MY AGENDA / FIRM-WIDE STAFF DIGEST. Stay scoped to the signed-in person unless they asked All Team. Follow BRIEF CADENCE. Draft-only. Do not invent numbers.',
+              projectName: ctx.projectName || 'Firm',
+              activityDigest: pepperCapDigest((cadenceBrief.digest || '') + '\n\n' + (cadenceFirm || ''))
+            }, log);
+          } catch (eCad) {
+            console.warn('[cchPepper] cadence brief', eCad);
+            appendMsg(log, 'Pepper', 'I couldn\'t build that brief just now. Try again in a moment.');
           }
           return;
         }

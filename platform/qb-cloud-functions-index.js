@@ -377,17 +377,24 @@ exports.pushPOToQB = functions.https.onCall(async (data, context) => {
   const vendorName = po.vendor || po.vendorName || "";
   const vendorId = await resolveQbVendorIdForPush(accessToken, vendorName);
 
-  const lineItems = (po.items || []).map((item, idx) => ({
-    LineNum: idx + 1,
-    Amount: parseFloat(item.cost || item.amount || 0),
-    Description: [item.title || item.name || "Item", item.sku || ""].filter(Boolean).join(" — "),
-    DetailType: "ItemBasedExpenseLineDetail",
-    ItemBasedExpenseLineDetail: {
-      ItemRef: { value: "1", name: "Services" },
-      Qty: parseFloat(item.qty || 1),
-      UnitPrice: parseFloat(item.cost || item.amount || 0) / parseFloat(item.qty || 1)
-    }
-  }));
+  const lineItems = (po.items || []).map((item, idx) => {
+    const qty = Math.max(parseFloat(item.qty || 1) || 1, 0.0001);
+    const unit = parseFloat(item.cost || item.unitCost || item.costPrice || 0) || 0;
+    const lineAmt = parseFloat(item.amount || item.total || 0) || 0;
+    const amount = unit > 0 ? Math.round(unit * qty * 100) / 100 : lineAmt;
+    const unitPrice = unit > 0 ? unit : (qty > 0 ? lineAmt / qty : lineAmt);
+    return {
+      LineNum: idx + 1,
+      Amount: amount,
+      Description: [item.title || item.name || "Item", item.sku || ""].filter(Boolean).join(" — "),
+      DetailType: "ItemBasedExpenseLineDetail",
+      ItemBasedExpenseLineDetail: {
+        ItemRef: { value: "1", name: "Services" },
+        Qty: qty,
+        UnitPrice: unitPrice
+      }
+    };
+  });
 
   const qbPO = {
     Line: lineItems,

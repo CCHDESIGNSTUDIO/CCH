@@ -1607,7 +1607,8 @@
         '<td style="' + td + 'font-size:12px;line-height:1.5;">' + selLinkHtml + '</td>' +
         '<td style="' + td + 'font-size:12px;color:var(--gray-500);" onclick="event.stopPropagation()">' +
         (typeof window.cchPoReceiverSelectHtml === 'function'
-          ? window.cchPoReceiverSelectHtml(po.projectId, po.id, po.receiver)
+          ? window.cchPoReceiverSelectHtml(po.projectId, po.id,
+              (typeof window.cchPoResolvedReceiverName === 'function' ? window.cchPoResolvedReceiverName(po) : po.receiver))
           : esc(r.location || '—')) + '</td>' +
         '<td style="' + td + 'text-align:right;font-weight:600;font-family:monospace;">$' +
         poTotal(po).toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
@@ -1647,6 +1648,8 @@
     var bucket = 'draft';
     if (billOnly) {
       if (qbBillId) bucket = 'synced';
+      else if (legQb && hasBill && pushAllowed) bucket = 'ready';
+      else if (legQb) bucket = 'awaiting_bill';
       else if (hasBill && pushAllowed) bucket = 'ready';
       else if (hasBill) bucket = 'ready_staging';
       else if (sent) bucket = 'awaiting_bill';

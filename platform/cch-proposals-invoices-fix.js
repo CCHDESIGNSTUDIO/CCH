@@ -851,6 +851,8 @@
         cchPropMoreItem('Check all documents on Room Boards', "cchPlaceDocLinesOnRoomBoards('" + projectId + "','','',true)") +
         invBtn +
         cchPropMoreItem('Generate POs by Vendor', "generatePOsFromDoc('" + projectId + "','proposals','" + proposalId + "')") +
+        cchPropMoreItem('Import vendor bid (PDF)', "openProposalImportVendorBidModal('" + projectId + "','" + proposalId + "')") +
+        cchPropMoreItem('Import lines', "openProposalImportLinesModal('" + projectId + "','" + proposalId + "')") +
         cchPropMoreItem('Duplicate proposal', "duplicateProposalAsCopy('" + projectId + "','" + proposalId + "')") +
         cchPropMoreItem('Attach from Files', "linkDocModal('" + projectId + "','proposals','" + proposalId + "')") +
         cchPropMoreItem('Delete proposal', "deleteProposal('" + projectId + "','" + proposalId + "')", true);
@@ -866,6 +868,8 @@
         cchPropMoreItem('Check all documents on Room Boards', "cchPlaceDocLinesOnRoomBoards('" + projectId + "','','',true)") +
         invBtn +
         cchPropMoreItem('Generate POs by Vendor', "generatePOsFromDoc('" + projectId + "','proposals','" + proposalId + "')") +
+        cchPropMoreItem('Import vendor bid (PDF)', "openProposalImportVendorBidModal('" + projectId + "','" + proposalId + "')") +
+        cchPropMoreItem('Import lines', "openProposalImportLinesModal('" + projectId + "','" + proposalId + "')") +
         cchPropMoreItem('Duplicate proposal', "duplicateProposalAsCopy('" + projectId + "','" + proposalId + "')") +
         cchPropMoreItem('Attach from Files', "linkDocModal('" + projectId + "','proposals','" + proposalId + "')") +
         cchPropMoreItem('Close legacy (hide attention)', "closeProposalAsLegacy('" + projectId + "','" + proposalId + "')") +
@@ -2757,13 +2761,18 @@
         poMore += cchDocMoreItem('💳 Pay bill', "cchPoOpenPaymentModal('" + pj + "','" + dj + "')");
       }
       if (opts.qbRealId) {
-        poMore += cchDocMoreItem('✅ QB synced (' + esc(String(opts.qbRealId)) + ')', '');
+        poMore += cchDocMoreItem('✅ QB PO (' + esc(String(opts.qbRealId)) + ')', '');
       } else if (docData.qbPushPending) {
         poMore += cchDocMoreItem('⏳ QB queued', '');
-      } else if (opts.canPushQB && !(typeof window.cchPoQbBillOnlyMode === 'function' && window.cchPoQbBillOnlyMode())) {
-        poMore += cchDocMoreItem('📤 Push to QuickBooks', "pushDocToQB('po','" + pj + "','" + dj + "',this)");
-      } else if (window.cchPoQbBillOnlyMode()) {
-        poMore += cchDocMoreItem('📤 QuickBooks: push vendor bill', "navigate('#/project/" + pj + "/po/" + dj + "')");
+      } else if (typeof window.cchPoCanPushPoToQb === 'function' ? window.cchPoCanPushPoToQb(docData, opts.canPushQB) : (opts.canPushQB && !(typeof window.cchPoQbBillOnlyMode === 'function' && window.cchPoQbBillOnlyMode()))) {
+        poMore += cchDocMoreItem('📤 Push PO to QuickBooks', "pushDocToQB('po','" + pj + "','" + dj + "',this)");
+      }
+      if (typeof window.cchPoQbBillOnlyMode === 'function' && window.cchPoQbBillOnlyMode()) {
+        if (docData.bill && docData.bill.qbBillId) {
+          poMore += cchDocMoreItem('✅ QB Bill synced', '');
+        } else {
+          poMore += cchDocMoreItem('📤 QuickBooks: push vendor bill', "navigate('#/project/" + pj + "/po/" + dj + "')");
+        }
       }
       poMore += cchDocMoreDivider();
       if (typeof window.cchPoOpenStatusModal === 'function') {
@@ -2870,11 +2879,11 @@
       }
       more += cchDocMoreDivider();
       if (qbRealIdPo) {
-        more += cchDocMoreItem('✅ QB synced (' + esc(String(qbRealIdPo)) + ')', '');
+        more += cchDocMoreItem('✅ QB PO (' + esc(String(qbRealIdPo)) + ')', '');
       } else if (docData.qbPushPending) {
         more += cchDocMoreItem('⏳ QB queued', '');
-      } else if (canPushQB && !(typeof window.cchPoQbBillOnlyMode === 'function' && window.cchPoQbBillOnlyMode())) {
-        more += cchDocMoreItem('📤 Push to QuickBooks', "pushDocToQB('" + type + "','" + pj + "','" + dj + "')");
+      } else if (typeof window.cchPoCanPushPoToQb === 'function' ? window.cchPoCanPushPoToQb(docData, canPushQB) : (canPushQB && !(typeof window.cchPoQbBillOnlyMode === 'function' && window.cchPoQbBillOnlyMode()))) {
+        more += cchDocMoreItem('📤 Push PO to QuickBooks', "pushDocToQB('" + type + "','" + pj + "','" + dj + "')");
       }
     }
     if (typeof linkDocModal === 'function') {
@@ -3143,18 +3152,19 @@
       }
     } else if (type === 'po') {
       var _billQbId = docData.bill && docData.bill.qbBillId;
-      var _poBillOnly = typeof window.cchPoQbBillOnlyMode === 'function' && window.cchPoQbBillOnlyMode();
-      if (_billQbId) {
+      if (_billQbId && qbRealId) {
+        qbViewTopBtn = '<span class="badge badge-approved" style="font-size:11px;padding:5px 12px;margin-left:4px;">✅ QB PO + Bill</span>';
+      } else if (_billQbId) {
         qbViewTopBtn = '<span class="badge badge-approved" style="font-size:11px;padding:5px 12px;margin-left:4px;">✅ QB Bill (' + esc(String(_billQbId)) + ')</span>';
-      } else if (_poBillOnly) {
-        qbViewTopBtn = '<span style="font-size:11px;color:#5C6B80;margin-left:4px;">QuickBooks: push vendor bill below</span>';
       } else if (qbRealId) {
-        qbViewTopBtn = '<span class="badge badge-approved" style="font-size:11px;padding:5px 12px;margin-left:4px;">✅ QB Synced (' + esc(String(qbRealId)) + ')</span>';
+        qbViewTopBtn = '<span class="badge badge-approved" style="font-size:11px;padding:5px 12px;margin-left:4px;">✅ QB PO (' + esc(String(qbRealId)) + ')</span>';
       } else if (docData.qbPushPending) {
         qbViewTopBtn = '<span class="badge" style="font-size:11px;padding:5px 12px;margin-left:4px;background:rgba(245,158,11,0.15);color:#92400E;border:1px solid rgba(245,158,11,0.35);">⏳ QB queued</span>';
-      } else if (_canPushQBView) {
+      } else if (typeof window.cchPoCanPushPoToQb === 'function' ? window.cchPoCanPushPoToQb(docData, _canPushQBView) : _canPushQBView) {
         var _qbErrHint = docData.qbPushLastError ? escAttr('Last error: ' + String(docData.qbPushLastError)) : '';
-        qbViewTopBtn = '<button class="btn btn-sm" style="background:#2CA01C;color:#1B3352;border:none;margin-left:4px;" title="' + _qbErrHint + '" onclick="pushDocToQB(\'po\',\'' + projectId + '\',\'' + docId + '\',this)">📤 Push to QuickBooks</button>';
+        qbViewTopBtn = '<button class="btn btn-sm" style="background:#2CA01C;color:#1B3352;border:none;margin-left:4px;" title="' + _qbErrHint + '" onclick="pushDocToQB(\'po\',\'' + projectId + '\',\'' + docId + '\',this)">📤 Push PO to QuickBooks</button>';
+      } else if (typeof window.cchPoQbBillOnlyMode === 'function' && window.cchPoQbBillOnlyMode()) {
+        qbViewTopBtn = '<span style="font-size:11px;color:#5C6B80;margin-left:4px;">QuickBooks: push vendor bill below</span>';
       }
     }
     var lineItemsQbBtn = '';
@@ -3215,14 +3225,14 @@
 
     var _showLineTagCol = type === 'invoice' || type === 'proposal' || type === 'po';
     var _showPoVendorCol = type !== 'po';
-    var _showPoLineEtaCol = false;
+    var _showPoLineEtaCol = type === 'po' && typeof window.cchPoLineEtaHtml === 'function';
     var _showPoShippingCol = type !== 'po';
     /** Invoices: tax is footer-only (Totals rail), not per-line — no Tax column on product rows. */
     var _showPoSalesTaxCol = (type === 'proposal');
-    /** Client-facing invoice view: room per line, no markup column (Manage has markup). */
-    var _showRoomCol = (type === 'invoice');
+    /** Invoice + PO main page: room per line (PO = scan without Edit). */
+    var _showRoomCol = (type === 'invoice' || type === 'po');
     var _showMarkupCol = (type !== 'po' && type !== 'invoice');
-    var _poExtraCols = (_showPoLineEtaCol ? 1 : 0);
+    var _poExtraCols = (_showPoLineEtaCol ? 1 : 0) + (type === 'po' && _showRoomCol ? 1 : 0);
     var _invTableColspan = type === 'invoice' ? 10 : (type === 'proposal' ? 10 : (9 + _poExtraCols));
 
     var _docViewTableHeadHtml =
@@ -3233,6 +3243,7 @@
           (_showPoVendorCol ? '<th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Vendor</th>' : '') +
           (_showRoomCol ? '<th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Room</th>' : '') +
           (_showLineTagCol ? '<th style="padding:8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;width:52px;" title="Optional label: fixture, fabric/trim, builder code">Tag</th>' : '') +
+          (_showPoLineEtaCol ? '<th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;min-width:110px;" title="Line ship status and ETA from Confirm order / vendor invoices">Ship / ETA</th>' : '') +
           (type === 'invoice' ? '<th style="padding:8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;width:64px;">Notes</th>' : '') +
           '<th style="padding:8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Qty</th>' +
           '<th style="padding:8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Cost</th>' +
@@ -3398,6 +3409,7 @@
           (_showPoVendorCol ? '<td style="padding:10px 8px;font-size:13px;color:var(--gray-500);">' + esc(item.vendor || '') + '</td>' : '') +
           (_showRoomCol ? '<td style="padding:10px 8px;font-size:13px;color:var(--gray-500);">' + esc(String(item.room || item.roomLocation || item.projectRoom || '').trim() || '—') + '</td>' : '') +
           (_showLineTagCol ? '<td style="padding:10px 8px;text-align:center;vertical-align:middle;font-size:12px;font-weight:700;color:#1B3352;">' + esc(lineTag || '—') + '</td>' : '') +
+          (_showPoLineEtaCol ? '<td style="padding:10px 8px;vertical-align:top;font-size:12px;">' + _poEtaHtml + '</td>' : '') +
           (type === 'invoice' ? '<td style="padding:10px 8px;text-align:center;vertical-align:middle;">' + invNoteBtnHtml + '</td>' : '') +
           '<td style="padding:10px 8px;text-align:center;font-size:14px;">' + qty + '</td>' +
           '<td style="padding:10px 8px;text-align:right;font-size:13px;font-family:monospace;">' + (cost > 0 ? formatMoney(cost) : '—') + '</td>' +
@@ -4905,16 +4917,49 @@
     var subtotal = 0, taxableSubtotal = 0, totalShipping = 0;
     // Show thumbnails on invoices/proposals/POs (vendor PDF includes line images).
     var _showPremiumImgCol = true;
-    var _premiumGroupColSpan = type === 'po' ? 6 : type === 'invoice' ? 5 : 6;
+    var _showRoomTagCols = (type === 'proposal' || type === 'invoice');
+    var _premiumGroupColSpan = type === 'po' ? 6 : (type === 'invoice' ? 7 : 8);
     var _hasProposalSectionGroups = type === 'proposal' && items.some(function(it) { return it && it.lineKind === 'group'; });
     /** One Item column (thumb + text in a grid) — avoids squeezing text when tag/notes add height. */
     var _premiumColgroup = '';
     if (type === 'invoice') {
-      _premiumColgroup = '<colgroup><col class="pc-item"><col class="pc-qty"><col class="pc-money"><col class="pc-money"><col class="pc-tax"><col class="pc-money"></colgroup>';
+      _premiumColgroup = '<colgroup><col class="pc-item"><col class="pc-room"><col class="pc-tag"><col class="pc-qty"><col class="pc-money"><col class="pc-money"><col class="pc-money"></colgroup>';
     } else if (type === 'po') {
       _premiumColgroup = '<colgroup><col class="pc-item"><col class="pc-sidemark"><col class="pc-qty"><col class="pc-money"><col class="pc-money"><col class="pc-money"></colgroup>';
     } else {
-      _premiumColgroup = '<colgroup><col class="pc-item"><col class="pc-qty"><col class="pc-money"><col class="pc-money"><col class="pc-tax"><col class="pc-money"></colgroup>';
+      _premiumColgroup = '<colgroup><col class="pc-item"><col class="pc-room"><col class="pc-tag"><col class="pc-qty"><col class="pc-money"><col class="pc-money"><col class="pc-tax"><col class="pc-money"></colgroup>';
+    }
+    function _premiumRoomTagTh() {
+      return _showRoomTagCols ? '<th class="cch-prem-room-th" style="text-align:center;">Room</th><th class="cch-prem-tag-th" style="text-align:center;">Tag</th>' : '';
+    }
+    function _premiumGroupPadCells() {
+      var n = (type === 'invoice') ? 3 : 4;
+      var html = '';
+      var i;
+      for (i = 0; i < n; i++) html += '<td class="cch-prem-group-pad" style="background:#F4F6FA;border-bottom:1px solid #E8ECF3;"></td>';
+      return html;
+    }
+    function _premiumGroupRowHtml(titleHtml, moneyHtml) {
+      var bg = 'background:#F4F6FA;border-bottom:1px solid #E8ECF3;';
+      if (type === 'po') {
+        return '<tr class="cch-prem-group-row"><td colspan="' + (_premiumGroupColSpan - 1) + '" style="' + bg + 'padding:10px 8px;">' + titleHtml + '</td>' +
+          '<td class="r total-cell" style="' + bg + '">' + moneyHtml + '</td></tr>';
+      }
+      return '<tr class="cch-prem-group-row">' +
+        '<td class="line-item-main" style="' + bg + 'padding:10px 8px;">' + titleHtml + '</td>' +
+        (_showRoomTagCols ? '<td class="cch-prem-room-cell" style="' + bg + '"></td><td class="cch-prem-tag-cell" style="' + bg + '"></td>' : '') +
+        _premiumGroupPadCells() +
+        '<td class="r total-cell" style="' + bg + '">' + moneyHtml + '</td></tr>';
+    }
+    function _premiumRoomTagTd(it) {
+      if (!_showRoomTagCols) return '';
+      var rm = String((it && it.room) || '').trim();
+      var tg = '';
+      if (typeof window.cchLineTagExplicit === 'function') tg = String(window.cchLineTagExplicit(it) || '').trim();
+      else tg = String((it && (it.lineTag || it.lineTagCode || it.fixtureTag)) || '').trim();
+      if (/^\d{4}-\d{2}-\d{2}\b/.test(tg)) tg = '';
+      return '<td class="cch-prem-room-cell">' + (rm ? esc(rm) : '\u2014') + '</td>' +
+        '<td class="cch-prem-tag-cell">' + (tg ? esc(tg) : '\u2014') + '</td>';
     }
 
     function _fmtIsoLong(iso) {
@@ -4974,10 +5019,6 @@
           notesBody = window.cchStripDateOnlyNoteLines(notesBody);
         }
         var htmlInv = '';
-        if (tagLine) {
-          htmlInv += '<div class="prop-line-detail-stack" style="margin-top:6px;"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Tag</div>' +
-            '<div class="item-desc item-desc-multiline line-notes" style="font-weight:600;">' + esc(tagLine) + '</div></div>';
-        }
         if (!notesBody) return htmlInv;
         var noteLines = String(notesBody).split(/\r?\n/).map(function(l) { return l.trim(); }).filter(Boolean);
         if (noteLines.length === 1) {
@@ -4989,10 +5030,6 @@
       }
       if (!tagLine && !notesBody) return '';
       var html = '';
-      if (tagLine) {
-        html += '<div class="prop-line-detail-stack" style="margin-top:6px;"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Tag</div>' +
-          '<div class="item-desc item-desc-multiline line-notes" style="font-weight:600;">' + esc(tagLine) + '</div></div>';
-      }
       if (notesBody) {
         var nLines = String(notesBody).split(/\r?\n/).map(function(l) { return l.trim(); }).filter(Boolean);
         html += '<div class="prop-line-detail-stack" style="margin-top:4px;"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Notes</div>';
@@ -5180,7 +5217,7 @@
         (type === 'po' ? '<td class="sidemark-cell">' + (function() {
           var sm = _poVendorSidemarkText(it);
           return sm ? esc(sm) : '<span style="color:#C4C4C4;">—</span>';
-        })() + '</td>' : '') +
+        })() + '</td>' : _premiumRoomTagTd(it)) +
         '<td style="text-align:center;">' + qtyCell + '</td>' +
         '<td class="r">' + priceCell + '</td>' +
         '<td class="r ship">' + (ship > 0 ? formatMoney(ship) : '\u2014') + '</td>' +
@@ -5189,37 +5226,62 @@
     }
 
     var _thItemLabel = type === 'invoice' ? 'Item' : 'Item';
+    var _premLineHead = '<th>' + (type === 'invoice' ? _premiumInvoiceColLabel(items) : _thItemLabel) + '</th>' +
+      (type === 'po' ? '<th>Sidemark</th>' : _premiumRoomTagTh()) +
+      '<th style="text-align:center;">Qty</th>' +
+      '<th class="r">Price</th>' +
+      '<th class="r">Shipping</th>' +
+      (type === 'po' || type === 'invoice' ? '' : '<th style="text-align:center;width:60px;">Tax</th>') +
+      '<th class="r">Total</th>';
     if (_hasProposalSectionGroups) {
-      var _secLabelFlat = (type === 'invoice') ? _premiumInvoiceColLabel(items) : _thItemLabel;
-      itemsHtml += '<div class="room-section"><div class="room-header"><span>Items</span><span></span></div>' +
-        '<table class="cch-premium-items-table">' + _premiumColgroup + '<thead><tr><th>' + _secLabelFlat + '</th>' +
-        (type === 'po' ? '<th>Sidemark</th>' : '') +
-        '<th style="text-align:center;">Qty</th>' +
-        '<th class="r">Price</th>' +
-        '<th class="r">Shipping</th>' +
-        (type === 'po' || type === 'invoice' ? '' : '<th style="text-align:center;width:60px;">Tax</th>') +
-        '<th class="r">Total</th></tr></thead><tbody>';
+      var _groupMoney = {};
+      items.forEach(function(it) {
+        if (!it || (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it))) return;
+        var gid = String(it.groupId || '');
+        var a = (typeof window.proposalLineClientTotal === 'function')
+          ? window.proposalLineClientTotal(it)
+          : (parseFloat(it.amount) || 0);
+        _groupMoney[gid] = (_groupMoney[gid] || 0) + (parseFloat(a) || 0);
+      });
+      var _secOpen = false;
+      var _secRoom = null;
+      function _premCloseRoomSec() {
+        if (_secOpen) {
+          itemsHtml += '</tbody></table></div>';
+          _secOpen = false;
+        }
+      }
+      function _premOpenRoomSec(roomName) {
+        var rn = String(roomName || '').trim() || 'General';
+        if (_secOpen && _secRoom === rn) return;
+        _premCloseRoomSec();
+        _secRoom = rn;
+        itemsHtml += '<div class="room-section">' +
+          '<div class="room-header"><span>' + esc(rn) + '</span><span></span></div>' +
+          '<table class="cch-premium-items-table">' + _premiumColgroup + '<thead><tr>' + _premLineHead + '</tr></thead><tbody>';
+        _secOpen = true;
+      }
       items.forEach(function(it) {
         if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it)) {
+          var _hdrRoom = String((it && it.room) || '').trim();
+          if (_hdrRoom) _premOpenRoomSec(_hdrRoom);
+          else if (!_secOpen) _premOpenRoomSec('General');
           var _grpHtml = typeof proposalGroupHeaderDisplayHtml === 'function'
             ? proposalGroupHeaderDisplayHtml(it, { compact: true })
             : esc(it.title || 'Section');
-          itemsHtml += '<tr><td colspan="' + _premiumGroupColSpan + '" style="background:#F4F6FA;padding:10px 8px;border-bottom:1px solid #E8ECF3;">' + _grpHtml + '</td></tr>';
+          var _gTot = _groupMoney[String(it.groupId || '')] || 0;
+          itemsHtml += _premiumGroupRowHtml(_grpHtml, formatMoney(_gTot));
           return;
         }
+        _premOpenRoomSec((it && it.room) || 'General');
         _premiumAppendLineRow(it);
       });
-      itemsHtml += '</tbody></table></div>';
+      _premCloseRoomSec();
     } else if (type === 'po') {
       var _flatPoPrint = (items || []).filter(function(it) {
         return !(typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it));
       });
-      itemsHtml += '<table class="cch-premium-items-table cch-po-vendor-pdf">' + _premiumColgroup + '<thead><tr><th>' + _thItemLabel + '</th>' +
-        '<th>Sidemark</th>' +
-        '<th style="text-align:center;">Qty</th>' +
-        '<th class="r">Price</th>' +
-        '<th class="r">Shipping</th>' +
-        '<th class="r">Total</th></tr></thead><tbody>';
+      itemsHtml += '<table class="cch-premium-items-table cch-po-vendor-pdf">' + _premiumColgroup + '<thead><tr>' + _premLineHead + '</tr></thead><tbody>';
       _flatPoPrint.forEach(function(it) {
         _premiumAppendLineRow(it);
       });
@@ -5240,7 +5302,7 @@
         var _secLabel = (type === 'invoice') ? _premiumInvoiceColLabel(catItems) : _thItemLabel;
         itemsHtml += '<div class="room-section"><div class="room-header"><span>' + esc(cat) + '</span><span>' + (type === 'po' ? '' : formatMoney(catTotal)) + '</span></div>' +
           '<table class="cch-premium-items-table">' + _premiumColgroup + '<thead><tr><th>' + _secLabel + '</th>' +
-          (type === 'po' ? '<th>Sidemark</th>' : '') +
+          (type === 'po' ? '<th>Sidemark</th>' : _premiumRoomTagTh()) +
           '<th style="text-align:center;">Qty</th>' +
           '<th class="r">Price</th>' +
           '<th class="r">Shipping</th>' +
@@ -5434,19 +5496,24 @@
       (Array.isArray(docData.timeEntryIds) && docData.timeEntryIds.length > 0) ||
       (items.length && typeof window.cchIsPureDesignServicesInvoice === 'function' && window.cchIsPureDesignServicesInvoice(items))
     ));
-    var premiumDispToolbarHtml = (premiumIsTimeInv && !_portalOpen)
+    var premiumColToolbarHtml = (!_portalOpen && (type === 'proposal' || type === 'invoice'))
+      ? '<span class="toolbar-sep"></span>' +
+        '<label class="toolbar-check"><input type="checkbox" id="cchPremDispRoom" checked onchange="cchPremColToggle(\'room\',this.checked)"> Show room</label>' +
+        '<label class="toolbar-check"><input type="checkbox" id="cchPremDispTag" checked onchange="cchPremColToggle(\'tag\',this.checked)"> Show tags</label>'
+      : '';
+    var premiumDispToolbarHtml = premiumColToolbarHtml + ((premiumIsTimeInv && !_portalOpen)
       ? '<span class="toolbar-sep"></span>' +
         '<label class="toolbar-check"><input type="checkbox" id="cchPremDispDates" checked onchange="cchPremInvDispToggle(\'dates\',this.checked)"> Show dates</label>' +
         '<label class="toolbar-check"><input type="checkbox" id="cchPremDispHours" onchange="cchPremInvDispToggle(\'hours\',this.checked)"> Show hours</label>' +
         '<label class="toolbar-check"><input type="checkbox" id="cchPremDispRate" onchange="cchPremInvDispToggle(\'rate\',this.checked)"> Show rate</label>' +
         '<label class="toolbar-check"><input type="checkbox" id="cchPremDispNotes" checked onchange="cchPremInvDispToggle(\'notes\',this.checked)"> Show notes</label>'
-      : '';
+      : '');
     var poPrintBodyClass = type === 'po' ? ' class="cch-po-vendor-print"' : '';
     var poPrintHint = _portalOpen
       ? ''
       : (type === 'po'
       ? 'Print dialog opens automatically. Turn off <strong>Headers and footers</strong> in print settings for a clean PDF.'
-      : 'For a clean PDF: in Print → <strong>More settings</strong>, turn off <strong>Headers and footers</strong>. Otherwise Chrome adds the date and title at the top and <strong>about:blank</strong> (or the page URL) at the bottom — that is not part of your invoice.');
+      : 'For a clean PDF: in Print → <strong>More settings</strong>, turn off <strong>Headers and footers</strong>, and set <strong>Margins</strong> to Default (not None). Otherwise Chrome adds the date and title at the top and <strong>about:blank</strong> (or the page URL) at the bottom — that is not part of your invoice.');
 
     var _invPay = Object.assign({ id: docId }, docData);
     /* One Pay in toolbar only — CC + Zelle are on the portal Pay page. */
@@ -5514,16 +5581,19 @@
       '.project-addr-sub { color:#5C6B80; font-size:11px; margin-top:3px; line-height:1.35; }' +
 
       /* Items */
-      '.items-section { padding:20px 22px 6px; }' +
-      '.room-section { margin-bottom:10px; }' +
+      '.items-section { padding:28px 36px 16px; }' +
+      '.room-section { margin-bottom:36px; padding-bottom:8px; }' +
+      '.room-section + .room-section { margin-top:8px; }' +
       '.room-header { display:flex; justify-content:space-between; align-items:center; padding:4px 0 2px; border-bottom:2px solid #1B3352; margin-bottom:2px; }' +
       '.room-header span:first-child { font-size:10px; text-transform:uppercase; letter-spacing:1.5px; color:#C4A464; font-weight:700; }' +
       '.room-header span:last-child { font-size:11px; color:#5C6B80; font-weight:600; font-family:"DM Sans"; }' +
       '.cch-po-vendor-pdf { width:100%; border-collapse:collapse; }' +
       '.cch-po-vendor-pdf thead tr { border-bottom:2px solid #1B3352; }' +
       'table.cch-premium-items-table { width:100%; border-collapse:collapse; table-layout:fixed; }' +
-      'col.pc-item { width:44%; }' +
-      'col.pc-qty { width:8%; }' +
+      'col.pc-item { width:42%; }' +
+      'col.pc-room { width:8%; }' +
+      'col.pc-tag { width:5%; }' +
+      'col.pc-qty { width:7%; }' +
       'col.pc-vendor { width:11%; }' +
       'col.pc-sidemark { width:12%; }' +
       'col.pc-money { width:9%; }' +
@@ -5536,14 +5606,21 @@
       '.cch-premium-item-thumb img { width:64px; height:64px; object-fit:contain; border-radius:0; display:block; }' +
       '.cch-premium-item-text { min-width:0; width:100%; max-width:100%; }' +
       '.prop-line-detail-stack { width:100%; min-width:0; max-width:100%; box-sizing:border-box; }' +
-      'th { text-align:left; padding:5px 5px; font-size:8px; text-transform:uppercase; letter-spacing:1px; color:#5C6B80; font-weight:600; border-bottom:1px solid #E8ECF3; background:#F4F6FA; }' +
+      'th { text-align:left; padding:10px 8px 8px; font-size:8px; text-transform:uppercase; letter-spacing:1px; color:#5C6B80; font-weight:600; border-bottom:1px solid #E8ECF3; background:#F4F6FA; }' +
       'th.r { text-align:right; }' +
-      'td { padding:6px 5px; border-bottom:1px solid #E8ECF3; font-size:12px; vertical-align:middle; }' +
+      'td { padding:8px 8px; border-bottom:1px solid #E8ECF3; font-size:12px; vertical-align:middle; }' +
       'td.r { text-align:right; font-family:"DM Sans"; }' +
-      'td.total-cell { font-weight:600; }' +
+      'td.total-cell { font-weight:600; padding-right:18px; }' +
       'td.ship { color:#5C6B80; }' +
       'td.vendor-cell { color:#5C6B80; font-size:12px; }' +
       'td.sidemark-cell { color:#1B3352; font-size:11px; font-weight:600; line-height:1.4; vertical-align:top; word-wrap:break-word; overflow-wrap:break-word; }' +
+      'td.cch-prem-room-cell, td.cch-prem-tag-cell { color:#1B3352; font-size:11px; font-weight:700; text-align:center; vertical-align:middle; letter-spacing:0.03em; padding-left:4px; padding-right:4px; }' +
+      'td.cch-prem-tag-cell { font-size:11px; white-space:nowrap; }' +
+      'body.cch-prem-hide-room .cch-prem-room-cell, body.cch-prem-hide-room .cch-prem-room-th, body.cch-prem-hide-room col.pc-room { display:none !important; }' +
+      'body.cch-prem-hide-tag .cch-prem-tag-cell, body.cch-prem-hide-tag .cch-prem-tag-th, body.cch-prem-hide-tag col.pc-tag { display:none !important; }' +
+      'body.cch-prem-hide-room.cch-prem-hide-tag col.pc-item { width:55%; }' +
+      'body.cch-prem-hide-room:not(.cch-prem-hide-tag) col.pc-item { width:50%; }' +
+      'body.cch-prem-hide-tag:not(.cch-prem-hide-room) col.pc-item { width:47%; }' +
       'td.img-cell img { width:64px; height:64px; object-fit:contain; border-radius:0; background:#fff; }' +
       'td strong { font-size:13px; display:block; }' +
       '.item-desc { font-size:11px; color:#5C6B80; margin-top:2px; }' +
@@ -5590,8 +5667,8 @@
 
       /* Print — hide screen toolbar AND its spacer (was leaving ~44px blank at top of every PDF) */
       /* no-thumb: print must NOT force 56px|1fr — sole child would land in 56px track and shred titles. */
-      '@media print { .toolbar{display:none!important;} .cch-inv-pay-bar{display:none!important;} .toolbar-spacer{display:none!important;height:0!important;} .print-hint-screen{display:none!important;} body{background:white;display:block;min-height:auto;} .page{min-height:auto;box-shadow:none;flex:none;} .page-body{flex:none;} .doc-footer{position:relative;margin-top:8px;} .cch-po-vendor-pdf tr{page-break-inside:avoid;} .room-section{page-break-inside:auto;} .room-header{page-break-after:avoid;} table.cch-premium-items-table tr{page-break-inside:avoid;} .info-section{padding:8px 20px 20px!important;gap:10px 20px!important;} .items-section{padding:18px 20px 6px!important;} .totals-section{padding:0 20px 10px!important;} .doc-header{padding:8px 20px 6px!important;} .cch-premium-item-grid{grid-template-columns:56px minmax(0,1fr)!important;gap:8px!important;} .cch-premium-item-grid--no-thumb,.cch-premium-item-grid--no-thumb.cch-premium-item-grid{grid-template-columns:minmax(0,1fr)!important;} .cch-premium-item-thumb{width:56px!important;padding:2px!important;} .cch-premium-item-thumb img,.img-cell img{width:48px!important;height:48px!important;} td{padding:4px 4px!important;} th{padding:4px!important;} .room-header{padding:4px 0 2px!important;margin-bottom:2px!important;} .room-section{margin-bottom:10px!important;} td.line-item-main,td.line-item-main strong,.cch-premium-item-text{word-break:normal;overflow-wrap:break-word;} }' +
-      '@page { margin:0.3in; }' +
+      '@media print { .toolbar{display:none!important;} .cch-inv-pay-bar{display:none!important;} .toolbar-spacer{display:none!important;height:0!important;} .print-hint-screen{display:none!important;} html,body{height:auto!important;overflow:visible!important;background:white;display:block;min-height:auto;} .page{max-width:none!important;width:100%!important;margin:0!important;min-height:auto;box-shadow:none;flex:none;} .page-body{flex:none;} .doc-footer{position:relative;margin-top:8px;} .cch-po-vendor-pdf tr{page-break-inside:avoid;} .room-section{page-break-inside:auto;margin-bottom:32px!important;} .room-header{page-break-after:avoid;} table.cch-premium-items-table{page-break-inside:auto;} table.cch-premium-items-table thead{display:table-header-group;} table.cch-premium-items-table tr{page-break-inside:avoid;} .info-section{padding:12px 40px 20px 48px!important;gap:10px 20px!important;} .items-section{padding:20px 40px 12px 48px!important;} .totals-section{padding:0 40px 12px 48px!important;} .memo-block{margin:0 40px 16px 48px!important;} .doc-header{padding:12px 40px 10px 48px!important;} .doc-footer{padding:10px 40px 12px 48px!important;} .cch-premium-item-grid{grid-template-columns:56px minmax(0,1fr)!important;gap:8px!important;} .cch-premium-item-grid--no-thumb,.cch-premium-item-grid--no-thumb.cch-premium-item-grid{grid-template-columns:minmax(0,1fr)!important;} .cch-premium-item-thumb{width:56px!important;padding:2px!important;} .cch-premium-item-thumb img,.img-cell img{width:48px!important;height:48px!important;} td{padding:4px 4px!important;} th{padding:6px 4px!important;} .room-header{padding:4px 0 2px!important;margin-bottom:2px!important;} td.line-item-main,td.line-item-main strong,.cch-premium-item-text{word-break:normal;overflow-wrap:break-word;} }' +
+      '@page { size:letter; margin:0.7in 0.55in 0.6in 0.8in; }' +
 
       /* Tear sheet pages (preview only — scoped; do not inject _getTearSheetCSSRedesign; it overrides body/toolbar) */
       '.ts-page { page-break-before:always; padding:48px; }' +
@@ -5710,6 +5787,7 @@
     });
     win.document.write('</div>');
     win.document.write('<script>var _tsVisible=false; function toggleTearSheets(){ _tsVisible=!_tsVisible; document.getElementById("tearSheetPages").style.display=_tsVisible?"block":"none"; document.getElementById("tsToggle").style.background=_tsVisible?"#C8B99A":"transparent"; document.getElementById("tsToggle").style.color=_tsVisible?"#1B3352":"#C8B99A"; document.getElementById("tsToggle").textContent=_tsVisible?"📑 Tear Sheets Included":"📑 Include Tear Sheets"; }' +
+      ' function cchPremColToggle(k,on){document.body.classList.toggle("cch-prem-hide-"+k,!on);try{var o=JSON.parse(localStorage.getItem("cchPremPropCols")||"{}");o[k]=!!on;localStorage.setItem("cchPremPropCols",JSON.stringify(o));}catch(e){}} (function(){try{var o=JSON.parse(localStorage.getItem("cchPremPropCols")||"{}");["room","tag"].forEach(function(k){if(o[k]===false){cchPremColToggle(k,false);var el=document.getElementById("cchPremDisp"+k.charAt(0).toUpperCase()+k.slice(1));if(el)el.checked=false;}});}catch(e2){}})();' +
       (premiumIsTimeInv ? ' var _cchPremDisp={dates:true,hours:false,rate:false,notes:true}; function cchPremInvDispToggle(k,on){_cchPremDisp[k]=!!on;var sel={dates:".cch-inv-disp-dates",hours:".cch-inv-disp-hours",rate:".cch-inv-disp-rate",notes:".cch-inv-disp-notes"}[k];if(sel)document.querySelectorAll(sel).forEach(function(el){el.style.display=on?"":"none";});try{localStorage.setItem("cchPremInvDisplay",JSON.stringify(_cchPremDisp));}catch(_e){}} (function(){try{var s=localStorage.getItem("cchPremInvDisplay");if(s)_cchPremDisp=JSON.parse(s);}catch(_e2){} ["dates","hours","rate","notes"].forEach(function(k){cchPremInvDispToggle(k,!!_cchPremDisp[k]);var el=document.getElementById("cchPremDisp"+k.charAt(0).toUpperCase()+k.slice(1));if(el)el.checked=!!_cchPremDisp[k];});})();' : '') +
       '<\/script>');
     }

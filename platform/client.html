@@ -3629,6 +3629,59 @@ function getProposalLineApprovalStatus(item) {
       if (item && item.approved) return 'approved';
       return 'pending';
     }
+    window._proposalLineShowFilter = window._proposalLineShowFilter || {};
+    function proposalLandingModeKey(projectId, proposalId) {
+      return String(projectId || '') + '|' + String(proposalId || '');
+    }
+    function getProposalLineShowFilter(projectId, proposalId) {
+      var k = proposalLandingModeKey(projectId, proposalId);
+      var v = window._proposalLineShowFilter[k];
+      if (!v || typeof v !== 'object') return { approved: true, pending: true, all: false };
+      return {
+        approved: v.all ? true : v.approved !== false,
+        pending: v.all ? true : v.pending !== false,
+        all: !!v.all
+      };
+    }
+    function proposalLinePassesShowFilter(item, filter) {
+      if (!item) return false;
+      if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(item)) return true;
+      var st = (typeof getProposalLineApprovalStatus === 'function') ? getProposalLineApprovalStatus(item) : 'pending';
+      if (filter && filter.all) return true;
+      if (st === 'declined') return false;
+      if (st === 'approved') return !!(filter && filter.approved);
+      return !!(filter && filter.pending);
+    }
+    function setProposalLineShowFilterUI(projectId, proposalId, which, checked) {
+      var k = proposalLandingModeKey(projectId, proposalId);
+      var v = getProposalLineShowFilter(projectId, proposalId);
+      if (which === 'all') {
+        v.all = !!checked;
+        if (v.all) { v.approved = true; v.pending = true; }
+      } else if (which === 'approved' || which === 'pending') {
+        v[which] = !!checked;
+        v.all = false;
+      }
+      window._proposalLineShowFilter[k] = v;
+      if (typeof renderClientPortal === 'function') void renderClientPortal(projectId, proposalId);
+    }
+    window.setProposalLineShowFilterUI = setProposalLineShowFilterUI;
+    function buildProposalLineShowFilterHtml(projectId, proposalId) {
+      var f = getProposalLineShowFilter(projectId, proposalId);
+      var pid = escAttr(projectId);
+      var prid = escAttr(proposalId);
+      function box(key, lab, on) {
+        return '<label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#0A1F3D;cursor:pointer;user-select:none;font-weight:600;">' +
+          '<input type="checkbox"' + (on ? ' checked' : '') + ' onclick="event.stopPropagation()" onchange="setProposalLineShowFilterUI(\'' + pid + '\',\'' + prid + '\',\'' + key + '\',this.checked)">' +
+          lab + '</label>';
+      }
+      return '<span class="cp-prop-line-show" style="display:inline-flex;align-items:center;gap:12px;flex-wrap:wrap;padding:4px 10px;border:1px solid #E2E2E2;background:#fff;">' +
+        '<span style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#5C6B80;">Show</span>' +
+        box('approved', 'Approved', !!f.approved) +
+        box('pending', 'Pending', !!f.pending) +
+        box('all', 'All', !!f.all) +
+        '</span>';
+    }
 
 function cpProposalLineApprovalToggleHtml(projectId, proposalId, lineIdx, la) {
       la = (la === 'approved' || la === 'declined') ? la : 'pending';
@@ -8058,7 +8111,10 @@ function cpBuildSingleProposalReviewHtml(projectId, p, opts) {
         (_propDocTag ? '<div style="font-size:12px;color:#6B7280;margin-top:4px;line-height:1.4;">' + esc(_propDocTag) + '</div>' : '') +
         '</div><div class="cp-prop-total cp-price" style="font-size:14px;flex-shrink:0;margin-left:12px;">' + formatMoney(grand) + '</div></div>' +
         '<div class="cp-prop-progress" style="margin:0 14px;"><div class="cp-prop-progress-fill" style="width:' + pct + '%;"></div></div>' +
-        '<div style="padding:6px 14px 8px;font-size:10px;color:#5C6B80;">' + appr + ' approved · ' + dec + ' declined · ' + pend + ' pending</div>';
+        '<div style="padding:6px 14px 8px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:10px;color:#5C6B80;">' +
+        '<span>' + appr + ' approved · ' + dec + ' declined · ' + pend + ' pending</span>' +
+        (typeof buildProposalLineShowFilterHtml === 'function' ? buildProposalLineShowFilterHtml(projectId, p.id) : '') +
+        '</div>';
 
       if (visibleProducts.length > 0) {
         var proj = opts.proj || {};
@@ -8101,6 +8157,11 @@ function cpBuildSingleProposalReviewHtml(projectId, p, opts) {
           _rowCopy._idx = idx;
           _portalItems.push(_rowCopy);
         });
+        var _showF = (typeof getProposalLineShowFilter === 'function')
+          ? getProposalLineShowFilter(projectId, p.id) : { approved: true, pending: true, all: false };
+        if (typeof proposalLinePassesShowFilter === 'function') {
+          _portalItems = _portalItems.filter(function(it) { return proposalLinePassesShowFilter(it, _showF); });
+        }
         var _docGroupMode = (typeof window.cchDocGroupModeForData === 'function') ? window.cchDocGroupModeForData(p, 'proposal') : 'room';
         var _grouped = (typeof window.cchGroupDocumentItems === 'function') ? window.cchGroupDocumentItems(_portalItems, 'proposal', _docGroupMode) : null;
         var _groupKeys = (_grouped && typeof window.cchOrderedDocumentGroupKeys === 'function')
@@ -8169,7 +8230,9 @@ function cpBuildSingleProposalReviewHtml(projectId, p, opts) {
           '</div>' +
           '<div class="cp-prem-items-section">';
 
-        if (_grouped && _groupKeys.length) {
+        if (!_portalItems.length) {
+          html += '<div style="padding:8px 14px 16px;font-size:12px;color:#5C6B80;">Declined items are hidden. Check All to review them.</div>';
+        } else if (_grouped && _groupKeys.length) {
           _groupKeys.forEach(function(roomKey) {
             var catItems = _grouped[roomKey] || [];
             if (!catItems.length) return;
@@ -12016,6 +12079,19 @@ function _cchPaintClientLineApprovalToggle(projectId, propId, lineIdx, status, i
       if (tr) {
         if (status === 'declined') tr.classList.add('cp-prop-line-declined');
         else tr.classList.remove('cp-prop-line-declined');
+        var _sf = (typeof getProposalLineShowFilter === 'function') ? getProposalLineShowFilter(projectId, propId) : { approved: true, pending: true, all: false };
+        var _fake = { lineApprovalStatus: status };
+        var _pass = (typeof proposalLinePassesShowFilter !== 'function') || proposalLinePassesShowFilter(_fake, _sf);
+        tr.style.display = _pass ? '' : 'none';
+        var _sec = tr.closest ? tr.closest('.cp-prem-room-section') : null;
+        if (_sec) {
+          var _rows = _sec.querySelectorAll('tbody tr');
+          var _any = false;
+          for (var _ri = 0; _ri < _rows.length; _ri++) {
+            if (_rows[_ri].style.display !== 'none') { _any = true; break; }
+          }
+          _sec.style.display = _any ? '' : 'none';
+        }
       }
       var pending = 0, approved = 0;
       (items || []).forEach(function(it) {
@@ -12215,6 +12291,6 @@ async function logActivity(type, action, description, projectId, projectName, me
   <script src="cch-client-ideas.js?v=20260807ci091b"></script>
   <script src="cch-square-pay.js?v=20260818mail3"></script>
   <script src="cch-invoice-redesign.js?v=20260817size1"></script>
-  <script src="cch-proposals-invoices-fix.js?v=20260818additem1"></script>
+  <script src="cch-proposals-invoices-fix.js?v=20260827pdfcols4"></script>
 </body>
 </html>

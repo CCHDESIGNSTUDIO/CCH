@@ -1319,13 +1319,13 @@ function assertQbPushAllowed(request) {
   }
 }
 
-/** Vendor bill push targets live QuickBooks — never staging Firebase project. */
+/** Live QuickBooks PO/bill push — never from the staging Firebase project. */
 function assertQbBillPushEnvironment() {
   const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || "";
   if (projectId === "cch-studio-staging") {
     throw new HttpsError(
       "failed-precondition",
-      "QuickBooks bill push is disabled on staging. Receive and edit bills in Studio here; push from production only."
+      "QuickBooks PO/bill push is disabled on staging. Receive and edit in Studio here; push from production only."
     );
   }
 }
@@ -2562,9 +2562,213 @@ exports.processInvoiceQBPushPending = onDocumentWritten(
     }
   });
 
+function normalizeQbTxnId(raw) {
+  const s = String(raw == null ? "" : raw).trim();
+  if (!s || !/^\d+$/.test(s)) return "";
+  return s;
+}
+
+/** QBO Bill→PO link: Line.LinkedTxn.TxnLineId is required. Item-based bill lines cannot carry that link. */
+async function fetchQbPurchaseOrderLineIds(accessToken, realmId, poQbId) {
+  const id = normalizeQbTxnId(poQbId);
+  if (!id) return [];
+  const fetched = await qbApiCall("GET", "purchaseorder/" + id, accessToken, realmId);
+  const poEnt = fetched && fetched.PurchaseOrder;
+  const lines = poEnt && poEnt.Line ? (Array.isArray(poEnt.Line) ? poEnt.Line : [poEnt.Line]) : [];
+  return lines
+    .filter((ln) => ln && ln.Id && ln.DetailType && ln.DetailType !== "SubTotalLineDetail")
+    .map((ln) => String(ln.Id));
+}
+
+function linkQbBillLinesToPurchaseOrder(lineItems, poQbId, poLineIds) {
+  const id = normalizeQbTxnId(poQbId);
+  const ids = Array.isArray(poLineIds) ? poLineIds.filter(Boolean) : [];
+  const canLink = !!(id && ids.length);
+  let poLineIdx = 0;
+  return (lineItems || []).map((ln) => {
+    const next = Object.assign({}, ln);
+    const skip = !!next._noPoLink;
+    delete next._noPoLink;
+    delete next.LinkedTxn;
+    if (skip || !canLink) return next;
+    const txnLineId = String(ids[Math.min(poLineIdx, ids.length - 1)]);
+    poLineIdx++;
+    return {
+      Amount: next.Amount,
+      Description: next.Description,
+      DetailType: "AccountBasedExpenseLineDetail",
+      AccountBasedExpenseLineDetail: {
+        AccountRef: { value: QB_ACCOUNTS.C1, name: "C1 - Studio Product Cost" }
+      },
+      LinkedTxn: [{ TxnId: id, TxnType: "PurchaseOrder", TxnLineId: txnLineId }]
+    };
+  });
+}
+
+function qbBillLinkedTxnForPo(poQbId, hasPoLines) {
+  const id = normalizeQbTxnId(poQbId);
+  if (!id || !hasPoLines) return null;
+  return [{ TxnId: id, TxnType: "PurchaseOrder" }];
+}
+
+/**
+ * Studio PO `cost` is unit trade (same as cchDocLineUnitCost). Never treat cost as a
+ * line total and never divide it by qty (PO-9019: $15 unit × 4 became Rate 3.75).
+ */
+function qbStudioPoLineMoney(item) {
+  item = item || {};
+  const qty = Math.max(parseFloat(item.qty || item.quantity || 1) || 1, 0.0001);
+  const unit = parseFloat(item.cost || item.unitCost || item.costPrice || item.tradeCost) || 0;
+  const lineAmt = parseFloat(item.amount || item.total || item.lineTotal) || 0;
+  const ship = parseFloat(item.shipping) || 0;
+  if (unit > 0) {
+    const merch = Math.round(unit * qty * 100) / 100;
+    const amount = Math.round((merch + ship) * 100) / 100;
+    return { qty, unitPrice: Math.round(unit * 100) / 100, amount };
+  }
+  if (lineAmt > 0.005) {
+    const amount = Math.round((lineAmt + ship) * 100) / 100;
+    return { qty, unitPrice: Math.round((lineAmt / qty) * 10000) / 10000, amount };
+  }
+  const amount = Math.round(ship * 100) / 100;
+  return { qty: amount > 0 ? 1 : qty, unitPrice: amount, amount };
+}
+
+/** Copy QBO PhysicalAddress without Id/SyncToken (create payloads reject those). */
+function qbPhysicalAddressForPush(addr) {
+  if (!addr || typeof addr !== "object") return null;
+  const out = {};
+  ["Line1", "Line2", "Line3", "City", "CountrySubDivisionCode", "PostalCode", "Country"].forEach((k) => {
+    const v = addr[k];
+    if (v != null && String(v).trim()) out[k] = String(v).trim();
+  });
+  return Object.keys(out).length ? out : null;
+}
+
+/** Create QBO PurchaseOrder from a Studio PO if qbDocId is missing. Used by pushPOToQB and pushBillToQB. */
+async function ensureQbPurchaseOrderForStudioPo(docRef, po, projectId, docId) {
+  if (po.qbDocId) {
+    return { success: true, message: "Already synced", qbDocId: String(po.qbDocId), alreadySynced: true };
+  }
+
+  const vendorName = po.vendor || po.vendorName || "";
+  if (!vendorName) {
+    throw new HttpsError("failed-precondition",
+      "Vendor name is required. Set the vendor on this PO before pushing to QB.");
+  }
+
+  if (!po.items || po.items.length === 0) {
+    throw new HttpsError("failed-precondition",
+      "PO has no line items. Add items before pushing to QB.");
+  }
+
+  const pushState = await beginQbDocumentPush(docRef);
+  if (pushState.alreadySynced) {
+    return { success: true, message: "Already synced", qbDocId: String(pushState.qbDocId), alreadySynced: true };
+  }
+
+  try {
+    const { accessToken, realmId } = await getQBAccessToken();
+    const vendorId = await resolveQbVendorIdForPush(accessToken, realmId, vendorName);
+
+    let customerId = null;
+    try {
+      const projRef = db.collection("boards").doc(projectId);
+      const projSnap = await projRef.get();
+      const proj = projSnap.exists ? projSnap.data() : {};
+      customerId = await resolveQbCustomerIdForPush(
+        accessToken,
+        realmId,
+        qbCustomerDisplayNameCandidates(proj, po, projectId),
+        proj.clientEmail || po.clientEmail || "",
+        projRef,
+        proj
+      );
+    } catch (custErr) {
+      console.warn("[ensureQbPurchaseOrderForStudioPo] customer match skipped:", custErr && custErr.message ? custErr.message : custErr);
+    }
+
+    let shipAddr = null;
+    if (customerId && /^\d+$/.test(String(customerId))) {
+      try {
+        const custFetched = await qbApiCall("GET", "customer/" + customerId, accessToken, realmId);
+        const cust = custFetched && custFetched.Customer;
+        shipAddr = qbPhysicalAddressForPush(cust && (cust.ShipAddr || cust.BillAddr));
+      } catch (addrErr) {
+        console.warn("[ensureQbPurchaseOrderForStudioPo] customer address skipped:", addrErr && addrErr.message ? addrErr.message : addrErr);
+      }
+    }
+
+    function pickPOItemRef(item) {
+      return qbItemRefForStudioExpenseLine(item);
+    }
+
+    function poLineDetail(base) {
+      if (customerId && /^\d+$/.test(String(customerId))) {
+        base.CustomerRef = { value: String(customerId) };
+      }
+      return base;
+    }
+
+    const lineItems = (po.items || []).map((item, idx) => {
+      const money = qbStudioPoLineMoney(item);
+      return {
+        LineNum: idx + 1,
+        Amount: money.amount,
+        Description: [item.title || item.name || "Item", item.sku || ""].filter(Boolean).join(" — "),
+        DetailType: "ItemBasedExpenseLineDetail",
+        ItemBasedExpenseLineDetail: poLineDetail({
+          ItemRef: pickPOItemRef(item),
+          Qty: money.qty,
+          UnitPrice: money.unitPrice
+        })
+      };
+    });
+
+    if (po.shipping && parseFloat(po.shipping) > 0) {
+      lineItems.push({
+        Amount: parseFloat(po.shipping),
+        Description: "Shipping & Freight",
+        DetailType: "ItemBasedExpenseLineDetail",
+        ItemBasedExpenseLineDetail: poLineDetail({
+          ItemRef: { value: QB_ITEMS_PO.shipping, name: "Studio Shipping" },
+          Qty: 1,
+          UnitPrice: parseFloat(po.shipping)
+        })
+      });
+    }
+
+    const qbPO = {
+      Line: lineItems,
+      VendorRef: { value: vendorId },
+      DocNumber: po.number || po.num || String(docId || "").slice(0, 10),
+      TxnDate: po.date || new Date().toISOString().split("T")[0],
+      PrivateNote: "CCH Studio. Project: " + projectId
+    };
+    if (shipAddr) qbPO.ShipAddr = shipAddr;
+
+    const result = await qbApiCall("POST", "purchaseorder", accessToken, realmId, qbPO);
+    const qbId = result.PurchaseOrder.Id;
+
+    await docRef.update({
+      qbDocId: qbId,
+      qbSyncDate: admin.firestore.FieldValue.serverTimestamp(),
+      qbSynced: true,
+      qbStatus: "sent",
+      [QB_PUSH_LOCK_FIELD]: admin.firestore.FieldValue.delete()
+    });
+
+    return { success: true, qbDocId: String(qbId), alreadySynced: false };
+  } catch (err) {
+    await clearQbPushLock(docRef);
+    throw err;
+  }
+}
+
 // ─── PUSH PO → QB (as Purchase Order) ───────────────────────────
 exports.pushPOToQB = onCall(QB_CALLABLE, async (request) => {
   assertQbPushAllowed(request);
+  assertQbBillPushEnvironment();
 
   const { projectId, docId } = request.data || {};
   const docRef = db.collection("boards").doc(projectId).collection("purchaseOrders").doc(docId);
@@ -2576,91 +2780,8 @@ exports.pushPOToQB = onCall(QB_CALLABLE, async (request) => {
     return { success: true, message: "Already synced", qbDocId: po.qbDocId };
   }
 
-  // Validation: require vendor
-  const vendorName = po.vendor || po.vendorName || "";
-  if (!vendorName) {
-    throw new HttpsError("failed-precondition",
-      "Vendor name is required. Set the vendor on this PO before pushing to QB.");
-  }
-
-  // Validation: require at least one line item
-  if (!po.items || po.items.length === 0) {
-    throw new HttpsError("failed-precondition",
-      "PO has no line items. Add items before pushing to QB.");
-  }
-
-  const pushState = await beginQbDocumentPush(docRef);
-  if (pushState.alreadySynced) {
-    return { success: true, message: "Already synced", qbDocId: pushState.qbDocId };
-  }
-
-  try {
-  const { accessToken, realmId } = await getQBAccessToken();
-  const vendorId = await resolveQbVendorIdForPush(accessToken, realmId, vendorName);
-
-  // Studio QB Item IDs for PO expense mapping
-  function pickPOItemRef(item) {
-    return qbItemRefForStudioExpenseLine(item);
-  }
-
-  const lineItems = (po.items || []).map((item, idx) => {
-    const qty = Math.max(parseFloat(item.qty || 1) || 1, 0.0001);
-    const lineTotal = parseFloat(item.cost || item.amount || item.total || item.lineTotal || 0) || 0;
-    return {
-      LineNum: idx + 1,
-      Amount: lineTotal,
-      Description: [item.title || item.name || "Item", item.sku || ""].filter(Boolean).join(" — "),
-      DetailType: "ItemBasedExpenseLineDetail",
-      ItemBasedExpenseLineDetail: {
-        ItemRef: pickPOItemRef(item),
-        Qty: qty,
-        UnitPrice: lineTotal / qty
-      }
-    };
-  });
-
-  // PO documents do not carry tax — vendor tax belongs on the vendor bill (bill.tax / pre-paid tax).
-
-  // Add shipping line if present
-  if (po.shipping && parseFloat(po.shipping) > 0) {
-    lineItems.push({
-      Amount: parseFloat(po.shipping),
-      Description: "Shipping & Freight",
-      DetailType: "ItemBasedExpenseLineDetail",
-      ItemBasedExpenseLineDetail: {
-        ItemRef: { value: QB_ITEMS_PO.shipping, name: "Studio Shipping" },
-        Qty: 1,
-        UnitPrice: parseFloat(po.shipping)
-      }
-    });
-  }
-
-  const qbPO = {
-    Line: lineItems,
-    VendorRef: { value: vendorId },
-    DocNumber: po.number || po.num || docId.slice(0, 10),
-    TxnDate: po.date || new Date().toISOString().split("T")[0],
-    PrivateNote: "CCH Studio. Project: " + projectId
-  };
-
-  const result = await qbApiCall("POST", "purchaseorder", accessToken, realmId, qbPO);
-  const qbId = result.PurchaseOrder.Id;
-
-  await docRef.update({
-    qbDocId: qbId,
-    qbSyncDate: admin.firestore.FieldValue.serverTimestamp(),
-    qbSynced: true,
-    qbStatus: "sent",
-    [QB_PUSH_LOCK_FIELD]: admin.firestore.FieldValue.delete()
-  });
-
-  return { success: true, qbDocId: qbId };
-  } catch (err) {
-    await clearQbPushLock(docRef);
-    throw err;
-  }
-  }
-);
+  return ensureQbPurchaseOrderForStudioPo(docRef, po, projectId, docId);
+});
 
 /** Vendor bill on PO doc — lock; create or update same qbBillId. */
 async function beginQbBillPush(docRef) {
@@ -2696,13 +2817,57 @@ async function beginQbBillPush(docRef) {
 }
 
 function vendorInvoiceSourceToQb(source) {
-  const s = String(source || "").toLowerCase();
+  const s = String(source || "").toLowerCase().replace(/\s+/g, "_");
+  if (s === "po") return "po";
   if (s === "freight" || s === "shipping") return "freight";
-  if (s === "tax") return "tax";
+  if (s === "tax" || s === "prepaid_tax" || s === "pre_paid_tax" || s === "vendor_tax") return "tax";
   if (s === "labor" || s === "installation" || s === "install") return "labor";
   if (s === "price_change" || s === "price") return "price_change";
   if (s === "merchandise" || s === "product") return "merchandise";
   return "extra";
+}
+
+/**
+ * Positive extras already recorded on the Studio bill (freight / tax / labor / price change / other).
+ * Merchandise and PO snapshots stay on the linked merch line. Negative credits stay in merch (QB Bill lines are unsigned).
+ */
+function studioBillPositiveVarianceCharges(bill) {
+  bill = bill || {};
+  const rows = [];
+  const seen = {};
+  function pushRow(source, amount, description) {
+    const src = vendorInvoiceSourceToQb(source);
+    if (src === "merchandise" || src === "po") return;
+    const amt = Math.round((parseFloat(amount) || 0) * 100) / 100;
+    if (amt < 0.01) return;
+    const desc = String(description || "").trim() || src;
+    const key = src + "|" + amt.toFixed(2) + "|" + desc.toLowerCase();
+    if (seen[key]) return;
+    seen[key] = true;
+    rows.push({ source: src, amount: amt, description: desc.slice(0, 100) });
+  }
+  if (Array.isArray(bill.vendorInvoices) && bill.vendorInvoices.length) {
+    bill.vendorInvoices.forEach((r) => {
+      if (!r) return;
+      const t = r.type || r.source;
+      const desc = [r.description || r.label || r.title, r.vendorInvoiceNumber ? "#" + r.vendorInvoiceNumber : ""]
+        .filter(Boolean)
+        .join(" · ");
+      pushRow(t, r.amount, desc);
+    });
+    return rows;
+  }
+  pushRow("freight", bill.freight, "Freight");
+  pushRow("tax", bill.tax, "Pre-paid tax");
+  pushRow("price_change", bill.priceChange, "Price change");
+  pushRow("extra", bill.extras, "Other / extra");
+  (bill.items || []).forEach((it) => {
+    if (!it) return;
+    const src = it.source || it.type;
+    if (!src || src === "po" || src === "merchandise") return;
+    pushRow(src, it.amount, it.title || it.label || it.note || src);
+  });
+  return rows;
 }
 
 /** Build QB Bill line items from Studio po.bill (PO lines + vendorInvoices / charge items). */
@@ -2808,6 +2973,8 @@ function buildVendorBillQbLineItems(po, bill, opts) {
     if (s === "labor") return qbLaborItemRef();
     if (s === "freight") return { value: QB_ITEM_IDS.shipping, name: "Studio Shipping" };
     if (s === "tax") return { value: QB_ITEM_IDS.tax, name: "Studio Prepaid Tax" };
+    if (s === "price_change") return qbProductItemRef();
+    if (s === "extra") return { value: QB_ITEM_IDS.reimbursable, name: "Studio Reimbursable" };
     if (s === "merchandise") return qbProductItemRef();
     return qbProductItemRef();
   }
@@ -2843,16 +3010,37 @@ function buildVendorBillQbLineItems(po, bill, opts) {
     (invRef ? " · Vendor inv " + invRef : "") +
     (billTotal > 0.01 ? " · Total $" + billTotal.toFixed(2) : "");
 
-  /** QB gets one line — the vendor bill total Studio recorded (detail stays in Studio only). */
-  if (billTotal > 0.01) {
+  /**
+   * Houzz: PO stays as ordered. Bill = merchandise (LinkedTxn to PO) + variance extras as extra Bill lines.
+   * Bank Match still uses the Bill total (same as one-line). Extra lines are not linked to the PO.
+   */
+  const extras = studioBillPositiveVarianceCharges(bill);
+  const extraSum = extras.reduce((s, r) => s + r.amount, 0);
+  const merchAmt = Math.round((billTotal - extraSum) * 100) / 100;
+  const lineItems = [];
+  let lineNum = 1;
+  if (merchAmt > 0.01) {
+    const desc = ["Vendor bill", poNum ? "PO " + poNum : "", invRef ? "Inv " + invRef : ""]
+      .filter(Boolean)
+      .join(" · ");
+    const ln = expenseLine(merchAmt, desc, "merchandise", lineNum++);
+    if (ln) lineItems.push(ln);
+  }
+  extras.forEach((ex) => {
+    const ln = expenseLine(ex.amount, ex.description, ex.source, lineNum++);
+    if (ln) {
+      ln._noPoLink = true;
+      lineItems.push(ln);
+    }
+  });
+  if (!lineItems.length && billTotal > 0.01) {
     const desc = ["Vendor bill", poNum ? "PO " + poNum : "", invRef ? "Inv " + invRef : ""]
       .filter(Boolean)
       .join(" · ");
     const ln = expenseLine(billTotal, desc, "merchandise", 1);
-    return { lineItems: ln ? [ln] : [], txnDate, docNumber, privateNote };
+    if (ln) lineItems.push(ln);
   }
-
-  return { lineItems: [], txnDate, docNumber, privateNote };
+  return { lineItems, txnDate, docNumber, privateNote };
 }
 
 async function clearQbBillPushLock(docRef) {
@@ -2880,7 +3068,7 @@ exports.pushBillToQB = onCall(QB_CALLABLE, async (request) => {
   const docRef = db.collection("boards").doc(projectId).collection("purchaseOrders").doc(docId);
   const snap = await docRef.get();
   if (!snap.exists) throw new HttpsError("not-found", "PO not found");
-  const po = snap.data();
+  let po = snap.data();
   const bill = po.bill || {};
 
   const vendorName = String(bill.billFromVendor || po.vendor || po.vendorName || "").trim();
@@ -2893,6 +3081,18 @@ exports.pushBillToQB = onCall(QB_CALLABLE, async (request) => {
       "failed-precondition",
       "Vendor bill total is required before pushing to QuickBooks. Receive the vendor bill in Studio and enter the total first."
     );
+  }
+
+  // Houzz matching: Purchase Order first, then Bill LinkedTxn to that PO.
+  if (!String(po.qbDocId || "").trim()) {
+    await ensureQbPurchaseOrderForStudioPo(docRef, po, projectId, docId);
+    const snapAfterPo = await docRef.get();
+    if (!snapAfterPo.exists) throw new HttpsError("not-found", "PO not found after QuickBooks PO push");
+    po = snapAfterPo.data();
+  }
+  const poQbId = String(po.qbDocId || "").trim();
+  if (!poQbId) {
+    throw new HttpsError("failed-precondition", "QuickBooks Purchase Order Id missing after PO push. Try Push PO to QuickBooks, then Sync bill.");
   }
 
   const pushState = await beginQbBillPush(docRef);
@@ -2919,7 +3119,18 @@ exports.pushBillToQB = onCall(QB_CALLABLE, async (request) => {
       console.warn("[pushBillToQB] customer match skipped:", custErr && custErr.message ? custErr.message : custErr);
     }
 
-    const { lineItems, txnDate, docNumber, privateNote } = buildVendorBillQbLineItems(po, bill, { customerId });
+    const built = buildVendorBillQbLineItems(po, bill, { customerId });
+    const txnDate = built.txnDate;
+    const docNumber = built.docNumber;
+    const privateNote = built.privateNote;
+    let poLineIds = [];
+    try {
+      poLineIds = await fetchQbPurchaseOrderLineIds(accessToken, realmId, poQbId);
+    } catch (poReadErr) {
+      console.warn("[pushBillToQB] QB Purchase Order lines for LinkedTxn:", poReadErr && poReadErr.message ? poReadErr.message : poReadErr);
+    }
+    const lineItems = linkQbBillLinesToPurchaseOrder(built.lineItems, poQbId, poLineIds);
+    const poLinkedTxn = qbBillLinkedTxnForPo(poQbId, poLineIds.length > 0);
     const docNumberCandidates = qbBillDocNumberCandidates(poNum);
 
     if (!lineItems.length) {
@@ -2949,6 +3160,7 @@ exports.pushBillToQB = onCall(QB_CALLABLE, async (request) => {
         TxnDate: txnDate || existing.TxnDate,
         PrivateNote: privateNote + " · Project " + projectId
       };
+      if (poLinkedTxn) qbBillPayload.LinkedTxn = poLinkedTxn;
       const result = await qbApiCall("POST", "bill", accessToken, realmId, qbBillPayload);
       qbBillId = result.Bill && result.Bill.Id;
       if (!qbBillId) {
@@ -2965,12 +3177,13 @@ exports.pushBillToQB = onCall(QB_CALLABLE, async (request) => {
         TxnDate: txnDate,
         PrivateNote: privateNote + " · Project " + projectId
       };
+      if (poLinkedTxn) qbBillPayload.LinkedTxn = poLinkedTxn;
       const result = await qbApiCall("POST", "bill", accessToken, realmId, qbBillPayload);
       qbBillId = result.Bill && result.Bill.Id;
       if (!qbBillId) {
         throw new HttpsError("internal", "QuickBooks did not return a Bill Id.");
       }
-      message = "Vendor bill pushed to QuickBooks as " + docNumber;
+      message = "Vendor bill pushed to QuickBooks as " + docNumber + " (linked to PO)";
     }
 
     const ts = new Date().toISOString();
@@ -2982,6 +3195,7 @@ exports.pushBillToQB = onCall(QB_CALLABLE, async (request) => {
       "bill.qbSyncedAt": ts,
       "bill.qbSyncedTotal": billTotal,
       "bill.qbDocNumber": storedDocNumber,
+      "bill.qbLinkedPoId": poQbId,
       "bill.qbPushLockAt": admin.firestore.FieldValue.delete(),
       lastQbBillPushAt: admin.firestore.FieldValue.serverTimestamp()
     };
@@ -4022,7 +4236,7 @@ exports.rebuildFinancialSummary = onRequest(HTTP_STUDIO, async (req, res) => {
 });
 
 // ─── PUSH POs → Airtable (CCH Delivery Receiving base) ─────────
-const { pushPOsToAirtable: runAirtablePoPush } = require("./lib/airtable-po-push.js");
+const { pushPOsToAirtable: runAirtablePoPush, lookupAirtablePoReceiver: runAirtablePoReceiverLookup } = require("./lib/airtable-po-push.js");
 
 const AIRTABLE_SECRET_NAMES = ["AIRTABLE_PAT"];
 const AIRTABLE_CALLABLE = {
@@ -4095,6 +4309,40 @@ exports.pushPOsToAirtable = onCall(AIRTABLE_CALLABLE, async (request) => {
     }
     console.error("[pushPOsToAirtable]", msg);
     throw new HttpsError("internal", msg.slice(0, 500));
+  }
+});
+
+const AIRTABLE_LOOKUP_CALLABLE = {
+  region: REGION,
+  secrets: AIRTABLE_SECRET_NAMES,
+  timeoutSeconds: 60,
+  memory: "256MiB",
+  invoker: "public"
+};
+
+exports.lookupAirtablePoReceiver = onCall(AIRTABLE_LOOKUP_CALLABLE, async (request) => {
+  assertAirtablePushAllowed(request);
+
+  const pat = String(process.env.AIRTABLE_PAT || "").trim();
+  if (!pat) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Airtable is not configured. Set the AIRTABLE_PAT secret on this Firebase project."
+    );
+  }
+
+  const poNumber = String((request.data && request.data.poNumber) || "").trim();
+  if (!poNumber) {
+    throw new HttpsError("invalid-argument", "poNumber is required");
+  }
+
+  try {
+    const hit = await runAirtablePoReceiverLookup({ pat, poNumber });
+    return { success: true, receiver: hit || null };
+  } catch (err) {
+    const msg = (err && err.message) ? String(err.message) : String(err);
+    console.error("[lookupAirtablePoReceiver]", msg);
+    throw new HttpsError("internal", msg.slice(0, 400));
   }
 });
 
