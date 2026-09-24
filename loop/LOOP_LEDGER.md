@@ -5,6 +5,7 @@ Deploy handoffs still go through `_DEPLOY_QUEUE.md` (Deploy Master #1). Do not d
 
 | WO | Title | Change ID | State | Attempts | Executor | Verifier | Notes |
 |----|-------|-----------|-------|----------|----------|----------|-------|
+| 122 | Pre-save markup check (20/35); paid and locked prices unchanged | pending | DONE-UNVERIFIED | 1 | Cursor | Cindy | Going forward only. No migration. No prod. `cch-markup-check.js`. Branch cursor/markup-presave-check-dfe8 off staging-fixes-2026-07-08. DONE_CR Sep24. |
 | 121 | Client portal: ID leak, portrait table, decline latency | 9.9.251 | DONE-UNVERIFIED | 1 | Cursor | Cindy (phone) | **PROD 9.9.251** (Cindy GO 2026-08-21 ~17:12; staging ~17:10). Filed as WO-112 in handoff; **112 already used** (Smart Time). Chips stripped; table cards ≤900px; approve/decline paint-then-write. Pricing FINDING only. |
 | 120 | Pepper daily / weekly / monthly briefs (product) | pending | OPEN | 0 | Cursor | Claude | **CR_Aug21.** After 119. Person-scoped weekly+monthly Pepper briefs. Morning daily = WO-105 (already PROD). Evening timeline = WO-111, do not duplicate. Do not replace Weekly Reports page. Staging first; no AI prod deploy. Plan: `PLAN_pepper-briefs-training_CR_Aug21.md`. |
 | 119 | Pepper training: brief cadence (daily/weekly/monthly presets) | 9.9.252 | DONE-UNVERIFIED | 1 | Cursor | Claude | **CR_Aug21.** BRIEF CADENCE after facts (`cchPepper.js` 107–113). Presets `daily_brief`/`weekly_brief`/`monthly_brief`. Facts 91–105 untouched (Square/Zelle :101). Staging hosting + `functions:cchPepper` queued. No prod deploy. |

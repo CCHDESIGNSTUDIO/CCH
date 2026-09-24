@@ -71802,6 +71802,14 @@ async function renderBoardsTab(T, proj) {
         if (rateDoc.exists) savedRates = rateDoc.data();
       } catch(e) {}
 
+      var savedMarkupRates = '20, 35';
+      try {
+        var markupDoc = await db.collection('settings').doc('markupPolicy').get();
+        if (markupDoc.exists && markupDoc.data() && Array.isArray(markupDoc.data().allowedMarkupPcts) && markupDoc.data().allowedMarkupPcts.length) {
+          savedMarkupRates = markupDoc.data().allowedMarkupPcts.join(', ');
+        }
+      } catch (eMk) {}
+
       // Load integrations settings
       var savedIntegrations = {};
       try {
@@ -71897,6 +71905,22 @@ async function renderBoardsTab(T, proj) {
                 '</div>' +
               '</div>';
             }).join('')}
+          </div>
+        </div>
+
+        <!-- ALLOWED MARKUP (WO-122) -->
+        <div class="card" style="padding:24px;margin-bottom:24px;">
+          <div style="margin-bottom:12px;">
+            <div style="font-size:16px;font-weight:700;color:var(--text-primary);">Allowed product markup</div>
+            <div style="font-size:12px;color:var(--gray-400);margin-top:4px;">Used by the pre-save check. Defaults are 20 and 35. A project's own default markup is allowed too. This does not change any saved price.</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:rgba(255,255,255,0.02);border:1px solid rgba(15,26,46,0.08);">
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:600;color:#0F1A2E;">Allowed percents</div>
+              <div style="font-size:10px;color:var(--gray-400);margin-top:2px;">Comma-separated. Example: 20, 35</div>
+            </div>
+            <input type="text" id="cchAllowedMarkupRates" value="${escAttr(savedMarkupRates)}" style="width:180px;background:#0E1629;color:white;border:1px solid rgba(201,169,110,0.45);padding:8px 10px;font-size:14px;font-weight:700;font-family:var(--font-mono);text-align:right;">
+            <span style="font-size:11px;color:var(--gray-400);">%</span>
           </div>
         </div>
 
@@ -72121,6 +72145,9 @@ async function renderBoardsTab(T, proj) {
       });
 
       try {
+        if (typeof cchSaveAllowedMarkupRatesFromSettings === 'function') {
+          await cchSaveAllowedMarkupRatesFromSettings();
+        }
         await db.collection('settings').doc('serviceRates').set(data, { merge: true });
 
         // Also update TEAM_CONFIG in memory so changes take effect immediately
@@ -88978,5 +89005,6 @@ async function renderBoardsTab(T, proj) {
   <script src="cch-ffe-procurement.js?v=ffeprod2"></script>
   <script src="cch-contractor-access.js?v=20260814ca5"></script>
   <script src="cch-square-pay.js?v=20260818mail3"></script>
+  <script src="cch-markup-check.js?v=20260924wo122"></script>
 </body>
 </html>

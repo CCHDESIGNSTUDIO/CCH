@@ -4768,6 +4768,17 @@
       previewWin.document.close();
     } catch (_pwLoad) {}
 
+    // WO-122: warn before the preview is filled in. Paid/locked docs are not prompted.
+    // Go back closes this window and does not save.
+    if ((type === 'proposal' || type === 'invoice') && typeof window.cchMarkupGatePreview === 'function') {
+      var _mkOk = true;
+      try { _mkOk = await window.cchMarkupGatePreview(type, projectId, docId); } catch (_mkE) { _mkOk = true; }
+      if (!_mkOk) {
+        try { previewWin.close(); } catch (_mkClose) {}
+        return;
+      }
+    }
+
     // Save any unsaved edits first
     if (window._docEdit && window._docEdit.docId === docId && window._docEdit.projectId === projectId) {
       try {
