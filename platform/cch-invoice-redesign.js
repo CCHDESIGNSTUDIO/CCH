@@ -241,6 +241,7 @@
       title = (typeof global.invoiceLineDisplayTitle === 'function')
         ? global.invoiceLineDisplayTitle(it) : (it.title || it.name || 'Design Services');
     }
+    if (/^t\s*&\s*e\s+vh$/i.test(title)) title = 'T&E';
     // Client View: AI / saved outcome prose wins. Never dump Manage "+ Notes" time-log (WO-067).
     var aiDesc = String(o.description || o.desc || '').trim();
     var desc = aiDesc;
@@ -250,6 +251,7 @@
         desc = fallback;
       }
     }
+    if (desc && typeof global.cchStripInvoiceVendorParens === 'function') desc = global.cchStripInvoiceVendorParens(desc, it);
     if (desc && typeof global.sanitizeInvoicePreviewLineText === 'function') desc = global.sanitizeInvoicePreviewLineText(desc);
     if (desc) desc = desc.replace(/^\s*[\d.]+\s*(?:hours?|hrs?)\b\s*[\u2014\u2013\-·:]*\s*/i, '').trim();
     return {
@@ -295,6 +297,9 @@
       var desc = _lineNotesBody(it);
       if (!desc) {
         desc = String(it.description || '').trim();
+        if (desc && typeof global.cchStripInvoiceVendorParens === 'function') {
+          desc = global.cchStripInvoiceVendorParens(desc, it);
+        }
         if (desc && typeof global.sanitizeInvoicePreviewLineText === 'function') {
           desc = global.sanitizeInvoicePreviewLineText(desc);
         }
@@ -518,7 +523,7 @@
     var chunks = [];
     if (o.dateRange) chunks.push('<span class="ds-dates">' + esc(o.dateRange) + '</span>');
     if (o.hours !== '' && o.hours != null && num(o.hours) > 0) {
-      chunks.push('<span class="ds-hours"> · <b>' + (Math.round(num(o.hours) * 10) / 10) + ' hrs</b></span>');
+      chunks.push('<span class="ds-hours"> · <b>' + _fmtQty(o.hours) + ' hrs</b></span>');
     }
     if (o.rate) chunks.push('<span class="ds-rate"> · ' + money(o.rate) + '/hr</span>');
     return chunks.length ? '<div class="o-meta">' + chunks.join('') + '</div>' : '';
@@ -564,7 +569,7 @@
   }
 
   function _totalsBlock(c) {
-    var hrsTot = c.totalHours ? '<span class="ds-hours"> · ' + (Math.round(c.totalHours * 10) / 10) + ' hours</span>' : '';
+    var hrsTot = c.totalHours ? '<span class="ds-hours"> · ' + _fmtQty(c.totalHours) + ' hours</span>' : '';
     var workSub = c.workSubtotal != null ? num(c.workSubtotal) : 0;
     var html = '';
     if (workSub > 0.005 || (c.outcomes && c.outcomes.length)) {

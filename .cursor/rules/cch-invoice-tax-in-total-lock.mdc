@@ -1,0 +1,39 @@
+---
+description: LOCKED — invoice Total always includes the sales-tax line (Send must not drop to merch-only)
+globs:
+  - platform/index.html
+  - platform/cch-proposals-invoices-fix.js
+  - platform/cch-square-pay.js
+alwaysApply: true
+---
+
+# Invoice Total includes sales tax — LOCKED (Cindy Aug 29, 2026)
+
+**Do not regress.** Cloud Rolling Hills (INV-6065 / 6067 / 6068 / 6069) showed tax at 9.75% and **Total without tax** after Send. Studio **9.9.298 / 9.9.299**.
+
+## Locked product rules
+
+1. **Total = merchandise + sales tax** (plus shipping/credits). The tax line on the rail is part of Total.
+2. **Draft and Sent use the same math.** Send / publish / email must not switch Total to stored merchandise-only `total`.
+3. **On Send**, persist `taxRate`, `taxAmount`, and tax-inclusive `total` **before** Square pay link and email (`_sendDocToClient`). Email and Square use that Total.
+4. If invoice `taxRate` is 0, use the **project** rate (RH is 9.75%). Do not display tax from the project and then omit it from Total.
+5. **Paid** invoices keep the amount actually collected. Do not reopen a tax balance on Paid.
+
+## Canonical code
+
+| Surface | Where | Locked behavior |
+|---|-----|-----|
+| Rail / list Total | `invoiceTotalsBreakdown` | `grandTotal = merch + tax` unless Paid |
+| Persist helper | `cchInvoiceTaxInclusivePersistFields` | writes taxRate + taxAmount + total |
+| Send | `_sendDocToClient` | persist tax-inclusive total **before** Square + email |
+| Save | `docEditSave` | writes `total` including taxAmt |
+
+## Forbidden without Cindy typed GO
+
+- Restoring `invoiceIsClientBilled` so Sent invoices use stored merch-only `total` for the rail, list, email, or Square
+- Creating Square links from merch-only `inv.total` while tax is shown separately
+- “Don’t invent a second total” that drops the tax line out of Total
+
+## If a task seems to require violating this
+
+STOP. Ask Cindy.

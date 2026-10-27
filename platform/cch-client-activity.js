@@ -55,6 +55,10 @@
     if (!d) return false;
     if (d.meta && (d.meta.staffOnly === true || d.meta.source === 'staff_chat')) return false;
     if (String(d.type || '').toLowerCase() === 'staff_chat') return false;
+    var author = String(d.authorType || (d.meta && d.meta.authorType) || '').toLowerCase();
+    if (author === 'designer' || author === 'staff') return false;
+    var action = String(d.action || '').toLowerCase();
+    if (action === 'decision_posted' || action === 'decision_updated') return false;
     var src = d.meta && d.meta.source;
     if (src === 'client_portal') return true;
     // older client-portal writes may predate meta.source — fall back to type family

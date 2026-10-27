@@ -105,7 +105,7 @@ On "RELOOK" or "GROUNDING CHECK" from Cindy: stop generating, state the search t
 
 ## Key People
 - **Cindy Holloway** — founder, admin user. Email: cindy@cchdesign.com. Display name: "Cindy" (never "Cynthia")
-- **Vanessa Holliday** — contractor/assistant. Different last name from Cindy.
+- **Vanessa Holliday** — contractor/assistant. Different last name from Cindy. Windows login on her computer: `VanessaHolliday` (`C:\Users\VanessaHolliday\`). Time Agent: `C:\Users\VanessaHolliday\CCH-TimeAgent\CCH-TimeAgent-v4.ps1`. Clipper on that machine syncs through OneDrive `CCH Studio - Documents\Clipper`.
 - **Member doc IDs** are email-prefix based: `cindy` and `vanessa` — never change these
 
 ## How to Deploy

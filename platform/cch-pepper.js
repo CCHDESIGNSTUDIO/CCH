@@ -18,7 +18,7 @@
   var FIRM = 'CCH Design Inc.';
   var PEPPER_DECISION_ACTIONS = { line_approved: 1, line_declined: 1, proposal_total_approved: 1 };
 
-  var BUILD = '20260821wo119';
+  var BUILD = '20261005wo280';
 
   /** Cap digest size — huge firm digests can trip callable/gateway failures. */
   function pepperCapDigest(text, maxChars) {
@@ -439,6 +439,28 @@
       return lines.join('\n');
     } catch (e) {
       console.warn('[cchPepper] decisions digest', e);
+      return '';
+    }
+  }
+
+  async function buildChecklistDigest(projectId) {
+    if (!projectId) return '';
+    try {
+      var snap = await pepperDb().collection('boards').doc(projectId).collection('decisionChecklist').get();
+      var lines = ['Approved checklist:'];
+      var n = 0;
+      snap.forEach(function (doc) {
+        var d = doc.data() || {};
+        if (n >= 40) return;
+        n++;
+        lines.push('- [' + (d.decidedOn || '?') + '] ' + (d.what || '') +
+          (d.room ? ' · ' + d.room : '') +
+          (String(d.status || '') === 'replaced' ? ' · replaced' + (d.replacedNote ? ': ' + d.replacedNote : '') : ''));
+      });
+      if (n === 0) return 'Approved checklist: none.';
+      return lines.join('\n');
+    } catch (e) {
+      console.warn('[cchPepper] checklist digest', e);
       return '';
     }
   }
@@ -983,6 +1005,7 @@
     if (projectId) {
       var money = await buildProjectMoneyDigest(projectId);
       var a = await buildDecisionsDigest(projectId);
+      var a2 = await buildChecklistDigest(projectId);
       var b = await buildFollowUpsDigest(projectId);
       var c = await buildActivityDigest(projectId);
       var d = await buildUnbilledTimeDigest(projectId);
@@ -991,6 +1014,7 @@
       var g = await buildProjectTasksDigest(projectId);
       if (money) parts.push(money);
       if (a) parts.push(a);
+      if (a2) parts.push(a2);
       if (g) parts.push(g);
       if (b) parts.push(b);
       if (c) parts.push(c);
@@ -1301,15 +1325,17 @@
   }
 
   /** Same topbar cluster as project Panel/Tabs — created on any Studio page so FABs stay put. */
-  /** Keep Panel/Pepper/Chat on the right edge — never wrap above the 52px topbar clip. */
+  /** Keep Panel/Pepper/Chat on the right. Action buttons wrap (WO-286). */
   function pepperLayoutTopbarCluster(cluster, actions) {
     if (!cluster || !actions) return;
     cluster.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:nowrap;justify-content:flex-end;min-width:0;flex:1 1 auto;';
     actions.style.minWidth = '0';
     actions.style.flex = '1 1 auto';
     actions.style.justifyContent = 'flex-end';
-    actions.style.flexWrap = 'nowrap';
-    actions.style.overflowX = 'auto';
+    actions.style.flexWrap = 'wrap';
+    actions.style.overflowX = 'visible';
+    actions.style.overflowY = 'visible';
+    actions.style.rowGap = '6px';
     if (actions.parentNode !== cluster) cluster.appendChild(actions);
     else if (cluster.firstChild !== actions) cluster.insertBefore(actions, cluster.firstChild);
     var toggleHost = document.getElementById('cchNavPanelToggleHost');
@@ -2534,6 +2560,7 @@
     }
     syncPepperVisibility();
     applyPepperDock();
+    void maybePepperOrderPush();
     /* Cindy Aug 10: do not auto-pop Pepper on dashboard / hashchange — wait until engaged. */
     if (!panel) {
       lastProjectId = contextKey();
@@ -2670,6 +2697,550 @@
     return;
   }
 
+  /* WO-278: push the existing order list. Does not open the chat. Read-only. */
+  var PEPPER_PROJECT_STRIPE = {
+    'cloud-rolling-hills': '#E07A2F',
+    'holtz-hill': '#1F7A6B',
+    'shimano-maverick-cir': '#6B4C9A',
+    'west-avalon': '#C4A464'
+  };
+  var pepperPushInFlight = false;
+
+  function pepperPushDayKey() {
+    var d = new Date();
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+
+  function pepperPushStaffKey() {
+    return currentEmail() || 'staff';
+  }
+
+  function pepperPushGet(key) {
+    try { return localStorage.getItem(key) || ''; } catch (_e) { return ''; }
+  }
+
+  function pepperPushSet(key, val) {
+    try { localStorage.setItem(key, val); } catch (_e) { /* */ }
+  }
+
+  function pepperPushSnoozed() {
+    var until = pepperPushGet('cchPepperPushSnooze:' + pepperPushStaffKey());
+    return until && until > pepperPushDayKey();
+  }
+
+  function pepperPushWave() {
+    var hour = new Date().getHours();
+    return hour >= 13 ? 'pm' : 'am';
+  }
+
+  function pepperPushFirmAlreadyShown() {
+    if (pepperPushSnoozed()) return true;
+    var stamp = pepperPushGet('cchPepperPushFirm:' + pepperPushStaffKey());
+    return stamp === pepperPushDayKey() + ':' + pepperPushWave();
+  }
+
+  function pepperPushMarkFirmShown() {
+    pepperPushSet('cchPepperPushFirm:' + pepperPushStaffKey(), pepperPushDayKey() + ':' + pepperPushWave());
+  }
+
+  function pepperProjectCardStamp(projectId) {
+    return pepperPushDayKey() + ':' + projectId;
+  }
+
+  function pepperProjectCardAlreadyShown(projectId) {
+    if (pepperPushSnoozed()) return true;
+    var stamp = pepperPushGet('cchPepperPushProject:' + pepperPushStaffKey());
+    return stamp === pepperProjectCardStamp(projectId);
+  }
+
+  function pepperPushMarkProjectShown(projectId) {
+    pepperPushSet('cchPepperPushProject:' + pepperPushStaffKey(), pepperProjectCardStamp(projectId));
+  }
+
+  function pepperPoAmount(po) {
+    if (typeof window.cchPoListPoTotal === 'function') {
+      var n = window.cchPoListPoTotal(po);
+      if (n) return n;
+    }
+    return pepperDocTotal(po);
+  }
+
+  function pepperPoAgeDays(po) {
+    var raw = po.issueDate || po.orderDate || po.poDate || po.date || po.createdAt || '';
+    if (!raw) return 0;
+    var dt = new Date(raw);
+    if (isNaN(dt.getTime()) && raw.seconds) dt = new Date(raw.seconds * 1000);
+    if (isNaN(dt.getTime())) return 0;
+    return Math.max(0, Math.floor((Date.now() - dt.getTime()) / 86400000));
+  }
+
+  function pepperPoIsDraft(po) {
+    if (!po) return false;
+    if (typeof window.cchOmIsPastConfirmation === 'function' && window.cchOmIsPastConfirmation(po)) return false;
+    if (typeof window.cchPoProcurementLaneId === 'function') {
+      return window.cchPoProcurementLaneId(po) === 'draft';
+    }
+    var st = String(po.status || '').trim().toLowerCase();
+    return st === 'draft' || st === '';
+  }
+
+  function pepperOrderPushRows(pos, projectId) {
+    var rows = [];
+    (pos || []).forEach(function (po) {
+      if (!po) return;
+      if (projectId && String(po.projectId || '') !== String(projectId)) return;
+      if (typeof window.cchOmIsHouzzPo === 'function' && window.cchOmIsHouzzPo(po)) return;
+      if (typeof window.cchOmIsOpenPo === 'function' && !window.cchOmIsOpenPo(po)) return;
+      var reason = '';
+      var rank = 9;
+      if (pepperPoIsDraft(po)) {
+        reason = 'Draft, not sent';
+        rank = 0;
+      } else if (typeof window.cchOmNeedsConfirmation === 'function' && window.cchOmNeedsConfirmation(po)) {
+        reason = 'No vendor confirmation';
+        rank = 1;
+      } else if (typeof window.cchOmNeedsBill === 'function' && window.cchOmNeedsBill(po)) {
+        reason = 'Missing vendor bill';
+        rank = 2;
+      }
+      if (!reason) return;
+      var age = pepperPoAgeDays(po);
+      rows.push({
+        po: po,
+        reason: reason,
+        rank: rank,
+        amount: pepperPoAmount(po),
+        age: age,
+        stale: age >= 14,
+        num: po.number || po.num || po.id,
+        vendor: po._displayVendor || po.vendor || 'Vendor',
+        projectName: po.projectName || po.projectId || 'Project',
+        href: '#/project/' + encodeURIComponent(po.projectId || '') + '/po/' + encodeURIComponent(po.id || '')
+      });
+    });
+    rows.sort(function (a, b) {
+      if (a.rank !== b.rank) return a.rank - b.rank;
+      if (b.amount !== a.amount) return b.amount - a.amount;
+      return b.age - a.age;
+    });
+    return rows;
+  }
+
+  async function pepperLoadOrderPos() {
+    if (window._omPosCache && Array.isArray(window._omPosCache.pos) && window._omPosCache.pos.length) {
+      return window._omPosCache.pos;
+    }
+    if (typeof window.cchPoLoadAllPosForVendorBills !== 'function') return [];
+    var loaded = await window.cchPoLoadAllPosForVendorBills();
+    var pos = (loaded && loaded.pos) || [];
+    if (pos.length) {
+      window._omPosCache = {
+        pos: pos,
+        projNames: (loaded && loaded.projNames) || {},
+        dedupeHidden: (loaded && loaded.dedupeHidden) || 0
+      };
+    }
+    return pos;
+  }
+
+  function pepperRemovePush(id) {
+    var el = document.getElementById(id);
+    if (el) el.remove();
+  }
+
+  function pepperStripeForProject(projectId) {
+    return PEPPER_PROJECT_STRIPE[String(projectId || '')] || '#0A1F3D';
+  }
+
+  function pepperRenderPushCard(opts) {
+    var id = opts.id;
+    pepperRemovePush(id);
+    if (!opts.rows || !opts.rows.length) return;
+    var shown = opts.rows.slice(0, 8);
+    var more = opts.rows.length - shown.length;
+    var card = document.createElement('div');
+    card.id = id;
+    card.setAttribute('data-pepper-push', '1');
+    if (opts.projectId) card.setAttribute('data-project', opts.projectId);
+    var top = opts.top || 12;
+    card.style.cssText = 'position:fixed;top:' + top + 'px;left:50%;transform:translateX(-50%);z-index:100060;width:min(560px,calc(100vw - 32px));background:#fff;color:#0A1F3D;border:1px solid #E2E2E2;border-left:6px solid ' + (opts.stripe || '#0A1F3D') + ';box-shadow:0 8px 28px rgba(10,31,61,.18);font-family:DM Sans,sans-serif;font-size:13px;line-height:1.35;';
+    var head = document.createElement('div');
+    head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;background:#0A1F3D;color:#fff;';
+    var title = document.createElement('div');
+    title.style.cssText = 'font-family:Playfair Display,serif;font-size:16px;';
+    title.textContent = opts.title;
+    var actions = document.createElement('div');
+    actions.style.cssText = 'display:flex;gap:6px;flex-shrink:0;';
+    function miniBtn(label, fn) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = label;
+      b.style.cssText = 'background:transparent;color:#fff;border:1px solid rgba(255,255,255,.45);padding:4px 8px;font-size:11px;letter-spacing:.04em;cursor:pointer;border-radius:0;';
+      b.onclick = fn;
+      return b;
+    }
+    actions.appendChild(miniBtn('Snooze until tomorrow', function () {
+      var d = new Date();
+      d.setDate(d.getDate() + 1);
+      function pad(n) { return (n < 10 ? '0' : '') + n; }
+      pepperPushSet('cchPepperPushSnooze:' + pepperPushStaffKey(), d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()));
+      pepperRemovePush('cch-pepper-order-push');
+      pepperRemovePush('cch-pepper-project-push');
+    }));
+    actions.appendChild(miniBtn('Close', function () {
+      if (opts.onClose) opts.onClose();
+      pepperRemovePush(id);
+    }));
+    head.appendChild(title);
+    head.appendChild(actions);
+    card.appendChild(head);
+    var list = document.createElement('div');
+    list.style.cssText = 'padding:8px 0;';
+    shown.forEach(function (row) {
+      var a = document.createElement('a');
+      a.href = row.href;
+      a.style.cssText = 'display:block;padding:7px 14px;color:#0A1F3D;text-decoration:none;border-top:1px solid #F0F0F0;';
+      a.innerHTML = '<span style="font-weight:600;">' + escapePepperPush(row.num) + '</span> · ' +
+        escapePepperPush(row.vendor) + ' · ' + escapePepperPush(row.projectName) +
+        '<br><span style="color:' + (row.stale ? '#9B2C2C' : '#5C6B7A') + ';">' +
+        escapePepperPush(row.reason) + (row.age ? ' · ' + row.age + ' days' : '') +
+        ' · ' + escapePepperPush(pepperMoneyFmt(row.amount)) + '</span>';
+      a.onclick = function (ev) {
+        ev.preventDefault();
+        if (typeof window.navigate === 'function') window.navigate(row.href);
+        else window.location.hash = row.href;
+      };
+      list.appendChild(a);
+    });
+    card.appendChild(list);
+    if (more > 0) {
+      var foot = document.createElement('a');
+      foot.href = '#/ordermanagement/open';
+      foot.textContent = '+ ' + more + ' more';
+      foot.style.cssText = 'display:block;padding:8px 14px 12px;color:#0A1F3D;font-weight:600;text-decoration:none;';
+      foot.onclick = function (ev) {
+        ev.preventDefault();
+        var href = '#/ordermanagement/open';
+        if (typeof window.navigate === 'function') window.navigate(href);
+        else window.location.hash = href;
+      };
+      card.appendChild(foot);
+    }
+    document.body.appendChild(card);
+  }
+
+  function escapePepperPush(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  var pepperClientUnsub = null;
+  var pepperClientListenFrom = '';
+  var pepperClientLiveLines = [];
+
+  function pepperStaffDecision(d) {
+    d = d || {};
+    var action = String(d.action || '').toLowerCase();
+    if (action !== 'decision_posted' && action !== 'decision_updated') return false;
+    var meta = d.meta || {};
+    var author = String(d.authorType || meta.authorType || '').toLowerCase();
+    if (author === 'client') return false;
+    return true;
+  }
+
+  function pepperStaffWho(d) {
+    var meta = (d && d.meta) || {};
+    var name = String((d && d.authorName) || meta.authorName || '').trim();
+    if (!name) {
+      var em = String((d && (d.authorEmail || d.user)) || meta.authorEmail || '').trim();
+      if (em.indexOf('@') > 0) name = em.split('@')[0];
+    }
+    if (!name) return 'Studio';
+    name = name.charAt(0).toUpperCase() + name.slice(1);
+    return name.split(/\s+/)[0];
+  }
+
+  function pepperActivityIsClient(d) {
+    d = d || {};
+    var meta = d.meta || {};
+    if (meta.studioPreview) return false;
+    var author = String(d.authorType || meta.authorType || '').toLowerCase();
+    if (author === 'designer' || author === 'staff') return false;
+    var action = String(d.action || '').toLowerCase();
+    if (action === 'decision_posted' || action === 'decision_updated') return false;
+    if (meta.source === 'client_portal' || d.source === 'client_pepper') return true;
+    if (String(d.type || '') === 'client_portal') return true;
+    if (author === 'client') return true;
+    return false;
+  }
+
+  function pepperClientWho(d) {
+    var meta = (d && d.meta) || {};
+    var name = String(meta.clientName || '').trim();
+    if (name) return name.split(/\s+/)[0];
+    var desc = String((d && d.description) || '');
+    var cut = desc.split('—')[0].split(' - ')[0].trim();
+    if (cut && cut.length < 40) return cut.split(/\s+/)[0];
+    return 'The client';
+  }
+
+  function pepperClientLine(id, d) {
+    var desc = String((d && d.description) || (d && d.action) || 'was on the portal').trim();
+    var staffDecision = pepperStaffDecision(d);
+    return {
+      id: id,
+      who: staffDecision ? pepperStaffWho(d) : pepperClientWho(d),
+      kind: staffDecision ? 'decision' : 'client',
+      text: desc,
+      projectId: String((d && d.projectId) || ''),
+      projectName: String((d && d.projectName) || ''),
+      when: String((d && (d.timestamp || d.createdAt)) || ''),
+      href: '#/project/' + encodeURIComponent(String((d && d.projectId) || ''))
+    };
+  }
+
+  function pepperPortalSeenStamp(projectId) {
+    return pepperPushGet('cchPepperPortalSeen:' + pepperPushStaffKey() + ':' + projectId);
+  }
+
+  function pepperMarkPortalSeen(projectId, stamp) {
+    pepperPushSet('cchPepperPortalSeen:' + pepperPushStaffKey() + ':' + projectId, stamp || new Date().toISOString());
+  }
+
+  function pepperRenderClientCard(lines, opts) {
+    opts = opts || {};
+    var id = opts.id || 'cch-pepper-client-now';
+    pepperRemovePush(id);
+    if (!lines || !lines.length) return;
+    var who = lines[0].who || 'The client';
+    var card = document.createElement('div');
+    card.id = id;
+    card.setAttribute('data-pepper-push', '1');
+    if (opts.projectId) card.setAttribute('data-project', opts.projectId);
+    var top = opts.top || 12;
+    card.style.cssText = 'position:fixed;top:' + top + 'px;right:24px;z-index:100070;width:min(420px,calc(100vw - 32px));background:#fff;color:#0A1F3D;border:1px solid #E2E2E2;border-left:6px solid #C4A464;box-shadow:0 8px 28px rgba(10,31,61,.18);font-family:DM Sans,sans-serif;font-size:13px;line-height:1.4;';
+    var head = document.createElement('div');
+    head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;background:#0A1F3D;color:#fff;';
+    var title = document.createElement('div');
+    title.style.cssText = 'font-family:Playfair Display,serif;font-size:16px;';
+    title.textContent = lines[0].kind === 'decision'
+      ? ((lines[0].who || 'Studio') + ' posted a decision that needs the client')
+      : ((who || 'The client') + ' just did this on the portal');
+    var close = document.createElement('button');
+    close.type = 'button';
+    close.textContent = 'Close';
+    close.style.cssText = 'background:transparent;color:#fff;border:1px solid rgba(255,255,255,.45);padding:4px 8px;font-size:11px;cursor:pointer;border-radius:0;';
+    close.onclick = function () {
+      if (opts.onClose) opts.onClose();
+      pepperRemovePush(id);
+    };
+    head.appendChild(title);
+    head.appendChild(close);
+    card.appendChild(head);
+    var list = document.createElement('div');
+    lines.slice(0, 6).forEach(function (line) {
+      var a = document.createElement('a');
+      a.href = line.href || '#/projects';
+      a.style.cssText = 'display:block;padding:8px 14px;color:#0A1F3D;text-decoration:none;border-top:1px solid #F0F0F0;';
+      a.innerHTML = '<span style="font-weight:600;">' + escapePepperPush(line.projectName || 'Project') + '</span><br>' +
+        escapePepperPush(line.text);
+      a.onclick = function (ev) {
+        ev.preventDefault();
+        if (typeof window.navigate === 'function') window.navigate(a.getAttribute('href'));
+        else window.location.hash = a.getAttribute('href');
+      };
+      list.appendChild(a);
+    });
+    card.appendChild(list);
+    document.body.appendChild(card);
+  }
+
+  function pepperShowClientNow(line) {
+    if (!line || !line.id) return;
+    var exists = false;
+    pepperClientLiveLines.forEach(function (row) { if (row.id === line.id) exists = true; });
+    if (exists) return;
+    pepperClientLiveLines.unshift(line);
+    pepperClientLiveLines = pepperClientLiveLines.slice(0, 6);
+    pepperRenderClientCard(pepperClientLiveLines, {
+      id: 'cch-pepper-client-now',
+      top: 12,
+      onClose: function () {
+        var newest = '';
+        pepperClientLiveLines.forEach(function (row) {
+          if (row.projectId) pepperMarkPortalSeen(row.projectId, row.when || new Date().toISOString());
+          if (row.when > newest) newest = row.when;
+        });
+        pepperClientLiveLines = [];
+      }
+    });
+  }
+
+  var pepperClientPrimed = false;
+  var pepperClientSeenIds = {};
+
+  function pepperStartClientLive() {
+    if (pepperClientUnsub || isClientRoute() || !isStaff()) return;
+    pepperClientListenFrom = new Date().toISOString();
+    pepperClientUnsub = pepperDb().collection('activity')
+      .orderBy('timestamp', 'desc')
+      .limit(20)
+      .onSnapshot(function (snap) {
+        if (!pepperClientPrimed) {
+          pepperClientPrimed = true;
+          snap.forEach(function (doc) { pepperClientSeenIds[doc.id] = 1; });
+          return;
+        }
+        if (isClientRoute() || !isStaff()) return;
+        snap.docChanges().forEach(function (ch) {
+          if (ch.type !== 'added') return;
+          if (pepperClientSeenIds[ch.doc.id]) return;
+          pepperClientSeenIds[ch.doc.id] = 1;
+          var data = ch.doc.data() || {};
+          var when = String(data.timestamp || data.createdAt || '');
+          if (pepperClientListenFrom && when && when < pepperClientListenFrom) return;
+          if (!pepperActivityIsClient(data) && !pepperStaffDecision(data)) return;
+          pepperShowClientNow(pepperClientLine(ch.doc.id, data));
+        });
+      }, function (err) {
+        console.warn('[cchPepper] client portal live', err);
+      });
+  }
+
+  function pepperStopClientLive() {
+    if (pepperClientUnsub) {
+      try { pepperClientUnsub(); } catch (_eUn) { /* */ }
+      pepperClientUnsub = null;
+    }
+    pepperClientPrimed = false;
+  }
+
+  async function pepperUnseenPortalLines(projectId) {
+    if (!projectId) return [];
+    var seen = pepperPortalSeenStamp(projectId);
+    var floor = seen;
+    if (!floor) {
+      floor = new Date(Date.now() - 2 * 86400000).toISOString();
+    }
+    var items = [];
+    try {
+      items = await pepperFetchProjectActivity(pepperDb(), projectId);
+    } catch (_eAct) {
+      return [];
+    }
+    var lines = [];
+    items.forEach(function (row) {
+      var data = row.data || {};
+      if (!pepperActivityIsClient(data) && !pepperStaffDecision(data)) return;
+      var when = String(data.timestamp || data.createdAt || '');
+      if (floor && when && when <= floor) return;
+      lines.push(pepperClientLine(row.id, data));
+    });
+    lines.sort(function (a, b) { return String(b.when).localeCompare(String(a.when)); });
+    return lines.slice(0, 6);
+  }
+
+  async function maybePepperOrderPush() {
+    if (isClientRoute() || !isStaff()) {
+      pepperRemovePush('cch-pepper-order-push');
+      pepperRemovePush('cch-pepper-project-push');
+      pepperRemovePush('cch-pepper-client-now');
+      pepperStopClientLive();
+      return;
+    }
+    pepperStartClientLive();
+    if (pepperPushInFlight) return;
+    var projectId = projIdFromHash();
+    var projectCard = document.getElementById('cch-pepper-project-push');
+    if (projectCard && projectCard.getAttribute('data-project') !== projectId) projectCard.remove();
+    var portalCard = document.getElementById('cch-pepper-portal-project');
+    if (portalCard && portalCard.getAttribute('data-project') !== projectId) portalCard.remove();
+    if (new Date().getHours() < 8) {
+      if (!projectId) return;
+      try {
+        var earlyPortal = await pepperUnseenPortalLines(projectId);
+        if (earlyPortal.length && !document.getElementById('cch-pepper-client-now')) {
+          pepperRenderClientCard(earlyPortal, {
+            id: 'cch-pepper-portal-project',
+            projectId: projectId,
+            top: 12,
+            onClose: function () { pepperMarkPortalSeen(projectId); }
+          });
+        }
+      } catch (_eEarly) { /* */ }
+      return;
+    }
+    var needFirm = !pepperPushFirmAlreadyShown() && !document.getElementById('cch-pepper-order-push');
+    var needProject = !!(projectId && !pepperProjectCardAlreadyShown(projectId) && !document.getElementById('cch-pepper-project-push'));
+    var needPortal = !!(projectId && !document.getElementById('cch-pepper-client-now') && !document.getElementById('cch-pepper-portal-project'));
+    if (!needFirm && !needProject && !needPortal) return;
+    if (!needFirm && !needProject && needPortal) {
+      try {
+        var onlyPortal = await pepperUnseenPortalLines(projectId);
+        if (onlyPortal.length) {
+          pepperRenderClientCard(onlyPortal, {
+            id: 'cch-pepper-portal-project',
+            projectId: projectId,
+            top: 12,
+            onClose: function () { pepperMarkPortalSeen(projectId); }
+          });
+        }
+      } catch (_eOnly) { /* */ }
+      return;
+    }
+    if (typeof window.cchPoLoadAllPosForVendorBills !== 'function' && !(window._omPosCache && window._omPosCache.pos)) return;
+    pepperPushInFlight = true;
+    try {
+      var pos = await pepperLoadOrderPos();
+      if (needFirm) {
+        var firmRows = pepperOrderPushRows(pos, '');
+        if (firmRows.length) {
+          pepperRenderPushCard({
+            id: 'cch-pepper-order-push',
+            title: 'Orders that need you',
+            stripe: '#C4A464',
+            top: 12,
+            rows: firmRows,
+            onClose: pepperPushMarkFirmShown
+          });
+        }
+        pepperPushMarkFirmShown();
+      }
+      if (needProject) {
+        var projectRows = pepperOrderPushRows(pos, projectId);
+        if (projectRows.length) {
+          var firmOpen = !!document.getElementById('cch-pepper-order-push');
+          pepperRenderPushCard({
+            id: 'cch-pepper-project-push',
+            title: (projectRows[0].projectName || 'This project') + ' — waiting',
+            stripe: pepperStripeForProject(projectId),
+            top: firmOpen ? 280 : 12,
+            projectId: projectId,
+            rows: projectRows,
+            onClose: function () { pepperPushMarkProjectShown(projectId); }
+          });
+        }
+        pepperPushMarkProjectShown(projectId);
+      }
+      var portalLines = await pepperUnseenPortalLines(projectId);
+      if (portalLines.length && !document.getElementById('cch-pepper-client-now')) {
+        pepperRenderClientCard(portalLines, {
+          id: 'cch-pepper-portal-project',
+          projectId: projectId,
+          top: document.getElementById('cch-pepper-order-push') ? 280 : 12,
+          onClose: function () { pepperMarkPortalSeen(projectId); }
+        });
+      }
+    } catch (ePush) {
+      console.warn('[cchPepper] order push', ePush);
+    } finally {
+      pepperPushInFlight = false;
+    }
+  }
+
   function mountPepperUi() {
     if (document.getElementById('cch-pepper-btn')) {
       applyPepperDock();
@@ -2737,6 +3308,7 @@
     var wt = setInterval(function () {
       if (isStaff()) {
         syncPepperVisibility();
+        void maybePepperOrderPush();
         clearInterval(wt);
       }
       if (++tries > 40) clearInterval(wt);
@@ -2747,5 +3319,5 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
-  console.info('[CCH Pepper] build ' + BUILD + ' — dashboard auto-pop + person-scoped plate');
+  console.info('[CCH Pepper] build ' + BUILD + ' — portal activity pops in Studio');
 })();

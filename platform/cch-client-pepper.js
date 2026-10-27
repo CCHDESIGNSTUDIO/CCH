@@ -8,7 +8,7 @@
   if (window._cchClientPepperLoaded) return;
   window._cchClientPepperLoaded = true;
 
-  var BUILD = '20260809cp104d';
+  var BUILD = '20261005wo279';
   var ACK = "Thank you. I'm still in training. Happy to pass this message on for you.";
   var DEFLECT = "I wish I could answer... hopefully soon! I'll let the team know :-)";
   var HELLO_FALLBACK = "Hi! I'm Pepper, design assistant in training. Type a note or tap Talk and speak. I'll pass it to Cindy or Vanessa.";
@@ -22,6 +22,8 @@
     projectName: '',
     clientName: '',
     clientEmail: '',
+    projectClientName: '',
+    latestClientNote: '',
     baseHash: '',
     openCounts: null,
     proposalNudges: [],
@@ -32,6 +34,7 @@
   var baseTranscript = '';
   var voicedHelloForProject = '';
   var pepperAudioEl = null;
+  var pepperUnlockHandler = null;
   var voiceMuted = false;
   /* Reset on hard refresh. Only X/close counts as dismiss — remounts must re-open. */
   var userDismissedThisLoad = false;
@@ -149,7 +152,32 @@
   function speechCtor() {
     return window.SpeechRecognition || window.webkitSpeechRecognition || null;
   }
+  function clearPepperUnlock() {
+    if (!pepperUnlockHandler) return;
+    document.removeEventListener('pointerdown', pepperUnlockHandler, true);
+    pepperUnlockHandler = null;
+  }
+  function armPepperUnlock(audio) {
+    clearPepperUnlock();
+    pepperUnlockHandler = function () {
+      clearPepperUnlock();
+      if (voiceMuted || pepperAudioEl !== audio) return;
+      audio.play().catch(function (ePlay) {
+        console.warn('[CCH ClientPepper] Elise play', ePlay);
+      });
+    };
+    document.addEventListener('pointerdown', pepperUnlockHandler, true);
+  }
+  function clipPepperSpeakLine(text) {
+    var s = String(text || '').trim();
+    if (s.length <= 300) return s;
+    var cut = s.slice(0, 300);
+    var sp = cut.lastIndexOf(' ');
+    if (sp > 220) cut = cut.slice(0, sp);
+    return cut;
+  }
   function stopSpeaking() {
+    clearPepperUnlock();
     try {
       if (pepperAudioEl) {
         pepperAudioEl.pause();
@@ -161,18 +189,6 @@
     try {
       if (window.speechSynthesis) window.speechSynthesis.cancel();
     } catch (_eC) { /* */ }
-  }
-  function speakPepperBrowserFallback(text) {
-    if (!window.speechSynthesis || typeof window.SpeechSynthesisUtterance !== 'function') return;
-    try {
-      var u = new SpeechSynthesisUtterance(String(text || ''));
-      u.lang = 'en-US';
-      u.rate = 0.98;
-      u.pitch = 1.08;
-      window.speechSynthesis.speak(u);
-    } catch (eSpeak) {
-      console.warn('[CCH ClientPepper] browser speak fallback', eSpeak);
-    }
   }
   async function speakPepperElise(text) {
     if (typeof firebase === 'undefined' || !firebase.app) throw new Error('Firebase not ready');
@@ -199,15 +215,24 @@
       try { URL.revokeObjectURL(url); } catch (_eR2) { /* */ }
       if (pepperAudioEl === audio) pepperAudioEl = null;
     };
-    await audio.play();
+    try {
+      await audio.play();
+    } catch (ePlay) {
+      var playName = (ePlay && ePlay.name) || '';
+      var playMsg = String((ePlay && ePlay.message) || '');
+      if (playName === 'NotAllowedError' || /not allowed|user gesture|play\(\)/i.test(playMsg)) {
+        armPepperUnlock(audio);
+        return;
+      }
+      throw ePlay;
+    }
   }
   function speakPepper(text) {
-    var line = String(text || '').trim();
+    var line = clipPepperSpeakLine(text);
     if (!line || voiceMuted) return;
     stopSpeaking();
     speakPepperElise(line).catch(function (e) {
       console.warn('[CCH ClientPepper] Elise speak', e);
-      speakPepperBrowserFallback(line);
     });
   }
   function syncMuteBtn() {
@@ -277,6 +302,22 @@
     return raw.split(/\s+/)[0] || 'there';
   }
 
+  function portalIsStaff() {
+    try {
+      if (typeof isCCHStudioStaffSession === 'function' && isCCHStudioStaffSession()) return true;
+    } catch (_eStaff) { /* */ }
+    var em = '';
+    try { em = String(((firebase.auth().currentUser || {}).email) || '').toLowerCase(); } catch (_eEm) { em = ''; }
+    if (!em) return false;
+    return em.indexOf('cindy@') === 0 || em.indexOf('cynthia@') === 0 || em.indexOf('vanessa@') === 0 || em.indexOf('cynthiacbh@') === 0;
+  }
+
+  function projectClientFirst() {
+    var raw = String(ctx.projectClientName || '').trim();
+    if (!raw || /^studio\b/i.test(raw) || /^client$/i.test(raw)) return 'The client';
+    return raw.split(/\s+/)[0];
+  }
+
   function buildGreetingText() {
     var first = greetFirstName();
     var c = ctx.openCounts;
@@ -295,7 +336,19 @@
     if (inv) parts.push(inv === 1 ? '1 invoice open' : (inv + ' invoices open'));
 
     var text;
-    if (!parts.length) {
+    var clientFirst = projectClientFirst();
+    if (portalIsStaff()) {
+      if (!parts.length) {
+        text = 'Hi ' + first + ', it\'s Pepper. ' + clientFirst + ' is caught up on the portal. Nothing is waiting on ' + clientFirst + '.';
+      } else if (parts.length === 1) {
+        text = 'Hi ' + first + ', it\'s Pepper. ' + clientFirst + ' has ' + parts[0] + '.';
+      } else {
+        text = 'Hi ' + first + ', it\'s Pepper. ' + clientFirst + ' has ' + parts.slice(0, -1).join(', ') + ', and ' + parts[parts.length - 1] + '.';
+      }
+      if (ctx.latestClientNote) {
+        text += ' ' + clientFirst + ' sent a note: ' + ctx.latestClientNote;
+      }
+    } else if (!parts.length) {
       text = 'Hi ' + first + ', it\'s Pepper. You\'re all caught up. Nothing needs you right now.';
     } else if (parts.length === 1) {
       text = 'Hi ' + first + ', it\'s Pepper. You have ' + parts[0] + '. Tap below and I\'ll take you right to it.';
@@ -306,7 +359,7 @@
     }
 
     var nudges = Array.isArray(ctx.proposalNudges) ? ctx.proposalNudges : [];
-    if (nudges.length) {
+    if (nudges.length && !portalIsStaff()) {
       var n0 = nudges[0];
       var label = String(n0.num || 'Proposal').trim() || 'Proposal';
       if (n0.readyForFinal) {
@@ -315,6 +368,16 @@
         text += ' ' + label + ' has ' + nInt(n0.pending) + ' line' + (nInt(n0.pending) === 1 ? '' : 's') +
           ' still pending your decision. You\'ve approved ' + nInt(n0.approved) +
           ', declined ' + nInt(n0.declined) + '.';
+      }
+    } else if (nudges.length && portalIsStaff()) {
+      var nStaff = nudges[0];
+      var labelStaff = String(nStaff.num || 'Proposal').trim() || 'Proposal';
+      if (nStaff.readyForFinal) {
+        text += ' ' + labelStaff + ' is ready for ' + clientFirst + '\'s final approval.';
+      } else if (nInt(nStaff.pending) > 0) {
+        text += ' ' + labelStaff + ' still has ' + nInt(nStaff.pending) + ' line' + (nInt(nStaff.pending) === 1 ? '' : 's') +
+          ' waiting on ' + clientFirst + '. ' + clientFirst + ' approved ' + nInt(nStaff.approved) +
+          ', declined ' + nInt(nStaff.declined) + '.';
       }
     }
 
@@ -351,7 +414,18 @@
     }
   }
 
+  function syncPepperIntro() {
+    var intro = document.getElementById('cchCpPepperIntro');
+    if (!intro) return;
+    if (portalIsStaff()) {
+      intro.textContent = 'You\'re signed in as studio. This is the client\'s portal. Pepper will tell you what is waiting on ' + projectClientFirst() + '.';
+      return;
+    }
+    intro.innerHTML = 'I\'m Pepper, CCH Design\'s studio assistant. Type a note, or tap <strong>Talk</strong> and speak. I\'ll write it down, then hit <strong>Send</strong> and I\'ll pass it to Cindy or Vanessa. I can\'t answer questions myself... yet ;-)';
+  }
+
   function renderGreetingBlock() {
+    syncPepperIntro();
     var el = document.getElementById('cchCpPepperGreeting');
     if (!el) return;
     var text = buildGreetingText();
@@ -369,6 +443,15 @@
     var nudgesHtml = '';
     (ctx.proposalNudges || []).slice(0, 2).forEach(function (n) {
       var label = esc(String(n.num || 'Proposal'));
+      if (portalIsStaff()) {
+        if (n.readyForFinal) {
+          nudgesHtml += '<p class="g-nudge">' + label + ' is ready for ' + esc(projectClientFirst()) + '\'s final approval.</p>';
+        } else if (nInt(n.pending) > 0) {
+          nudgesHtml += '<p class="g-nudge">' + label + ': ' + nInt(n.pending) + ' waiting on ' + esc(projectClientFirst()) + ' · ' +
+            nInt(n.approved) + ' approved · ' + nInt(n.declined) + ' declined.</p>';
+        }
+        return;
+      }
       if (n.readyForFinal) {
         nudgesHtml += '<p class="g-nudge">' + label + ' is ready for final approval.</p>';
       } else if (nInt(n.pending) > 0) {
@@ -625,7 +708,7 @@
         '<div id="cchCpPepperGreeting"></div>' +
         '<div id="cchCpPepperLog"><div class="cch-cp-log-empty">Loading your notes…</div></div>' +
         '<div id="cchCpPepperBody">' +
-          '<p>I\'m Pepper, CCH Design\'s studio assistant. Type a note, or tap <strong>Talk</strong> and speak. I\'ll write it down, then hit <strong>Send</strong> and I\'ll pass it to Cindy or Vanessa. I can\'t answer questions myself... yet ;-)</p>' +
+          '<p id="cchCpPepperIntro">I\'m Pepper, CCH Design\'s studio assistant. Type a note, or tap <strong>Talk</strong> and speak. I\'ll write it down, then hit <strong>Send</strong> and I\'ll pass it to Cindy or Vanessa. I can\'t answer questions myself... yet ;-)</p>' +
           '<textarea id="cchCpPepperInput" placeholder="Type or tap Talk and speak…" maxlength="2000"></textarea>' +
           '<div id="cchCpPepperListenHint"></div>' +
           '<div id="cchCpPepperAck"></div>' +
@@ -699,7 +782,7 @@
         var isClient = from === 'client' || m.type === 'client' || m.source === 'client_pepper' || /^client$/i.test(author);
         if (!isClient && m.published !== true && !m.fromClient) return;
         rows.push({
-          who: isClient ? 'You' : (author || 'CCH'),
+          who: isClient ? (portalIsStaff() ? projectClientFirst() : 'You') : (author || 'CCH'),
           text: String(m.text || m.body || '').trim(),
           when: m.createdAt || m.timestamp || ''
         });
@@ -707,8 +790,18 @@
       rows = rows.filter(function (r) { return r.text; });
       rows.sort(function (a, b) { return String(a.when).localeCompare(String(b.when)); });
       if (rows.length > 40) rows = rows.slice(-40);
+      if (portalIsStaff()) {
+        var lastNote = '';
+        rows.forEach(function (r) {
+          if (r.who === projectClientFirst() && r.text) lastNote = r.text;
+        });
+        ctx.latestClientNote = lastNote.length > 90 ? (lastNote.slice(0, 89) + '…') : lastNote;
+        renderGreetingBlock();
+      }
       if (!rows.length) {
-        log.innerHTML = '<div class="cch-cp-log-empty">No notes yet. Send one below and your design team sees it in Communications.</div>';
+        log.innerHTML = portalIsStaff()
+          ? '<div class="cch-cp-log-empty">No note from the client yet.</div>'
+          : '<div class="cch-cp-log-empty">No notes yet. Send one below and your design team sees it in Communications.</div>';
         return;
       }
       log.innerHTML = rows.map(function (r) {
@@ -803,6 +896,12 @@
       return;
     }
     var wantsChat = looksLikeWantsPepperAnswer(text);
+    var localAnswer = '';
+    try {
+      if (typeof window.cchPortalRecordsAnswer === 'function') {
+        localAnswer = await window.cchPortalRecordsAnswer(ctx.projectId, text);
+      }
+    } catch (_eLocal) {}
     if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
     try {
       await writeProjectMessage(database, text);
@@ -827,7 +926,7 @@
       } catch (_eAct) { /* */ }
       lastSendAt = now;
       ta.value = '';
-      setAck(wantsChat ? DEFLECT : ACK, { speak: true });
+      setAck(localAnswer || (wantsChat ? DEFLECT : ACK), { speak: true });
       void refreshChatLog();
     } catch (e) {
       console.error('[CCH ClientPepper] send', e);
@@ -843,6 +942,8 @@
     ctx.projectName = String(opts.projectName || '').trim();
     ctx.clientName = String(opts.clientName || 'Client').trim() || 'Client';
     ctx.clientEmail = String(opts.clientEmail || '').trim();
+    ctx.projectClientName = String(opts.projectClientName || '').trim();
+    ctx.latestClientNote = '';
     ctx.baseHash = String(opts.baseHash || ('#/clientview/' + ctx.projectId)).trim();
     /* WO-104 accuracy: counts come from portal snapshot — Pepper never invents them. */
     if (opts.openCounts && typeof opts.openCounts === 'object') {

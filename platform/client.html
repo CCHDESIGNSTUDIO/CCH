@@ -1932,7 +1932,7 @@
     .ib-item-badge {
       font-size: 10px; padding: 2px 6px; border-radius: 0; font-weight: 500;
     }
-    .ib-item-badge.star { background: #C4A464; color: #FFFFFF; font-weight: 700; font-size: 11px; padding: 3px 8px; }
+    .ib-item-badge.star { background: #C4A464; color: #FFFFFF; font-weight: 700; font-size: 14px; padding: 4px 10px; }
     .ib-item-badge.comment { background: rgba(66,165,245,0.1); color: #1565C0; }
     .ib-item-badge.vendor { background: var(--gray-50); color: var(--gray-500); }
     .ib-grid.ib-hide-vendor-labels .ib-item-badge.vendor { display: none !important; }
@@ -2067,10 +2067,10 @@
 
     /* Star badge */
     .ib-item-star-badge {
-      position: absolute; top: 8px; left: 8px; background: rgba(196,164,100,0.9);
-      color: white; border-radius: 4px; padding: 4px 8px; font-size: 12px; font-weight: 700;
-      display: flex; align-items: center; gap: 3px; z-index: 2;
-      backdrop-filter: blur(4px); pointer-events: none;
+      position: absolute; top: 8px; left: 8px; background: rgba(196,164,100,0.95);
+      color: #0F1A2E; border-radius: 4px; padding: 6px 12px; font-size: 16px; font-weight: 700;
+      display: flex; align-items: center; gap: 4px; z-index: 2;
+      backdrop-filter: blur(4px); pointer-events: none; line-height: 1;
     }
 
     /* Upload drop zone */
@@ -2105,12 +2105,12 @@
     .cp-insp-client-note { width: 100%; text-align: left; font-size: 12px; color: #0A1F3D; background: #FAF9F6; border: 1px dashed #C4A464; padding: 8px 10px; cursor: pointer; font-family: inherit; line-height: 1.4; }
     .cp-insp-client-note-empty { color: #9CA3AF; border-color: #E2E2E2; }
     #modalContainer .cp-insp-comments-modal { z-index: 120000 !important; }
-    .cp-insp-board-tile .cp-insp-star-btn { position: absolute; bottom: 8px; left: 8px; z-index: 3; width: 40px; height: 40px; border: 2px solid #C4A464; border-radius: 50%; background: rgba(255, 255, 255, 0.98); box-shadow: 0 2px 10px rgba(10, 31, 61, 0.22); cursor: pointer; font-size: 19px; line-height: 1; color: #0A1F3D; display: flex; align-items: center; justify-content: center; font-family: inherit; padding: 0; transition: color 0.12s ease, border-color 0.12s ease, transform 0.12s ease; }
+    .cp-insp-board-tile .cp-insp-star-btn { position: absolute; bottom: 8px; left: 8px; z-index: 3; width: 56px; height: 56px; border: 2px solid #C4A464; border-radius: 0; background: rgba(255, 255, 255, 0.98); box-shadow: 0 2px 12px rgba(10, 31, 61, 0.35); cursor: pointer; font-size: 32px; line-height: 1; color: #0A1F3D; display: flex; align-items: center; justify-content: center; font-family: inherit; padding: 0; transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease; }
     .cp-insp-board-tile .cp-insp-star-btn:hover { background: #fff; color: #C4A464; border-color: #0A1F3D; }
-    .cp-insp-board-tile .cp-insp-star-btn.cp-insp-star-btn--on { color: #C4A464; border-color: #0A1F3D; }
+    .cp-insp-board-tile .cp-insp-star-btn.cp-insp-star-btn--on { background: #C4A464; color: #0A1F3D; border-color: #0A1F3D; }
     .cp-insp-board-tile .cp-insp-star-btn.cp-insp-star-btn--pending { pointer-events: none; opacity: 0.72; }
-    .cp-insp-board-tile .cp-insp-star-badge { position: absolute; bottom: 8px; left: 8px; z-index: 2; min-width: 34px; height: 34px; padding: 0 8px; border-radius: 17px; background: rgba(255, 255, 255, 0.92); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #C4A464; pointer-events: none; box-shadow: 0 2px 6px rgba(10, 31, 61, 0.12); }
-    .cp-insp-board-tile .cp-insp-comment-btn { position: absolute; bottom: 8px; right: 8px; z-index: 2; min-width: 38px; height: 34px; border: none; border-radius: 17px; background: rgba(255, 255, 255, 0.95); box-shadow: 0 2px 8px rgba(10, 31, 61, 0.18); cursor: pointer; font-size: 12px; font-weight: 700; color: #0A1F3D; display: flex; align-items: center; justify-content: center; font-family: inherit; padding: 0 10px; gap: 4px; }
+    .cp-insp-board-tile .cp-insp-star-badge { position: absolute; bottom: 8px; left: 68px; z-index: 2; min-width: 44px; height: 44px; padding: 0 10px; border-radius: 0; background: rgba(255, 255, 255, 0.96); display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: #C4A464; pointer-events: none; box-shadow: 0 2px 8px rgba(10, 31, 61, 0.22); }
+    .cp-insp-board-tile .cp-insp-comment-btn { position: absolute; bottom: 8px; right: 8px; z-index: 2; min-width: 48px; height: 44px; border: none; border-radius: 0; background: rgba(255, 255, 255, 0.95); box-shadow: 0 2px 12px rgba(10, 31, 61, 0.28); cursor: pointer; font-size: 18px; font-weight: 700; color: #0A1F3D; display: flex; align-items: center; justify-content: center; font-family: inherit; padding: 0 12px; gap: 4px; }
     .cp-insp-board-tile .cp-insp-comment-btn:hover { background: #fff; color: #C4A464; }
     .cp-insp-timeline { margin-top: 10px; border-top: 1px solid #ECECEC; padding-top: 10px; max-height: 280px; overflow-y: auto; }
     .cp-insp-timeline-label { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #9CA3AF; margin-bottom: 8px; }
@@ -2487,19 +2487,19 @@
     .ib-p2-card-body { padding: 14px 14px 16px; }
     .ib-p2-card-title { font-family: var(--font-body, 'DM Sans', sans-serif); font-size: 14px; font-weight: 600; color: #0A1F3D; margin: 0; line-height: 1.35; }
     .ib-p2-card-meta { font-size: 11px; color: #9CA3AF; margin-top: 6px; }
-    .ib-p2-card-activity { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; font-size: 11px; font-weight: 600; }
-    .ib-p2-card-act-star { color: var(--gold, #C9A96E); }
+    .ib-p2-card-activity { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; font-size: 14px; font-weight: 700; }
+    .ib-p2-card-act-star { color: var(--gold, #C9A96E); font-size: 15px; }
     .ib-p2-card-act-com { color: #5C6B80; }
     .ib-p2-card-act-badge {
       position: absolute; top: 8px; right: 8px; z-index: 2;
       display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 16px);
     }
     .ib-p2-card-act-pill {
-      font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 4px;
+      font-size: 13px; font-weight: 700; padding: 5px 10px; border-radius: 4px;
       background: rgba(15,26,46,0.82); color: #fff; letter-spacing: 0.02em; white-space: nowrap;
       box-shadow: 0 2px 8px rgba(0,0,0,0.18);
     }
-    .ib-p2-card-act-pill.star { background: rgba(196,164,100,0.95); color: #0F1A2E; }
+    .ib-p2-card-act-pill.star { background: #C4A464; color: #0F1A2E; font-size: 15px; }
     .ib-p2-landing-act {
       display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
       padding: 10px 14px; margin: 0 0 16px; border: 1px solid rgba(196,164,100,0.35);
@@ -3301,7 +3301,7 @@
         'Labor': { rate: 125, taxable: false, desc: 'Labor / trade time' },
         'Installation Charges': { rate: 125, taxable: false, desc: 'Installation & site work' },
         'Transaction Fees': { rate: 0, taxable: false, desc: 'Card / platform fees' },
-        'Freight': { rate: 0, taxable: true, desc: 'Shipping & freight' },
+        'Freight': { rate: 0, taxable: false, desc: 'Shipping & freight' },
         'Expenses': { rate: 0, taxable: false, desc: 'Reimbursable expenses' },
         'Postage & Printing': { rate: 0, taxable: true, desc: 'Postage, copies, printing' },
         'Product': { rate: 0, taxable: true, desc: 'Furnishings & vendor goods' },
@@ -3324,7 +3324,7 @@
     let _cachedProposals = null, _cachedInvoices = null, _cachedPOs = null, _cachedProjNames = null, _cachedProjList = null;
     let _finDataClientNamesLower = null;
     let _cacheTime = 0;
-    const CP_CLIENT_DOCUMENT_FOLDERS = ['Selections', 'Drawings', 'Schedules', 'Renderings', 'Proposals', 'Contracts', 'General'];
+    const CP_CLIENT_DOCUMENT_FOLDERS = ['Selections', 'Drawings', 'Schedules', 'Renderings', 'Proposals', 'Contracts', 'General', 'Other'];
     var CP_CLIENT_IDENTITY_LS_KEY = 'cchClientIdentity';
     var cpPortalPdfThumbCache = window._cpPortalPdfThumbCache || (window._cpPortalPdfThumbCache = {});
     let _teamsWebhookUrl = null;
@@ -3536,10 +3536,12 @@ function proposalNeedsClientReview(pr) {
       if (!pr || !pr.published) return false;
       if (pr.hideFromClientPortal || pr.hideFromClientAttention || pr.archived || pr.isArchived || pr.legacyClosedAt) return false;
       if (String(pr.importedFrom || '').toLowerCase() === 'houzz' && pr.clientReviewRequired !== true) return false;
+      if (typeof proposalHasPendingClientLines === 'function' && proposalHasPendingClientLines(pr)) return true;
       if (proposalTextLooksTerminal(pr)) return false;
       var st = String(pr.status || '').trim();
       var stL = st.toLowerCase();
       var terminal = ['approved', 'invoiced', 'converted', 'declined', 'rejected', 'cancelled', 'lost', 'signed', 'complete', 'completed', 'closed', 'void', 'archived'];
+      if (stL === 'partially invoiced') return true;
       if (terminal.indexOf(stL) >= 0) return false;
       var inFlight = ['published', 'in review', 'sent', 'pending', 'awaiting', 'awaiting review', 'draft', 'open', 'viewed', 'revision', 'revisions', 'changes requested', 'under review', 'respond', 'needs review', 'client review'];
       if (inFlight.indexOf(stL) >= 0) return true;
@@ -3580,13 +3582,27 @@ function getClientHiddenColumnList(docData) {
       ['cost', 'markupPct'].forEach(function(k) {
         if (base.indexOf(k) < 0) base.push(k);
       });
+      if (docData && docData.showVendorToClient === true) {
+        base = base.filter(function(k) { return k !== 'vendor'; });
+      } else if (base.indexOf('vendor') < 0) {
+        base.push('vendor');
+      }
       return base;
     }
 
 function proposalLineClientTotal(it) {
+      var qty = parseFloat(it && it.qty);
+      if (!isFinite(qty)) qty = 1;
       var amount = parseMoney(it && it.amount);
+      if (it && (it.invoicedOnInvoiceId || it.invoicedAt) && !isNaN(amount)) return amount;
+      var cost = parseMoney(it && it.cost);
+      var ship = parseMoney(it && it.shipping) || 0;
+      var m = parseFloat(it && it.markupPct) || 0;
+      if (cost > 0) {
+        var unit = Math.round(cost * (1 + m / 100));
+        return unit * qty + ship;
+      }
       if (!isNaN(amount)) return amount;
-      var qty = parseFloat(it && it.qty) || 1;
       var clientPrice = parseMoney(it && it.clientPrice);
       return clientPrice * qty;
     }
@@ -3629,6 +3645,17 @@ function getProposalLineApprovalStatus(item) {
       if (item && item.approved) return 'approved';
       return 'pending';
     }
+    function proposalHasPendingClientLines(pr) {
+      if (!pr) return false;
+      var items = Array.isArray(pr.items) ? pr.items : [];
+      for (var i = 0; i < items.length; i++) {
+        var it = items[i];
+        if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it)) continue;
+        if (getProposalLineApprovalStatus(it) === 'pending') return true;
+      }
+      return false;
+    }
+    window.proposalHasPendingClientLines = proposalHasPendingClientLines;
     window._proposalLineShowFilter = window._proposalLineShowFilter || {};
     function proposalLandingModeKey(projectId, proposalId) {
       return String(projectId || '') + '|' + String(proposalId || '');
@@ -3813,19 +3840,58 @@ function cchLineDescriptionNotesHtml(desc, notes, opts) {
       return html;
     }
 
+function cchPoSplitPrintDescription(item) {
+      item = item || {};
+      var explicitTag = (typeof cchLineTagExplicit === 'function' ? cchLineTagExplicit(item) : '') ||
+        String(item.lineTag || item.lineTagCode || item.fixtureTag || '').trim();
+      var displayTag = (typeof cchLineTagText === 'function' ? cchLineTagText(item) : '') || explicitTag;
+      var dimField = String(item.dimensions || item.dimension || item.size || item.dims || item.measurements || '').trim();
+      var desc = String(item.description || item.vendorDescription || '').trim();
+      var dimParts = [];
+      var rest = [];
+      var inferredTag = '';
+      var title = String(item.title || item.name || '').trim().toLowerCase();
+      desc.split(/\r?\n/).forEach(function(raw) {
+        var l = String(raw || '').trim();
+        if (!l) return;
+        if (title && l.toLowerCase() === title) return;
+        var dimM = l.match(/^(width|height|depth|length)\s*:\s*(.+)$/i);
+        if (dimM) {
+          var lab = dimM[1].charAt(0).toUpperCase() + dimM[1].slice(1).toLowerCase();
+          dimParts.push(lab + ': ' + dimM[2].trim());
+          return;
+        }
+        if (displayTag && l.toLowerCase() === String(displayTag).toLowerCase()) return;
+        if (explicitTag && l.toLowerCase() === String(explicitTag).toLowerCase()) return;
+        if (!displayTag && !inferredTag && /^[A-Za-z]{1,4}\d{1,4}[A-Za-z]?$/.test(l) && l.length <= 12) {
+          inferredTag = l;
+          return;
+        }
+        rest.push(l);
+      });
+      return {
+        tag: displayTag || inferredTag,
+        dimensions: dimField || (dimParts.length ? dimParts.join(' · ') : ''),
+        rest: rest.join('\n')
+      };
+    }
+    window.cchPoSplitPrintDescription = cchPoSplitPrintDescription;
+
 function cchPoLineSpecsBlockHtml(item, opts) {
       opts = opts || {};
       item = item || {};
       var parts = [];
       var rm = String(item.room || '').trim();
-      var tag = (typeof cchLineTagText === 'function' ? cchLineTagText(item) : '') ||
+      var split = (opts.omitTag && typeof cchPoSplitPrintDescription === 'function')
+        ? cchPoSplitPrintDescription(item) : null;
+      var tag = (split && split.tag) || (typeof cchLineTagText === 'function' ? cchLineTagText(item) : '') ||
         String(item.lineTag || item.lineTagCode || item.fixtureTag || '').trim();
-      if (tag) parts.push({ label: 'Tag', value: tag });
+      if (tag && !opts.omitTag) parts.push({ label: 'Tag', value: tag });
       var sku = String(item.sku || item.model || item.itemCode || item.productCode || item.productSku || item.vendorSku || '').trim();
       var color = String(item.color || item.colour || '').trim();
       var fin = String(item.finish || item.finishColor || item.materials || item.finishMaterial || '').trim();
       if (!color && item.finishColor && item.finish) color = String(item.finishColor || '').trim();
-      var dim = String(item.dimensions || item.dimension || item.size || item.dims || item.measurements || '').trim();
+      var dim = (split && split.dimensions) || String(item.dimensions || item.dimension || item.size || item.dims || item.measurements || '').trim();
       if (opts.forceVendorFields) {
         if (!opts.omitRoom) parts.push({ label: 'Room', value: rm || '—' });
         parts.push({ label: 'SKU', value: sku || '—' });
@@ -3851,10 +3917,16 @@ function cchPoLineSpecsBlockHtml(item, opts) {
         html += '</div>';
       }
       if (opts.includeDescription !== false) {
-        var desc = String(item.description || item.vendorDescription || '').trim();
+        var desc = (split && opts.omitTag)
+          ? String(split.rest || '').trim()
+          : String(item.description || item.vendorDescription || '').trim();
         if (desc) {
-          html += '<div style="margin-top:6px;"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Description</div>' +
-            '<div style="font-size:11px;color:#5C6B80;margin-top:2px;white-space:pre-wrap;line-height:1.45;">' + esc(desc) + '</div></div>';
+          if (opts.omitTag) {
+            html += '<div class="cch-po-line-rest" style="margin-top:4px;font-size:11px;color:#5C6B80;line-height:1.45;white-space:pre-wrap;">' + esc(desc) + '</div>';
+          } else {
+            html += '<div style="margin-top:6px;"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Description</div>' +
+              '<div style="font-size:11px;color:#5C6B80;margin-top:2px;white-space:pre-wrap;line-height:1.45;">' + esc(desc) + '</div></div>';
+          }
         }
       }
       return html;
@@ -4094,24 +4166,39 @@ function _ibMaterializeItemFeedbackRead(item) {
 
 function _ibStarCountFromItem(item) {
       var o = typeof item === 'string' ? {} : (item || {});
-      if (_ibFeedbackShapeOk(o.feedback)) return (o.feedback.stars || []).length;
+      if (o.feedback && Array.isArray(o.feedback.stars)) return o.feedback.stars.length;
       return (typeof o.stars === 'number' && o.stars >= 1) ? 1 : 0;
     }
 
 function _ibCommentCountFromItem(item) {
       var o = typeof item === 'string' ? {} : (item || {});
-      if (_ibFeedbackShapeOk(o.feedback)) return (o.feedback.comments || []).length;
+      if (o.feedback && Array.isArray(o.feedback.comments)) return o.feedback.comments.length;
       return ((o.comments) || []).length;
     }
+
+function _ibSectionActivityCounts(section) {
+      var arr = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(section && section.images) : [];
+      var nStarImg = 0, nCom = 0;
+      arr.forEach(function(it) {
+        var o = typeof it === 'string' ? {} : it;
+        if (_ibStarCountFromItem(o) > 0) nStarImg++;
+        nCom += _ibCommentCountFromItem(o);
+      });
+      return { nStarImg: nStarImg, nCom: nCom };
+    }
+    window._ibSectionActivityCounts = _ibSectionActivityCounts;
 
 function _ibClientStarIndex(stars, clientEmail) {
       var em = _ibEmailNorm(clientEmail);
       if (!em || !Array.isArray(stars)) return -1;
+      var any = -1;
       for (var j = 0; j < stars.length; j++) {
         var s = stars[j];
-        if (s && s.authorType === 'client' && _ibEmailNorm(s.authorEmail) === em) return j;
+        if (!s || _ibEmailNorm(s.authorEmail) !== em) continue;
+        if (s.authorType === 'client') return j;
+        if (any < 0) any = j;
       }
-      return -1;
+      return any;
     }
 
 function _ibPortalClientStarButtonFilled(rawItem, ident) {
@@ -5376,6 +5463,9 @@ async function _previewDocumentOriginal(type, projectId, docId) {
           var _pvImgHero = getProposalLineHeroImageUrl(it);
           var imgTag = (showImgColLegacy && !isSvcLegacy && _pvImgHero) ? '<img src="' + _escImgSrcAttr(_pvImgHero) + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '';
           var _pvDesc = it.description || '';
+          if (type === 'invoice' && typeof window.cchStripInvoiceVendorParens === 'function') {
+            _pvDesc = window.cchStripInvoiceVendorParens(_pvDesc, it);
+          }
           if (type === 'invoice' && typeof window.sanitizeInvoicePreviewLineText === 'function') {
             _pvDesc = window.sanitizeInvoicePreviewLineText(_pvDesc);
           }
@@ -6100,7 +6190,7 @@ function cpPortalRouteStateFromHash(projectId) {
         }
         return out;
       }
-      if (slug === 'documents' || slug === 'communications' || slug === 'messages' || slug === 'notes' || slug === 'progress' || slug === 'activity' || slug === 'tasks' || slug === 'home' ||
+      if (slug === 'documents' || slug === 'communications' || slug === 'messages' || slug === 'notes' || slug === 'meetings' || slug === 'checklist' || slug === 'progress' || slug === 'activity' || slug === 'tasks' || slug === 'home' ||
           slug === 'rooms' || slug === 'concepts' || slug === 'inspiration' || slug === 'inspirations' || slug === 'designboards' ||
           slug === 'proposals' || slug === 'invoices' || slug === 'updates') {
         if (slug === 'communications') out.page = 'messages';
@@ -6713,6 +6803,18 @@ function cpPortalEnsureClientIdentity(projectId) {
       return new Promise(function(resolve) {
         var ident = cpPortalEffectiveClientIdentity();
         if (ident && ident.email) { resolve(ident); return; }
+        if (typeof cpPortalIsStudioPreview === 'function' && cpPortalIsStudioPreview()) {
+          var u = (typeof auth !== 'undefined' && auth && auth.currentUser) ? auth.currentUser : null;
+          var em = u && String(u.email || '').trim();
+          if (em) {
+            resolve({
+              email: em,
+              name: String((u.displayName && String(u.displayName).trim()) || em).trim(),
+              source: 'studio'
+            });
+            return;
+          }
+        }
         cpRenderClientIdentityModal(projectId, function() {
           resolve(cpPortalEffectiveClientIdentity());
         }).catch(function() { resolve(null); });
@@ -7119,6 +7221,7 @@ function cpBuildMergedPortalDocuments(clientDocuments, projectFiles) {
       (projectFiles || []).forEach(function(f) {
         if (!f || !f.id) return;
         if (f.internal === true || f.hideFromClient === true) return;
+        if (String(f.category || '').trim() === 'QPI') return;
         var u = _cpDocUrl(f);
         var rawF = String((f && f.url) || '').trim();
         var storageBacked = !!(f.storagePath || f.fullPath || /^gs:\/\//i.test(rawF));
@@ -7576,40 +7679,43 @@ async function cpPortalToggleInspirationStar(projectId, sectionId, imageIndex) {
       try {
         await ibEnsureIdeabookFeedbackMigrated(projectId, sectionId);
         var docRef = db.collection('boards').doc(projectId).collection('ideabooks').doc(sectionId);
-        var doc = await docRef.get();
-        if (!doc.exists) throw new Error('Board not found');
-        var secData = doc.data() || {};
-        var images = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(secData.images) : [];
-        if (idx >= images.length) throw new Error('Image not found');
-        var item = images[idx];
-        if (typeof item === 'string') item = { imageUrl: item };
-        else item = Object.assign({}, item);
-        item = _ibMaterializeItemFeedbackRead(item);
-        var stars = (item.feedback.stars || []).slice();
-        if (wasStarred) {
+        var secData = {};
+        var item = null;
+        await db.runTransaction(async function(tx) {
+          var doc = await tx.get(docRef);
+          if (!doc.exists) throw new Error('Board not found');
+          secData = doc.data() || {};
+          var images = typeof _coerceImageIterable === 'function' ? _coerceImageIterable(secData.images) : [];
+          if (idx >= images.length) throw new Error('Image not found');
+          item = images[idx];
+          if (typeof item === 'string') item = { imageUrl: item };
+          else item = Object.assign({}, item);
+          item = _ibMaterializeItemFeedbackRead(item);
+          var stars = (item.feedback.stars || []).slice();
           var cix = _ibClientStarIndex(stars, ident.email);
-          if (cix >= 0) stars.splice(cix, 1);
-          else if (stars.length === 1) {
-            var x0 = stars[0];
-            var xa = _ibEmailNorm(x0 && x0.authorEmail);
-            var xt = String((x0 && x0.authorType) || '').toLowerCase();
-            if (xt === 'designer' && xa === 'legacy@cch.studio') stars = [];
-            else if ((!xt || xt === 'client') && !xa && String((x0 && x0.authorName) || '').trim().toLowerCase() === String(ident.name || '').trim().toLowerCase()) stars = [];
+          if (wasStarred) {
+            if (cix >= 0) stars.splice(cix, 1);
+            else if (stars.length === 1) {
+              var x0 = stars[0];
+              var xa = _ibEmailNorm(x0 && x0.authorEmail);
+              var xt = String((x0 && x0.authorType) || '').toLowerCase();
+              if (xt === 'designer' && xa === 'legacy@cch.studio') stars = [];
+              else if ((!xt || xt === 'client') && !xa && String((x0 && x0.authorName) || '').trim().toLowerCase() === String(ident.name || '').trim().toLowerCase()) stars = [];
+            }
+          } else if (cix < 0) {
+            stars.push({
+              authorEmail: _ibEmailNorm(ident.email),
+              authorName: String(ident.name || ident.email || 'Client').trim(),
+              authorType: 'client',
+              createdAt: new Date().toISOString()
+            });
           }
-        } else {
-          stars.push({
-            authorEmail: _ibEmailNorm(ident.email),
-            authorName: String(ident.name || ident.email || 'Client').trim(),
-            authorType: 'client',
-            createdAt: new Date().toISOString()
-          });
-        }
-        item.feedback.stars = stars;
-        images[idx] = item;
-        var starNow = new Date().toISOString();
-        await docRef.update({ images: images, updatedAt: starNow });
+          item.feedback.stars = stars;
+          images[idx] = item;
+          tx.update(docRef, { images: images, updatedAt: new Date().toISOString() });
+        });
         var secName = secData.name || secData.title || 'Inspiration';
-        var cap = item.caption || item.title || 'image';
+        var cap = (item && (item.caption || item.title)) || 'image';
         var actDesc = wasStarred
           ? ('removed a star from "' + cap + '" · ' + secName)
           : ('starred "' + cap + '" · ' + secName);
@@ -8071,7 +8177,7 @@ function cpBuildSingleProposalReviewHtml(projectId, p, opts) {
       var showBanner = opts.showBanner !== false;
       var html = '';
       if (showBanner) {
-        html += '<div style="background:#FFFBF5;border:1px solid #E8D9A8;padding:10px 12px;border-radius:6px;margin-bottom:12px;font-size:12px;color:#0F1A2E;line-height:1.4;">Approve or decline <strong>each line</strong>, then <strong>Approve proposal &amp; total</strong> when every line is decided. Both steps are required before invoicing.</div>';
+        html += '<div style="background:#FFFBF5;border:1px solid #E8D9A8;padding:10px 12px;border-radius:6px;margin-bottom:12px;font-size:12px;color:#0F1A2E;line-height:1.4;">Approve the items you are ready for. The studio can invoice those now — pending lines stay on the proposal.</div>';
       }
       var visibleProducts = [];
       var hg = null;
@@ -8092,7 +8198,7 @@ function cpBuildSingleProposalReviewHtml(projectId, p, opts) {
         else pend++;
       });
       var decided = visibleProducts.length > 0 && pend === 0;
-      var canFinalApprove = decided && appr >= 1 && !p.clientApprovedTotalAt && p.status !== 'Invoiced';
+      var canFinalApprove = appr >= 1 && !p.clientApprovedTotalAt && (p.status !== 'Invoiced' || (typeof proposalHasPendingClientLines === 'function' && proposalHasPendingClientLines(p)));
       var totalApproved = !!p.clientApprovedTotalAt;
       var pct = visibleProducts.length > 0 ? Math.round((appr / visibleProducts.length) * 100) : 0;
       var grand = parseFloat(p.total) || 0;
@@ -8256,16 +8362,16 @@ function cpBuildSingleProposalReviewHtml(projectId, p, opts) {
         '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;"><span style="color:#5C6B80;">Pending</span><span class="cp-price" style="font-family:monospace;font-weight:600;">' + formatMoney(sumPending) + '</span></div>' +
         '<div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;padding-top:8px;border-top:1px solid #E2E2E2;"><span>Grand total</span><span class="cp-price" style="font-family:monospace;">' + formatMoney(grand) + '</span></div></div>';
 
-      if (p.status !== 'Invoiced') {
+      if (p.status !== 'Invoiced' || (typeof proposalHasPendingClientLines === 'function' && proposalHasPendingClientLines(p))) {
         if (!totalApproved) {
           html += '<div style="padding:12px 14px;border-top:1px solid #E8ECF3;">' +
             '<button type="button" class="cp-btn cp-btn-primary" style="width:100%;padding:10px 12px;font-size:13px;font-weight:700;' + (canFinalApprove ? '' : 'opacity:0.42;cursor:not-allowed;') + '" ' +
             (canFinalApprove ? 'onclick="clientApproveProposal(\'' + escJsStr(projectId) + '\',\'' + escJsStr(p.id) + '\')"' : 'disabled') +
-            '>Approve entire proposal &amp; total</button>';
-          if (!decided) {
-            html += '<p style="font-size:11px;color:#5C6B80;text-align:center;margin:10px 0 0;">Approve or decline every line above to enable this button.</p>';
-          } else if (appr < 1) {
+            '>Approve selected items for invoice</button>';
+          if (appr < 1) {
             html += '<p style="font-size:11px;color:#5C6B80;text-align:center;margin:10px 0 0;">At least one line must be approved.</p>';
+          } else if (!decided) {
+            html += '<p style="font-size:11px;color:#5C6B80;text-align:center;margin:10px 0 0;">Pending items stay on the proposal. You can invoice approved items now.</p>';
           }
           html += '</div>';
         } else {
@@ -8453,7 +8559,7 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
       var roomBoardKey = _routeState.roomBoardKey || null;
       var zelleInvoiceId = _routeState.zelleInvoiceId || null;
       var payInvoiceId = _routeState.payInvoiceId || null;
-      var proj = {}, clips = [], proposals = [], invoices = [], notes = [], ideabooks = [], messages = [], roomMeta = {}, activity = [], tasks = [];
+      var proj = {}, clips = [], proposals = [], invoices = [], notes = [], ideabooks = [], messages = [], roomMeta = {}, activity = [], tasks = [], meetingPublished = [];
       var clientDocuments = [], clientDecisions = [], whatsNewItems = [], timeEntries = [];
       // Safe defaults at top of function — render paths reference these even if try{} below throws.
       var inspirationIdeabooks = [];
@@ -8489,7 +8595,8 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
           db.collection('boards').doc(projectId).collection('whatsNew').orderBy('createdAt','desc').limit(20).get().catch(function(){ return db.collection('boards').doc(projectId).collection('whatsNew').limit(20).get(); }),
           db.collection('boards').doc(projectId).collection('files').get(),
           db.collection('boards').doc(projectId).collection('tasks').orderBy('createdAt', 'desc').limit(150).get().catch(function(){ return db.collection('boards').doc(projectId).collection('tasks').limit(150).get(); }),
-          db.collection('boards').doc(projectId).collection('clientDecisions').orderBy('createdAt', 'desc').limit(100).get().catch(function(){ return db.collection('boards').doc(projectId).collection('clientDecisions').limit(100).get(); })
+          db.collection('boards').doc(projectId).collection('clientDecisions').orderBy('createdAt', 'desc').limit(100).get().catch(function(){ return db.collection('boards').doc(projectId).collection('clientDecisions').limit(100).get(); }),
+          db.collection('boards').doc(projectId).collection('meetingSummaries').where('status', '==', 'published').limit(50).get()
         ]);
         var clipSnap = _cpSnapFromSettled(_cpSettled[0], 'clips');
         var propSnap = _cpSnapFromSettled(_cpSettled[1], 'proposals');
@@ -8503,6 +8610,8 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
         var fileSnap = _cpSnapFromSettled(_cpSettled[9], 'files');
         var taskSnap = _cpSnapFromSettled(_cpSettled[10], 'tasks');
         var decisionSnap = _cpSnapFromSettled(_cpSettled[11], 'clientDecisions');
+        var meetingSnap = _cpSnapFromSettled(_cpSettled[12], 'meetingSummaries');
+        meetingSnap.forEach(function(d) { meetingPublished.push({ id: d.id, ...d.data() }); });
         clipSnap.forEach(function(d) { clips.push({ id: d.id, ...d.data() }); });
         propSnap.forEach(function(d) { var p = d.data(); proposals.push({ id: d.id, ...p }); });
         invSnap.forEach(function(d) { var inv = d.data(); invoices.push({ id: d.id, ...inv }); });
@@ -8739,6 +8848,10 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
         'font-family:"DM Sans",-apple-system,sans-serif;color:var(--cp-text);background:#FFFFFF !important;min-height:100vh;font-size:14px;font-weight:400;display:flex;flex-direction:column; }' +
         '.cp-portal * { box-sizing: border-box; }' +
         '.cp-portal,.cp-portal * { border-radius:0 !important; box-shadow:none !important; }' +
+        '.cp-portal .cp-insp-board-tile .cp-insp-star-btn { width:56px !important; height:56px !important; font-size:32px !important; box-shadow:0 2px 12px rgba(10,31,61,0.35) !important; background:rgba(255,255,255,0.98) !important; border:2px solid #C4A464 !important; color:#0A1F3D !important; }' +
+        '.cp-portal .cp-insp-board-tile .cp-insp-star-btn.cp-insp-star-btn--on { background:#C4A464 !important; color:#0A1F3D !important; border-color:#0A1F3D !important; }' +
+        '.cp-portal .cp-insp-board-tile .cp-insp-star-badge { min-width:44px !important; height:44px !important; left:68px !important; font-size:16px !important; box-shadow:0 2px 8px rgba(10,31,61,0.22) !important; background:rgba(255,255,255,0.96) !important; }' +
+        '.cp-portal .cp-insp-board-tile .cp-insp-comment-btn { min-width:48px !important; height:44px !important; font-size:18px !important; box-shadow:0 2px 12px rgba(10,31,61,0.28) !important; background:rgba(255,255,255,0.95) !important; }' +
         '.cp-portal *:focus-visible { outline:2px solid rgba(10,31,61,0.38); outline-offset:2px; }' +
         '.cp-shell-row { display:flex; flex:1; min-height:0; align-items:stretch; width:100%; }' +
         '.cp-left-sidebar { width:220px; min-width:220px; background:#FFFFFF; border-right:1px solid #E2E2E2; display:flex; flex-direction:column; font-family:"DM Sans",sans-serif; }' +
@@ -9190,10 +9303,19 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
         var _actBadgeCt = _cpClientSafeActivityFeed.length > 0 ? String(Math.min(_cpClientSafeActivityFeed.length, 99)) : '';
         var _taskBadgeCt = _cpActiveTaskCount > 0 ? String(Math.min(_cpActiveTaskCount, 99)) : '';
         var _decBadgeCt = _decisionsNeededCount > 0 ? String(Math.min(_decisionsNeededCount, 99)) : '';
+        var _invOpenCt = invoices.filter(function(inv) {
+          if (typeof window.cpPortalIsStudioPortalInvoice === 'function' && !window.cpPortalIsStudioPortalInvoice(inv)) return false;
+          return typeof window.cpPortalInvoiceIsOpen === 'function' && window.cpPortalInvoiceIsOpen(inv);
+        }).length;
+        var _invBadgeCt = _invOpenCt > 0 ? String(Math.min(_invOpenCt, 99)) : '';
         var _pubNotesCt = (notes || []).filter(function (n) {
           return n && n.published === true && String(n.text || n.body || n.content || '').trim();
         }).length;
         var _notesBadgeCt = _pubNotesCt > 0 ? String(Math.min(_pubNotesCt, 9)) : '';
+        var _mtUnacked = (meetingPublished || []).filter(function (m) {
+          return m && m.status === 'published' && !(m.clientAck && (m.clientAck.name || m.clientAck.at));
+        }).length;
+        var _mtBadgeCt = _mtUnacked > 0 ? String(Math.min(_mtUnacked, 9)) : '';
         html += '<div class="cp-shell-row"><nav class="cp-left-sidebar" aria-label="Client portal">' +
           '<div class="cp-sb-logo"><div class="cp-sb-logo-top">CCH Design</div><div class="cp-sb-logo-sub">Client Portal</div></div>' +
           '<div class="cp-sb-nav">' +
@@ -9202,10 +9324,12 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
           '<button type="button" class="cp-sb-item' + (sbAct('notes') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/notes') + '><span class="cp-sb-icon">\u270E</span> Notes' + (_notesBadgeCt ? '<span class="cp-sb-badge">' + esc(_notesBadgeCt) + '</span>' : '') + '</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('updates') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/updates') + '><span class="cp-sb-icon">\u25CE</span> Updates' + (_puBadgeCt ? '<span class="cp-sb-badge">' + esc(_puBadgeCt) + '</span>' : '') + '</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('decisions') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/decisions') + '><span class="cp-sb-icon">\u25C6</span> Decisions' + (_decBadgeCt ? '<span class="cp-sb-badge">' + esc(_decBadgeCt) + '</span>' : '') + '</button>' +
+          '<button type="button" class="cp-sb-item' + (sbAct('checklist') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/checklist') + '><span class="cp-sb-icon">\u2713</span> Checklist</button>' +
+          '<button type="button" class="cp-sb-item' + (sbAct('meetings') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/meetings') + '><span class="cp-sb-icon">\u270E</span> Meeting notes<span class="cp-sb-badge" id="cch-sb-meetings-badge"' + (_mtBadgeCt ? '' : ' style="display:none"') + '>' + esc(_mtBadgeCt || '') + '</span></button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('inspiration') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/inspiration') + '><span class="cp-sb-icon">\u273D</span> Inspiration Boards</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('rooms') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/rooms') + '><span class="cp-sb-icon">\u25EB</span> Room Boards</button>' +
+          '<button type="button" class="cp-sb-item' + (sbAct('invoices') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/invoices') + '><span class="cp-sb-icon">\u25A6</span> Invoices' + (_invBadgeCt ? '<span class="cp-sb-badge">' + esc(_invBadgeCt) + '</span>' : '') + '</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('proposals') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/proposals') + '><span class="cp-sb-icon">\u25F0</span> Proposals' + (_propBadgeCt ? '<span class="cp-sb-badge">' + esc(_propBadgeCt) + '</span>' : '') + '</button>' +
-          '<button type="button" class="cp-sb-item' + (sbAct('invoices') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/invoices') + '><span class="cp-sb-icon">\u25A6</span> Invoices</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('documents') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/documents') + '><span class="cp-sb-icon">\u25A4</span> Documents</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('tasks') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/tasks') + '><span class="cp-sb-icon">\u2713</span> Tasks' + (_taskBadgeCt ? '<span class="cp-sb-badge">' + esc(_taskBadgeCt) + '</span>' : '') + '</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('activity') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/activity') + '><span class="cp-sb-icon">\u25C7</span> Activity' + (_actBadgeCt ? '<span class="cp-sb-badge">' + esc(_actBadgeCt) + '</span>' : '') + '</button>' +
@@ -9527,8 +9651,8 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
                 ? _ibPortalClientStarButtonFilled(_ibImgRowsLb[_cell.imageIndex], _inspIdent)
                 : false;
               var _starBt = '<button type="button" class="cp-insp-star-btn' + (_stOn ? ' cp-insp-star-btn--on' : '') + '" title="' + (_stOn ? 'Remove your star' : 'Star this image') + '" aria-label="' + (_stOn ? 'Remove star' : 'Star') + '" onclick="event.preventDefault();event.stopPropagation();void window.cpPortalToggleInspirationStar(\'' + pidJs + '\',\'' + secIdJs + '\',' + _cell.imageIndex + ')">' + (_stOn ? '\u2605' : '\u2606') + '</button>';
-              if (!_stOn && _starCnt > 0 && !_canInspStar) {
-                _starBt += '<span class="cp-insp-star-badge" title="' + _starCnt + ' star' + (_starCnt !== 1 ? 's' : '') + ' on this image" aria-hidden="true" style="left:52px;">\u2605 ' + _starCnt + '</span>';
+              if (_starCnt > 0) {
+                _starBt += '<span class="cp-insp-star-badge" title="' + _starCnt + ' star' + (_starCnt !== 1 ? 's' : '') + ' on this image" aria-hidden="true">\u2605 ' + _starCnt + '</span>';
               }
               var _commentBt = '<button type="button" class="cp-insp-comment-btn" title="Jump to comments" aria-label="Comments" onclick="event.preventDefault();event.stopPropagation();void window.cpPortalOpenInspirationComments(\'' + pidJs + '\',\'' + secIdJs + '\',' + _cell.imageIndex + ')">\uD83D\uDCAC' + (_cmCount ? (' ' + _cmCount) : '') + '</button>';
               var _rawRow = _ibImgRowsLb[_cell.imageIndex];
@@ -9614,6 +9738,7 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
               var tit = ib.name || ib.title || 'Board';
               var _ic = cpIdeabookItemCount(ib);
               var _isCi = typeof cchClientIdeasIsClientIdeasBoard === 'function' && cchClientIdeasIsClientIdeasBoard(ib);
+              var _ibActList = (typeof _ibSectionActivityCounts === 'function') ? _ibSectionActivityCounts(ib) : { nStarImg: 0, nCom: 0 };
               var _inspCardHash = '#/clientview/' + projectId + '/inspirations/' + ib.id;
               html += '<div class="cp-board-list-item" style="cursor:pointer;" role="link" tabindex="0" onclick=' + cpPortalNavigateOnclickAttr(_inspCardHash) + '>' +
                 '<div class="cp-inspiration-card">' +
@@ -9621,7 +9746,9 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
                 '<div class="cp-inspiration-cover-fallback" style="display:' + (iu ? 'none' : 'flex') + ';filter:grayscale(30%);">\u273F</div>' +
                 '</div>' +
                 '<div class="cp-board-list-title">' + esc(tit) + (_isCi ? ' <span style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#C4A464;font-weight:600;">From you</span>' : '') + '</div>' +
-                '<div class="cp-board-list-count">' + _ic + ' item' + (_ic !== 1 ? 's' : '') + '</div></div>';
+                '<div class="cp-board-list-count">' + _ic + ' item' + (_ic !== 1 ? 's' : '') +
+                (_ibActList.nStarImg ? ' \u00B7 \u2605 ' + _ibActList.nStarImg + ' starred' : '') +
+                '</div></div>';
             } catch (eIb) {
               console.error('[renderClientPortal] inspiration card skipped:', (ib && ib.id) || ib, eIb);
             }
@@ -9947,6 +10074,10 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
           html += '<div id="cp-answered-dec-body" style="' + (_answeredCollapsed ? 'display:none;' : '') + 'margin-top:8px;"><div style="font-size:13px;color:#6B7280;padding:4px 0 8px;">No answered decisions yet.</div></div>';
         }
         html += '</div>';
+      } else if (activePage === 'meetings' || activePage === 'checklist') {
+        html += (typeof window.cchPortalRecordsMount === 'function')
+          ? window.cchPortalRecordsMount(projectId, activePage)
+          : '<div style="font-size:13px;color:#6B7280;">This page is loading.</div>';
       } else if (activePage === 'progress') {
         var now = new Date();
         var start = null;
@@ -10310,12 +10441,14 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
           projectName: String((proj && (proj.name || proj.projectName)) || projName || projectId),
           clientName: String(_pepperIdent.name || _pepperIdent.clientName || (isOwner ? 'Studio Preview' : 'Client')),
           clientEmail: String(_pepperIdent.email || ''),
+          projectClientName: String((proj && (proj.clientName || proj.client)) || ''),
           baseHash: '#/clientview/' + projectId,
           openCounts: _pepperSnap.openCounts,
           proposalNudges: _pepperSnap.proposalNudges,
           whatsNew: _pepperSnap.whatsNew
         });
       }
+      if (typeof window.cchPortalRecordsBoot === 'function') window.cchPortalRecordsBoot(projectId);
       if (typeof cpPortalPaintPdfThumbs === 'function') void cpPortalPaintPdfThumbs(T);
       if (typeof cpPortalAttachLiveSync === 'function') cpPortalAttachLiveSync(projectId);
       if (activePage === 'decisions' && _routeState.decisionFocusId && typeof cpPortalScrollToDecisionFocus === 'function') {
@@ -10410,9 +10543,12 @@ window.cpPortalInvoiceBalance = function(inv) {
       if (stL === 'paid' || stL === 'void' || stL === 'voided') return 0;
       var total = parseFloat(inv.total || inv.amount) || 0;
       var paid = window.cpPortalInvoicePaidAmount(inv);
-      if (total > 0.01 && paid >= total - 0.02) return 0;
-      var qbBal = parseFloat(inv.balance);
-      if (!isNaN(qbBal) && qbBal >= 0 && inv.balance != null && inv.balance !== '') return qbBal;
+      if (total > 0.01) {
+        if (paid >= total - 0.02) return 0;
+        return Math.max(0, Math.round((total - paid) * 100) / 100);
+      }
+      var storedBal = parseFloat(inv.balance);
+      if (!isNaN(storedBal) && storedBal >= 0 && inv.balance != null && inv.balance !== '') return storedBal;
       return Math.max(0, total - paid);
     };
 
@@ -10427,6 +10563,7 @@ window.cpPortalInvoiceIsOpen = function(inv) {
       }
       return false;
     };
+window.cpPortalIsStudioPortalInvoice = cpPortalIsStudioPortalInvoice;
 
 window.cpPortalSortByNewest = function(arr) {
       return (Array.isArray(arr) ? arr.slice() : []).sort(function(a, b) {
@@ -10509,11 +10646,13 @@ window.cpPortalPublishedNotesHtml = function (notes, opts) {
 
 window.cpPortalProposalIsClosed = function(p) {
       if (!p) return true;
+      if (typeof proposalHasPendingClientLines === 'function' && proposalHasPendingClientLines(p)) return false;
       if (typeof proposalNeedsClientReview === 'function' && proposalNeedsClientReview(p)) return false;
       var st = String(p.status || '').trim().toLowerCase();
+      if (st === 'partially invoiced') return false;
       var closedSt = ['invoiced', 'converted', 'declined', 'rejected', 'cancelled', 'canceled', 'closed', 'void', 'archived', 'complete', 'completed', 'lost', 'signed'];
       if (closedSt.indexOf(st) >= 0) return true;
-      if (st === 'approved' && p.clientApprovedTotalAt) return true;
+      if (st === 'approved' && p.clientApprovedTotalAt && !(typeof proposalHasPendingClientLines === 'function' && proposalHasPendingClientLines(p))) return true;
       if (typeof proposalTextLooksTerminal === 'function' && proposalTextLooksTerminal(p)) return true;
       return false;
     };
@@ -10775,6 +10914,8 @@ function cpPortalDocUrlFileName(url) {
 
 function cpPortalDocDisplayFileName(d) {
       d = d || {};
+      var title = String(d.title || '').trim();
+      if (title) return title;
       var urls = cpPortalDocAttachmentUrls(d);
       var fromUrl = '';
       for (var i = 0; i < urls.length; i++) {
@@ -10783,7 +10924,7 @@ function cpPortalDocDisplayFileName(d) {
       }
       if (fromUrl) return fromUrl;
       if (d._portalKind === 'studioFile') return String(d.title || 'File').trim() || 'File';
-      return String(d.title || d.docNumber || 'Document').trim();
+      return String(d.docNumber || 'Document').trim();
     }
 
 function cpPortalDocMediaKind(u, mimeOrType) {
@@ -10861,11 +11002,15 @@ function cpPortalDocCardHtml(projectId, d) {
       var dFolder = cpClientDocNormalizedFolder(d);
       var dDate = d.createdAt ? new Date(d.createdAt).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : '';
       var dStatus = String(d.status || '').toLowerCase();
-      var fileName = cpPortalDocDisplayFileName(d);
       var titleLine = String(d.title || '').trim();
-      var subLine = '';
-      if (titleLine && titleLine !== fileName) subLine = titleLine;
-      else if (d.docNumber && d.docNumber !== fileName && d.docNumber !== 'Studio') subLine = d.docNumber;
+      var urlName = '';
+      var urlsForName = typeof cpPortalDocAttachmentUrls === 'function' ? cpPortalDocAttachmentUrls(d) : [];
+      for (var ui = 0; ui < urlsForName.length; ui++) {
+        urlName = typeof cpPortalDocUrlFileName === 'function' ? cpPortalDocUrlFileName(urlsForName[ui]) : '';
+        if (urlName) break;
+      }
+      var primary = titleLine || urlName || String(d.docNumber || 'Document').trim();
+      var subLine = (urlName && urlName !== primary) ? urlName : '';
       var rawDoc = String((d && d.url) || '').trim();
       var resolvedPre = typeof studioProjectFilePublicUrl === 'function' ? studioProjectFilePublicUrl(d) : '';
       var openHttp = cpPortalBrowserHttpUrl(resolvedPre || rawDoc) || cpPortalBrowserHttpUrl(rawDoc);
@@ -10892,7 +11037,7 @@ function cpPortalDocCardHtml(projectId, d) {
       }
       return '<div class="cp-doc-card">' +
         '<div class="cp-doc-card-thumb">' + (typeof cpPortalDocThumbHtml === 'function' ? cpPortalDocThumbHtml(d, { layout: 'card', projectId: projectId }) : '') + '</div>' +
-        '<div class="cp-doc-card-name">' + esc(fileName) + '</div>' +
+        '<div class="cp-doc-card-name">' + esc(primary) + '</div>' +
         '<div class="cp-doc-card-meta">' + esc(dFolder) + (dDate ? ' · ' + esc(dDate) : '') +
           (subLine ? '<div style="margin-top:3px;color:#6B7280;">' + esc(subLine) + '</div>' : '') +
         '</div>' +
@@ -11250,7 +11395,7 @@ window.cpPortalBuildPepperOpenSnapshot = function(opts) {
             else if (s === 'declined') decl++;
             else pend++;
           });
-          var readyForFinal = visible.length > 0 && pend === 0 && appr >= 1 && !p.clientApprovedTotalAt && p.status !== 'Invoiced';
+          var readyForFinal = visible.length > 0 && appr >= 1 && !p.clientApprovedTotalAt && (p.status !== 'Invoiced' || (typeof proposalHasPendingClientLines === 'function' && proposalHasPendingClientLines(p)));
           nudges.push({
             id: p.id,
             num: p.proposalNum || p.name || 'Proposal',
@@ -11467,6 +11612,7 @@ function cpPortalDecisionCardHtml(projectId, item, mode, withBorderTop) {
             '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;flex:1;" onclick=' + cpPortalOnclickAttr('void cpAdminReopenClientDecision(' + JSON.stringify(projectId) + ',' + JSON.stringify(id) + ')') + '>Reopen</button>';
         }
         actions += '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;flex:1;" onclick=' + cpPortalOnclickAttr('void cpAdminOpenPostDecisionModal(' + JSON.stringify(projectId) + ',' + JSON.stringify(id) + ')') + '>Edit</button>' +
+          '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;flex:1;" onclick=' + cpPortalOnclickAttr('void cchAddPostedDecisionToChecklist(' + JSON.stringify(projectId) + ',' + JSON.stringify(id) + ')') + '>Add to the checklist</button>' +
           '<button type="button" class="cp-btn cp-btn-outline" style="padding:4px 8px;font-size:10px;flex:1;color:#B45309;border-color:#FCD9BD;" onclick=' + cpPortalOnclickAttr('void cpAdminDeleteClientDecision(' + JSON.stringify(projectId) + ',' + JSON.stringify(id) + ')') + '>Delete</button>' +
           '</div>';
       }
@@ -11953,7 +12099,7 @@ async function clientApproveProposal(projectId, proposalId) {
       const data = doc.data();
       const items = data.items || [];
       var hg = null;
-      var pending = 0, appr = 0;
+      var pending = 0, appr = 0, approvedAmt = 0;
       items.forEach(function(it) {
         if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it)) {
           hg = it.hideFromClient ? it.groupId : null;
@@ -11963,33 +12109,38 @@ async function clientApproveProposal(projectId, proposalId) {
         hg = null;
         var s = getProposalLineApprovalStatus(it);
         if (s === 'pending') pending++;
-        if (s === 'approved') appr++;
+        if (s === 'approved') {
+          appr++;
+          approvedAmt += typeof proposalLineClientTotal === 'function' ? proposalLineClientTotal(it) : (parseFloat(it.amount) || 0);
+        }
       });
-      if (pending > 0) {
-        await cchAlert('Please approve or decline each line item first.', 'Approve Proposal');
-        return;
-      }
       if (appr < 1) {
-        await cchAlert('At least one line must be approved before you can approve the proposal total.', 'Approve Proposal');
+        await cchAlert('At least one line must be approved before you can authorize an invoice.', 'Approve Proposal');
         return;
       }
-      if (!(await cchConfirm('Approve this proposal and the total amount shown? This confirms pricing and tells the studio they may invoice approved items.', 'Approve Proposal', { confirmText: 'Approve Total' }))) return;
+      var money = typeof formatMoney === 'function' ? formatMoney : function (n) { return '$' + (Number(n) || 0).toFixed(2); };
+      var confMsg = pending > 0
+        ? ('Invoice the ' + appr + ' approved item(s) totaling ' + money(approvedAmt) + '? ' + pending + ' pending line(s) stay on the proposal.')
+        : 'Approve this proposal and the total amount shown? This confirms pricing and tells the studio they may invoice approved items.';
+      if (!(await cchConfirm(confMsg, 'Approve Proposal', { confirmText: pending > 0 ? 'Invoice approved items' : 'Approve Total' }))) return;
 
-      await db.collection('boards').doc(projectId).collection('proposals').doc(proposalId).update({
-        status: 'Approved',
-        clientApprovedTotalAt: new Date().toISOString(),
+      var nowIso = new Date().toISOString();
+      var patch = {
+        clientApprovedTotalAt: nowIso,
         clientApprovedTotalBy: 'client',
-        approvedAt: new Date().toISOString(),
-        approvedBy: 'client',
-        updatedAt: new Date().toISOString()
-      });
+        approvedAt: data.approvedAt || nowIso,
+        approvedBy: data.approvedBy || 'client',
+        updatedAt: nowIso
+      };
+      if (pending === 0) patch.status = 'Approved';
+      await db.collection('boards').doc(projectId).collection('proposals').doc(proposalId).update(patch);
 
       var propNum = data.proposalNum || data.name || proposalId.substring(0, 8);
       var projDoc = await db.collection('boards').doc(projectId).get();
       var projName = projDoc.exists ? (projDoc.data().name || projectId) : projectId;
-      var propTotal = formatMoney(data.total || 0);
-      await appendClientProposalActivity(projectId, proposalId, 'client_proposal_total_approved', 'Client approved proposal total ' + propTotal);
-      await logClientPortalActivity('proposal_total_approved', 'Client approved final total for ' + propNum + ': ' + propTotal, projectId, projName, { proposalId: proposalId });
+      var propTotal = money(approvedAmt);
+      await appendClientProposalActivity(projectId, proposalId, 'client_proposal_total_approved', 'Client authorized invoice of approved items ' + propTotal + (pending > 0 ? (' (' + pending + ' pending)') : ''));
+      await logClientPortalActivity('proposal_total_approved', 'Client authorized invoice of approved items on ' + propNum + ': ' + propTotal, projectId, projName, { proposalId: proposalId });
 
       if (USE_NEW_PORTAL) await renderClientPortal(projectId, proposalId); else renderClientView(projectId);
     }
@@ -12100,7 +12251,7 @@ function _cchPaintClientLineApprovalToggle(projectId, propId, lineIdx, status, i
         if (s === 'approved') approved++;
         else if (s !== 'declined') pending++;
       });
-      var canFinal = pending === 0 && approved > 0;
+      var canFinal = approved > 0;
       document.querySelectorAll('.cv-approve-btn').forEach(function(btn) {
         if (canFinal) {
           btn.style.opacity = '';
@@ -12281,16 +12432,18 @@ async function logActivity(type, action, description, projectId, projectName, me
       auth.onAuthStateChanged(function(u) { currentUser = u || null; _cchBootOnce(); });
     } catch (e) { console.warn('[client portal] auth listener', e); }
     setTimeout(_cchBootOnce, 1600); // never block clients on auth
-    console.info('[CCH Client Portal] lightweight build 20260821wo121-phone');
+    console.info('[CCH Client Portal] lightweight build 20261005wo281');
   </script>
   <script src="cch-notes-format.js?v=20260802n1"></script>
   <script src="cch-voice-profile.js?v=20260713voice1"></script>
   <script src="cch-progress-updates.js?v=20260714pu18"></script>
   <script src="cch-client-board.js?v=20260710cp1"></script>
-  <script src="cch-client-pepper.js?v=20260812pepper"></script>
+  <script src="cch-client-pepper.js?v=20261016wo303"></script>
   <script src="cch-client-ideas.js?v=20260807ci091b"></script>
-  <script src="cch-square-pay.js?v=20260818mail3"></script>
-  <script src="cch-invoice-redesign.js?v=20260817size1"></script>
-  <script src="cch-proposals-invoices-fix.js?v=20260827pdfcols4"></script>
+  <script src="cch-invoice-tax-rules.js?v=20260827freight2"></script>
+  <script src="cch-square-pay.js?v=20260930mailclose"></script>
+  <script src="cch-invoice-redesign.js?v=20261007wo284"></script>
+  <script src="cch-proposals-invoices-fix.js?v=20260911inv224"></script>
+  <script src="cch-portal-records.js?v=20261023wo327"></script>
 </body>
 </html>

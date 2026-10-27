@@ -15,7 +15,7 @@ You are working on CCH Studio, the practice management platform for CCH Design I
 
 Brand promise: "Everything from us should look like a gift." Every change must preserve that standard.
 
-This file covers business logic and edit discipline. It does NOT override the other rules in this folder; in particular `code-grounding.mdc` (grep+read before any claim or edit), `commit-deploy-policy.mdc` (only #1 commits/deploys; everyone else queues via `_DEPLOY_QUEUE.md`), `cch-staging-production.mdc` (staging default, production only on Cindy's typed GO), `document-isolation.mdc`, and `cch-platform-js-edits.mdc` (cache busters, node --check, tail verify) all remain in force.
+This file covers business logic and edit discipline. It does NOT override the other rules in this folder; in particular `code-grounding.mdc` (grep+read before any claim or edit), `commit-deploy-policy.mdc` (builder deploys staging; only #1 commits and deploys production, after Cindy's typed GO), `cch-staging-production.mdc` (staging default, production only on Cindy's typed GO), `document-isolation.mdc`, and `cch-platform-js-edits.mdc` (cache busters, node --check, tail verify) all remain in force.
 
 ## 1. SURGICAL EDIT CONTRACT (overrides everything else in this file)
 

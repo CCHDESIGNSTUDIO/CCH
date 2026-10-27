@@ -10,6 +10,35 @@
     return false;
   };
 
+  var _cchAtPushWait = {};
+
+  /** One PO, no confirm. Receiver line check-ins stay; the PO row and lines upsert. */
+  window.cchPushPoToAirtableQuiet = function(projectId, poId) {
+    projectId = String(projectId || '').trim();
+    poId = String(poId || '').trim();
+    if (!projectId || !poId) return Promise.resolve(null);
+    if (!window.cchCanPushToAirtable()) return Promise.resolve(null);
+    var key = projectId + '/' + poId;
+    if (_cchAtPushWait[key]) return _cchAtPushWait[key];
+    var run = (async function() {
+      try {
+        var fn = firebase.functions().httpsCallable('pushPOsToAirtable');
+        var res = await fn({ scope: 'po', projectId: projectId, poId: poId });
+        var data = res && res.data ? res.data : {};
+        if (typeof window.showToast === 'function') window.showToast(data.message || 'Updated in Airtable', 'success');
+        return data;
+      } catch (e) {
+        var errMsg = (e && e.message) ? e.message : String(e);
+        if (typeof window.showToast === 'function') window.showToast('Airtable did not update: ' + errMsg, 'warning');
+        return null;
+      } finally {
+        delete _cchAtPushWait[key];
+      }
+    })();
+    _cchAtPushWait[key] = run;
+    return run;
+  };
+
   window.cchPushToAirtable = async function(opts, btnEl) {
     opts = opts || {};
     if (!window.cchCanPushToAirtable()) {

@@ -1500,6 +1500,8 @@ function qbStudioInvoiceLineAmount(item) {
  */
 function qbStudioInvoiceLineTaxable(item) {
   if (!item) return false;
+  if (cchTaxRules.cchInvoiceLineIsFreightLike && cchTaxRules.cchInvoiceLineIsFreightLike(item)) return false;
+  if (cchTaxRules.cchInvoiceLineIsTaxableMerchandiseVariance && cchTaxRules.cchInvoiceLineIsTaxableMerchandiseVariance(item)) return true;
   const et = String(item.expenseType || item.itemType || "").toLowerCase();
   if (et === "sales_tax" || et === "discount" || et === "retainer_credit") return false;
   if (qbStudioLineLooksLikeLabor(item)) return false;
@@ -1507,7 +1509,7 @@ function qbStudioInvoiceLineTaxable(item) {
   if (qbStudioLineIsDesignServiceCategory(item)) return false;
   if (qbStudioLineMapsToNonTaxableQbItem(item)) return false;
   if (cchTaxRules.cchInvoiceLineIsNonTaxableService(item)) return false;
-  if (["service", "design_service", "labor", "expense", "other_expense", "installation", "handling"].indexOf(et) >= 0) {
+  if (["service", "design_service", "labor", "expense", "other_expense", "installation", "handling", "freight", "shipping", "expedited"].indexOf(et) >= 0) {
     return false;
   }
   const blob = [item.title, item.name, item.category, item.service, item.billingCategory, item.description]
@@ -1595,8 +1597,25 @@ async function runPushInvoiceToQBCore(projectId, docId, sendEmail, opts) {
 
     const QB_ITEMS = QB_ITEM_IDS;
 
+    function qbStripInvoiceVendorParens(text, item) {
+      let t = String(text || "");
+      if (!t) return t;
+      let v = String((item && item.vendor) || "").trim();
+      if (!v) {
+        const m = t.match(/\s*\(([^)]+)\)\s*$/);
+        if (m) v = String(m[1] || "").trim();
+      }
+      if (v) {
+        const escV = v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        t = t.replace(new RegExp("\\s*\\(" + escV + "\\)", "gi"), "");
+      }
+      const looksVar = /^po\s/i.test(t) || /\bfreight\b/i.test(t) || /\bprice\s+increase\b/i.test(t) ||
+        /\bprice\s+change\b/i.test(t) || /\bvendor\s+bill\s+variance\b/i.test(t);
+      if (looksVar) t = t.replace(/\s*\(([^)]+)\)/g, "");
+      return t.replace(/\s{2,}/g, " ").replace(/\s[-–—]\s*$/, "").trim();
+    }
     function qbInvoiceLineLabel(item) {
-      const t = String((item && (item.title || item.name)) || "").trim();
+      let t = qbStripInvoiceVendorParens(String((item && (item.title || item.name)) || "").trim(), item);
       const low = t.toLowerCase();
       if (t && low !== "item" && low !== "general item" && low !== "general" && low !== "untitled") return t;
       const svc = String((item && (item.service || item.billingCategory)) || "").trim();
@@ -1624,7 +1643,7 @@ async function runPushInvoiceToQBCore(projectId, docId, sendEmail, opts) {
       const lineTotal = qbStudioInvoiceLineAmount(item);
       const lineLabel = qbInvoiceLineLabel(item);
       const lineTaxable = qbStudioInvoiceLineTaxable(item);
-      let restDesc = String((item && item.description) || "").trim();
+      let restDesc = qbStripInvoiceVendorParens(String((item && item.description) || "").trim(), item);
       if (restDesc && lineLabel && restDesc.toLowerCase().startsWith(lineLabel.toLowerCase())) {
         restDesc = restDesc.slice(lineLabel.length).replace(/^\s*\([^)]*\)\s*[\u2014—\-]\s*/, "").trim();
       }
@@ -1639,7 +1658,6 @@ async function runPushInvoiceToQBCore(projectId, docId, sendEmail, opts) {
           lineLabel,
           restDesc && restDesc.toLowerCase() !== lineLabel.toLowerCase() ? restDesc : "",
           lineNotes,
-          item.vendor ? "(" + item.vendor + ")" : "",
           item.room || item.category || ""
         ].filter(Boolean).join(" — "),
         DetailType: "SalesItemLineDetail",
@@ -1669,12 +1687,7 @@ async function runPushInvoiceToQBCore(projectId, docId, sendEmail, opts) {
 
     if (invoice.shipping && parseFloat(invoice.shipping) > 0) {
       const shipAmt = parseFloat(invoice.shipping);
-      const shipTaxable = salesTaxForQb > 0.02 && cchTaxRules.cchCaliforniaInvoiceLineIsTaxable({
-        category: "Freight",
-        expenseType: "freight",
-        title: "Shipping & Handling",
-        taxable: true
-      });
+      const shipTaxable = false;
       lineItems.push({
         Amount: shipAmt,
         Description: "Shipping & Handling",
@@ -2145,6 +2158,49 @@ function qbInvoicePaymentLineKey(payId, invId, amount) {
   return String(payId) + "|" + String(invId) + "|" + String(Math.round(amt * 100));
 }
 
+function paymentCountsTowardPaid(p) {
+  if (!p) return false;
+  if (p.countsTowardPaid === false) return false;
+  if (String(p.confirmsPaymentId || "").trim()) return false;
+  return true;
+}
+
+function paymentAmountsClose(a, b) {
+  return Math.abs((parseFloat(a) || 0) - (parseFloat(b) || 0)) <= 0.05;
+}
+
+function isSquareStudioPayment(p) {
+  if (!p) return false;
+  if (String(p.qbPaymentId || "").trim()) return false;
+  if (String(p.squarePaymentId || "").trim()) return true;
+  return /^pay_square_/i.test(String(p.id || ""));
+}
+
+/** QB row that matches a Square payment of the same amount and date confirms it. It is not a second payment. */
+function linkQbRowsThatConfirmSquare(payLines) {
+  if (!Array.isArray(payLines)) return payLines || [];
+  payLines.forEach((row) => {
+    if (!row || !String(row.qbPaymentId || "").trim()) return;
+    if (row.countsTowardPaid === false || String(row.confirmsPaymentId || "").trim()) return;
+    const d = String(row.date || "").slice(0, 10);
+    const match = payLines.find((p) => {
+      if (!isSquareStudioPayment(p)) return false;
+      if (!paymentAmountsClose(p.amount, row.amount)) return false;
+      const pd = String(p.date || "").slice(0, 10);
+      return !d || !pd || d === pd;
+    });
+    if (!match) return;
+    row.countsTowardPaid = false;
+    row.confirmsPaymentId = String(match.id || ("pay_square_" + (match.squarePaymentId || ""))).trim();
+    row.note = "QuickBooks confirmation of the Square payment";
+  });
+  return payLines;
+}
+
+function sumPaymentsThatCount(payLines) {
+  return (payLines || []).reduce((s, p) => s + (paymentCountsTowardPaid(p) ? (parseFloat(p.amount) || 0) : 0), 0);
+}
+
 function dedupeInvoicePaymentRowsServer(payments) {
   if (!Array.isArray(payments) || payments.length <= 1) return payments || [];
   const seenQb = new Set();
@@ -2192,8 +2248,8 @@ function mergeQbPaymentRowsIntoPatch(existing, patch, qbPayRows, refTotal, qbBal
     if (key) seenQk.add(key);
     payLines.push(row);
   });
-  payLines = dedupeInvoicePaymentRowsServer(payLines);
-  const paidSum = payLines.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+  payLines = linkQbRowsThatConfirmSquare(dedupeInvoicePaymentRowsServer(payLines));
+  const paidSum = Math.round(sumPaymentsThatCount(payLines) * 100) / 100;
   const latestDate = qbPayRows
     .map((p) => String(p.date || "").slice(0, 10))
     .filter(Boolean)
@@ -2304,7 +2360,10 @@ function buildFirestorePatchFromQBInvoice(existing, qbInv, qbPayRows) {
       }
       // QB balance is ~0 here, so QB considers the invoice fully paid. Trust QB and mark
       // Paid even if the Studio total is higher (edited after QB was paid); flag the gap.
-      const rowsPaid = (updates.payments || payLines).reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+      linkQbRowsThatConfirmSquare(payLines);
+      updates.payments = payLines;
+      updates.paymentCount = payLines.length;
+      const rowsPaid = Math.round(sumPaymentsThatCount(updates.payments) * 100) / 100;
       const paidAmt = rowsPaid > 0.02 ? rowsPaid : qbPaidAmt;
       updates.status = "Paid";
       updates.qbStatus = "paid";
@@ -2570,14 +2629,20 @@ function normalizeQbTxnId(raw) {
 
 /** QBO Bill→PO link: Line.LinkedTxn.TxnLineId is required. Item-based bill lines cannot carry that link. */
 async function fetchQbPurchaseOrderLineIds(accessToken, realmId, poQbId) {
+  const fetched = await fetchQbPurchaseOrderForBillLink(accessToken, realmId, poQbId);
+  return fetched.lineIds;
+}
+
+async function fetchQbPurchaseOrderForBillLink(accessToken, realmId, poQbId) {
   const id = normalizeQbTxnId(poQbId);
-  if (!id) return [];
+  if (!id) return { lineIds: [], txnDate: "" };
   const fetched = await qbApiCall("GET", "purchaseorder/" + id, accessToken, realmId);
   const poEnt = fetched && fetched.PurchaseOrder;
   const lines = poEnt && poEnt.Line ? (Array.isArray(poEnt.Line) ? poEnt.Line : [poEnt.Line]) : [];
-  return lines
+  const lineIds = lines
     .filter((ln) => ln && ln.Id && ln.DetailType && ln.DetailType !== "SubTotalLineDetail")
     .map((ln) => String(ln.Id));
+  return { lineIds, txnDate: poEnt && poEnt.TxnDate ? String(poEnt.TxnDate).slice(0, 10) : "" };
 }
 
 function linkQbBillLinesToPurchaseOrder(lineItems, poQbId, poLineIds) {
@@ -2963,6 +3028,33 @@ function sanitizeVendorInvRef(raw) {
   return t.replace(/\s+/g, " ").trim();
 }
 
+function qbYmd(val) {
+  if (val == null || val === "") return "";
+  if (typeof val.toDate === "function") {
+    try { val = val.toDate(); } catch (_e) { return ""; }
+  }
+  if (val instanceof Date && !isNaN(val.getTime())) return val.toISOString().slice(0, 10);
+  const s = String(val).trim();
+  const iso = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso) return iso[1];
+  const md = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (md) {
+    const mm = md[1].padStart(2, "0");
+    const dd = md[2].padStart(2, "0");
+    return md[3] + "-" + mm + "-" + dd;
+  }
+  return "";
+}
+
+function qbLaterYmd() {
+  let best = "";
+  for (let i = 0; i < arguments.length; i++) {
+    const y = qbYmd(arguments[i]);
+    if (y && y > best) best = y;
+  }
+  return best;
+}
+
 function buildVendorBillQbLineItems(po, bill, opts) {
   opts = opts || {};
   const customerId = opts.customerId ? String(opts.customerId).trim() : "";
@@ -3003,7 +3095,7 @@ function buildVendorBillQbLineItems(po, bill, opts) {
   const poNum = po.number || po.num || po.poNum || "";
   const billTotal = Math.round((parseFloat(bill.billTotal) || 0) * 100) / 100;
   const invRef = sanitizeVendorInvRef(bill.vendorInvoiceNumber);
-  const txnDate = (bill.vendorInvoiceDate || po.date || new Date().toISOString()).toString().slice(0, 10);
+  const txnDate = qbLaterYmd(bill.vendorInvoiceDate, po.date, opts.qbPoTxnDate) || new Date().toISOString().slice(0, 10);
   const docNumber = qbBillDocNumberFromPo(poNum).slice(0, 21);
   const privateNote =
     "CCH Studio vendor bill · PO " + poNum +
@@ -3119,16 +3211,19 @@ exports.pushBillToQB = onCall(QB_CALLABLE, async (request) => {
       console.warn("[pushBillToQB] customer match skipped:", custErr && custErr.message ? custErr.message : custErr);
     }
 
-    const built = buildVendorBillQbLineItems(po, bill, { customerId });
-    const txnDate = built.txnDate;
-    const docNumber = built.docNumber;
-    const privateNote = built.privateNote;
     let poLineIds = [];
+    let qbPoTxnDate = "";
     try {
-      poLineIds = await fetchQbPurchaseOrderLineIds(accessToken, realmId, poQbId);
+      const poLink = await fetchQbPurchaseOrderForBillLink(accessToken, realmId, poQbId);
+      poLineIds = poLink.lineIds || [];
+      qbPoTxnDate = poLink.txnDate || "";
     } catch (poReadErr) {
       console.warn("[pushBillToQB] QB Purchase Order lines for LinkedTxn:", poReadErr && poReadErr.message ? poReadErr.message : poReadErr);
     }
+    const built = buildVendorBillQbLineItems(po, bill, { customerId, qbPoTxnDate });
+    const txnDate = built.txnDate;
+    const docNumber = built.docNumber;
+    const privateNote = built.privateNote;
     const lineItems = linkQbBillLinesToPurchaseOrder(built.lineItems, poQbId, poLineIds);
     const poLinkedTxn = qbBillLinkedTxnForPo(poQbId, poLineIds.length > 0);
     const docNumberCandidates = qbBillDocNumberCandidates(poNum);
@@ -3658,8 +3753,9 @@ async function processQbCustomerPaymentEntity(entity, accessToken, realmId) {
         qbInvoiceTxnId: String(txn.TxnId),
         qbPaymentLineKey: lineFingerprint
       });
+      linkQbRowsThatConfirmSquare(payments);
 
-      const totalPaid = payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+      const totalPaid = Math.round(sumPaymentsThatCount(payments) * 100) / 100;
       const total = studioDocRefTotal(existing);
       const newStatus = total > 0.01 && totalPaid >= total - 0.02 ? "Paid" : "Partially Paid";
       const qbStatus = newStatus === "Paid" ? "paid" : "partial";

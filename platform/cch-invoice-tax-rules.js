@@ -23,7 +23,36 @@
     'travel', 'expense', 'service', 'consult', 'admin', 'retainer',
     'phase', 'hour', 'meeting', 'zoom', 'call',
     'professional service', 'design fee', 'blended design', 'smart time',
+    'freight', 'shipping',
   ];
+
+  /** Freight / shipping lines are never client sales-taxable (CCH / Houzz canon). */
+  function cchInvoiceLineIsFreightLike(it) {
+    it = it || {};
+    var et = norm(it.expenseType || it.itemType);
+    if (et === 'freight' || et === 'shipping' || et === 'expedited') return true;
+    var cat = norm(it.category);
+    if (cat === 'freight' || cat === 'shipping') return true;
+    var title = norm(it.title || it.name);
+    if (/\bfreight\b/.test(title)) return true;
+    if (/\bfreight\s*\/\s*shipping\b/.test(title)) return true;
+    if (/\bfreight\s*&\s*delivery\b/.test(title)) return true;
+    return false;
+  }
+
+  /** Price increase / merch cost variance — always client sales-taxable (not an Expense). */
+  function cchInvoiceLineIsTaxableMerchandiseVariance(it) {
+    it = it || {};
+    if (cchInvoiceLineIsFreightLike(it)) return false;
+    var code = norm(it.varianceReasonCode);
+    if (code === 'price_increase' || code === 'cost_difference' || code === 'larger_size' || code === 'tariff') return true;
+    var blob = norm((it.title || '') + ' ' + (it.name || '') + ' ' + (it.description || ''));
+    if (/\bprice\s+increase\b/.test(blob)) return true;
+    if (/\bdifference\s+in\s+cost\b/.test(blob)) return true;
+    if (/\bpurchased\s+a\s+larger\s+size\b/.test(blob)) return true;
+    if (/\btariff\b|\bduty\b/.test(blob) && !cchInvoiceLineIsFreightLike(it)) return true;
+    return false;
+  }
 
   /** TAXABLE product categories */
   var CCH_CA_TAXABLE_CATEGORY_KEYWORDS = [
@@ -60,7 +89,10 @@
    * Grok / tracker cleaning rules — default taxable? (before explicit line checkbox).
    */
   function cchInvoiceLineCaliforniaTaxableDefault(it) {
+    if (cchInvoiceLineIsFreightLike(it)) return false;
+    if (cchInvoiceLineIsTaxableMerchandiseVariance(it)) return true;
     var f = lineFields(it);
+    if (f.itemType.indexOf('product') >= 0) return true;
     if (blobHasKeyword(f.category, CCH_CA_TAXABLE_CATEGORY_KEYWORDS)) {
       return true;
     }
@@ -94,6 +126,8 @@
     if (!it) return false;
     var et = norm(it.expenseType || it.itemType);
     if (et === 'sales_tax' || et === 'discount' || et === 'retainer_credit') return false;
+    if (cchInvoiceLineIsFreightLike(it)) return false;
+    if (cchInvoiceLineIsTaxableMerchandiseVariance(it)) return true;
 
     var caDefault = cchInvoiceLineCaliforniaTaxableDefault(it);
 
@@ -134,6 +168,16 @@
   /** Apply CA rules to a line object (mutates). Returns true if changed. */
   function cchApplyCaliforniaTaxRulesToLine(it) {
     if (!it) return false;
+    if (cchInvoiceLineIsFreightLike(it)) {
+      var freightChanged = false;
+      if (it.taxable !== false) { it.taxable = false; freightChanged = true; }
+      return freightChanged;
+    }
+    if (cchInvoiceLineIsTaxableMerchandiseVariance(it)) {
+      var merchChanged = false;
+      if (it.taxable !== true) { it.taxable = true; merchChanged = true; }
+      return merchChanged;
+    }
     var shouldTax = cchInvoiceLineCaliforniaTaxableDefault(it);
     var changed = false;
     if (shouldTax === false) {
@@ -151,6 +195,8 @@
   return {
     CCH_CA_NON_TAXABLE_KEYWORDS: CCH_CA_NON_TAXABLE_KEYWORDS,
     CCH_CA_TAXABLE_CATEGORY_KEYWORDS: CCH_CA_TAXABLE_CATEGORY_KEYWORDS,
+    cchInvoiceLineIsFreightLike: cchInvoiceLineIsFreightLike,
+    cchInvoiceLineIsTaxableMerchandiseVariance: cchInvoiceLineIsTaxableMerchandiseVariance,
     cchInvoiceLineCaliforniaTaxableDefault: cchInvoiceLineCaliforniaTaxableDefault,
     cchInvoiceLineIsNonTaxableService: cchInvoiceLineIsNonTaxableService,
     cchCaliforniaInvoiceLineIsTaxable: cchCaliforniaInvoiceLineIsTaxable,

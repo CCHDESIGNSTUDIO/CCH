@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Agent handoff — use `_DEPLOY_QUEUE.md`
 
-All Machine-1 sessions share one working copy. **Do not commit, push, or deploy** unless you are repo owner **#1**. See `commit-deploy-policy.mdc`.
+All Machine-1 sessions share one working copy. The chat that builds a feature **deploys it to staging**. Only Cursor #1 deploys production, and only after Cindy's typed GO. Do not commit unless she asks. See `commit-deploy-policy.mdc` and `loop/CCH_STUDIO_DEPLOY_RULE_CW_Oct16.md`.
 
 ## When your work is ready
 
@@ -22,7 +22,8 @@ Example:
 ```
 
 - Default target: **staging** unless Cindy gave explicit production GO.
-- Do **not** message Cindy for deploy — queue it; #1 batches hourly.
+- Features: deploy staging in this chat, then set the queue line to done with the staging time.
+- Production: queue target production and wait for her typed GO. Only #1 deploys that.
 
 ## Handoff block (for Docs or chat summary)
 
@@ -33,15 +34,16 @@ When writing a handoff doc or ending a substantive session, include:
 3. **Pre-deploy checks** — `node --check` files, cache buster bumps
 4. **Verify steps** — URL, hard refresh, specific page/doc to open
 5. **Guardrails** — isolation, no prod deploy, staging doc IDs if relevant
-6. **STATUS** — `pending` until #1 deploys
+6. **STATUS** — `done (staging deploy …)` after this chat deploys staging. Production stays pending until her GO and #1 deploys.
 
 ## #1 (Deploy Master) checklist
 
-1. Read `_DEPLOY_QUEUE.md` pending lines
-2. Batch related staging items (one deploy at a time for readability)
-3. Run pre-deploy checks from handoff
-4. Deploy staging first; production only on Cindy GO
-5. Flip line to `STATUS: done (staging deploy YYYY-MM-DD HH:MM)` or prod equivalent
+Production only. Staging is already deployed by the builder chat.
+
+1. Read `_DEPLOY_QUEUE.md` lines still waiting on production
+2. Before deploy, check what is already live so nothing newer is overwritten
+3. Deploy production only after Cindy's typed GO
+4. Flip the line to `STATUS: done (PRODUCTION hosting YYYY-MM-DD HH:MM Cindy GO)`
 
 ## Session logs
 

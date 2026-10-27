@@ -1,0 +1,65 @@
+---
+description: EVERY code change gets a WO number — including conversational fixes, not only "work the queue" runs
+alwaysApply: true
+---
+
+# Every change gets a WO number (Cindy, Aug 30 2026)
+
+## The gap this closes
+
+`loop-work-orders.mdc` describes the queue path: Cindy says "work the queue", you take the
+oldest OPEN row, you finish with a DONE file + deploy-queue row + ledger update.
+
+**That rule only fires in queue mode.** When Cindy asks for a fix conversationally
+("the PO print margins are wrong, fix it"), you are not in queue mode, so no WO number is
+allocated, no DONE file is written, and no ledger row is touched. Only the deploy-queue
+line gets appended, because that is tied to deploying.
+
+**Measured Aug 30, 2026: 39 deploy-queue rows since Aug 22 carry a build number. Zero carry
+a WO number.** The last work order written was WO-121 on Aug 22. `loop/LOOP_LEDGER.md` still
+ends at row 121. Builds 9.9.261 through 9.9.300 exist only as deploy lines.
+
+The numbering did not break. It stopped.
+
+## The rule
+
+**A code change is a work order. There is no second category.** It does not matter whether
+it came from the queue, from a chat message, from a screenshot, or from a bug Cindy hit
+thirty seconds ago.
+
+### Before you edit (same turn as the first edit)
+
+1. Read `loop/LOOP_LEDGER.md`, take the next free number.
+2. Add the ledger row: number, one-line title, state `IN PROGRESS`, executor, and a
+   Notes field naming who asked and what the reported symptom was.
+3. Say the number out loud in chat: *"This is WO-122."*
+
+For a one-line fix this is thirty seconds. Do it anyway. The cost of skipping it is that
+in three days nobody can tell which build changed the thing that is now broken, which is
+exactly the position this repo is in today.
+
+### When you finish
+
+Unchanged from `loop-work-orders.mdc`, all three steps, every time:
+
+1. `loop/WO-###_DONE_CR_[MonDD].md` — files touched with line ranges, what changed, self-test.
+2. Append to `_DEPLOY_QUEUE.md`, **with the WO number in the line**, STATUS: pending.
+3. Set the ledger row to `DONE-UNVERIFIED`. Never `VERIFIED` — that belongs to the verifier.
+
+### Deploy-queue line format
+
+The WO number goes immediately after the date stamp:
+
+```
+[2026-08-30 11:45] WO-122 #Cursor po-print-ship-tag-thumbs — <files> — staging — <what changed>. Studio 9.9.300. Verify: <doc>. — STATUS: pending
+```
+
+A deploy-queue row with no WO number is an incomplete row. If you are about to write one,
+stop and allocate the number first.
+
+## Do not
+
+- Do not treat "this is too small for a work order" as a reason to skip. There is no size floor.
+- Do not batch several unrelated fixes under one number. One change, one number.
+- Do not write the DONE file later "when things calm down." It is written in the same turn
+  the change is finished, or it is not written at all.

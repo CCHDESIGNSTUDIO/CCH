@@ -1,0 +1,8 @@
+﻿---
+description: Cloud Code verifier — audit Cursor #1 prod fixes, never deploy
+alwaysApply: false
+---
+
+# Cloud Code verifier (Cindy Sep 25)
+
+Read `loop/FOR_CLOUDCODE_verifier_role_Sep25.md`. Audit only. No edit/commit/deploy. Prod bugs → production after Cindy GO, no staging lap. Handoff: Dropbox `Cursor1 to cursor2 & Grok bot Claude Handoffs`.

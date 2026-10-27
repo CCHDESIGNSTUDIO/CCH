@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CCH Studio — Project Navigation Mockup · Holtz Hill</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{ --navy:#0E1629; --navy2:#0A1F3D; --ink:#1B3352; --gold:#C9A96E; --gold-dk:#A98C4F; --line:#E2E2E2; --line-lt:#F0F0F0; --mut:#6B7280; --mut2:#9CA3AF; --bg:#F7F7F5; }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);display:flex;min-height:100vh;}
+  .mock-tag{position:fixed;top:0;left:0;right:0;background:#B45309;color:#fff;text-align:center;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;padding:4px;z-index:999;}
+
+  /* ===== LEVEL 1: main studio rail (existing CCH sidebar, condensed) ===== */
+  .rail{width:190px;min-width:190px;background:var(--navy);color:rgba(255,255,255,.75);padding:38px 0 20px;display:flex;flex-direction:column;}
+  .rail .logo{font-family:'Playfair Display',serif;color:var(--gold);font-size:17px;letter-spacing:.24em;padding:14px 20px 4px;}
+  .rail .logo small{display:block;font-family:'DM Sans';font-size:8.5px;letter-spacing:.32em;color:rgba(255,255,255,.4);margin-top:2px;}
+  .rail nav{margin-top:18px;}
+  .rail a{display:flex;align-items:center;gap:9px;padding:8px 20px;font-size:12.5px;color:rgba(255,255,255,.72);text-decoration:none;}
+  .rail a.on{color:#fff;background:rgba(201,169,110,.14);border-left:2px solid var(--gold);padding-left:18px;}
+  .rail a .b{margin-left:auto;background:var(--gold);color:var(--navy);font-size:9.5px;font-weight:700;padding:1px 7px;border-radius:8px;}
+  .rail .sec{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.32);padding:16px 20px 4px;}
+
+  /* ===== LEVEL 2: project sub-panel (the Houzz idea) ===== */
+  .proj{width:216px;min-width:216px;background:#fff;border-right:1px solid var(--line);padding:44px 0 20px;overflow-y:auto;}
+  .proj .ph{padding:12px 18px 10px;border-bottom:1px solid var(--line-lt);}
+  .proj .ph .nm{font-family:'Playfair Display',serif;font-size:16px;color:var(--navy2);}
+  .proj .ph .cl{font-size:11px;color:var(--mut2);margin-top:2px;}
+  .proj .grp{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--mut2);font-weight:700;padding:16px 18px 5px;}
+  .proj a{display:flex;align-items:center;gap:8px;padding:7px 18px;font-size:12.5px;color:var(--ink);text-decoration:none;}
+  .proj a:hover{background:#FCFBF8;}
+  .proj a.on{background:#FBF7EE;border-left:2px solid var(--gold);padding-left:16px;font-weight:600;color:var(--navy2);}
+  .proj a .b{margin-left:auto;background:var(--gold);color:var(--navy);font-size:9.5px;font-weight:700;padding:1px 7px;border-radius:8px;}
+  .proj a .b.hot{background:#E86F45;color:#fff;}
+  .proj a .b.mut{background:#EEE9DD;color:#8A7030;}
+
+  /* ===== content ===== */
+  .content{flex:1;min-width:0;padding:52px 30px 60px;}
+  .crumb{font-size:11px;color:var(--mut2);margin-bottom:6px;}
+  h1{font-family:'Playfair Display',serif;font-size:26px;font-weight:600;color:var(--navy2);}
+  .subtitle{font-size:12px;color:var(--mut);margin-top:4px;}
+  .statrow{display:flex;gap:12px;margin:18px 0 24px;flex-wrap:wrap;}
+  .stat{background:#fff;border:1px solid var(--line);padding:10px 16px;min-width:130px;}
+  .stat b{display:block;font-size:20px;font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--navy2);}
+  .stat span{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut2);}
+  .stat.hot b{color:#E86F45;}
+  .lane-h{display:flex;align-items:center;gap:10px;margin:22px 0 8px;}
+  .lane-h h2{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--navy2);}
+  .lane-h::after{content:'';flex:1;height:1px;background:var(--line);}
+  .card{background:#fff;border:1px solid var(--line);}
+  .row{display:flex;align-items:center;gap:14px;padding:13px 18px;border-bottom:1px solid var(--line-lt);}
+  .row:last-child{border-bottom:none;}
+  .ic{width:34px;height:34px;min-width:34px;display:flex;align-items:center;justify-content:center;border:1px solid var(--line);font-size:14px;background:#FAFAFA;}
+  .rmain{flex:1;min-width:0;}
+  .rtitle{font-size:13.5px;font-weight:600;color:var(--navy2);}
+  .rsub{font-size:11.5px;color:var(--mut);margin-top:2px;}
+  .rsub b{color:#166534;}
+  .age{font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:600;padding:3px 9px;white-space:nowrap;}
+  .age.a1{color:#8A7030;background:#FAF3E3;} .age.a2{color:#B45309;background:#FDF0E3;} .age.a3{color:#B91C1C;background:#FDECEC;}
+  .btn{font:600 11px 'DM Sans';padding:6px 12px;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink);white-space:nowrap;}
+  .btn.gold{background:linear-gradient(180deg,#D8BC78,#C9A96E);border-color:#A98C4F;color:#1a1204;}
+  /* rail never collapses in this mockup — narrow preview panes were hiding all its text */
+</style>
+</head>
+<body>
+<div class="mock-tag">Navigation mockup · Houzz-style two-level left nav for CCH Studio · real Holtz Hill data · replaces the 18-tab scroll bar</div>
+
+<!-- LEVEL 1: studio rail (your existing sidebar, unchanged in spirit) -->
+<div class="rail">
+  <div class="logo">CCH<small>STUDIO</small></div>
+  <nav>
+    <a href="#"><span class="t">Dashboard</span></a>
+    <a href="#"><span class="t">Follow-Ups</span><span class="b">12</span></a>
+    <a href="#" class="on"><span class="t">Projects</span></a>
+    <a href="#"><span class="t">Inspiration</span></a>
+    <a href="#"><span class="t">Product Library</span></a>
+    <div class="sec">Finance</div>
+    <a href="#"><span class="t">Proposals</span></a>
+    <a href="#"><span class="t">Invoices</span></a>
+    <a href="#"><span class="t">Purchase Orders</span></a>
+    <div class="sec">Studio</div>
+    <a href="#"><span class="t">Clients</span></a>
+    <a href="#"><span class="t">Vendors</span></a>
+    <a href="#"><span class="t">Smart Time</span></a>
+  </nav>
+</div>
+
+<!-- LEVEL 2: project sub-panel — this replaces the horizontal tab bar -->
+<div class="proj">
+  <div class="ph">
+    <div class="nm">Holtz Hill</div>
+    <div class="cl">Calvin &amp; Valerie Shimano · Dana Point</div>
+  </div>
+  <a href="#"><span>Overview</span></a>
+  <a href="#" class="on"><span>Follow-Ups</span><span class="b hot">7</span></a>
+  <a href="#"><span>Tasks</span></a>
+
+  <div class="grp">Design</div>
+  <a href="#"><span>Inspiration</span><span class="b mut">72</span></a>
+  <a href="#"><span>Selections</span></a>
+  <a href="#"><span>Room Boards</span></a>
+  <a href="#"><span>Design Boards</span></a>
+
+  <div class="grp">Client</div>
+  <a href="#"><span>Decisions</span><span class="b">2</span></a>
+  <a href="#"><span>Proposals</span><span class="b">1</span></a>
+  <a href="#"><span>Communications</span><span class="b">3</span></a>
+  <a href="#"><span>Client Portal ↗</span></a>
+
+  <div class="grp">Money</div>
+  <a href="#"><span>Invoices</span><span class="b hot">$</span></a>
+  <a href="#"><span>Purchase Orders</span></a>
+  <a href="#"><span>Bill Variances</span></a>
+  <a href="#"><span>Financials</span></a>
+
+  <div class="grp">Operations</div>
+  <a href="#"><span>Work Orders</span><span class="b mut">15</span></a>
+  <a href="#"><span>FFE Tracker</span></a>
+  <a href="#"><span>Spec Book</span></a>
+  <a href="#"><span>Time</span></a>
+  <a href="#"><span>Files &amp; Docs</span><span class="b">1</span></a>
+  <a href="#"><span>Notes</span></a>
+</div>
+
+<!-- CONTENT: per-project Follow-Ups -->
+<div class="content">
+  <div class="crumb">Projects › Holtz Hill › Follow-Ups</div>
+  <h1>Follow-Ups</h1>
+  <div class="subtitle">7 stalled handoffs · Calvin's first portal visit was Jul 9 — he's watching right now</div>
+  <div class="statrow">
+    <div class="stat"><b>3</b><span>Waiting on client</span></div>
+    <div class="stat hot"><b>4</b><span>Waiting on you</span></div>
+    <div class="stat"><b>14.3</b><span>Hrs · 30 days</span></div>
+    <div class="stat"><b>26d</b><span>Oldest · invoice bal.</span></div>
+  </div>
+
+  <div class="lane-h"><h2>Waiting on Calvin &amp; Valerie</h2></div>
+  <div class="card">
+    <div class="row"><div class="ic">◆</div><div class="rmain"><div class="rtitle">2 decisions open · Master Bedroom rendering + wallcovering</div><div class="rsub">Posted Jul 8 · <b>Calvin visited Jul 9</b>, answered neither</div></div><span class="age a1">3d</span><button class="btn gold">Copy nudge</button></div>
+    <div class="row"><div class="ic">📄</div><div class="rmain"><div class="rtitle">DOC-1001 Wallpaper Designs &amp; Layouts — pending review</div><div class="rsub">Vanessa's package, shared Jul 8</div></div><span class="age a1">3d</span><button class="btn gold">Copy nudge</button></div>
+    <div class="row"><div class="ic">🧾</div><div class="rmain"><div class="rtitle">INV-6048 · $35,168.63 partially paid — balance open</div><div class="rsub">Issued Jun 15 · <b>viewed Jul 9</b></div></div><span class="age a3">26d</span><button class="btn gold">Follow up</button></div>
+  </div>
+
+  <div class="lane-h"><h2>Waiting on you &amp; Vanessa</h2></div>
+  <div class="card">
+    <div class="row"><div class="ic">📋</div><div class="rmain"><div class="rtitle">Wallcovering proposal · $35,907 — drafted, never sent</div><div class="rsub">Vanessa built it Jun 29 · decision went out Jul 8</div></div><span class="age a2">12d</span><button class="btn gold">Finish &amp; send</button></div>
+    <div class="row"><div class="ic">🪟</div><div class="rmain"><div class="rtitle">15 window-treatment build orders — next: workroom quote</div><div class="rsub">Specs ✓ → Quote · next → Proposal → Approval → Invoice → Fabricate</div></div><span class="age a3">57d</span><button class="btn gold">Request quote</button></div>
+    <div class="row"><div class="ic">💡</div><div class="rmain"><div class="rtitle">Jul 2 lighting round · 9 fixtures — not shared</div><div class="rsub">Stairwell, dining, office, master</div></div><span class="age a2">9d</span><button class="btn gold">Post decision</button></div>
+    <div class="row"><div class="ic">⏱</div><div class="rmain"><div class="rtitle">No hours logged in 9 days on an active project</div><div class="rsub">Last entry Jul 2 · Vanessa, Office CD revisions</div></div><span class="age a2">9d</span><button class="btn gold">Open Time Ledger</button></div>
+  </div>
+</div>
+</body>
+</html>

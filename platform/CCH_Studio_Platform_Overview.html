@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CCH Studio — Platform Overview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0F1A2E; --gold:#C4A464; --gold-soft:#E8DCC4;
+    --cream:#FBF9F4; --line:#E4E0D8; --ink:#1B2333; --muted:#5C6B80;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'DM Sans',system-ui,sans-serif;color:var(--ink);background:var(--cream);line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:960px;margin:0 auto;padding:0 28px 80px}
+  header.hero{background:var(--navy);color:#fff;padding:52px 28px 44px}
+  header.hero .inner{max-width:960px;margin:0 auto}
+  .eyebrow{font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--gold);margin-bottom:14px}
+  h1{font-family:'Playfair Display',serif;font-weight:500;font-size:42px;letter-spacing:.5px;line-height:1.1}
+  .hero p{color:rgba(255,255,255,.72);margin-top:14px;font-size:15px;max-width:640px}
+  .hero .meta{margin-top:22px;font-size:12px;color:rgba(255,255,255,.5);letter-spacing:.04em}
+  h2{font-family:'Playfair Display',serif;font-weight:500;font-size:25px;color:var(--navy);margin:52px 0 6px;padding-bottom:10px;border-bottom:2px solid var(--gold)}
+  h2 .n{color:var(--gold);font-size:16px;margin-right:10px;font-family:'DM Sans';font-weight:600}
+  p.lede{color:var(--muted);margin:10px 0 4px}
+  .flow{background:#fff;border:1px solid var(--line);padding:16px 20px;margin-top:16px;font-size:14px;letter-spacing:.01em}
+  .flow b{color:var(--navy)}
+  table{width:100%;border-collapse:collapse;margin-top:18px;font-size:14px;background:#fff;border:1px solid var(--line)}
+  th{background:var(--navy);color:#fff;text-align:left;font-weight:500;font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:11px 14px}
+  td{padding:11px 14px;border-top:1px solid var(--line);vertical-align:top}
+  td b,td strong{color:var(--navy)}
+  tr:nth-child(even) td{background:#FCFBF8}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}
+  @media(max-width:680px){.cols{grid-template-columns:1fr}}
+  .card{background:#fff;border:1px solid var(--line);border-left:3px solid var(--gold);padding:16px 18px}
+  .card h3{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:9px;font-weight:600}
+  .card ul{list-style:none;font-size:13.5px}
+  .card li{padding:3px 0 3px 16px;position:relative;color:var(--ink)}
+  .card li::before{content:"";position:absolute;left:0;top:11px;width:5px;height:5px;background:var(--gold);border-radius:50%}
+  .rules{background:var(--navy);color:#fff;padding:26px 30px;margin-top:20px}
+  .rules h3{font-family:'Playfair Display',serif;font-weight:500;font-size:19px;color:var(--gold);margin-bottom:14px}
+  .rules ol{margin-left:20px;font-size:14px}
+  .rules li{padding:5px 0;color:rgba(255,255,255,.9)}
+  .rules li b{color:#fff}
+  .pillrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .pill{font-size:12px;padding:5px 12px;border:1px solid var(--line);background:#fff;color:var(--navy);letter-spacing:.02em}
+  .pill.on{border-color:var(--gold);background:#FBF6EC}
+  .never{color:#8A3A2E}
+  .can{color:#2E6B4F}
+  footer{margin-top:60px;padding-top:22px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);text-align:center}
+  .tag{display:inline-block;font-size:11px;background:var(--gold-soft);color:#6B5426;padding:2px 8px;letter-spacing:.04em;margin-left:8px;vertical-align:middle}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="inner">
+    <div class="eyebrow">CCH Design · Studio Platform</div>
+    <h1>CCH Studio — Platform Overview</h1>
+    <p>What exists, where to click, and the rules that must never be gotten wrong. The read-first reference for the team and for Claude.</p>
+    <div class="meta">C-Team · Aug 12, 2026 · grounded against the live build</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <h2><span class="n">01</span>What CCH Studio is</h2>
+  <p class="lede">Cindy Holloway's luxury residential interior design platform. Staff work in <b>Studio</b> (cch-platform.web.app); clients use a lighter <b>Client Portal</b>. Everything runs on Firebase.</p>
+  <div class="flow">
+    <b>Flow:</b> Inspire → select products → boards → <b>proposal</b> → client approves (often line by line) → <b>invoice</b> → client <b>pays</b> → <b>purchase orders</b> → vendor bills → QuickBooks.
+  </div>
+
+  <h2><span class="n">02</span>Three different "boards" <span class="tag">never merge these</span></h2>
+  <table>
+    <tr><th>Staff tab</th><th>Client portal</th><th>What it is</th></tr>
+    <tr><td><b>Inspiration</b></td><td><b>Inspiration Boards</b></td><td>Mood / reference images; client stars &amp; comments</td></tr>
+    <tr><td><b>Room Boards</b></td><td>Room Boards</td><td>The products chosen for the project, organized by room</td></tr>
+    <tr><td><b>Design Boards</b></td><td>(published views)</td><td>Canva-style visual layout boards — what goes in the room</td></tr>
+  </table>
+  <p class="lede" style="margin-top:12px"><b>Selections</b> is another view of the same project products (an editable list). <b>Style Library</b> in the sidebar is internal reference only — copy into a real project when ready.</p>
+
+  <h2><span class="n">03</span>Where to click (Studio sidebar)</h2>
+  <div class="cols">
+    <div class="card"><h3>Daily design</h3><ul>
+      <li>Projects → open a project → its tabs</li>
+      <li>Overview, Tasks, Selections, Inspiration, Room Boards, Design Boards, Proposals, Invoices…</li></ul></div>
+    <div class="card"><h3>Firm-wide lists</h3><ul>
+      <li>Proposals, Invoices, Purchase Orders</li><li>Tasks, Product Library, FFE Schedule</li></ul></div>
+    <div class="card"><h3>Time</h3><ul>
+      <li>Smart Time (day / captures)</li><li>Reconciliation · Time Ledger</li><li>Timely Logged (production only)</li></ul></div>
+    <div class="card"><h3>Ops</h3><ul>
+      <li>Follow-Ups · Activity Feed</li><li>Bugs &amp; Requests · Staff Chat</li></ul></div>
+    <div class="card"><h3>Money / admin</h3><ul>
+      <li>Order Management, Vendor Bills, Bill variances</li><li>QuickBooks, Financials, Profit Tracker</li></ul></div>
+    <div class="card"><h3>Tools &amp; AI</h3><ul>
+      <li>Order Builder (custom upholstery), Receiving, E-Specs</li><li><b>Pepper</b> (staff assistant) · Client Pepper (portal)</li></ul></div>
+  </div>
+
+  <h2><span class="n">04</span>Inside every project (tabs)</h2>
+  <p class="lede">Overview · Work Orders · Tasks · Selections · Inspiration · Room Boards · Design Boards · FFE Tracker · Spec Book · Proposals · Invoices · Purchase Orders · Bill variances · Financials (admin) · Files &amp; Docs · Time · Communications · Notes</p>
+
+  <h2><span class="n">05</span>Client Portal — what clients see</h2>
+  <p class="lede">URL: <b>client.html#/clientview/{projectId}</b> — no password, link access.</p>
+  <div class="cols">
+    <div class="card" style="border-left-color:#2E6B4F"><h3 class="can" style="color:#2E6B4F">Clients CAN see</h3><ul>
+      <li>Home, Messages, Notes, Updates, Decisions</li>
+      <li>Inspiration Boards, Room Boards</li>
+      <li>Proposals, Invoices, Documents</li>
+      <li>Tasks (client-visible), Activity, Time &amp; Progress, Client Pepper</li></ul></div>
+    <div class="card" style="border-left-color:#8A3A2E"><h3 class="never" style="color:#8A3A2E">Clients NEVER see</h3><ul>
+      <li>Purchase orders, vendor bills</li>
+      <li>Cost, markup, margin, DNET</li>
+      <li>Product Library, Smart Time ledger</li>
+      <li>QuickBooks, internal notes</li></ul></div>
+  </div>
+  <p class="lede" style="margin-top:12px"><b>Invoices</b> may show hours/rates if Cindy toggled display on that invoice (default off).</p>
+
+  <h2><span class="n">06</span>Rules you must not get wrong</h2>
+  <div class="rules">
+    <h3>The seven that matter</h3>
+    <ol>
+      <li><b>Doc numbers:</b> PRO-3000+, INV-6000+, PO-9000+. "IN-10000" is old Houzz imports, not the Studio series. There is no DOC financial series.</li>
+      <li><b>Products on documents are COPIES.</b> Changing the Product Library does not update existing proposals/invoices. A line edit stays on that document.</li>
+      <li><b>Partial approval is normal.</b> A client approves some lines → those become an invoice → the rest stay open. One proposal → many invoices.</li>
+      <li><b>POs happen after the invoice is paid</b> — not when the proposal is approved.</li>
+      <li><b>PO lines lock when the PO is sent</b> to the vendor. (Invoices lock when sent / paid / overdue / QB-synced.)</li>
+      <li><b>QuickBooks syncs both ways</b> — Studio pushes documents out and pulls paid status back. QB is the source of truth for payment.</li>
+      <li><b>Timely sync uses production Studio only</b> — never staging.</li>
+    </ol>
+  </div>
+
+  <h2><span class="n">07</span>Integrations</h2>
+  <div class="pillrow">
+    <span class="pill on">QuickBooks (push + pull)</span>
+    <span class="pill on">Timely (prod)</span>
+    <span class="pill on">Airtable (PO receiving)</span>
+    <span class="pill on">Desktop time agent</span>
+    <span class="pill on">ElevenLabs voice</span>
+    <span class="pill">Twilio two-way SMS — backlog, not live</span>
+  </div>
+
+  <h2><span class="n">08</span>When someone asks Claude…</h2>
+  <table>
+    <tr><th>Question</th><th>Answer lives in</th></tr>
+    <tr><td>"Where do I…?"</td><td>§03 Where to click + project tabs (§04)</td></tr>
+    <tr><td>"Can the client see…?"</td><td>§05 Client Portal + the never-see list</td></tr>
+    <tr><td>"Why didn't the library price update on the proposal?"</td><td>Rule 2 — products are copies</td></tr>
+    <tr><td>"Can I invoice part of a proposal?"</td><td>Rule 3 — partial approval</td></tr>
+    <tr><td>"When do we create a PO?"</td><td>Rule 4 — after payment</td></tr>
+    <tr><td>"Room Boards vs Design Boards?"</td><td>§02 Three boards</td></tr>
+  </table>
+
+  <footer>
+    CCH Studio — Platform Overview · C-Team_Aug12_v1.0 · Built from the live build, not from prior drafts.<br>
+    Full feature glossary + Firestore collections: <b>CCH_STUDIO_CURRENT_STATE_C-Team_Aug12_v1.1</b>.
+  </footer>
+</div>
+</body>
+</html>

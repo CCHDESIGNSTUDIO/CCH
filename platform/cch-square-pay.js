@@ -5,6 +5,143 @@
 (function () {
   'use strict';
 
+  window.cchInvoiceOpenBalance = function (inv) {
+    if (!inv) return 0;
+    var st = String(inv.status || '').toLowerCase();
+    if (st === 'paid' || st === 'void' || st === 'voided') return 0;
+    var total = parseFloat(inv.total || inv.amount) || 0;
+    var paid = 0;
+    if (typeof window.cpPortalInvoicePaidAmount === 'function') paid = window.cpPortalInvoicePaidAmount(inv);
+    else {
+      paid = (inv.payments || []).reduce(function (s, p) { return s + (parseFloat(p.amount) || 0); }, 0);
+      if (paid < 0.001) paid = parseFloat(inv.paidAmount || inv.paid || inv.totalPaid || 0) || 0;
+    }
+    return Math.max(0, Math.round((total - paid) * 100) / 100);
+  };
+
+  function cchParseDueNowMoney(raw) {
+    var s = String(raw || '').trim().toLowerCase().replace(/[$,\s]/g, '');
+    if (!s) return 0;
+    var mul = 1;
+    if (s.charAt(s.length - 1) === 'k') {
+      mul = 1000;
+      s = s.slice(0, -1);
+    }
+    var n = parseFloat(s);
+    if (!Number.isFinite(n) || n < 0) return 0;
+    return Math.round(n * mul * 100) / 100;
+  }
+
+  /** Net dollars Square should collect this round. Empty Due now = full remaining. */
+  window.cchInvoiceDueNowNet = function (inv) {
+    var remaining = window.cchInvoiceOpenBalance(inv);
+    if (remaining < 0.01) return 0;
+    var amt = parseFloat(inv && inv.dueNowAmount);
+    var pct = parseFloat(inv && inv.dueNowPercent);
+    var dueNow = 0;
+    if (Number.isFinite(amt) && amt > 0.009) dueNow = amt;
+    else if (Number.isFinite(pct) && pct > 0) dueNow = remaining * (Math.min(100, pct) / 100);
+    if (dueNow < 0.01) dueNow = remaining;
+    return Math.min(remaining, Math.round(dueNow * 100) / 100);
+  };
+
+  window.cchInvoiceDueNowRailHtml = function (projectId, invoiceId, inv) {
+    inv = inv || {};
+    var remaining = window.cchInvoiceOpenBalance(inv);
+    if (remaining < 0.01) return '';
+    var dueNow = window.cchInvoiceDueNowNet(inv);
+    var money = typeof window.formatMoney === 'function' ? window.formatMoney : function (n) {
+      return '$' + (Number(n) || 0).toFixed(2);
+    };
+    var amt = parseFloat(inv.dueNowAmount);
+    var amtStr = (Number.isFinite(amt) && amt > 0.009) ? String(Math.round(amt * 100) / 100) : '';
+    var pct = parseFloat(inv.dueNowPercent);
+    var pctStr = (Number.isFinite(pct) && pct > 0) ? String(pct) : '';
+    var slice = dueNow + 0.01 < remaining;
+    var leftAfter = Math.max(0, Math.round((remaining - dueNow) * 100) / 100);
+    var pid = String(projectId || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    var iid = String(invoiceId || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    return '<div class="cch-doc-view-rail-card">' +
+      '<div class="cch-doc-view-rail-title">Due now (card)</div>' +
+      '<div style="font-size:11px;color:#5C6B80;line-height:1.4;margin:0 0 8px;">Type the card amount (65000 or 65k). Square cannot let the client type an amount. Stay under Square\u2019s $50k cap per charge.</div>' +
+      '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">' +
+        '<label style="font-size:11px;color:#5C6B80;white-space:nowrap;">This payment $</label>' +
+        '<input id="cchDueNowAmt" type="text" inputmode="decimal" value="' + amtStr.replace(/"/g, '&quot;') + '" placeholder="65000 or 65k" style="width:130px;padding:6px 8px;border:1px solid #E2E2E2;font-size:13px;" onchange="cchInvoiceDueNowSave(\'' + pid + '\',\'' + iid + '\',\'amt\')" onkeydown="if(event.key===\'Enter\'){event.preventDefault();cchInvoiceDueNowSave(\'' + pid + '\',\'' + iid + '\',\'amt\');}">' +
+        '<label style="font-size:11px;color:#5C6B80;margin-left:4px;">or %</label>' +
+        '<input id="cchDueNowPct" type="number" min="0" max="100" step="1" value="' + pctStr.replace(/"/g, '&quot;') + '" placeholder="50" style="width:56px;padding:6px 8px;border:1px solid #E2E2E2;font-size:13px;" onchange="cchInvoiceDueNowSave(\'' + pid + '\',\'' + iid + '\',\'pct\')">' +
+      '</div>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">' +
+        '<button type="button" class="btn btn-secondary btn-sm" onclick="cchInvoiceDueNowFillPct(\'' + pid + '\',\'' + iid + '\',' + remaining + ',50)">50%</button>' +
+        '<button type="button" class="btn btn-secondary btn-sm" onclick="cchInvoiceDueNowFillPct(\'' + pid + '\',\'' + iid + '\',' + remaining + ',33)">33%</button>' +
+        '<button type="button" class="btn btn-secondary btn-sm" onclick="cchInvoiceDueNowFillPct(\'' + pid + '\',\'' + iid + '\',' + remaining + ',100)">Remainder</button>' +
+      '</div>' +
+      '<div style="font-size:12px;color:#0A1F3D;line-height:1.45;">This payment: <strong>' + money(dueNow) + '</strong></div>' +
+      '<div style="font-size:12px;color:#5C6B80;margin-top:4px;line-height:1.45;">' +
+        (slice
+          ? ('Balance after this payment: <strong style="color:#0A1F3D;">' + money(leftAfter) + '</strong>')
+          : 'This pays the remaining balance.') +
+      '</div>' +
+      '</div>';
+  };
+
+  window.cchInvoiceDueNowFillPct = function (projectId, invoiceId, remaining, pct) {
+    remaining = parseFloat(remaining) || 0;
+    pct = parseFloat(pct) || 0;
+    var amtEl = document.getElementById('cchDueNowAmt');
+    var pctEl = document.getElementById('cchDueNowPct');
+    var amt = pct >= 99.9
+      ? remaining
+      : Math.round(remaining * (Math.min(100, pct) / 100) * 100) / 100;
+    if (amtEl) amtEl.value = amt ? String(amt) : '';
+    if (pctEl) pctEl.value = '';
+    return window.cchInvoiceDueNowSave(projectId, invoiceId, 'amt');
+  };
+
+  window.cchInvoiceDueNowSave = async function (projectId, invoiceId, source) {
+    if (!projectId || !invoiceId || typeof db === 'undefined') return;
+    var amtEl = document.getElementById('cchDueNowAmt');
+    var pctEl = document.getElementById('cchDueNowPct');
+    var remaining = 0;
+    try {
+      var snap = await db.collection('boards').doc(projectId).collection('invoices').doc(invoiceId).get();
+      remaining = window.cchInvoiceOpenBalance(snap.exists ? snap.data() : {});
+    } catch (_eRem) {}
+    var patch = { updatedAt: new Date().toISOString() };
+    if (source === 'pct') {
+      var pct = pctEl ? parseFloat(pctEl.value) : 0;
+      if (Number.isFinite(pct) && pct > 0 && pct < 99.95) {
+        patch.dueNowPercent = pct;
+        patch.dueNowAmount = 0;
+        if (amtEl) amtEl.value = '';
+      } else {
+        patch.dueNowPercent = 0;
+        patch.dueNowAmount = 0;
+      }
+    } else {
+      var amt = cchParseDueNowMoney(amtEl ? amtEl.value : '');
+      if (remaining > 0.009 && amt > remaining) amt = remaining;
+      if (amt > 0.009) {
+        patch.dueNowAmount = amt;
+        patch.dueNowPercent = 0;
+        if (pctEl) pctEl.value = '';
+        if (amtEl) amtEl.value = String(amt);
+      } else {
+        patch.dueNowAmount = 0;
+        patch.dueNowPercent = 0;
+      }
+    }
+    try {
+      await db.collection('boards').doc(projectId).collection('invoices').doc(invoiceId).set(patch, { merge: true });
+      if (typeof window._cacheTime !== 'undefined') window._cacheTime = 0;
+      if (typeof window.showToast === 'function') window.showToast('Due now saved \u2014 Create / Refresh Square pay link');
+      if (typeof window.renderInvoiceDetail === 'function') {
+        await window.renderInvoiceDetail(projectId, invoiceId);
+      }
+    } catch (e) {
+      if (typeof window.cchAlert === 'function') await window.cchAlert((e && e.message) ? e.message : String(e), 'Due now');
+    }
+  };
+
   window.cchSquarePayLink = function (inv) {
     if (!inv) return '';
     return String(inv.squareCheckoutUrl || '').trim();
@@ -20,7 +157,13 @@
       if (d && (d.markedPaid || d.enriched)) {
         if (typeof window._cacheTime !== 'undefined') window._cacheTime = 0;
         if (typeof window.showToast === 'function') {
-          window.showToast(d.markedPaid ? 'Square payment recorded — invoice Paid' : 'Square payment method updated', 'success');
+          var stPay = String((d && d.status) || '');
+          window.showToast(
+            d.markedPaid
+              ? (stPay === 'Partially Paid' ? 'Square payment recorded — Partially Paid' : 'Square payment recorded — invoice Paid')
+              : 'Square payment method updated',
+            'success'
+          );
         }
         if (!opts.skipRefresh && typeof window.renderInvoiceDetail === 'function') {
           await window.renderInvoiceDetail(projectId, invoiceId);
@@ -36,7 +179,8 @@
     }
   };
 
-  window.cchEnsureSquarePaymentLink = async function (projectId, invoiceId) {
+  window.cchEnsureSquarePaymentLink = async function (projectId, invoiceId, opts) {
+    opts = opts || {};
     if (!projectId || !invoiceId) return '';
     try {
       var fn = firebase.app().functions('us-central1').httpsCallable('createSquarePaymentLink');
@@ -45,6 +189,7 @@
       if (url && typeof window._cacheTime !== 'undefined') window._cacheTime = 0;
       return url;
     } catch (eEns) {
+      if (opts.throwErr) throw eEns;
       return '';
     }
   };
@@ -61,7 +206,7 @@
           return;
         }
       }
-      var url = await window.cchEnsureSquarePaymentLink(projectId, invoiceId);
+      var url = await window.cchEnsureSquarePaymentLink(projectId, invoiceId, { throwErr: true });
       if (url && typeof window.sendInvoiceToClient === 'function') {
         await window.sendInvoiceToClient(projectId, invoiceId);
       } else if (url && typeof window.showToast === 'function') {
@@ -153,6 +298,9 @@
           return Math.max(0, total - paid);
         })();
     if (!(bal > 0.01)) return '';
+    var payNow = typeof window.cchInvoiceDueNowNet === 'function' ? window.cchInvoiceDueNowNet(inv) : bal;
+    if (!(payNow > 0.01)) payNow = bal;
+    var slice = payNow + 0.02 < bal;
     var money = typeof window.formatMoney === 'function' ? window.formatMoney : function (n) {
       return '$' + (Number(n) || 0).toFixed(2);
     };
@@ -178,8 +326,9 @@
       '" onclick=' + payClickAttr + '>Pay</button>';
     if (opts.toolbar) return payBtn;
     return '<div class="cch-inv-pay-bar" style="max-width:820px;margin:0 auto 20px;padding:18px 20px;border:1px solid #E2E2E2;background:#FAFAFA;">' +
-      '<div style="font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#9CA3AF;margin-bottom:6px;">Balance due</div>' +
-      '<div style="font-size:20px;font-weight:600;color:#0A1F3D;font-family:\'Playfair Display\',Georgia,serif;margin-bottom:12px;">' + money(bal) + '</div>' +
+      '<div style="font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#9CA3AF;margin-bottom:6px;">' + (slice ? 'Pay now' : 'Balance due') + '</div>' +
+      '<div style="font-size:20px;font-weight:600;color:#0A1F3D;font-family:\'Playfair Display\',Georgia,serif;margin-bottom:4px;">' + money(payNow) + '</div>' +
+      (slice ? '<div style="font-size:12px;color:#6B7280;margin-bottom:12px;line-height:1.45;">Invoice balance ' + money(bal) + '<br>Leaves ' + money(Math.max(0, Math.round((bal - payNow) * 100) / 100)) + ' after this payment.</div>' : '<div style="margin-bottom:12px;"></div>') +
       '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">' + payBtn + '</div>' +
       '<div style="font-size:12px;color:#6B7280;line-height:1.5;">Opens card pay and Zelle instructions on one page.</div></div>';
   };
@@ -220,13 +369,21 @@
     var bal = typeof window.cpPortalInvoiceBalance === 'function'
       ? window.cpPortalInvoiceBalance(inv)
       : (parseFloat(inv.total || inv.amount) || 0);
-    var paid = bal <= 0.01;
+    var remaining = typeof window.cchInvoiceOpenBalance === 'function'
+      ? window.cchInvoiceOpenBalance(inv)
+      : bal;
+    var payNow = typeof window.cchInvoiceDueNowNet === 'function'
+      ? window.cchInvoiceDueNowNet(inv)
+      : remaining;
+    if (!(payNow > 0.01)) payNow = remaining;
+    var slice = payNow + 0.02 < remaining;
+    var paid = remaining <= 0.01;
     var sq = typeof window.cchSquarePayLink === 'function'
       ? window.cchSquarePayLink(inv)
       : String(inv.squareCheckoutUrl || '').trim();
     var email = window.cchZelleEmail();
     var name = window.cchZelleName();
-    var amtCopy = (Math.round(bal * 100) / 100).toFixed(2);
+    var amtCopy = (Math.round(payNow * 100) / 100).toFixed(2);
     var html = '<div class="cp-sec-label-jx">Pay</div>' +
       '<p style="font-size:12px;color:#6B7280;margin:-4px 0 18px;line-height:1.55;font-family:\'DM Sans\',sans-serif;">Pay ' + esc(docNum) + ' by card or Zelle — both options are on this page.</p>' +
       '<div style="border:1px solid #E2E2E2;padding:28px;max-width:560px;">' +
@@ -234,7 +391,11 @@
     if (paid) {
       html += '<div style="font-size:14px;color:#0A1F3D;margin:12px 0 20px;">This invoice is paid. No payment is needed.</div>';
     } else {
-      html += '<div style="font-size:22px;font-weight:600;color:#0A1F3D;font-family:\'Playfair Display\',Georgia,serif;margin:12px 0 24px;">' + money(bal) + ' due</div>';
+      var leftAfterPay = Math.max(0, Math.round((remaining - payNow) * 100) / 100);
+      html += '<div style="font-size:22px;font-weight:600;color:#0A1F3D;font-family:\'Playfair Display\',Georgia,serif;margin:12px 0 8px;">' + money(payNow) + (slice ? ' now' : ' due') + '</div>' +
+        (slice
+          ? '<div style="font-size:12px;color:#6B7280;margin:0 0 24px;line-height:1.5;">Invoice balance ' + money(remaining) + '<br>Leaves ' + money(leftAfterPay) + ' after this payment.</div>'
+          : '<div style="margin-bottom:24px;"></div>');
 
       /* —— Card (Square) —— */
       html += '<div style="margin:0 0 28px;padding-bottom:28px;border-bottom:1px solid #E2E2E2;">' +
@@ -254,7 +415,7 @@
         '<div style="margin:0 0 16px;">' +
         '<div style="font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#9CA3AF;margin-bottom:6px;">Amount to send</div>' +
         '<div style="display:flex;gap:8px;align-items:center;">' +
-        '<div style="flex:1;font-size:20px;font-weight:600;color:#0A1F3D;font-family:\'Playfair Display\',Georgia,serif;">' + money(bal) + '</div>' +
+        '<div style="flex:1;font-size:20px;font-weight:600;color:#0A1F3D;font-family:\'Playfair Display\',Georgia,serif;">' + money(payNow) + '</div>' +
         copyBtn(amtCopy, 'Copy amount') +
         '</div></div>' +
         '<div style="margin:0 0 16px;">' +
@@ -272,7 +433,7 @@
         '<ol style="margin:0;padding-left:18px;font-size:13px;color:#5C6B80;line-height:1.65;">' +
         '<li>Open your bank app and choose Zelle.</li>' +
         '<li>Send to <strong style="color:#0A1F3D;">' + esc(email) + '</strong>.</li>' +
-        '<li>Enter <strong style="color:#0A1F3D;">' + money(bal) + '</strong>.</li>' +
+        '<li>Enter <strong style="color:#0A1F3D;">' + money(payNow) + '</strong>.</li>' +
         '<li>Put <strong style="color:#0A1F3D;">' + esc(docNum) + '</strong> in the memo.</li>' +
         '</ol></div>';
     }
@@ -348,6 +509,8 @@
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      var sentModal = document.getElementById('cchInvoiceSentModal');
+      if (sentModal) sentModal.remove();
       if (typeof window.showToast === 'function') {
         window.showToast('Email draft opened — the https:// links are clickable', 'success');
       }

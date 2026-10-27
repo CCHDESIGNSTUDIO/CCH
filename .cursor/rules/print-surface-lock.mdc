@@ -1,0 +1,59 @@
+---
+description: LOCKED — print/PDF layer is shared by four document types; staging only, verify all four
+globs:
+  - platform/cch-proposals-invoices-fix.js
+  - platform/index.html
+  - platform/client.html
+alwaysApply: true
+---
+
+# Print surface lock (Cindy, Aug 30 2026)
+
+## Why this exists
+
+The print/PDF layer in `cch-proposals-invoices-fix.js`, `index.html` and `client.html` is
+shared by **four document types: proposals, invoices, purchase orders, tear sheets.**
+
+A change aimed at one of them silently reaches the other three.
+
+Confirmed cases:
+
+- **9.9.278** (Aug 27, straight to production): "Print/PDF: drop 850px page lock, page 2
+  top + left inset." Its verify line read *"Verify: PRO-3044 Print"*. It was checked against
+  a proposal. PO Print inherited the inset and printed a dead band. Found three days later
+  on PO-9045 with a vendor waiting.
+- **9.9.214** (Aug 17): Ship To restyled to a bold name plus a 12px gray caption "to match
+  vendor." Nobody asked for it. It made the job address on every PO read as a footnote.
+- **9.9.275 / 9.9.276** (Aug 27): Room/Tag columns and the Show room / Show tags toggles
+  were added, gated to `type === 'proposal' || type === 'invoice'`. POs were excluded, so on
+  a PO those fields still stack under ITEM. This reads to Cindy as the fix "reverting"
+  when it was never applied to that surface.
+
+## Rules
+
+1. **Staging only.** A print-layer change does not take a same-session production GO.
+   It goes to staging, gets the four-document verify, and ships to production in a later
+   pass. Print defects surface days later in front of a client or a vendor, which is
+   exactly when the "I need it now" instinct is most expensive.
+
+2. **Verify the set, not the trigger.** Every print-layer change is verified against
+   **all four**: one PO, one sent invoice, one sent proposal, one tear sheet. Naming a
+   single document in the verify line is not sufficient and is how 9.9.278 shipped.
+
+3. **State the surfaces in the WO.** The work order says which of the four the change is
+   intended to affect and which it must not. If you cannot answer that, you have not
+   grounded the change yet.
+
+4. **No uncommissioned restyling.** Do not change type size, weight, color, stacking or
+   spacing on Bill To, Ship To, or the line-item block to make one document "match"
+   another. Layout parity is a design decision and it is Cindy's, not an implementation detail.
+
+5. **Ship To renders verbatim.** The Ship To block prints the field exactly as typed in
+   Edit PO, preserving line breaks. Nothing downstream re-parses it, reflows it to one
+   line, or inserts separator characters.
+
+## Before editing any `@media print`, `@page`, Bill To / Ship To, or line-item block
+
+Grep the gate you are about to change and list every `type ===` branch it sits inside.
+If a gate names some document types and not others, say so in chat before editing, because
+that asymmetry is usually the actual bug rather than the thing you were sent to fix.

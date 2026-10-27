@@ -9,7 +9,7 @@
   if (window._cchBugsRequestsLoaded) return;
   window._cchBugsRequestsLoaded = true;
 
-  var BUILD = '20260811fb147';
+  var BUILD = '20260905fb191';
   var POLL_MS = 45000;
   var MIGRATE_KEY = 'cchFbMigratedV1';
 
@@ -53,6 +53,33 @@
 
   function fbToast(msg, type) {
     if (typeof showToast === 'function') showToast(msg, type);
+  }
+
+  // WO-191: Vanessa filed six identical rows in 12s (Aug 11) because Send gave no feedback.
+  var _fbSubmitInFlight = false;
+  var _fbLastNewSubmit = { fp: '', at: 0 };
+  var FB_DUP_WINDOW_MS = 60000;
+
+  function cchFbNormSubmitFp(type, title, text) {
+    return String(type || '').toLowerCase() + '\n' +
+      String(title || '').toLowerCase().replace(/\s+/g, ' ').trim() + '\n' +
+      String(text || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  function cchFbGuardNewSubmit(type, title, text) {
+    var fp = cchFbNormSubmitFp(type, title, text);
+    var now = Date.now();
+    if (_fbSubmitInFlight) return { ok: false, reason: 'in-flight', fp: fp };
+    if (_fbLastNewSubmit.fp && _fbLastNewSubmit.fp === fp && (now - _fbLastNewSubmit.at) < FB_DUP_WINDOW_MS) {
+      return { ok: false, reason: 'duplicate', fp: fp };
+    }
+    _fbSubmitInFlight = true;
+    return { ok: true, fp: fp };
+  }
+
+  function cchFbReleaseNewSubmit(fp, success) {
+    _fbSubmitInFlight = false;
+    if (success && fp) _fbLastNewSubmit = { fp: fp, at: Date.now() };
   }
 
   function fbFmtDate(ts) {
@@ -657,12 +684,25 @@
       };
     });
     document.getElementById('cchFbQuickSend').onclick = function() {
+      var sendBtn = document.getElementById('cchFbQuickSend');
       var text = (document.getElementById('cchFbQuickMsg').value || '').trim();
       if (!text) {
         fbToast('Please describe the issue', 'error');
         return;
       }
-      fbQuickSubmit(selectedType, text, ctx);
+      if (sendBtn && sendBtn.getAttribute('data-busy') === '1') return;
+      if (sendBtn) {
+        sendBtn.setAttribute('data-busy', '1');
+        sendBtn.disabled = true;
+        sendBtn.textContent = 'Sending\u2026';
+      }
+      fbQuickSubmit(selectedType, text, ctx).then(function(ok) {
+        if (!ok && sendBtn) {
+          sendBtn.removeAttribute('data-busy');
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Send';
+        }
+      });
     };
     document.getElementById('cchFbFullModal').onclick = function() {
       fbClosePanel();
@@ -681,11 +721,16 @@
   async function fbQuickSubmit(type, text, ctx) {
     var database = fbDb();
     var u = fbAuthUser();
-    if (!database || !u) return;
+    if (!database || !u) return false;
     var myRole = fbMyRole();
     var other = fbOtherRole(myRole);
     var now = new Date().toISOString();
     var title = fbTrunc(text.split('\n')[0], 80) || 'New ' + type;
+    var guard = cchFbGuardNewSubmit(type, title, text);
+    if (!guard.ok) {
+      fbToast(guard.reason === 'duplicate' ? 'Already submitted \u2014 check Bugs & Requests' : 'Sending\u2026', 'info');
+      return false;
+    }
     var data = {
       type: type,
       title: title,
@@ -715,6 +760,7 @@
         createdAt: now
       });
       await fbPostAssistantAck(database, ref.id, data, now);
+      cchFbReleaseNewSubmit(guard.fp, true);
       fbToast('Request submitted', 'success');
       fbClosePanel();
       await fbRefreshUnread();
@@ -722,9 +768,12 @@
         renderFeedbackRequests();
       }
       fbOpenThread(ref.id);
+      return true;
     } catch (e) {
+      cchFbReleaseNewSubmit(guard.fp, false);
       if (typeof cchAlert === 'function') cchAlert('Error saving: ' + e.message, 'Error');
       else console.error(e);
+      return false;
     }
   }
 
@@ -1019,6 +1068,8 @@
   window.cchFbCaptureContext = fbCaptureContext;
   window.cchFbMyRole = fbMyRole;
   window.cchFbQuickSubmit = fbQuickSubmit;
+  window.cchFbGuardNewSubmit = cchFbGuardNewSubmit;
+  window.cchFbReleaseNewSubmit = cchFbReleaseNewSubmit;
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fbInit);
   else fbInit();

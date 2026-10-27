@@ -88,7 +88,8 @@
 
   // Mailto + thread log. Named cchPoEmailVendor — index.html emailVendorPO() and comms panel call this.
   // Must NOT use cchPoSendToVendor (that is Send PO / mark-sent only, in cch-po-bill-variance.js).
-  window.cchPoEmailVendor = async function(projectId, poId) {
+  window.cchPoEmailVendor = async function(projectId, poId, opts) {
+    opts = opts || {};
     try {
       var snap = await firebase.firestore().collection('boards').doc(projectId)
         .collection('purchaseOrders').doc(poId).get();
@@ -166,6 +167,12 @@
       }
 
       if (typeof window.showToast === 'function') window.showToast('Outbound logged · opening email', 'success');
+      if (typeof window.cchPushPoToAirtableQuiet === 'function') {
+        try { await window.cchPushPoToAirtableQuiet(projectId, poId); } catch (_eAt) {}
+      }
+      if (!opts.skipQbRemind && typeof window.cchPoRemindPushPo === 'function') {
+        try { await window.cchPoRemindPushPo(projectId, poId); } catch (_eQb) {}
+      }
       if (window.location.hash.indexOf('/po/' + poId) >= 0 && typeof window.renderProjectDetail === 'function') {
         window.renderProjectDetail();
       }

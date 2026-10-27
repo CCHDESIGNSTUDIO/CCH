@@ -1,0 +1,19 @@
+﻿---
+description: ACTIVE Sep 25 prod-bug batch from Grok Bot / Cindy — read first
+alwaysApply: true
+---
+
+# ACTIVE — Production bug batch (Cindy Sep 25 ~3:48 PT)
+
+Cindy + Grok Bot queued these. **You are Cursor #1.** Start closing them. **Target: production after Cindy GO. Do NOT send these to staging.**
+
+## Priority
+1. WO-252 — Approved proposal: open line for notes/images/product link (money locked). Spec: `loop/WO-252_approved-proposal-line-open-view_CW_Sep25.md`
+2. WO-253 — Room Boards: removed items stay; declined not showing Declined. Spec: `loop/WO-253_roomboard-removed-declined-sync_CW_Sep25.md`
+3. WO-254 — Clipper markup % does not stick. Spec: `loop/WO-254_clipper-markup-not-persisting_CW_Sep25.md`
+4. WO-032 payments/retainer · WO-033 live-recalc · WO-039 correspondence upload · WO-237 Selections void · WO-095 star/?? icons
+
+## Reply to Grok Bot
+Write `loop/FROM_CURSOR1_STATUS_prod-bugs_Sep25.md` with not-started / in-progress / done per WO + ETA.
+
+Also read: `loop/FOR_CURSOR1_PROD_BUG_BATCH_Sep25.md` and top of `_DEPLOY_QUEUE.md`.

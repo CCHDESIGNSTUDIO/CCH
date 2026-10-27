@@ -1,0 +1,71 @@
+{
+  "id": "INV-STG-DS-EXPENSE-GOLDEN",
+  "projectId": "cloud-rolling-hills",
+  "docNum": "INV-STG-DS-GOLD",
+  "docData": {
+    "number": "INV-STG-DS-GOLD",
+    "status": "Draft",
+    "date": "2026-07-30",
+    "clientName": "Golden Lock Client",
+    "clientAddress": "1 Staging Way\nLaguna Beach, CA 92651",
+    "source": "time-tracker",
+    "timeEntryIds": ["golden-lock"],
+    "memo": "All fees are non-refundable. Freight and delivery charges will be invoiced separately upon shipment. Payment due within 30 days of invoice date.",
+    "clientSummary": ""
+  },
+  "proj": {
+    "id": "cloud-rolling-hills",
+    "name": "Staging — DS Expense Golden",
+    "clientName": "Golden Lock Client",
+    "clientAddress": "1 Staging Way\nLaguna Beach, CA 92651"
+  },
+  "items": [
+    {
+      "title": "Design Services",
+      "expenseType": "service",
+      "itemType": "service",
+      "qty": 4,
+      "rate": 150,
+      "amount": 600,
+      "cost": 0,
+      "lineNotes": "Concept refinement — July",
+      "serviceDateStart": "2026-07-01",
+      "serviceDateEnd": "2026-07-30"
+    },
+    {
+      "title": "T&E (Travel & Entertainment)",
+      "expenseType": "expense",
+      "billingCategory": "T&E",
+      "qty": 1,
+      "cost": 200,
+      "amount": 200,
+      "lineNotes": "Site trip visit"
+    },
+    {
+      "title": "Handling & Packing Fee",
+      "expenseType": "handling",
+      "billingCategory": "Shipping & Handling",
+      "qty": 1,
+      "cost": 500,
+      "amount": 500,
+      "lineNotes": "Shipping"
+    },
+    {
+      "title": "Reimbursable Expense",
+      "expenseType": "other_expense",
+      "billingCategory": "Reimbursable Expense",
+      "qty": 1,
+      "cost": 300,
+      "amount": 300,
+      "lineNotes": "Bartolo invoice"
+    },
+    {
+      "title": "Pre-Paid Sales Tax",
+      "expenseType": "sales_tax",
+      "qty": 1,
+      "cost": 75,
+      "amount": 75,
+      "_cchVendorPrepaidTax": true
+    }
+  ]
+}

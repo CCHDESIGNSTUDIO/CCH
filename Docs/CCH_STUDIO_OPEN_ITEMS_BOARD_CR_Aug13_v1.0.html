@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CCH Studio — Open Items Board (Aug 13, 2026)</title>
+<style>
+  :root{
+    --navy:#0E1629; --navy2:#16243f; --gold:#C9A96E; --gold-dim:rgba(201,169,110,.35);
+    --text:#e8ecf4; --muted:#9aa8be; --line:rgba(201,169,110,.22);
+    --risk:#e57373; --risk-bg:rgba(229,115,115,.12);
+    --warn:#ffb74d; --warn-bg:rgba(255,183,77,.12);
+    --ok:#81c784; --ok-bg:rgba(129,199,132,.12);
+    --block:#9575cd; --block-bg:rgba(149,117,205,.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Segoe UI",system-ui,sans-serif;background:var(--navy);color:var(--text);line-height:1.55;padding-bottom:64px;}
+  .hero{background:linear-gradient(180deg,#121c32 0%,var(--navy) 100%);border-bottom:1px solid var(--line);padding:28px 32px 22px;}
+  .hero .eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);font-weight:700;}
+  .hero h1{font-family:Georgia,serif;font-weight:400;font-size:28px;margin:8px 0 4px;color:#fff;}
+  .hero .sub{color:var(--muted);font-size:13px;max-width:920px;}
+  .wrap{max-width:1120px;margin:0 auto;padding:24px 24px 0;}
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:0 0 24px;}
+  .metric{background:var(--navy2);border:1px solid var(--line);border-radius:10px;padding:16px 18px;}
+  .metric .n{font-size:28px;font-weight:800;color:var(--gold);line-height:1.1;}
+  .metric .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-top:6px;font-weight:700;}
+  .bottleneck{border:2px solid var(--gold);border-radius:12px;padding:18px 20px;background:rgba(201,169,110,.06);margin-bottom:28px;}
+  .bottleneck h2{font-size:14px;color:var(--gold);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;}
+  .bottleneck p,.bottleneck li{font-size:13.5px;color:var(--text);}
+  .bottleneck ul{margin:10px 0 0 18px;}
+  .bottleneck li{margin-bottom:6px;}
+  .sec{margin-bottom:28px;}
+  .sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:8px;}
+  .sec-num{font-size:11px;font-weight:800;color:var(--gold);letter-spacing:.1em;}
+  .sec-title{font-size:17px;font-weight:700;color:#fff;}
+  .item{background:var(--navy2);border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:8px;padding:14px 16px;margin-bottom:10px;}
+  .item.risk{border-left-color:var(--risk);}
+  .item.warn{border-left-color:var(--warn);}
+  .item.block{border-left-color:var(--block);}
+  .item .row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;}
+  .item .id{font-weight:800;color:#fff;font-size:14px;}
+  .item .state{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;border-radius:4px;white-space:nowrap;}
+  .s-open{background:var(--warn-bg);color:var(--warn);}
+  .s-block{background:var(--block-bg);color:var(--block);}
+  .s-risk{background:var(--risk-bg);color:var(--risk);}
+  .s-done{background:var(--ok-bg);color:var(--ok);}
+  .item .body{font-size:13px;color:var(--muted);margin-top:6px;}
+  .item .body b{color:var(--text);font-weight:600;}
+  .since{background:rgba(129,199,132,.08);border:1px solid rgba(129,199,132,.25);border-radius:10px;padding:16px 18px;margin-bottom:28px;}
+  .since h2{font-size:14px;color:var(--ok);margin-bottom:8px;}
+  .since li{font-size:13px;margin-bottom:5px;color:var(--text);}
+  .since ul{margin:0 0 0 18px;}
+  .decisions{background:var(--navy2);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:28px;}
+  .decisions h2{font-size:14px;color:var(--gold);margin-bottom:10px;}
+  .decisions li{font-size:13px;margin-bottom:6px;}
+  .decisions ul{margin:0 0 0 18px;color:var(--muted);}
+  .foot{font-size:11px;color:var(--muted);border-top:1px solid var(--line);padding-top:16px;margin-top:8px;}
+  code{background:rgba(255,255,255,.08);padding:1px 6px;border-radius:4px;font-size:11px;color:var(--gold);}
+  a{color:var(--gold);}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="eyebrow">CCH Studio · Open Items Board</div>
+  <h1>What is still open</h1>
+  <div class="sub">
+    Reconciled Aug 13, 2026 (Pacific) · <code>C-Team_Aug13_v1.0</code> ·
+    Full audit: <a href="OPEN_ITEMS_AUDIT_CR_Aug13_v1.0.md"><code>OPEN_ITEMS_AUDIT_CR_Aug13_v1.0.md</code></a> ·
+    Sources: <code>loop/LOOP_LEDGER.md</code>, <code>_DEPLOY_QUEUE.md</code>, canary fixtures.
+    Claude project docs unread (no Projects tool) — this HTML is the executive summary; the markdown audit is the full list.
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="metrics">
+    <div class="metric"><div class="n">~48</div><div class="lbl">OPEN loop WOs</div></div>
+    <div class="metric"><div class="n">~55</div><div class="lbl">DONE-UNVERIFIED ships</div></div>
+    <div class="metric"><div class="n">8</div><div class="lbl">Live money risks (M1–M8)</div></div>
+    <div class="metric"><div class="n">6</div><div class="lbl">Blocked / decision</div></div>
+    <div class="metric"><div class="n">1</div><div class="lbl">Primary bottleneck</div></div>
+  </div>
+
+  <div class="bottleneck">
+    <h2>The one item under most of the others</h2>
+    <p><b>Frozen staging canary fixtures</b> — automated smoke tests skip deep asserts when env hashes are empty, so items get marked DONE while live checks still fail.</p>
+    <ul>
+      <li><b>Symptom:</b> <code>STAGING_INVOICE_HASH</code>, <code>STAGING_BOARD_HASH</code> unset → canary skips DS tax, board dup-id, Builder ghost asserts.</li>
+      <li><b>Fix path:</b> Edit <code>staging-canary.env</code> per <code>_scripts/canary/FIXTURES.md</code> (example invoice hash for cloud-rolling-hills is documented).</li>
+      <li><b>Unblocks verify for:</b> WO-067 (invoice AI + DS tax), WO-069-B (Builder cost-on-line), WO-070 (All Tasks sort), WO-064 (board dup IDs).</li>
+      <li><b>Not a code deploy</b> — operator fills env + runs <code>node canary_smoke.js</code>; exit 0 = green gate.</li>
+    </ul>
+  </div>
+
+  <div class="since">
+    <h2>Since this board snapshot (Aug 13 session)</h2>
+    <ul>
+      <li><b>WO-112</b> Smart Time source split — staging <code>9.9.162</code> deployed; Timely vs Agent vs Logged in Reconciliation Month + Week.</li>
+      <li><b>WO-113 Part 1</b> coded — board-scoped proposal lines now feed Selections tab; build <code>9.9.168</code> queued staging (PRO-3035 / Rolling Hills test case).</li>
+      <li><b>Tear sheet</b> 3A/3B layouts — staging <code>9.9.163–167</code> shipped.</li>
+      <li><b>Platform canon</b> — Aug 12 docs in repo + Dropbox (<code>CCH_STUDIO_CURRENT_STATE</code>, Vanessa guide, Truth Protocol).</li>
+    </ul>
+  </div>
+
+  <div class="sec">
+    <div class="sec-head"><span class="sec-num">01</span><span class="sec-title">Live money and data risk</span></div>
+
+    <div class="item risk">
+      <div class="row"><span class="id">M1 · Variance tax double-charge</span><span class="state s-risk">BACKFILL AUDIT NOT RUN</span></div>
+      <div class="body">Tax components pushed onto invoices that already have tax. Related: WO-DRAFT-A variance breakout shipped Aug 12 (<code>9.9.151</code> prod) — <b>backfill audit of existing invoices still open</b>.</div>
+    </div>
+
+    <div class="item risk">
+      <div class="row"><span class="id">M2 · Phantom sales tax on hours-only DS invoices</span><span class="state s-risk">SHIPPED UNDER FAIL VERDICT</span></div>
+      <div class="body"><b>INV-6055</b> showed tax on pure Design Services. WO-067 shipped prod Aug 3 with pure-DS tax=0 intent — <b>canary DS tax assert still skipped without fixture</b>. Re-verify after canary env filled.</div>
+    </div>
+
+    <div class="item block">
+      <div class="row"><span class="id">M3 · AI redraft overwrites manual invoice edits</span><span class="state s-block">BLOCKED ON FIXTURE + VERIFY</span></div>
+      <div class="body"><code>draftInvoiceSummary</code> refresh can discard Manage edits. WO-067 merged AI vs human in Client View — <b>save/refresh durability not verified</b> without canary + manual regression on a known invoice.</div>
+    </div>
+
+    <div class="item risk">
+      <div class="row"><span class="id">M4 · QB tax-push bug (P0)</span><span class="state s-open">OPEN SINCE JUL 10</span></div>
+      <div class="body">Sync changes default tax locations; non-taxable service fees marked taxable. Tracked as <b>WO-034</b> — audit table first, no hardcoded TAX. <b>Not started in code.</b></div>
+    </div>
+
+    <div class="item warn">
+      <div class="row"><span class="id">M5 · Trade cost blank on Builder-picked lines</span><span class="state s-open">DECISIVE TEST UNRUN</span></div>
+      <div class="body">Sell flows; cost does not. WO-069-B cost-on-line shipped prod Aug 3 — <b>canary deep assert needs <code>STAGING_BUILDER_PROJECT_ID</code></b>. WO-049-B (material $0) separate Builder lane.</div>
+    </div>
+
+    <div class="item risk">
+      <div class="row"><span class="id">M6 · $2,869.27 Bugle Trail vendor cash, no QB bill</span><span class="state s-risk">UNRECONCILED</span></div>
+      <div class="body">Six POs paid in Studio with no matching QB bill export. Data/ops track — not a single WO. Pairs with WO-040 (bulk link by DocNumber).</div>
+    </div>
+
+    <div class="item risk">
+      <div class="row"><span class="id">M7 · No PO-9### reached QuickBooks</span><span class="state s-open">GOING-FORWARD DEFECT</span></div>
+      <div class="body">Three April POs missing from export window. Confirm current QB push path for new PO-9000+ series; may need Cindy GO for historical export.</div>
+    </div>
+
+    <div class="item warn">
+      <div class="row"><span class="id">M8 · Studio $13,599.46 light vs Houzz (Bugle Trail POs)</span><span class="state s-open">NEEDS FULL 44-ROW EXPORT</span></div>
+      <div class="body">Freight-drop pattern never tested firm-wide. WO-020 staging Houzz parity is BLOCKED-DISCUSSION. Requires full outgoing export compare, not spot fix.</div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-head"><span class="sec-num">02</span><span class="sec-title">Sync &amp; display (new Aug 13)</span></div>
+
+    <div class="item warn">
+      <div class="row"><span class="id">WO-113 · Proposal → Selections → Room Boards trilogy</span><span class="state s-open">PART 1 CODED · PARTS 2–3 OPEN</span></div>
+      <div class="body">PRO-3035 (Rolling Hills): lines on proposal but missing from Selections/Room Boards after adding pictures. Part 1 fixes board-scoped proposal ingest. Part 2 = durable clip ensure (WO-045 writes still OFF). Part 3 = unify tab vs Add-item picker. Handoff: <code>Docs/HANDOFF_WO-113_*</code>.</div>
+    </div>
+
+    <div class="item">
+      <div class="row"><span class="id">WO-045 · Reverse-sync durability</span><span class="state s-block">WRITES OFF BY DEFAULT</span></div>
+      <div class="body">Prod RH backfill applied Jul 27 (458→579 clips). New doc lines still need <code>_cchDocLineClipEnsureApply=true</code> session flag — folded into WO-113 Part 2.</div>
+    </div>
+
+    <div class="item">
+      <div class="row"><span class="id">WO-092 · Library duplicate dropdown</span><span class="state s-open">PART 1 SHIPPED · 2–3 OPEN</span></div>
+      <div class="body">Display dedupe in Add-item picker (<code>9.9.107</code>). Underlying duplicate library rows + Studio ID stamp = Parts 2–3 + WO-094.</div>
+    </div>
+
+    <div class="item block">
+      <div class="row"><span class="id">SEL-1 · Selections edit persistence</span><span class="state s-block">BLOCKED-DECISION</span></div>
+      <div class="body">Needs Cindy a/b/c on edit-save behavior before code.</div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-head"><span class="sec-num">03</span><span class="sec-title">Prod break &amp; urgent</span></div>
+
+    <div class="item risk">
+      <div class="row"><span class="id">HOTFIX-032 · Payment edit/delete buttons dead on PROD</span><span class="state s-risk">OPEN-URGENT</span></div>
+      <div class="body">JSON.stringify inside double-quoted onclick → "Unexpected end of input". WO-032 guard works; ✎/× buttons broken. Single-quote fix at index.html ~26979.</div>
+    </div>
+  </div>
+
+  <div class="decisions">
+    <h2>Decisions on Cindy (sample — not exhaustive)</h2>
+    <ul>
+      <li><b>Canaries:</b> Fill <code>staging-canary.env</code> hashes and run smoke — unblocks verify pipeline.</li>
+      <li><b>WO-113 Part 2:</b> GO for default-on clip ensure on staging (then prod after dry-run).</li>
+      <li><b>WO-045 prod backfill:</b> Other projects beyond Rolling Hills — separate from durability.</li>
+      <li><b>WO-020:</b> Mass staging Houzz close-out — data write needs explicit GO.</li>
+      <li><b>WO-034 / M4:</b> Authorize QB tax audit + fix (services → NON).</li>
+      <li><b>SEL-1:</b> Pick edit-persistence option a/b/c.</li>
+      <li><b>Client visibility:</b> Room Boards / Documents / Updates on portal — confirm keep vs move (Aug 7 standing rule).</li>
+      <li><b>HOTFIX-032:</b> Prod hotfix for payment buttons — daytime deploy rule applies.</li>
+    </ul>
+  </div>
+
+  <div class="foot">
+    <p><b>Repo copies:</b> <code>Docs/CCH_STUDIO_OPEN_ITEMS_BOARD_CR_Aug13_v1.0.html</code> (this file) ·
+    <code>Docs/HANDOFF_OPEN_ITEMS_BOARD_RECONCILIATION_CR_Aug13_v1.0.md</code> (Claude paste) ·
+    <code>loop/LOOP_LEDGER.md</code> (WO states).</p>
+    <p style="margin-top:8px;"><b>Upload to Claude Team:</b> Dropbox <code>Studio Claude skills/CCH_STUDIO_OPEN_ITEMS_BOARD_C-Team_Aug13_v1.0.html</code></p>
+    <p style="margin-top:8px;">Counts differ from an earlier ~215 figure — that assumed a full Claude project doc sweep. This version counts only ledger-verified OPEN + DONE-UNVERIFIED + M-series risks.</p>
+  </div>
+
+</div>
+</body>
+</html>

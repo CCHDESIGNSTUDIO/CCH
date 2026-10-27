@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CCH Studio — Features, Bugs &amp; Open Issues (Jun 14, 2026)</title>
+<style>
+  :root{
+    --navy:#0F1A2E; --navy2:#16243f; --gold:#C4A464; --cream:#FFFDF8;
+    --paper:#f5f3ee; --card:#fff; --line:rgba(15,26,46,0.10);
+    --done:#2e7d32; --done-bg:#eaf5ec;
+    --partial:#1565c0; --partial-bg:#e9f1fb;
+    --bug:#b71c1c; --bug-bg:#fbeaea;
+    --open:#c2410c; --open-bg:#fdeee4;
+    --planned:#6b7280; --planned-bg:#eef0f3;
+    --gray:#6b7280;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Segoe UI",system-ui,-apple-system,sans-serif;background:var(--paper);color:var(--navy);line-height:1.5;padding-bottom:80px;}
+  .header{background:var(--navy);color:#fff;padding:22px 32px;position:sticky;top:0;z-index:50;box-shadow:0 2px 12px rgba(0,0,0,.25);}
+  .header h1{font-family:Georgia,serif;font-weight:400;font-size:22px;letter-spacing:.4px;}
+  .header .sub{color:#b9c2d4;font-size:12.5px;margin-top:4px;}
+  .wrap{max-width:1180px;margin:0 auto;padding:24px 24px 0;}
+  .summary{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0 8px;}
+  .pill{display:flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:7px 14px;font-size:12.5px;font-weight:600;}
+  .pill .n{font-size:15px;font-weight:800;}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .filters{display:flex;flex-wrap:wrap;gap:6px;margin:16px 0 20px;}
+  .fbtn{padding:6px 14px;font-size:12px;font-weight:700;border:1px solid var(--line);background:var(--card);color:var(--gray);cursor:pointer;border-radius:6px;}
+  .fbtn.active{border-color:var(--gold);background:rgba(196,164,100,.14);color:var(--navy);}
+  .tabs{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:20px;flex-wrap:wrap;}
+  .tab{padding:9px 16px;font-size:13px;font-weight:700;color:var(--gray);background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;margin-bottom:-2px;}
+  .tab.active{color:var(--navy);border-bottom-color:var(--gold);}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+  .card h3{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 16px;font-size:14px;border-bottom:1px solid var(--line);background:#fbfaf7;}
+  .card h3 .ico{font-size:18px;}
+  .card h3 .meta{font-size:10.5px;color:var(--gray);font-weight:500;}
+  .ring{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;}
+  .feat{display:flex;gap:9px;align-items:flex-start;padding:8px 16px;border-bottom:1px solid rgba(15,26,46,.05);}
+  .feat:last-child{border-bottom:none;}
+  .feat .fn{font-size:12.5px;font-weight:600;}
+  .feat .fnote{font-size:11px;color:var(--gray);margin-top:1px;}
+  .badge{font-size:9px;padding:2px 7px;border-radius:4px;font-weight:800;white-space:nowrap;text-transform:uppercase;letter-spacing:.3px;}
+  .b-done{background:var(--done-bg);color:var(--done);}
+  .b-partial{background:var(--partial-bg);color:var(--partial);}
+  .b-bug{background:var(--bug-bg);color:var(--bug);}
+  .b-open{background:var(--open-bg);color:var(--open);}
+  .b-planned{background:var(--planned-bg);color:var(--planned);}
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+  th,td{text-align:left;padding:10px 14px;font-size:12.5px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{background:var(--navy);color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:.4px;}
+  tr:last-child td{border-bottom:none;}
+  td .id{font-weight:800;color:var(--navy);}
+  .sec-title{font-size:15px;font-weight:800;margin:6px 0 12px;display:flex;align-items:center;gap:8px;}
+  .note{font-size:12px;color:var(--gray);margin:0 0 16px;}
+  .hide{display:none!important;}
+  .prio-h{font-size:12px;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px;}
+  ul.lst{margin:0 0 8px 18px;font-size:12.5px;} ul.lst li{margin-bottom:5px;}
+  .ship{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--done);border-radius:8px;padding:12px 16px;margin-bottom:10px;font-size:12.5px;}
+  .ship b{color:var(--navy);}
+  .foot{font-size:11px;color:var(--gray);margin-top:24px;border-top:1px solid var(--line);padding-top:14px;}
+  code{background:#eee;padding:1px 5px;border-radius:3px;font-size:11px;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>CCH Studio — Features, Bugs &amp; Open Issues</h1>
+    <div class="sub">Snapshot Jun 14, 2026 · grounded in in-app Platform Status map + KNOWN_ISSUES + CURRENT_PRIORITIES · Author: Cursor (CR)</div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="tabs">
+    <button class="tab active" data-tab="features" onclick="showTab('features')">Features</button>
+    <button class="tab" data-tab="bugs" onclick="showTab('bugs')">Bugs</button>
+    <button class="tab" data-tab="open" onclick="showTab('open')">Open Issues &amp; Priorities</button>
+    <button class="tab" data-tab="shipped" onclick="showTab('shipped')">Shipped This Session</button>
+  </div>
+
+  <!-- FEATURES -->
+  <div id="tab-features">
+    <div class="summary" id="summary"></div>
+    <div class="filters" id="filters"></div>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <!-- BUGS -->
+  <div id="tab-bugs" class="hide">
+    <div class="sec-title">🐛 Confirmed defects in shipped features</div>
+    <p class="note">In-app bug-flagged rows plus tracked regressions from <code>KNOWN_ISSUES.md</code> (Jun 8).</p>
+    <table id="bugTable"><thead><tr><th style="width:90px;">Ref</th><th style="width:130px;">Area</th><th>Issue</th><th style="width:200px;">Status</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <!-- OPEN -->
+  <div id="tab-open" class="hide"></div>
+
+  <!-- SHIPPED -->
+  <div id="tab-shipped" class="hide">
+    <div class="sec-title">✅ Shipped this session (Jun 13–14)</div>
+    <p class="note">Design-board + proposal usability arc. Deployed staging → <b>production</b> Jun 14 (<code>cch-design-boards</code> → cch-platform.web.app).</p>
+    <div id="shipList"></div>
+  </div>
+
+  <div class="foot">
+    Sources: <code>index.html</code> renderPlatformStatus (57594–57728), proposal Bulk Actions (~27274) + setAllProposalLinesRoom, room render/group (8746, 12047); <code>cch-design-board.js</code> createProposalFromBoard (2565+), dbPickRoom (2514+); <code>Docs/KNOWN_ISSUES.md</code>, <code>Docs/CURRENT_PRIORITIES.md</code>, <code>Docs/INTERNAL_CURRENT_PLATFORM_STATUS_CR_Jun09_v1.0.md</code>. Companion markdown: <code>INTERNAL_PLATFORM_FEATURES_BUGS_OPEN_ISSUES_CR_Jun14_v1.0.md</code>.
+  </div>
+</div>
+
+<script>
+const STATUS = {
+  done:    {label:'Done',    badge:'b-done',    color:'#2e7d32'},
+  partial: {label:'Partial', badge:'b-partial', color:'#1565c0'},
+  bug:     {label:'Bug',     badge:'b-bug',     color:'#b71c1c'},
+  open:    {label:'Open',    badge:'b-open',    color:'#c2410c'},
+  planned: {label:'Planned', badge:'b-planned', color:'#6b7280'}
+};
+
+const SECTIONS = [
+  {id:'dashboard', name:'Dashboard', ico:'🏠', features:[
+    {n:'Owner Dashboard', s:'done', note:'Financial health, project summary, KPIs'},
+    {n:'Vanessa Contractor Dashboard', s:'done', note:'Productivity, revenue impact, fee alerts'},
+    {n:"What's New Widget", s:'done', note:'Links to Release Notes + Bug Tracker'},
+    {n:'Daily Design Inspiration Feed', s:'planned', note:'Curated design news/trends'},
+    {n:'Unlogged Time Alerts', s:'done', note:'Days with captures but no logged time'}
+  ]},
+  {id:'projects', name:'Projects', ico:'📁', features:[
+    {n:'Project List (Grid/List)', s:'done', note:'Sortable, filterable, search'},
+    {n:'Project Detail Overview', s:'done', note:'Financials, time, selection boards'},
+    {n:'Edit Project Modal', s:'done', note:'Client dropdown, address, fee, status'},
+    {n:'Client Auto-Lookup', s:'done', note:'From clients collection'},
+    {n:'Financial Health Bar', s:'done', note:'Cash/loaded profit, efficiency, fee burn'},
+    {n:'Pinterest Board Embed', s:'done', note:'Link any Pinterest board URL'},
+    {n:'Files & Attachments', s:'done', note:'Upload or link URLs per project'},
+    {n:'Client Portal Preview', s:'partial', note:'Basic view — needs polish'},
+    {n:'Project Tabs', s:'done', note:'Overview, Tasks, Ideabooks, Boards, FFE, Proposals, Invoices, POs, Financials, Time, Comms, Notes'}
+  ]},
+  {id:'selections', name:'Selections / FFE', ico:'🛋️', features:[
+    {n:'Selection Grid/List View', s:'done', note:'Room-grouped product cards'},
+    {n:'Product Detail Modal', s:'done', note:'Edit title, vendor, price, room, images'},
+    {n:'Room Boards', s:'done', note:'Visual room-based grouping'},
+    {n:'Category Boards', s:'done', note:'Category-based grouping'},
+    {n:'FFE Tracker', s:'done', note:'Full FFE schedule with status'},
+    {n:'Search Selections', s:'bug', note:"Cursor jumps out of search box"},
+    {n:'Delete Items from Boards', s:'bug', note:'No delete button on room/ideabook items'}
+  ]},
+  {id:'proposals', name:'Proposals', ico:'📋', features:[
+    {n:'Proposals List', s:'done', note:'Sortable table'},
+    {n:'Time Period Filters', s:'done', note:'Week / Month / YTD / All'},
+    {n:'Stat Cards', s:'done', note:'Proposed, Approved, Paid, Invoiced'},
+    {n:'Proposal Detail/Edit', s:'done', note:'Full editor with line items'},
+    {n:'Proposal → Invoice Link', s:'done', note:'Tracks conversions'},
+    {n:'Numbering (PRO-3000+)', s:'done', note:'Auto-increment from docCounters'},
+    {n:'Board → Proposal room inherit', s:'done', note:'NEW Jun 14 — no double-prompt'},
+    {n:'Bulk: Set room for all lines', s:'done', note:'NEW Jun 14 — fixes existing proposals'}
+  ]},
+  {id:'invoices', name:'Invoices', ico:'💰', features:[
+    {n:'Invoices List', s:'done', note:'Sortable with payment status'},
+    {n:'New Invoice Modal', s:'done', note:'Auto-number INV-6000+, line items'},
+    {n:'Invoice Status Flow', s:'done', note:'Draft → Sent → Paid / Overdue'},
+    {n:'Invoice Edit/View Split', s:'done', note:'Edit = line items · View = totals/QB/client'},
+    {n:'QuickBooks Sync', s:'done', note:'qbWebhook Gen2; balance sync jobs'},
+    {n:'Payment Tracking', s:'partial', note:'Manual + qbWebhook auto-clear (two-state)'},
+    {n:'Houzz Payment Import', s:'partial', note:'Mostly applied; spot-fix IN-10145/10151/10159'},
+    {n:'Firm-wide invoice dedup', s:'partial', note:'179 dupes merged; ~20 boards w/ case-variant pairs'}
+  ]},
+  {id:'pos', name:'Purchase Orders', ico:'📦', features:[
+    {n:'PO List', s:'done', note:'Sortable with vendor/status/amount'},
+    {n:'New PO Modal', s:'done', note:'Quick create'},
+    {n:'Numbering (PO-400000+)', s:'done', note:'Auto-increment'},
+    {n:'PO → Bill → QB (bill-only)', s:'done', note:'Shipped May 28; vendor bill captures actuals'},
+    {n:'PO lock after Send', s:'done', note:'Total/items immutable once sent'},
+    {n:'PO Detail Page', s:'partial', note:'Classic theme shows black boxes'},
+    {n:'PO Variance / Discrepancy Report', s:'planned', note:'Per SPEC_PO_Bill_Variance_Workflow'}
+  ]},
+  {id:'smarttime', name:'Smart Time', ico:'⏱️', features:[
+    {n:'Desktop Agent (v4)', s:'done', note:'Captures every 15s, flush every 5min'},
+    {n:'Timeline / List / Week views', s:'done', note:'Day timeline, list, Mon–Fri week'},
+    {n:'Date Picker / Member Selector', s:'done', note:'Jump dates; admin views Vanessa'},
+    {n:'Noise Filter', s:'done', note:'Snipping Tool, Explorer filtered'},
+    {n:'Service Type Suggestions', s:'done', note:'SketchUp→Design, Houzz→Procurement'},
+    {n:'Teams/Zoom Detection', s:'done', note:'Meeting titles from window name'},
+    {n:'UTC Timezone Fix', s:'done', note:'UTC→local date correct'},
+    {n:'Capture Consolidation', s:'bug', note:'Overcounting (Campco 1.25hr for 14min)'},
+    {n:'Ghost Block', s:'bug', note:'Logged time shows as capture in timeline'},
+    {n:'Delete in List View', s:'bug', note:'Delete button missing/unwired'},
+    {n:'Batch Edit / AI Auto-Draft / Time→Invoice', s:'planned', note:'Planned pipeline'}
+  ]},
+  {id:'team', name:'Team & Contacts', ico:'👥', features:[
+    {n:'Contact Card Grid', s:'done', note:'Roles, rates, email, phone'},
+    {n:'Add/Edit/Delete Modal', s:'done', note:'Full CRUD with linked projects'},
+    {n:'Role Filter', s:'done', note:'Owner, Contractor, Sub, Workroom, Vendor, Architect'},
+    {n:'Auto-Import from Vendors', s:'done', note:'Vendors merged into team view'},
+    {n:'Quick Actions (Call/Email/Text)', s:'done', note:'tel:/mailto:/sms:'}
+  ]},
+  {id:'clients', name:'Clients', ico:'🤝', features:[
+    {n:'Client List', s:'done', note:'Aggregated from project clientName'},
+    {n:'Client → Project Association', s:'partial', note:'47 clients, 26 projects linked'},
+    {n:'Client Detail Page', s:'planned', note:'Full profile'},
+    {n:'Add to Project Button', s:'planned', note:'Assign client to project'},
+    {n:'Client Search Cursor', s:'bug', note:'Cursor jumps out (same class as Selections)'}
+  ]},
+  {id:'vendors', name:'Vendors', ico:'🏪', features:[
+    {n:'Vendor List + Search', s:'done', note:'Sortable with tags, product counts'},
+    {n:'Vendor Detail (4 tabs)', s:'done', note:'Products, POs, Invoices, Info'},
+    {n:'PO Filtering', s:'done', note:'By vendor name'},
+    {n:'Products Tab', s:'bug', note:'Jumps to Design Hub instead of vendor products'}
+  ]},
+  {id:'ideabooks', name:'Inspiration', ico:'💡', features:[
+    {n:'Ideabook Grid', s:'done', note:'Visual boards with covers'},
+    {n:'Lightbox View', s:'done', note:'Full-screen viewer, stars, comments'},
+    {n:'Star/Comment Readability', s:'bug', note:'Text invisible on dark background'},
+    {n:'Delete Items', s:'bug', note:'No delete button on ideabook items'}
+  ]},
+  {id:'comms', name:'Communications', ico:'💬', features:[
+    {n:'5-Part Unified Feed', s:'done', note:'Correspondence, Messages, Notes, Updates, Activity'},
+    {n:'Log Correspondence Modal', s:'done', note:'Email, call, text, meeting, change order'},
+    {n:'Team Contact Autocomplete', s:'planned', note:'From/To from team collection'},
+    {n:'Outlook Email Integration', s:'planned', note:'MS Graph API'},
+    {n:'Text/SMS Logging', s:'planned', note:'Quick-log texts'}
+  ]},
+  {id:'theme', name:'Theme & UI', ico:'🎨', features:[
+    {n:'Studio Dark Theme', s:'done', note:'Navy/Gold/Cream'},
+    {n:'Color Palette Cleanup', s:'done', note:'Navy/gold/cream only'},
+    {n:'Classic White Theme', s:'partial', note:'Some pages still have dark boxes'},
+    {n:'Responsive Layout', s:'partial', note:'1200px+ works; mobile needs polish'}
+  ]},
+  {id:'clipper', name:'CCH Clipper (Chrome Ext)', ico:'📌', features:[
+    {n:'Clip Products to Projects', s:'done', note:'Right-click from any site'},
+    {n:'Save Source URL', s:'bug', note:'Not saving source link on add to ideabooks'},
+    {n:'Clear Images Between Pages', s:'bug', note:'Old images persist on navigate'},
+    {n:'Right-Click Clip', s:'bug', note:"Can't right-click images to clip"}
+  ]},
+  {id:'designboards', name:'Design Boards (Canva-style)', ico:'🎨', features:[
+    {n:'Incremental drag/render', s:'done', note:'translate3d; replaced full re-render'},
+    {n:'Unstick (UI reset)', s:'done', note:'Nuclear unstick'},
+    {n:'Cost Summary panel (estimate)', s:'done', note:'Client/internal toggle; print with images'},
+    {n:'Print / Export menu', s:'done', note:'Print board / cost summary; PNG hardened'},
+    {n:'New Product from board image', s:'done', note:'Nudge → New Product modal'},
+    {n:'Board → Proposal (auto PRO#, room inherit)', s:'done', note:'Jun 14'},
+    {n:'Room picker (board + proposal)', s:'done', note:'Project rooms dropdown + type-in'},
+    {n:'Desktop drag-drop to canvas', s:'bug', note:'KNOWN_ISSUES DB-1'},
+    {n:'Room filter on left sidebar', s:'bug', note:'KNOWN_ISSUES DB-2'},
+    {n:'Inspiration tab pull-in', s:'bug', note:'KNOWN_ISSUES DB-3'}
+  ]},
+  {id:'data', name:'Data & Imports', ico:'📊', features:[
+    {n:'Houzz Product Import', s:'done', note:'Tracker-spreadsheet import (taxonomy-guarded)'},
+    {n:'Client Extraction', s:'done', note:'47 clients from Houzz files'},
+    {n:'Houzz Transaction Report', s:'partial', note:'Parsed, not fully reconciled'},
+    {n:'Houzz Payment Import', s:'open', note:'$11.3M parsed — push to invoice records'}
+  ]}
+];
+
+const BUGS = [
+  {ref:'DB-1', area:'Design Board', issue:'Desktop drag-drop to canvas not working', status:'Open — fix in openDesignBoard()'},
+  {ref:'DB-2', area:'Design Board', issue:'Left-sidebar Room filter missing', status:'Open'},
+  {ref:'DB-3', area:'Design Board', issue:'Inspiration pull-in empty', status:'Open'},
+  {ref:'RB-1', area:'Room Board', issue:'Decline triggers "New clips detected" refresh; appears not to save', status:'Fixed on staging — awaiting prod sign-off'},
+  {ref:'RB-2', area:'Room Board', issue:'Approve/Decline doesn\'t sync room-board ↔ proposal line', status:'Root fix on staging; full write-back deferred'},
+  {ref:'SEL-1', area:'Selections', issue:'Category/Edit-modal edits don\'t persist for library/products/Houzz rows', status:'Open — decision pending'},
+  {ref:'—', area:'Selections', issue:'Search box cursor jump', status:'Open (input-layer)'},
+  {ref:'—', area:'Smart Time', issue:'Capture overcounting; ghost block; list-view delete missing', status:'Open'},
+  {ref:'—', area:'Clients', issue:'Search cursor jump', status:'Open (shared root)'},
+  {ref:'—', area:'Vendors', issue:'Products tab routes to Design Hub', status:'Open'},
+  {ref:'—', area:'Inspiration', issue:'Star/comment text unreadable on dark; no delete button', status:'Open'},
+  {ref:'—', area:'Clipper', issue:'Source URL not saved; images don\'t clear; right-click clip broken', status:'Open'}
+];
+
+const SHIPPED = [
+  '<b>Stability:</b> incremental DOM drag/render; nuclear unstick; hardened PNG export (re-entry guard, scale 1, confirm); auto-close print windows; global Esc dismisses overlays.',
+  '<b>Cost Summary (estimate):</b> priced product summary with clear Internal/Client toggle; print includes image thumbnails; nudge to convert images → products.',
+  '<b>Print / Export menu:</b> replaced broken html2canvas PNG export (tainted-canvas error) with Print board / Cost summary / Download PNG.',
+  '<b>View clarity:</b> toggles show current state ("👁 Client view: ON") instead of the action.',
+  '<b>Board → Proposal:</b> auto-fills next PRO# as the document name; stores proposalNum, createdBy, increments proposalCount.',
+  '<b>Room flow (Jun 14):</b> new proposals inherit the board\'s room (no double-prompt); reusable dbPickRoom (project rooms + type-in); Bulk Actions → "Set room for all lines…" fixes existing proposals — verified by Cynthia.'
+];
+
+let filter = 'all';
+
+function renderSummary(){
+  const counts = {done:0,partial:0,bug:0,open:0,planned:0,total:0};
+  SECTIONS.forEach(s=>s.features.forEach(f=>{counts.total++;counts[f.s]++;}));
+  const order=['done','partial','bug','open','planned'];
+  document.getElementById('summary').innerHTML =
+    `<div class="pill"><span class="n">${counts.total}</span> Features</div>` +
+    order.map(k=>`<div class="pill"><span class="dot" style="background:${STATUS[k].color}"></span><span class="n" style="color:${STATUS[k].color}">${counts[k]}</span> ${STATUS[k].label}</div>`).join('');
+  const fl=['all',...order];
+  document.getElementById('filters').innerHTML = fl.map(k=>{
+    const c = k==='all'?counts.total:counts[k];
+    const lbl = k==='all'?'All':STATUS[k].label;
+    return `<button class="fbtn ${filter===k?'active':''}" onclick="setFilter('${k}')">${lbl} (${c})</button>`;
+  }).join('');
+}
+
+function renderGrid(){
+  const g=document.getElementById('grid');
+  g.innerHTML = SECTIONS.map(s=>{
+    let feats = filter==='all'?s.features:s.features.filter(f=>f.s===filter);
+    if(!feats.length) return '';
+    const done = s.features.filter(f=>f.s==='done').length;
+    const pct = Math.round(done/s.features.length*100);
+    const bugs = s.features.filter(f=>f.s==='bug').length;
+    const ringColor = pct===100?'#2e7d32':pct>50?'#1565c0':'#c2410c';
+    return `<div class="card">
+      <h3>
+        <span style="display:flex;align-items:center;gap:10px;">
+          <span class="ico">${s.ico}</span>
+          <span><div>${s.name}</div><div class="meta">${done}/${s.features.length} done${bugs?` · <span style="color:#b71c1c;">${bugs} bug${bugs>1?'s':''}</span>`:''}</div></span>
+        </span>
+        <span class="ring" style="border:3px solid ${ringColor};color:${ringColor};">${pct}%</span>
+      </h3>
+      ${feats.map(f=>`<div class="feat">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span class="fn">${f.n}</span><span class="badge ${STATUS[f.s].badge}">${STATUS[f.s].label}</span></div>
+          <div class="fnote">${f.note}</div>
+        </div>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+function renderBugs(){
+  document.querySelector('#bugTable tbody').innerHTML = BUGS.map(b=>
+    `<tr><td><span class="id">${b.ref}</span></td><td>${b.area}</td><td>${b.issue}</td><td>${b.status}</td></tr>`
+  ).join('');
+}
+
+function renderOpen(){
+  document.getElementById('tab-open').innerHTML = `
+    <div class="sec-title">📌 Open issues &amp; priorities</div>
+    <p class="note">From <code>CURRENT_PRIORITIES.md</code> (May 27 rev) + <code>KNOWN_ISSUES.md</code> Jun 5 intake.</p>
+    <div class="prio-h">HIGH — active UI regressions</div>
+    <ul class="lst">
+      <li><b>Design Board — restore Morpholio/Canva behaviors</b> (DB-1/2/3): desktop drag-drop, room filter, inspiration pull-in.</li>
+      <li><b>PO → Bill → Client Invoice variance + Discrepancy Report</b> — discrepancy tab/report/dashboard + client-invoice routing.</li>
+      <li><b>BIG QuickBooks push notifications</b> — modal on first push, sync banner, sticky toast stack; red failure states.</li>
+    </ul>
+    <div class="prio-h">HIGH — architectural</div>
+    <ul class="lst">
+      <li><b>RESOLVE vs APPLY pattern</b> — replace applyLibraryImageSyncToDocItems / ensureLibraryProductsForLineItems / syncImageFromLibrary.</li>
+      <li><b>Restore Product Library UI</b> lost in May 13 revert (Houzz ID, LINKED column popover, LINKED section).</li>
+      <li><b>Re-add Replace Image button</b> (must UPDATE, not CREATE).</li>
+      <li><b>Categories regression</b> — filter expenseType service|expense out of dropdowns.</li>
+    </ul>
+    <div class="prio-h">Agent layer (approved May 27)</div>
+    <ul class="lst">
+      <li><b>Chief of Staff Agent v1.0</b> — daily briefing modal first.</li>
+      <li><b>CFO Agent v1.0</b> — AR aging widget + daily cash snapshot first.</li>
+      <li><b>CMO / Client Experience Agent v1.0</b> — silence detection + engagement scorecard first.</li>
+    </ul>
+    <div class="prio-h">MEDIUM</div>
+    <ul class="lst">
+      <li>Client searchbar cursor jump (shared input-layer fix).</li>
+      <li>Smart Time overcounting; list delete unwired; Activity page empty (verify prod).</li>
+      <li>Remove 11 service/expense rows from Product Library; fix "Appliances  & Plumbing" double-space (14 docs).</li>
+      <li>Tearsheets page blank; connect image slots 2–5 (9,579 orphaned files); Apr 29 silent save issue.</li>
+    </ul>
+    <div class="prio-h">Nice-to-have</div>
+    <ul class="lst">
+      <li>Triple-DUP cleanup (~1,043 dup clips); Display ID prefix (H-/S-/C-); reconcile products/productLibrary; Clipper ID format.</li>
+    </ul>
+    <div class="prio-h">Design-board improvements identified Jun 13–14 (not yet built)</div>
+    <ul class="lst">
+      <li><b>Search relevance ranking</b> — broad coverage, weak ranking; fix before taxonomy.</li>
+      <li><b>Category taxonomy unification</b> — align to 21-category canon.</li>
+      <li><b>Missing/blurry board images</b> — hotlink/Magento sources; lean on Firebase Storage + resolve helpers.</li>
+      <li><b>Morpholio-style product report</b> — cost summary shipped; full product report next.</li>
+      <li><b>Highlight non-product board items</b> — flag items needing to become products before a proposal.</li>
+    </ul>`;
+}
+
+function renderShipped(){
+  document.getElementById('shipList').innerHTML = SHIPPED.map(s=>`<div class="ship">${s}</div>`).join('');
+}
+
+function setFilter(k){ filter=k; renderSummary(); renderGrid(); }
+function showTab(t){
+  ['features','bugs','open','shipped'].forEach(x=>{
+    document.getElementById('tab-'+x).classList.toggle('hide', x!==t);
+    document.querySelector(`.tab[data-tab="${x}"]`).classList.toggle('active', x===t);
+  });
+}
+
+renderSummary(); renderGrid(); renderBugs(); renderOpen(); renderShipped();
+</script>
+</body>
+</html>

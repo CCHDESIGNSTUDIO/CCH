@@ -39,6 +39,35 @@ function moneyCents(v) {
   return isFinite(n) ? Math.round(n * 100) : 0;
 }
 
+/** Square merchant per-charge cap (gross, including our 3% card gross-up). */
+const SQUARE_GROSS_MAX_CENTS = 5000000;
+
+function invoicePaidCents(inv) {
+  let paid = moneyCents(inv.paidAmount);
+  const rows = Array.isArray(inv.payments) ? inv.payments : [];
+  const fromRows = rows.reduce((s, p) => s + moneyCents(p && p.amount), 0);
+  if (fromRows > paid) paid = fromRows;
+  return paid;
+}
+
+function invoiceOpenBalanceCents(inv) {
+  if (String(inv.status || "").toLowerCase() === "paid") return 0;
+  return Math.max(0, moneyCents(inv.total) - invoicePaidCents(inv));
+}
+
+/** Due now $ or % of remaining. Empty = full remaining (legacy). */
+function invoiceDueNowNetCents(inv) {
+  const remaining = invoiceOpenBalanceCents(inv);
+  if (remaining < 1) return 0;
+  let dueNow = moneyCents(inv.dueNowAmount);
+  const pct = parseFloat(inv.dueNowPercent);
+  if (dueNow < 1 && Number.isFinite(pct) && pct > 0) {
+    dueNow = Math.round(remaining * (Math.min(100, pct) / 100));
+  }
+  if (dueNow < 1) dueNow = remaining;
+  return Math.min(dueNow, remaining);
+}
+
 async function squareFetch(path, token, opts) {
   opts = opts || {};
   const clean = String(token || "").replace(/[\r\n\t ]+/g, "").trim();
@@ -111,15 +140,18 @@ exports.createSquarePaymentLink = onCall(
     if (!snap.exists) throw new HttpsError("not-found", "Invoice not found");
     const inv = snap.data() || {};
 
-    const total = moneyCents(inv.total);
-    const paid = moneyCents(inv.paidAmount);
-    let due = total - paid;
-    if (String(inv.status || "").toLowerCase() === "paid") due = 0;
+    const due = invoiceDueNowNetCents(inv);
     if (due < 1) {
       throw new HttpsError("failed-precondition", "Invoice has no open balance to collect.");
     }
 
     const charge = squareGrossChargeCents(due);
+    if (charge > SQUARE_GROSS_MAX_CENTS) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Square max is $50,000 per card charge (including the 3% fee). Lower Due now — e.g. 50% of INV-6065 — then Refresh Square pay link."
+      );
+    }
     const existing = String(inv.squareCheckoutUrl || "").trim();
     if (existing && inv.squareFeeGrossed && Number(inv.squareCheckoutAmountCents) === charge) {
       return { success: true, url: existing, reused: true, chargeCents: charge, dueCents: due };
@@ -164,6 +196,8 @@ exports.createSquarePaymentLink = onCall(
         projectId: projectId,
         invoiceId: invoiceId,
         paymentLinkId: link.id || "",
+        dueCents: due,
+        chargeCents: charge,
         createdAt: new Date().toISOString()
       });
     }
@@ -220,7 +254,8 @@ function squareHowPaidLabel(payment) {
   return "Square";
 }
 
-function applySquarePaymentPatch(inv, payment) {
+function applySquarePaymentPatch(inv, payment, opts) {
+  opts = opts || {};
   const payId = String(payment.id || "").trim();
   const cents = payment.amount_money && payment.amount_money.amount;
   const rawAmount = Math.round((Number(cents) || 0)) / 100;
@@ -229,7 +264,12 @@ function applySquarePaymentPatch(inv, payment) {
   const alreadyPaid = payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
   const invTotal = parseFloat(inv.total || inv.amount) || 0;
   const remaining = Math.round(Math.max(0, invTotal - alreadyPaid) * 100) / 100;
-  const amount = remaining > 0.01 ? Math.min(rawAmount, remaining) : rawAmount;
+  /* Gross Square charge includes the 3% card fee. Credit the invoice with Due-now net for this checkout. */
+  let cap = remaining;
+  const dueNet =
+    Math.round((Number(opts.dueNetCents) || Number(inv.squareInvoiceDueCents) || 0)) / 100;
+  if (dueNet > 0.01) cap = Math.min(remaining, dueNet);
+  const amount = remaining > 0.01 ? Math.min(rawAmount, cap) : rawAmount;
   const existingIdx = payId ? payments.findIndex((p) => String(p.squarePaymentId || "") === payId) : -1;
   if (existingIdx >= 0) {
     const cur = payments[existingIdx] || {};
@@ -290,8 +330,8 @@ async function findCompletedSquarePayment(token, inv) {
   return null;
 }
 
-async function markInvoicePaidFromSquare(ref, inv, payment) {
-  const applied = applySquarePaymentPatch(inv, payment);
+async function markInvoicePaidFromSquare(ref, inv, payment, opts) {
+  const applied = applySquarePaymentPatch(inv, payment, opts);
   if (applied.already && applied.enriched && applied.patch) {
     await ref.update(applied.patch);
     return { markedPaid: false, already: true, enriched: true, status: inv.status || "" };
@@ -325,7 +365,13 @@ exports.checkSquarePayment = onCall(
     try {
       const pay = await findCompletedSquarePayment(token, inv);
       if (!pay) return { markedPaid: false, pending: true };
-      return await markInvoicePaidFromSquare(ref, inv, pay);
+      let dueNetCents = Number(inv.squareInvoiceDueCents) || 0;
+      const oid = String(inv.squareOrderId || pay.order_id || "").trim();
+      if (oid) {
+        const look = await db.collection("squareCheckouts").doc(oid).get();
+        if (look.exists) dueNetCents = Number((look.data() || {}).dueCents) || dueNetCents;
+      }
+      return await markInvoicePaidFromSquare(ref, inv, pay, { dueNetCents });
     } catch (err) {
       if (err instanceof HttpsError) throw err;
       throw new HttpsError("failed-precondition", String((err && err.message) || err).slice(0, 300));
@@ -371,12 +417,14 @@ exports.squarePaymentWebhook = onRequest(
       const db = admin.firestore();
       let projectId = "";
       let invoiceId = "";
+      let checkoutDue = 0;
       if (orderId) {
         const look = await db.collection("squareCheckouts").doc(orderId).get();
         if (look.exists) {
           const row = look.data() || {};
           projectId = String(row.projectId || "");
           invoiceId = String(row.invoiceId || "");
+          checkoutDue = Number(row.dueCents) || 0;
         }
       }
       if (!projectId || !invoiceId) {
@@ -389,7 +437,9 @@ exports.squarePaymentWebhook = onRequest(
         res.status(200).json({ ok: true, missing: true });
         return;
       }
-      await markInvoicePaidFromSquare(ref, snap.data() || {}, payment);
+      await markInvoicePaidFromSquare(ref, snap.data() || {}, payment, {
+        dueNetCents: checkoutDue
+      });
       res.status(200).json({ ok: true, marked: true });
     } catch (err) {
       console.error("[squarePaymentWebhook]", err && err.message ? err.message : err);

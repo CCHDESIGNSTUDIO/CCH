@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>CCH Custom Order Builder</title>
-<meta name="cch-builder-rev" content="2026-08-13ft066-workroom-cost-draft">
+  <meta name="cch-builder-rev" content="2026-10-04wo-materials-col">
 <script src="https://cdn.jsdelivr.net/gh/gitbrent/PptxGenJS@v3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -34,7 +34,7 @@
   .header-save-status{font-size:11px;color:var(--flag);font-weight:600;letter-spacing:.5px}
   .header-builder-preview-btns{display:none;gap:8px;align-items:center;flex-wrap:wrap;margin-left:8px;position:relative;z-index:6}
   .header-builder-preview-btns .btn.secondary{padding:7px 12px;font-size:10px;letter-spacing:1px}
-  .header-bartolo-import{display:none;align-items:center;margin-left:8px;flex-shrink:0}
+  .header-bartolo-import{display:none;align-items:center;margin-left:8px;flex-shrink:0;gap:8px}
   body.builder-signed-in .header-bartolo-import{display:flex}
   body.bulk-print-mode .header-bartolo-import{display:flex!important}
   .header-all-wo{display:none;align-items:center;margin-left:8px;flex-shrink:0}
@@ -349,6 +349,10 @@
   .pp-section{font-size:11px;letter-spacing:3px;font-weight:700;color:var(--ink);text-transform:uppercase;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--hairline)}
   .pp-section.pp-section--compact{font-size:10px;letter-spacing:2px;margin-bottom:3px;padding-bottom:2px}
   .pp-intent{font-size:11px;font-style:italic;color:var(--body);line-height:1.35;margin-bottom:8px}
+  .pp-workroom-desc{font-size:11px;color:var(--ink);line-height:1.35;margin-bottom:8px;white-space:pre-wrap}
+  .pp-scope-block{padding:2px var(--pp-pad-r) 8px var(--pp-pad-l)}
+  .pp-scope-block .pp-intent{font-size:12px;line-height:1.4;max-width:none}
+  .pp-scope-block .pp-workroom-desc{font-size:11px;line-height:1.4}
   .pp-custom-box{margin-top:8px;border:1px solid var(--hairline);padding:8px}
   .pp-custom-box-img{margin:6px 0}
   .pp-custom-box-img img{width:100%;height:auto;display:block;max-height:2.4in;object-fit:contain}
@@ -361,7 +365,7 @@
   .pp-specs .pp-spec-row .pp-spec-text{flex:1;min-width:120px;line-height:1.25}
   .pp-specs .pp-spec-row .pp-spec-text b{font-size:10px;font-weight:700;color:var(--ink)}
   .pp-specs .pp-spec-thumb{width:72px;height:72px;object-fit:cover;border:1px solid var(--rule);flex-shrink:0}
-  .pp-specs .pp-spec-imgnote{font-size:9px;color:var(--muted);margin:0 0 2px 2px;font-style:italic;line-height:1.2}
+  .pp-specs .pp-spec-imgnote{font-size:9px;color:var(--muted);margin:2px 0 0;font-style:italic;line-height:1.2}
   .pp-rendering{background:#fff;border:1px solid var(--hairline);min-height:160px;max-height:280px;height:200px;display:flex;align-items:center;justify-content:center;overflow:hidden}
   .pp-rendering.pp-rendering--has-img{background:#fff;border:1px solid var(--hairline)}
   .preview-body.preview-bedding .pp-rendering{min-height:260px;max-height:430px;height:340px}
@@ -506,6 +510,10 @@
     @page { size: 11in 8.5in landscape; margin: 0.35in 0.38in 0.28in 0.52in; }
     #cchStagingBanner { display: none !important; }
     body { padding-top: 0 !important; }
+    header, nav.tabs, .library-rail, .form-pane, .preview-view-toolbar, #previewPaneFooter,
+    .header-save-bar, .header-library-toggle, .header-builder-preview-btns, .header-all-wo,
+    .header-bartolo-import, .auth-note, .toolbar { display: none !important; }
+    .builder-shell, #builderShell, #app, .preview-pane { display: block !important; width: 100% !important; max-width: none !important; grid-template-columns: none !important; }
     .preview-shrink { transform: none !important; margin: 0 !important; }
     .preview-page {
       width: 100% !important;
@@ -693,6 +701,9 @@
     .preview-page--roller .pp-notes-blk ul { padding-left: 12px !important; }
     .preview-page--roller .pp-meas-bar { padding: 2px 8px !important; font-size: 6.5pt !important; }
     .preview-page--roller .pp-intent { font-size: 8.5pt !important; line-height: 1.25 !important; }
+    .pp-scope-block { break-inside: auto; page-break-inside: auto; }
+    .pp-scope-block .pp-workroom-desc { font-size: 9pt !important; line-height: 1.35 !important; }
+    .preview-page--roller .pp-workroom-desc { font-size: 8pt !important; line-height: 1.25 !important; }
     .preview-page--roller .pp-specs .pp-spec-thumb { width: 0.62in !important; height: 0.62in !important; }
     .preview-page--roller .strip-cell .img { height: 0.46in !important; max-height: 0.46in !important; }
     .preview-strip { break-inside: avoid-page; page-break-inside: avoid; }
@@ -721,6 +732,7 @@
     .preview-page--product .pp-specs .pp-spec-row .pp-spec-text { line-height: 1.35 !important; }
     .preview-page--product .pp-specs .pp-spec-row .pp-spec-text b { font-size: 10.5pt !important; }
     .preview-page--product .pp-intent { font-size: 10pt !important; line-height: 1.35 !important; }
+    .preview-page--product .pp-workroom-desc { font-size: 9.5pt !important; line-height: 1.3 !important; }
     .preview-page--product .pp-section.pp-section--compact { font-size: 9pt !important; }
     .pp-fabric .sw { width: 0.95in !important; height: 0.95in !important; }
     .pp-fabric-body { grid-template-columns: 0.95in minmax(0, 1fr) !important; gap: 6px 8px !important; }
@@ -893,6 +905,7 @@
   </div>
   <div class="header-bartolo-import" id="headerBartoloImportWrap">
     <button type="button" class="btn secondary" id="headerBartoloImportBtn" title="Upload a workroom estimate PDF (QuickBooks PO/invoice or designer budget) to create a grouped draft proposal">Import Workroom Estimate → Proposal</button>
+    <button type="button" class="btn secondary" id="headerPptDesignBtn" title="Copy pictures, tags, and design notes from the window-treatment PowerPoint onto the matching work orders">Bring in design from PowerPoint</button>
   </div>
   <div class="auth-note" id="authNote">Checking sign-in...</div>
   <div class="header-builder-preview-btns" id="headerBuilderPreviewBtns" aria-label="Preview layout">
@@ -1322,6 +1335,30 @@ function dbSyncFabricationPage2(twoPage, cat, d, ups, pks, caps) {
     allNotes.slice(0, 20).forEach(function(n){ ul.append(el("li", {}, n)); });
     pg.append(ul);
   }
+  shrink.append(pg);
+}
+/** WO-270: long workroom description prints on page 2, same idea as the furniture fabrication page. */
+function dbSyncScopePage2(on, cat, d, scope) {
+  const shrink = document.querySelector(".preview-shrink");
+  const existing = document.getElementById("previewScopePage2");
+  if (existing) existing.remove();
+  if (!on || !shrink || !scope || !String(scope.extra || "").trim()) return;
+  const pg = el("div", {
+    class: "preview-page" + (isWindowTreatmentCategory(cat) ? " preview-page--windows" : ""),
+    id: "previewScopePage2",
+    style: "page-break-before:always;break-before:page;margin-top:22px"
+  });
+  const hdr = el("div", { class: "pp-header" });
+  hdr.append(el("div", { class: "pp-header-brand" }, "CCH Design Inc."));
+  hdr.append(el("div", { class: "pp-title" }, "WORK ORDER:  ", el("b", {}, templateTitle(cat) + " "), el("span", { class: "num" }, d.workOrder || "")));
+  hdr.append(el("div", { class: "pp-page" }, "2 OF 2"));
+  pg.append(hdr);
+  const room = String(d.room || "").trim();
+  if (room) pg.append(el("div", { class: "pp-room-banner" }, el("div", { class: "pp-room-primary" }, room)));
+  const blk = el("div", { class: "pp-scope-block" });
+  blk.append(el("div", { class: "pp-section" }, "Workroom Description"));
+  blk.append(el("div", { class: "pp-workroom-desc" }, scope.extra));
+  pg.append(blk);
   shrink.append(pg);
 }
 function pickerFabricMetaCaption(cat, pickerId, d) {
@@ -2391,6 +2428,9 @@ function normalizeBartoloPdfLine(raw) {
     .replace(/\uE5AF/g, "")
     .replace(/[\u2018\u2019\u0060\u00B4]/g, "'")
     .replace(/\s+/g, " ")
+    .replace(/(\d)\s*-\s*(\d)/g, "$1-$2")
+    .replace(/([A-Za-z])\s+-\s+([A-Za-z])/g, "$1-$2")
+    .replace(/(\d)\s+-\s+([A-Za-z])/g, "$1-$2")
     .trim();
 }
 function normalizeBartoloPdfLines(lines) {
@@ -2417,10 +2457,12 @@ function ensureBudgetRoomEntry(roomMap, estimateNum, room) {
 function detectBartoloFormat(lines) {
   const norm = normalizeBartoloPdfLines(lines);
   const text = norm.join("\n");
-  const hasQbSublines = /\b\d{1,2}\.\d{1,2}\s+\S/m.test(text);
+  const hasQbSublines = /^\d{1,2}\.\d{1,2}\s+\S/m.test(text);
   if (/Budget Proposal/i.test(text) && (/Motorized shade product scope/i.test(text) || /ROOM DETAIL \| ESTIMATE/i.test(text))) return "budget-proposal";
+  if (/Budget Proposal/i.test(text) && /Treatment Scope/i.test(text) && /20\d{2}-\d{5}/.test(text)) return "budget-proposal";
   if (/Purchase Order/i.test(text) && (hasQbSublines || /Window Treatment W\d/i.test(text) || /^\d+\.\d+\s+Window/im.test(text))) return "qb-po";
   if (/\bINVOICE\b/i.test(text) && (/DESCRIPTION\s+QTY\s+AMOUNT/i.test(text) || /\*{2,}\S/m.test(text))) return "invoice";
+  if (/\b(ESTIMATE|QUOTE|QUOTATION)\b/i.test(text) && /DESCRIPTION\s+QTY/i.test(text)) return "invoice";
   if (/^\d{1,2}\s+(?:Window Treatm|Upholstery|Custom|Chair|Sofa|Sectional|Headboard|Bench|Ottoman|Pillow|Bedding|Labor|Fabric)/im.test(text) && hasQbSublines) return "qb-po";
   if (/^\d{1,2}\s+Window Treatm/im.test(text)) return "qb-po";
   if (hasQbSublines && /(?:Qty|Quantity|Amount|Subtotal|Total)/i.test(text)) return "qb-po";
@@ -2430,6 +2472,47 @@ function detectBartoloFormat(lines) {
 function extractBartoloLineTags(text) {
   const tags = String(text || "").match(/\b[WD]\d+\b/gi);
   return tags ? tags.join(", ") : "";
+}
+
+/** Consolidated "Detailed Window Treatment Budget Proposal": room, then 2026-##### $pre $tax $total, then Treatment Scope. */
+function ingestConsolidatedBudgetRooms(norm, roomMap) {
+  const ROOM_MONEY = /^(20\d{2}-\d{5})\s+\$([\d,]+\.\d{2})\s+\$([\d,]+\.\d{2})\s+\$([\d,]+\.\d{2})\s*$/;
+  const SKIP_NAME = /^(Estimate Number|Detailed Window|BARTOLO WINDOW|Budget Summary|Room-by-Room|Included Motorization|Exclusions|Acceptance|Category|Investment|Treatment Scope|Fabric \/ Lining|Installation Notes)/i;
+  for (let i = 0; i < norm.length; i++) {
+    const m = norm[i].match(ROOM_MONEY);
+    if (!m) continue;
+    const est = m[1];
+    if (roomMap[est] && roomMap[est].total > 0) continue;
+    let room = "";
+    for (let j = i - 1; j >= Math.max(0, i - 6); j--) {
+      const prev = norm[j];
+      if (!prev || SKIP_NAME.test(prev)) continue;
+      room = prev;
+      break;
+    }
+    if (!room) continue;
+    const product = parseFloat(m[2].replace(/,/g, "")) || 0;
+    const total = parseFloat(m[4].replace(/,/g, "")) || product;
+    const bullets = [];
+    for (let k = i + 1; k < norm.length; k++) {
+      if (ROOM_MONEY.test(norm[k]) || /^(Exclusions|Acceptance)\b/i.test(norm[k])) break;
+      const ln = norm[k];
+      if (/^Estimate Number\b/i.test(ln)) {
+        if (bullets.length) bullets.pop();
+        break;
+      }
+      if (SKIP_NAME.test(ln) || /^BARTOLO WINDOW/i.test(ln)) continue;
+      bullets.push(ln.replace(/^[\u2022\uF0B7\u00B7•]\s*/, ""));
+    }
+    const g = ensureBudgetRoomEntry(roomMap, est, room);
+    g.room = room;
+    g.product = product;
+    g.install = 0;
+    g.total = total;
+    g.productTitle = String(bullets[0] || room).slice(0, 180);
+    g.scopeBullets = bullets;
+    if (/great room dormer/i.test(g.room) && /stair tower/i.test(bullets.join(" "))) g.room = "Stair Tower";
+  }
 }
 
 /** Bartolo designer budget PDF (room tables + ROOM DETAIL | ESTIMATE sections). */
@@ -2554,6 +2637,8 @@ function parseBartoloBudgetProposalLines(lines) {
     }
   });
 
+  ingestConsolidatedBudgetRooms(norm, roomMap);
+
   const groups = [];
   Object.keys(roomMap).sort().forEach(est => {
     const g = roomMap[est];
@@ -2567,7 +2652,7 @@ function parseBartoloBudgetProposalLines(lines) {
     const subLines = [];
     if (g.product > 0) {
       subLines.push({
-        title: "Motorized shade product scope",
+        title: g.productTitle || "Motorized shade product scope",
         description: scopeText || g.intent || "",
         room: g.room,
         qty: 1,
@@ -2767,7 +2852,22 @@ function parseBartoloInvoiceLines(lines) {
   let currentLine = null;
   const INVOICE_ITEM = /^(.+?)\s+(\d+)\s+([\d,]+\.\d{2})\s*$/;
 
+  function promoteParenLocationTitle(line) {
+    if (!line) return;
+    const title = String(line.title || "").trim();
+    if (!/^\([^)]+\)$/.test(title)) return;
+    const desc = String(line.description || "").trim();
+    if (!desc) return;
+    const cut = desc.search(/\.\s+/);
+    const head = (cut === -1 ? desc : desc.slice(0, cut + 1)).trim();
+    const rest = cut === -1 ? "" : desc.slice(cut + 1).trim();
+    if (!head) return;
+    line.title = head;
+    line.description = [title, rest].filter(Boolean).join(" ").trim();
+  }
+
   function finishGroup() {
+    promoteParenLocationTitle(currentLine);
     if (group && group.lines.length) groups.push(group);
     group = null;
     currentLine = null;
@@ -2791,6 +2891,7 @@ function parseBartoloInvoiceLines(lines) {
 
     const item = ln.match(INVOICE_ITEM);
     if (item) {
+      promoteParenLocationTitle(currentLine);
       if (!group) group = { title: "Window Treatments", room: "", lines: [], total: 0, description: "" };
       const title = item[1].trim();
       const qty = parseInt(item[2], 10) || 1;
@@ -2848,8 +2949,11 @@ function extractBartoloPoMeta(lines, fallbackVendor) {
   const text = (lines || []).join("\n");
   const po = (text.match(/\bPO-?(\d+)\b/i) || [])[0] || "";
   const inv = (text.match(/\bINVOICE\s+(\d+)\b/i) || [])[1] || "";
-  const projectName = ((text.match(/Project:\s*(.+)/i) || [])[1] || "").trim();
-  const vendorFromPdf = ((text.match(/(?:Vendor|From|Supplier):\s*(.+)/i) || [])[1] || "").trim().split(/\s{2,}|$/)[0].trim();
+  const projectMatch = text.match(/Project:\s*(.+)/i);
+  const projectName = projectMatch && projectMatch[1] ? String(projectMatch[1]).trim() : "";
+  const vendorMatch = text.match(/(?:Vendor|From|Supplier):\s*(.+)/i);
+  const vendorRaw = vendorMatch && vendorMatch[1] ? String(vendorMatch[1]).trim() : "";
+  const vendorFromPdf = vendorRaw ? String(vendorRaw.split(/\s{2,}/)[0] || "").trim() : "";
   const estNums = [];
   (text.match(/20\d{2}-\d{5}/g) || []).forEach(n => { if (estNums.indexOf(n) < 0) estNums.push(n); });
   const budgetEst = estNums[0] ? ("Est. " + estNums[0]) : "";
@@ -2879,7 +2983,9 @@ function bartoloGroupsToProposalItems(groups, markupPct, vendorName) {
       description: String(g.description || "").trim().slice(0, 500),
       groupId: gid,
       room: groupRoom,
-      lineTag
+      lineTag: String(g.lineTag || g.workOrderNumber || lineTag || "").trim(),
+      workOrderId: g.workOrderId || "",
+      workOrderNumber: g.workOrderNumber || ""
     });
     (g.lines || []).forEach(sub => {
       const unitCost = parseFloat(sub.unitCost || sub.cost) || 0;
@@ -2896,7 +3002,9 @@ function bartoloGroupsToProposalItems(groups, markupPct, vendorName) {
         description: String(sub.description || "").trim().slice(0, 400),
         room: lineRoom,
         category: classified.category || "Custom Window Coverings",
-        lineTag,
+        lineTag: String(sub.workOrderNumber || lineTag || "").trim(),
+        workOrderId: sub.workOrderId || "",
+        workOrderNumber: sub.workOrderNumber || "",
         vendor: sub.vendor || workroomVendor,
         qty,
         cost: unitCost,
@@ -3045,6 +3153,8 @@ function defaultData(catId) {
     date: new Date().toLocaleDateString("en-US"),
     revision: 1,
     designIntent: "",
+    /** Fabrication spec for the workroom. Not the client proposal description. */
+    workroomDescription: "",
     treatmentOptions: [],
     /** One window tag (W#) but more than one treatment on this work order — e.g. double rod / layered pair. */
     sameWindowTagMultipleTreatments: false,
@@ -3150,6 +3260,96 @@ function getFabricRoleDefs(cat, d) {
   });
   return [...base, ...extras].slice(0, 4);
 }
+const WINDOW_MATERIAL_ROLES = ["Face", "Sheer", "Liner", "Valance", "Trim", "Side channel"];
+function canonicalWindowMaterialRole(role) {
+  const r = String(role || "").trim();
+  if (!r) return "";
+  const u = r.toUpperCase();
+  if (/SHADE FACE|FACE FABRIC|ROLLER FABRIC|PRIMARY FABRIC|DRAPERY PANELS|FACE \/ FRONT|^FACE$|^FACING$/.test(u)) return "Face";
+  if (/SIDE CHANNEL|PELMET/i.test(r)) return "Side channel";
+  if (/^LINING$/i.test(r)) return "Liner";
+  const hit = WINDOW_MATERIAL_ROLES.find(x => x.toLowerCase() === r.toLowerCase());
+  return hit || r;
+}
+function windowMaterialRoleOptions(cat, currentRole) {
+  const cur = canonicalWindowMaterialRole(currentRole) || String(currentRole || "").trim();
+  const base = WINDOW_MATERIAL_ROLES.slice();
+  if (cur && base.indexOf(cur) < 0 && cur.toLowerCase() !== "other") base.unshift(cur);
+  return base.concat(["Other"]);
+}
+function setFabricRoleLabel(cat, fr, d, roleValue) {
+  const v = String(roleValue || "").trim();
+  const asTrim = /^trim$/i.test(v);
+  if (fr.extra) {
+    const target = (d.extraFabricRoles || []).find(x => x.id === fr.id);
+    if (!target) return;
+    target.role = v || (target.slotKind === "trim" ? "TRIM " + fr.id : "FABRIC " + fr.id);
+    if (asTrim) target.slotKind = "trim";
+    else if (target.slotKind === "trim") target.slotKind = "fabric";
+    fr.slotKind = target.slotKind;
+  } else {
+    if (!d.fabricRoleOverrides) d.fabricRoleOverrides = {};
+    const cfgRole = ((CATS[cat] || {}).fabricRoles || []).find(x => x.id === fr.id);
+    d.fabricRoleOverrides[fr.id] = v || (cfgRole && cfgRole.role) || "";
+    if (!d.fabricSlotKinds) d.fabricSlotKinds = {};
+    if (asTrim) d.fabricSlotKinds[fr.id] = "trim";
+    else if (d.fabricSlotKinds[fr.id] === "trim") d.fabricSlotKinds[fr.id] = "fabric";
+  }
+  fr.role = v || fr.role;
+  if (asTrim) fr.slotKind = "trim";
+  else if (fr.slotKind === "trim") fr.slotKind = "fabric";
+}
+function appendMaterialRoleControl(sec, cat, fr, d) {
+  const wrap = el("div", { class: "field" });
+  wrap.append(el("label", {}, "Role"));
+  function applyRole(v, rebuild) {
+    const prevKind = fr.slotKind;
+    setFabricRoleLabel(cat, fr, d, v);
+    const h2 = sec.querySelector("h2");
+    if (h2) h2.textContent = "Material " + fr.id;
+    updatePreview();
+    scheduleBuilderDraftSave();
+    if (rebuild || fr.slotKind !== prevKind) renderForm();
+  }
+  if (!isWindowTreatmentCategory(cat)) {
+    const inp = el("input", { type: "text", value: fr.role || "", placeholder: "e.g. Face, lining, welt" });
+    inp.addEventListener("input", e => applyRole(e.target.value, false));
+    wrap.append(inp);
+    sec.append(wrap);
+    return;
+  }
+  const opts = windowMaterialRoleOptions(cat, fr.role);
+  const cur = canonicalWindowMaterialRole(fr.role) || String(fr.role || "").trim();
+  const named = opts.filter(x => x !== "Other");
+  const known = named.indexOf(cur) >= 0;
+  const sel = el("select");
+  opts.forEach(opt => {
+    const o = el("option", { value: opt }, opt === "Other" ? "Other…" : opt);
+    if (opt === "Other") o.selected = !known;
+    else if (opt === cur) o.selected = true;
+    sel.append(o);
+  });
+  wrap.append(sel);
+  const otherInp = el("input", {
+    type: "text",
+    placeholder: "Custom role",
+    value: known ? "" : cur,
+    style: "width:100%;margin-top:6px;" + (known ? "display:none" : "display:block")
+  });
+  sel.addEventListener("change", () => {
+    if (sel.value === "Other") {
+      otherInp.style.display = "block";
+      otherInp.focus();
+      return;
+    }
+    otherInp.style.display = "none";
+    otherInp.value = "";
+    applyRole(sel.value, /^trim$/i.test(sel.value));
+  });
+  otherInp.addEventListener("input", e => applyRole(e.target.value, false));
+  wrap.append(otherInp);
+  sec.append(wrap);
+}
 /** Restore Fabric B/C/D form sections when saved WO has fabric rows but extraFabricRoles was empty. */
 function syncExtraFabricRolesFromFabrics(d, cat) {
   const cfg = CATS[cat];
@@ -3215,7 +3415,7 @@ function fabricRoleHasCatalogContent(d, fr, ups) {
   if (String(f.yards || "").trim()) return true;
   return !!(String(f.sku || "").trim() || String(f.color || "").trim() || String(f.vendor || "").trim());
 }
-/** Workroom name must not appear as fabric vendor unless tied to a product pick. */
+/** Workroom name must not appear as fabric vendor on COM rows unless tied to a product pick. */
 function stripWorkroomVendorFromFabricsWithoutProduct(d) {
   if (!d || !d.fabrics) return;
   const wr = d.workroomId && state.workrooms ? state.workrooms.find(w => w.id === d.workroomId) : null;
@@ -3228,6 +3428,8 @@ function stripWorkroomVendorFromFabricsWithoutProduct(d) {
   Object.keys(d.fabrics).forEach(rid => {
     const f = d.fabrics[rid];
     if (!f || String(f.productId || "").trim()) return;
+    /* Vendor-supplied rows keep manufacturer / vendor name (Lutron, etc.). */
+    if (fabricIsWorkroomMaterial(f)) return;
     const v = String(f.vendor || "").trim().toLowerCase();
     if (v && names.has(v)) f.vendor = "";
   });
@@ -3301,7 +3503,7 @@ function pushCustomProjectRoom(name) {
   state.projectRooms.sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { sensitivity: "base" }));
 }
 function pickerDetailSlotsForForm(cfg) {
-  return (cfg.pickers || []).filter(p => String(p.id || "") !== "hardware");
+  return (cfg.pickers || []).slice();
 }
 function saveFormSectionOpenState() {
   const pane = document.getElementById("formPane");
@@ -3590,6 +3792,51 @@ function shadeVendorMaterialHasContent(d, ups) {
   if (sw) return true;
   return !!(String(svm.partNo || "").trim() || String(svm.manufacturer || "").trim()
     || String(svm.collection || "").trim() || String(svm.colorName || "").trim());
+}
+/** WO-174: old Shade Face block → Material A when A is empty, so Lutron/part # still show. */
+function hydrateShadeVendorIntoMaterialA(cat, d) {
+  if (!isShadeRollCategory(cat)) return;
+  if (!shadeVendorMaterialHasContent(d, state.uploads[cat] || {})) return;
+  if (!d.fabrics) d.fabrics = {};
+  if (!d.fabrics.A || typeof d.fabrics.A !== "object") d.fabrics.A = emptyFabricRow();
+  const fab = d.fabrics.A;
+  const emptyA = !String(fab.vendor || "").trim() && !String(fab.sku || "").trim()
+    && !String(fab.color || "").trim() && !String(fab.productId || "").trim();
+  if (!emptyA) return;
+  const svm = ensureShadeVendorMaterial(d);
+  const mode = String(d.shadeMaterialMode || "com").toLowerCase();
+  fab.materialSource = mode === "vendor" ? "workroom" : "com";
+  fab.vendor = String(svm.manufacturer || "").trim();
+  fab.sku = String(svm.partNo || "").trim();
+  fab.color = String(svm.colorName || "").trim();
+  const note = String(svm.note || "").trim();
+  if (note && !String(fab.application || fab.materialUse || "").trim()) setFabricApplication(fab, note);
+  if (!d.swatchUrls) d.swatchUrls = {};
+  if (!d.swatchUrls.swatch_A && d.swatchUrls.shadeVendor) d.swatchUrls.swatch_A = d.swatchUrls.shadeVendor;
+}
+/** WO-176: leftover Shade Face openness/note → Material A swatch note if that note is empty. */
+function hydrateShadeOpennessIntoSwatchNote(cat, d) {
+  if (!isShadeRollCategory(cat) || !d) return;
+  const svm = d.shadeVendorMaterial;
+  if (!svm || typeof svm !== "object") return;
+  const leftover = [svm.openness, svm.note].map(x => String(x || "").trim()).filter(Boolean).join(" · ");
+  if (!leftover) return;
+  const caps = ensureImageCaptions(d);
+  if (String(caps.swatch_A || "").trim()) return;
+  caps.swatch_A = leftover;
+}
+/** Form/preview: swatch caption, else leftover Shade Face openness/note on Material A. */
+function fabricSwatchNote(d, fr, f) {
+  const id = fr && fr.id ? fr.id : "";
+  const cap = String((d && d.imageCaptions && d.imageCaptions["swatch_" + id]) || "").trim();
+  if (cap) return cap;
+  const fabNote = String((f && f.note) || "").trim();
+  if (fabNote) return fabNote;
+  if (id === "A" && d && d.shadeVendorMaterial) {
+    const svm = d.shadeVendorMaterial;
+    return [svm.openness, svm.note].map(x => String(x || "").trim()).filter(Boolean).join(" · ");
+  }
+  return "";
 }
 function shadeMaterialModeLabel(d) {
   return String(d.shadeMaterialMode || "com") === "vendor" ? "Vendor" : "COM";
@@ -4002,7 +4249,7 @@ function fabricMetaWithYards(f) {
   return bits.join(" · ");
 }
 /** Full preview row: COM or Vendor material letter + swatch | spec lines | yardage. */
-function buildPreviewFabricRow(fr, f, sw) {
+function buildPreviewFabricRow(fr, f, sw, d) {
   const isWr = fabricIsWorkroomMaterial(f);
   const { yards } = fabricPreviewMetaParts(f);
   const colParsed = parseFabricColSqFt(f && f.colSqFt);
@@ -4015,8 +4262,14 @@ function buildPreviewFabricRow(fr, f, sw) {
   body.append(el("div", { class: "sw" }, sw ? el("img", { src: sw, alt: "" }) : ""));
   const main = el("div", { class: "pp-fabric-maincol" });
   if (isWr) {
-    if (sku) main.append(el("div", { class: "pp-fabric-title" }, sku));
-    else main.append(el("div", { class: "pp-fabric-title", style: "font-style:italic;color:var(--muted)" }, "Part #"));
+    const mfr = String(f.vendor || "").trim();
+    if (mfr) main.append(el("div", { class: "pp-fabric-title" }, mfr));
+    if (sku) main.append(el("div", { class: "pp-fabric-spec-line pp-fabric-spec-line--sku" }, el("b", {}, "Part #: "), sku));
+    else if (!mfr) main.append(el("div", { class: "pp-fabric-title", style: "font-style:italic;color:var(--muted)" }, "Part #"));
+    const wrColor = String(f.color || "").trim();
+    if (wrColor) main.append(el("div", { class: "pp-fabric-spec-line" }, el("b", {}, "Color: "), wrColor));
+    const wrNote = fabricSwatchNote(d, fr, f);
+    if (wrNote) main.append(el("div", { class: "pp-fabric-spec-line", style: "white-space:pre-wrap" }, el("b", {}, "Note: "), wrNote));
     main.append(el("div", { class: "pp-fabric-spec-line", style: "font-size:10px;color:var(--muted);font-style:italic" },
       "Vendor — included in workroom price; reference only"));
     /* Location lives on COM/Vendor A heading only (fabricPreviewHeading) — not repeated under swatch. */
@@ -4039,6 +4292,8 @@ function buildPreviewFabricRow(fr, f, sw) {
     specLine("Material", material);
     specLine("Repeat", repeat);
     if (colNote) specLine("Coverage note", colNote);
+    const comNote = fabricSwatchNote(d, fr, f);
+    if (comNote) specLine("Note", comNote);
   }
   body.append(main);
   if (hasCoverage) {
@@ -4163,6 +4418,13 @@ function builderMarkupPctFromProject(projectRecord) {
 }
 
 /** Older saves used `location` for the room name. Move known room names into `room` so `location` can hold the window tag. */
+function renameDormerTitleToStairTower(d) {
+  if (!d || !/great room dormer/i.test(String(d.room || ""))) return false;
+  const blob = String(d.designIntent || "") + " " + String(d.workroomDescription || "");
+  if (!/stair tower/i.test(blob)) return false;
+  d.room = "Stair Tower";
+  return true;
+}
 function migrateLegacyRoomLocation(d) {
   if (!d || typeof d !== "object") return;
   const roomStr = String(d.room || "").trim();
@@ -4722,6 +4984,18 @@ function summarizeFirmWorkOrderRow(projectId, docId, data) {
     updatedAt: x.updatedAt || null,
     revision: x.revision
   };
+}
+function workOrderSelectLabel(row) {
+  const num = String((row && (row.workOrderNumber || row.workOrder)) || (row && row.id) || "").trim();
+  const place = [row && row.room, row && row.location].map(x => String(x || "").trim()).filter(Boolean).join(" · ");
+  const date = String((row && row.date) || "").trim();
+  const revN = Number(row && row.revision);
+  const rev = (isFinite(revN) && revN > 0) ? revN : 1;
+  let s = num;
+  if (place) s += " — " + place;
+  if (date) s += "  ·  " + date;
+  s += "  ·  Rev " + rev;
+  return s;
 }
 async function listWorkOrders(projectId) {
   if (!projectId) return [];
@@ -5953,12 +6227,47 @@ const BUILDER_LOCAL_DRAFT_VER = 1;
 const BUILDER_LOCAL_DRAFT_MAX_AGE_MS = 7 * 24 * 3600 * 1000;
 const BUILDER_LOCAL_DRAFT_MAX_BYTES = 4500000;
 let builderDraftSaveTimer = null;
+let builderDirtySinceSave = false;
 
 function builderLocalDraftKey(projectId, cat, workOrderId) {
   return "cch_builder_local_draft_v" + BUILDER_LOCAL_DRAFT_VER + "_" + projectId + "_" + cat + "_" + (workOrderId || "new");
 }
 
+function builderLastProjectSaveKey(projectId, woId) {
+  return "cch_builder_last_project_save_v1_" + projectId + "_" + (woId || "new");
+}
+
+function cancelBuilderDraftSaveTimer() {
+  if (builderDraftSaveTimer) {
+    clearTimeout(builderDraftSaveTimer);
+    builderDraftSaveTimer = null;
+  }
+}
+
+function builderTimestampMs(ts) {
+  if (!ts) return 0;
+  try {
+    if (typeof ts.toMillis === "function") return ts.toMillis();
+  } catch (e0) {}
+  if (typeof ts.seconds === "number") return ts.seconds * 1000 + Math.floor((ts.nanoseconds || 0) / 1e6);
+  const n = Number(ts);
+  return Number.isFinite(n) && n > 1e11 ? n : 0;
+}
+
+function builderDraftIsNotNewerThanProjectSave(projectId, woId, draftSavedAt, serverUpdatedAt) {
+  const draftMs = Number(draftSavedAt || 0);
+  if (!draftMs) return true;
+  try {
+    const last = Number(localStorage.getItem(builderLastProjectSaveKey(projectId, woId || "")) || 0);
+    if (last && draftMs <= last) return true;
+  } catch (e) {}
+  const serverMs = builderTimestampMs(serverUpdatedAt);
+  if (serverMs && draftMs <= serverMs) return true;
+  return false;
+}
+
 function scheduleBuilderDraftSave() {
+  builderDirtySinceSave = true;
   if (builderDraftSaveTimer) clearTimeout(builderDraftSaveTimer);
   builderDraftSaveTimer = setTimeout(() => {
     builderDraftSaveTimer = null;
@@ -5971,6 +6280,7 @@ function scheduleBuilderDraftSave() {
 }
 
 function writeBuilderLocalDraftNow() {
+  if (!builderDirtySinceSave) return;
   const cat = state.category;
   const d = getCatData(cat);
   const projectId = (d.projectId || "").trim();
@@ -6022,6 +6332,8 @@ function writeBuilderLocalDraftNow() {
 }
 
 function clearBuilderLocalDraftAfterSave() {
+  cancelBuilderDraftSaveTimer();
+  builderDirtySinceSave = false;
   const cat = state.category;
   const d = getCatData(cat);
   const projectId = (d.projectId || "").trim();
@@ -6030,6 +6342,7 @@ function clearBuilderLocalDraftAfterSave() {
   try {
     localStorage.removeItem(builderLocalDraftKey(projectId, cat, "new"));
     if (woId) localStorage.removeItem(builderLocalDraftKey(projectId, cat, woId));
+    localStorage.setItem(builderLastProjectSaveKey(projectId, woId || "new"), String(Date.now()));
   } catch (e) {}
 }
 
@@ -6041,7 +6354,7 @@ function clearBuilderLocalDraftNewSlot(projectId, cat) {
 }
 
 /** Returns true if a draft was merged into state (unsaved work recovered). */
-function maybeRestoreBuilderLocalDraft(cat) {
+async function maybeRestoreBuilderLocalDraft(cat) {
   const d = getCatData(cat);
   const projectId = (d.projectId || "").trim();
   if (!projectId) return false;
@@ -6064,6 +6377,13 @@ function maybeRestoreBuilderLocalDraft(cat) {
   if (String(draft.projectId || "") !== projectId || String(draft.category || "") !== cat) return false;
   const draftWo = draft.workOrderId || "";
   if (draftWo !== woId) return false;
+  // WO-172: a saved work order is the project copy. Never ask. Never overlay a browser draft.
+  if (woId) {
+    try {
+      localStorage.removeItem(key);
+    } catch (eSaved) {}
+    return false;
+  }
   const age = Date.now() - Number(draft.savedAt || 0);
   if (age > BUILDER_LOCAL_DRAFT_MAX_AGE_MS || age < 0) {
     try {
@@ -6071,25 +6391,12 @@ function maybeRestoreBuilderLocalDraft(cat) {
     } catch (e2) {}
     return false;
   }
-  const serverRev = Number(d.revision || 1);
-  const draftRev = Number(draft.revision || 1);
-  // Always confirm for an existing saved WO — silent same-rev restore was wiping
-  // fields (e.g. workroomCosts) when a browser draft was emptier than Firestore.
-  if (woId) {
-    const msg = "This browser has an unsaved draft"
-      + (serverRev !== draftRev ? " (rev " + draftRev + ")" : "")
-      + " from "
-      + new Date(draft.savedAt).toLocaleString()
-      + (serverRev !== draftRev
-        ? ". The saved work order is revision " + serverRev + "."
-        : ".")
-      + "\n\nRestore the unsaved draft?\n(Cancel keeps the saved copy.)";
-    if (!confirm(msg)) {
-      try {
-        localStorage.removeItem(key);
-      } catch (e3) {}
-      return false;
-    }
+  // WO-167: leftover autosave/flush after a project Save is not unsaved work.
+  if (builderDraftIsNotNewerThanProjectSave(projectId, woId, draft.savedAt, d.updatedAt)) {
+    try {
+      localStorage.removeItem(key);
+    } catch (eStale) {}
+    return false;
   }
   try {
     state.data[cat] = { ...defaultData(cat), ...(draft.data || {}) };
@@ -6108,6 +6415,7 @@ function maybeRestoreBuilderLocalDraft(cat) {
     console.warn("[Builder] draft restore", e4);
     return false;
   }
+  builderDirtySinceSave = true;
   state.builderDraftUiMessage = "Restored unsaved browser draft — Save when ready.";
   return true;
 }
@@ -6254,6 +6562,31 @@ async function logBuilderWorkOrderActivity(opts) {
   }
 }
 
+/** WO-177: set(..., { merge:true }) keeps nested map keys you omit. Empty/missing → delete. */
+function builderMergeDeleteEmptyKeys(src, knownKeys) {
+  const map = src && typeof src === "object" && !Array.isArray(src) ? src : {};
+  const out = {};
+  const seen = {};
+  (knownKeys || []).concat(Object.keys(map)).forEach(k => {
+    if (seen[k]) return;
+    seen[k] = true;
+    const v = map[k];
+    if (v == null || v === "") out[k] = firebase.firestore.FieldValue.delete();
+    else out[k] = v;
+  });
+  return out;
+}
+const BUILDER_SWATCH_CLEAR_KEYS = [
+  "rollerSlot0", "rollerSlot1", "rollerSlot2", "wtDetail0", "wtDetail1",
+  "custom4", "shadeVendor", "stitchDetail", "woodFinishRef", "nailheadRef", "feetRef",
+  "fabricationDrawing", "swatch_A", "swatch_B", "swatch_C", "swatch_D"
+];
+function builderPickerSelectionsForSave(cat) {
+  const current = state.pickers[cat] || {};
+  const ids = ((CATS[cat] && CATS[cat].pickers) || []).map(p => p.id);
+  return builderMergeDeleteEmptyKeys(current, ids);
+}
+
 async function saveWorkOrder(isNewRevision) {
   updateHeaderSaveUI("saving");
   const cat = state.category;
@@ -6282,7 +6615,7 @@ async function saveWorkOrder(isNewRevision) {
   try {
   const col = db.collection("boards").doc(projectId).collection("workOrders");
   const now = firebase.firestore.FieldValue.serverTimestamp();
-  const existingId = state.currentWorkOrderId && !isNewRevision ? state.currentWorkOrderId : "";
+  const existingId = state.currentWorkOrderId || "";
   const docRef = existingId ? col.doc(existingId) : col.doc();
   if (!data.workOrder) {
     data.workOrder = nextWorkOrderNumber(data.project, cat, state.workOrdersByProject);
@@ -6292,6 +6625,13 @@ async function saveWorkOrder(isNewRevision) {
   );
   if (conflicting) {
     data.workOrder = nextWorkOrderNumber(data.project, cat, state.workOrdersByProject);
+  }
+  if (!existingId) {
+    data.revision = 1;
+    if (!String(data.date || "").trim()) data.date = new Date().toLocaleDateString("en-US");
+  } else if (isNewRevision) {
+    data.revision = Number(data.revision || 1) + 1;
+    data.date = new Date().toLocaleDateString("en-US");
   }
   await uploadPendingAssets(cat, projectId, docRef.id);
   if (cat === "pillows") syncPillowSpecFromSpecs(data);
@@ -6307,6 +6647,7 @@ async function saveWorkOrder(isNewRevision) {
     room: data.room || "",
     location: data.location || "",
     designIntent: data.designIntent || "",
+    workroomDescription: data.workroomDescription || "",
     customBoxTitle: data.customBoxTitle || "",
     customBoxNote: data.customBoxNote || "",
     treatmentOptions: data.treatmentOptions || [],
@@ -6326,15 +6667,20 @@ async function saveWorkOrder(isNewRevision) {
     specCustomText: data.specCustomText || {},
     fabrics: data.fabrics || {},
     measurements: data.measurements || {},
-    pickerSelections: state.pickers[cat] || {},
+    pickerSelections: builderPickerSelectionsForSave(cat),
     notes: data.notes || [],
     fabNotes: data.fabNotes || [],
     renderingUrl: data.renderingUrl || "",
     detailSketchUrl: data.detailSketchUrl || "",
     elevationUrl: data.elevationUrl || "",
     sectionViewUrl: data.sectionViewUrl || "",
-    imageCaptions: data.imageCaptions || {},
-    imageSlotTitles: data.imageSlotTitles || {},
+    imageCaptions: builderMergeDeleteEmptyKeys(data.imageCaptions, [
+      "rendering", "custom4", "sectionView", "wtDetail0", "wtDetail1",
+      "rollerSlot0", "rollerSlot1", "rollerSlot2", "picker_face", "picker_hardware", "picker_valance"
+    ]),
+    imageSlotTitles: builderMergeDeleteEmptyKeys(data.imageSlotTitles, [
+      "sectionView", "custom4", "wtDetail0", "wtDetail1", "rollerSlot0", "rollerSlot1", "rollerSlot2"
+    ]),
     treatmentLayerDetails: data.treatmentLayerDetails || {},
     trimBanding: data.trimBanding || {},
     trimOptionDetails: data.trimOptionDetails || {},
@@ -6342,7 +6688,7 @@ async function saveWorkOrder(isNewRevision) {
     specAttachments: data.specAttachments || {},
     specAttachmentNotes: data.specAttachmentNotes || {},
     materialPlacementNote: data.materialPlacementNote || "",
-    swatchUrls: data.swatchUrls || {},
+    swatchUrls: builderMergeDeleteEmptyKeys(data.swatchUrls, BUILDER_SWATCH_CLEAR_KEYS),
     shadeMaterialMode: data.shadeMaterialMode || "com",
     shadeVendorMaterial: data.shadeVendorMaterial || emptyShadeVendorMaterial(),
     workroomCosts: data.workroomCosts || defaultWorkroomCosts(),
@@ -6354,9 +6700,7 @@ async function saveWorkOrder(isNewRevision) {
   };
   await docRef.set(payload, { merge:true });
   state.currentWorkOrderId = docRef.id;
-  if (!existingId) data.revision = 1;
-  if (isNewRevision) data.revision = Number(data.revision || 1) + 1;
-  var actAction = isNewRevision ? "revised" : (!existingId ? "created" : "updated");
+  var actAction = isNewRevision && existingId ? "revised" : (!existingId ? "created" : "updated");
   var actRev = Number(data.revision || 1);
   void logBuilderWorkOrderActivity({
     action: actAction,
@@ -6374,6 +6718,9 @@ async function saveWorkOrder(isNewRevision) {
   syncBuilderUrl();
   updateHeaderSaveUI("saved");
   renderForm();
+  // WO-170: renderForm → updatePreview → scheduleBuilderDraftSave marks dirty and
+  // would rewrite a "unsaved" draft ~2s later, which is what Vanessa still saw.
+  clearBuilderLocalDraftAfterSave();
   return true;
   } catch (err) {
     console.error("[Builder] saveWorkOrder", err);
@@ -6448,11 +6795,22 @@ async function loadWorkOrderById(id) {
   const data = getCatData(cat);
   // Flush browser draft for the WO we are leaving so cost/labor edits survive a switch.
   // Skip until UI is ready so boot URL-load does not overwrite a "new" draft with blanks.
+  // WO-167: do not rewrite a draft after Save — that is what triggered the restore prompt.
   if (state.builderUiReady) {
     const nextId = id || "";
     const prevId = state.currentWorkOrderId || "";
     if (String(prevId) !== String(nextId)) {
-      try { writeBuilderLocalDraftNow(); } catch (eFlush) {}
+      cancelBuilderDraftSaveTimer();
+      if (builderDirtySinceSave) {
+        try { writeBuilderLocalDraftNow(); } catch (eFlush) {}
+      } else {
+        const projectIdLeave = (data.projectId || "").trim();
+        if (projectIdLeave) {
+          try {
+            localStorage.removeItem(builderLocalDraftKey(projectIdLeave, cat, prevId || "new"));
+          } catch (eClr) {}
+        }
+      }
     }
   }
   if (!id) {
@@ -6475,7 +6833,8 @@ async function loadWorkOrderById(id) {
     state.uploadFiles[cat] = {};
     const fresh = getCatData(cat);
     if (fresh.projectId) fresh.workOrder = nextWorkOrderNumber(fresh.project, cat, state.workOrdersByProject);
-    maybeRestoreBuilderLocalDraft(cat);
+    builderDirtySinceSave = false;
+    await maybeRestoreBuilderLocalDraft(cat);
     renderForm();
     return;
   }
@@ -6493,6 +6852,12 @@ async function loadWorkOrderById(id) {
   const dm = state.data[mergedCat];
   if (!dm.workOrder && dm.workOrderNumber) dm.workOrder = dm.workOrderNumber;
   migrateLegacyRoomLocation(dm);
+  if (renameDormerTitleToStairTower(dm)) {
+    db.collection("boards").doc(projectId).collection("workOrders").doc(id).set({
+      room: "Stair Tower",
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true }).catch(e => console.warn("[Builder] stair tower room", e));
+  }
   if (projectId) {
     await ensureProjectRoomsLoaded(projectId);
   }
@@ -6512,7 +6877,8 @@ async function loadWorkOrderById(id) {
     const grp = b.dataset.group || (b.dataset.cat ? currentGroupFromCategory(b.dataset.cat) : "windows");
     b.classList.toggle("active", grp === state.uiGroup);
   });
-  maybeRestoreBuilderLocalDraft(mergedCat);
+  builderDirtySinceSave = false;
+  await maybeRestoreBuilderLocalDraft(mergedCat);
   writeBuilderSession();
   syncBuilderUrl();
 }
@@ -6607,7 +6973,7 @@ async function applyBuilderQueryParams() {
     if (duplicateFrom && !state.bulkPrintMode) {
       await duplicateWorkOrderFromFirestore(projectId, duplicateFrom);
     } else if (!workOrderId && !state.bulkPrintMode) {
-      maybeRestoreBuilderLocalDraft(state.category);
+      await maybeRestoreBuilderLocalDraft(state.category);
       writeBuilderSession();
     }
     syncBuilderUrl();
@@ -6645,14 +7011,19 @@ function buildUpload(cat, key, hint) {
       if (gd.imageCaptions) gd.imageCaptions.sectionView = "";
       if (gd.imageSlotTitles) gd.imageSlotTitles.sectionView = "";
     } else if (key === "custom4") {
-      if (gd.swatchUrls) delete gd.swatchUrls.custom4;
+      if (!gd.swatchUrls) gd.swatchUrls = {};
+      gd.swatchUrls.custom4 = "";
       if (gd.imageCaptions) gd.imageCaptions.custom4 = "";
       if (gd.imageSlotTitles) gd.imageSlotTitles.custom4 = "";
     } else if (/^(rollerSlot[0-2]|wtDetail[01])$/.test(key)) {
-      if (gd.swatchUrls) delete gd.swatchUrls[key];
+      if (!gd.swatchUrls) gd.swatchUrls = {};
+      gd.swatchUrls[key] = "";
       if (gd.imageCaptions) gd.imageCaptions[key] = "";
       if (gd.imageSlotTitles) gd.imageSlotTitles[key] = "";
-    } else if (gd.swatchUrls && gd.swatchUrls[key]) delete gd.swatchUrls[key];
+    } else {
+      if (!gd.swatchUrls) gd.swatchUrls = {};
+      gd.swatchUrls[key] = "";
+    }
   }
   if (cur) {
     wrap.classList.add("has-img");
@@ -6842,9 +7213,10 @@ function clearPickerSlot(cat, pickerId) {
   if (state.uploads[cat]) delete state.uploads[cat][upKey];
   if (state.uploadFiles[cat]) delete state.uploadFiles[cat][upKey];
   const d = getCatData(cat);
-  if (d.imageCaptions) delete d.imageCaptions[upKey];
+  if (d.imageCaptions) d.imageCaptions[upKey] = "";
   updatePreview();
   renderForm();
+  scheduleBuilderDraftSave();
 }
 
 function pickerDetailCaption(caps, pickerId) {
@@ -6976,7 +7348,8 @@ function clearImageSlot(cat, imageKey) {
     if (d.imageCaptions) d.imageCaptions.sectionView = "";
     if (d.imageSlotTitles) d.imageSlotTitles.sectionView = "";
   } else {
-    if (d.swatchUrls) delete d.swatchUrls[imageKey];
+    if (!d.swatchUrls) d.swatchUrls = {};
+    d.swatchUrls[imageKey] = "";
     if (d.imageCaptions) d.imageCaptions[imageKey] = "";
     if (d.imageSlotTitles) d.imageSlotTitles[imageKey] = "";
   }
@@ -7140,6 +7513,9 @@ function buildImageSlotRow(cat, opts) {
   }
   row.append(thumb, btns);
   wrap.append(row);
+  if (opts.noteLabel) {
+    wrap.append(el("label", { style: "font-weight:700;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink);margin:10px 0 4px;display:block" }, opts.noteLabel));
+  }
   const noteTa = el("textarea", {
     rows: 2,
     placeholder: opts.notePlaceholder || "Optional note — prints under this image on the work order preview",
@@ -7722,17 +8098,17 @@ function appendPreviewHardwareBand(root, cat, d, ups, overflowCols) {
   band.append(grid);
   root.append(band);
 }
-/** Roller WO: shade face, lift/mount, and optional detail slots directly under the hero rendering. */
+/** Roller WO: shade face, lift/mount, spec photos, and dual-shade slots under the hero rendering. */
 function appendPreviewRollerDetailsBelowRendering(parent, cat, cfg, d, ups, pks, caps) {
-  const cols = [];
+  const pickerCols = [];
   (cfg.pickers || []).forEach(p => {
-    if (String(p.id || "") === "hardware") return;
     const src = ups["picker_" + p.id] || (pks[p.id] && pks[p.id].downloadURL) || "";
-    if (src) cols.push({ title: p.label, src: src, caption: pickerDetailCaption(caps, p.id) });
+    if (src) pickerCols.push({ title: p.label, src: src, caption: pickerDetailCaption(caps, p.id) });
   });
+  const slotCols = [];
   const liftSrc = ups.wtDetail0 || ((d.swatchUrls || {}).wtDetail0 || "");
   if (liftSrc) {
-    cols.push({
+    slotCols.push({
       title: detailSlotHeading("wtDetail0", d, caps, "Detail"),
       src: liftSrc,
       caption: detailSlotCaption("wtDetail0", d, caps)
@@ -7743,12 +8119,17 @@ function appendPreviewRollerDetailsBelowRendering(parent, cat, cfg, d, ups, pks,
     const src = ups[k] || ((d.swatchUrls || {})[k] || "");
     if (!src) return;
     const cap = String((caps && caps[k]) || "").trim();
-    cols.push({
+    slotCols.push({
       title: detailSlotHeading(k, d, caps, "Detail " + (i + 1)),
       src: src,
       caption: detailSlotCaption(k, d, caps) || cap
     });
   });
+  const cols = mergeDetailColsDeduped([
+    collectSpecAttachmentDetailCols(cat, cfg, d, ups),
+    pickerCols,
+    slotCols
+  ]);
   if (!cols.length) return;
   const rowCls = "pp-roller-detail-row" +
     (cols.length === 1 ? " pp-roller-detail-row--n1" : cols.length === 2 ? " pp-roller-detail-row--n2" : "");
@@ -7878,10 +8259,7 @@ function collectSpecAttachmentDetailCols(cat, cfg, d, ups) {
     if (!imgSrc) return;
     const raw = d.specs[s.id];
     let disp = formatSpecBulletDisplay(cat, s, d);
-    const sn = d.specAttachmentNotes && String(d.specAttachmentNotes[s.id] || "").trim();
-    let caption = String(disp || "").trim();
-    if (sn) caption = caption ? (caption + " — " + sn) : sn;
-    cols.push({ title: s.label, src: imgSrc, caption: caption });
+    cols.push({ title: s.label, src: imgSrc, caption: String(disp || "").trim() });
   });
   return cols;
 }
@@ -9393,6 +9771,25 @@ async function renderLibraryRail() {
   }
 }
 
+/** Long imported scope: first sentence stays Design Intent. The rest prints on page 2. */
+function splitLongWorkOrderScope(intentRaw, wrRaw) {
+  let intent = String(intentRaw || "").trim();
+  let extra = String(wrRaw || "").trim();
+  if (!extra && intent.length > 180) {
+    const cut = intent.search(/\.\s+/);
+    if (cut > 30) {
+      extra = intent.slice(cut + 1).trim();
+      intent = intent.slice(0, cut + 1).trim();
+    }
+  }
+  extra = extra.replace(/\s+([A-Z][^.]{1,48})$/, function(all, tail) {
+    if (/\d/.test(tail) || tail.split(/\s+/).length > 6) return all;
+    return "";
+  });
+  if (extra && extra.indexOf("\n") < 0) extra = extra.replace(/\.\s+/g, ".\n");
+  return { intent: intent, extra: extra.trim() };
+}
+
 function updatePreview() {
   const cat = state.category;
   const cfg = CATS[cat];
@@ -9420,7 +9817,10 @@ function updatePreview() {
   hdr.append(el("div", { class:"pp-title" }, "WORK ORDER:  ", el("b", {}, tTitle + " "), el("span", { class:"num" }, d.workOrder || tPlaceholder)));
   /* WO-077-B: optional dedicated fabrication page 2 (toggle default OFF; page 1 unchanged). */
   const _fab2On = _isProductTpl && !!d.fabricationOnOwnPage && !!productFabricationDrawingSrc(cat, d, ups, pks);
-  hdr.append(el("div", { class:"pp-page" }, _fab2On ? "1 OF 2" : "1 OF 1"));
+  const scopeSheet = splitLongWorkOrderScope(String(d.designIntent || "").trim(), String(d.workroomDescription || "").trim());
+  const scopePage2 = scopeSheet.extra.length > 80;
+  const scopeAsPage2 = scopePage2 && isWindowTreatmentCategory(cat) && !_fab2On;
+  hdr.append(el("div", { class:"pp-page" }, (_fab2On || scopeAsPage2) ? "1 OF 2" : "1 OF 1"));
   root.append(hdr);
   dbSyncFabricationPage2(_fab2On, cat, d, ups, pks, caps);
   const tagDisp = _isProductTpl ? productTemplateTagLine(d) : String(d.location || "").trim();
@@ -9460,7 +9860,9 @@ function updatePreview() {
     subRow.append(tagLeft);
     subRow.append(el("div", { class: "pp-room-sub-wo" },
       "Work order # ",
-      el("span", { class: "pp-wo-num" }, woNum)));
+      el("span", { class: "pp-wo-num" }, woNum),
+      String(d.date || "").trim() ? ("  ·  " + String(d.date).trim()) : "",
+      "  ·  REV " + String(Number(d.revision || 1))));
     roomBan.append(subRow);
   }
   root.append(roomBan);
@@ -9473,12 +9875,17 @@ function updatePreview() {
   const body = el("div", { class:"preview-body"
     + (cat === "bedding" ? " preview-bedding" : "") });
   const left = el("div");
-  const intentRaw = String(d.designIntent || "").trim();
+  const intentRaw = scopePage2 ? scopeSheet.intent : String(d.designIntent || "").trim();
   const showIntent = !!intentRaw || !_isProductTpl;
   if (showIntent) {
     left.append(el("div", { class:"pp-section" }, "Design Intent"));
     const intentDisp = intentRaw || "—";
     left.append(el("div", { class:"pp-intent" + ((cat === "bedding" || cat === "pillows") ? " pp-intent--compact" : "") }, intentDisp));
+  }
+  const wrDesc = scopePage2 ? "" : String(d.workroomDescription || "").trim();
+  if (wrDesc) {
+    left.append(el("div", { class:"pp-section pp-section--compact" }, "Workroom Description"));
+    left.append(el("div", { class:"pp-workroom-desc" }, wrDesc));
   }
   const specs = el("div", { class:"pp-specs" });
   const specRows = visibleSpecBulletsForCat(cat, cfg, d);
@@ -9488,17 +9895,14 @@ function updatePreview() {
     if (!disp && cat === "upholstery" && s.id === "constructionDetails") {
       disp = upholsteryLegacyConstructionSummary(d);
     }
-    const att = d.specAttachments && d.specAttachments[s.id];
-    const pendSrc = ups["specAttach_" + s.id];
-    const imgSrc = (att && att.downloadURL) || pendSrc;
+    const specNote = d.specAttachmentNotes && String(d.specAttachmentNotes[s.id] || "").trim();
     const hasText = String(disp).trim().length > 0;
-    if (!hasText && !imgSrc) return;
-    if (!hasText && imgSrc) disp = "N/A";
-    const specImgInDetailBand = !!imgSrc && useDetailBand;
-    const row = el("div", { class: "pp-spec-row" });
-    row.append(el("div", { class: "pp-spec-text" }, el("b", {}, s.label + ": "), disp));
-    if (imgSrc && !specImgInDetailBand) row.append(el("img", { src: imgSrc, class: "pp-spec-thumb", alt: "" }));
-    specs.append(row);
+    if (!hasText && !specNote) return;
+    const textInner = el("div", { class: "pp-spec-text" });
+    textInner.append(el("b", {}, s.label + ": "));
+    if (hasText) textInner.append(disp);
+    if (specNote) textInner.append(el("div", { class: "pp-spec-imgnote" }, specNote));
+    specs.append(el("div", { class: "pp-spec-row" }, textInner));
   });
   if (d.treatmentOptions && d.treatmentOptions.length) {
     specs.append(el("div", { class: "pp-spec-row" },
@@ -9514,16 +9918,6 @@ function updatePreview() {
     specs.append(el("div", { class: "pp-spec-row" },
       el("div", { class: "pp-spec-text" },
         el("b", {}, "Trim: "), trimDisp)));
-  }
-  if (isShadeRollCategory(cat) && shadeVendorMaterialHasContent(d, ups)) {
-    const svm = ensureShadeVendorMaterial(d);
-    const pn = String(svm.partNo || "").trim();
-    const bits = [shadeMaterialModeLabel(d)];
-    if (pn) bits.push("Material # " + pn);
-    if (String(svm.colorName || "").trim()) bits.push(String(svm.colorName).trim());
-    specs.append(el("div", { class: "pp-spec-row" },
-      el("div", { class: "pp-spec-text" },
-        el("b", {}, "Shade face: "), bits.join(" · "))));
   }
   if (isWindowTreatmentCategory(cat) && d.sameWindowTagMultipleTreatments) {
     specs.append(el("div", { class: "pp-spec-row" },
@@ -9601,6 +9995,8 @@ function updatePreview() {
   } else if (isProductTemplateCategory(cat)) {
     mid.append(el("div", { class:"pp-rendering", style:"min-height:120px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;font-style:italic;padding:16px;border:1px dashed var(--hairline)" },
       "Add main image under Rendering & reference images"));
+  } else if (isWindowTreatmentCategory(cat)) {
+    mid.append(el("div", { class:"pp-rendering" }));
   }
   appendProductTemplateHeroCallouts(mid, cat, d, ups, caps);
   if (cat === "roller") {
@@ -9624,7 +10020,7 @@ function updatePreview() {
     const src = ups[trimKey] || tb.imageUrl;
     return src ? { opt, tb, src } : null;
   }).filter(Boolean);
-  const showShadeMat = isShadeRollCategory(cat) && shadeVendorMaterialHasContent(d, ups);
+  const showShadeMat = false;
   const hasVendorCol = showShadeMat || fabricFrs.length || trimFrs.length || trimIntentPreview.length;
   if (hasVendorCol) {
     right.append(el("div", { class:"pp-section" }, MATERIALS_SECTION));
@@ -9635,13 +10031,13 @@ function updatePreview() {
       const f = d.fabrics[fr.id] || {};
       const swKey = "swatch_" + fr.id;
       const sw = ups[swKey] || (d.swatchUrls && d.swatchUrls[swKey]);
-      right.append(buildPreviewFabricRow(fr, f, sw));
+      right.append(buildPreviewFabricRow(fr, f, sw, d));
     });
     trimFrs.forEach(fr => {
       const f = d.fabrics[fr.id] || {};
       const swKey = "swatch_" + fr.id;
       const sw = ups[swKey] || (d.swatchUrls && d.swatchUrls[swKey]);
-      right.append(buildPreviewFabricRow(fr, f, sw));
+      right.append(buildPreviewFabricRow(fr, f, sw, d));
     });
     trimIntentPreview.forEach(row => {
       right.append(buildPreviewTrimOptionRow(row.opt, row.tb, row.src));
@@ -9665,7 +10061,12 @@ function updatePreview() {
     right.append(el("div", { class:"pp-section", style:"margin-top:6px" }, "Details"));
     right.append(el("div", { style:"font-size:10px;line-height:1.3;margin:0" }, detailBits.join(" • ")));
   }
-  const showRightCol = hasVendorCol || detailBits.length > 0;
+  /* Window sheets keep the Materials column so the 3-column template holds. Product sheets still drop an empty column. */
+  const windowMaterialsCol = isWindowTreatmentCategory(cat);
+  if (windowMaterialsCol && !hasVendorCol) {
+    right.append(el("div", { class:"pp-section" }, MATERIALS_SECTION));
+  }
+  const showRightCol = hasVendorCol || detailBits.length > 0 || windowMaterialsCol;
   if (showRightCol) {
     body.append(right);
   } else {
@@ -9751,6 +10152,11 @@ function updatePreview() {
     wrRight));
   foot.append(approvalBlk);
   root.append(foot);
+  dbSyncScopePage2(scopeAsPage2, cat, d, scopeSheet);
+  const prevFoot = document.getElementById("previewPaneFooter");
+  if (prevFoot) prevFoot.textContent = (_fab2On || scopeAsPage2) ? "PREVIEW · 1 OF 2" : "PREVIEW · 1 OF 1";
+  // Catch-all so field() callbacks that only call updatePreview() still autosave.
+  // WO-170: this also runs after Save's renderForm — Save must clear again after paint.
   scheduleBuilderDraftSave();
 }
 
@@ -10265,6 +10671,100 @@ async function createProposalFromWorkOrderRecords(projectId, records, opts) {
   });
 }
 
+function bartoloLineSkipsWorkOrder(sub) {
+  const title = String((sub && sub.title) || "").trim().toLowerCase();
+  const bucket = String((sub && sub.workroomCostCategory) || "").toLowerCase();
+  if (bucket === "lining" || bucket === "installation" || bucket === "shipping") return true;
+  if (/\blining\b|\binterlining\b/.test(title)) return true;
+  if (/^(installation|install)\b/.test(title)) return true;
+  return false;
+}
+
+function bartoloLineWorkOrderCategory(sub) {
+  const blob = (String(sub.title || "") + " " + String(sub.description || "")).toLowerCase();
+  const shade = /\b(shade|roller|solar|sunscreen)\b/.test(blob);
+  const drape = /\b(drapery|drape|curtain)\b/.test(blob);
+  if (/\broman\b/.test(blob)) return "roman";
+  if (shade && drape) return "style";
+  if (shade) return "roller";
+  if (drape) return "drapery";
+  if (isWindowTreatmentCategory(state.category)) return state.category;
+  return "style";
+}
+
+function countBartoloWorkOrders(groups) {
+  let n = 0;
+  (groups || []).forEach(g => {
+    (g.lines || []).forEach(sub => {
+      const unit = parseFloat(sub.unitCost || sub.cost) || 0;
+      if (unit > 0 && !bartoloLineSkipsWorkOrder(sub)) n++;
+    });
+  });
+  return n;
+}
+
+/** One work order per product line. Description is the scope. Cost is the workroom amount, not the marked-up client price. */
+async function saveWorkOrdersFromBartoloGroups(projectId, d, groups, markupPct) {
+  const col = db.collection("boards").doc(projectId).collection("workOrders");
+  const snap = await col.get();
+  const existing = [];
+  snap.forEach(doc => existing.push(doc.data() || {}));
+  const projectName = d.project || "";
+  let count = 0;
+  for (const g of (groups || [])) {
+    const targets = (g.lines || []).filter(sub => {
+      const unit = parseFloat(sub.unitCost || sub.cost) || 0;
+      return unit > 0 && !bartoloLineSkipsWorkOrder(sub);
+    });
+    for (const sub of targets) {
+      const cat = bartoloLineWorkOrderCategory(sub);
+      const num = nextWorkOrderNumber(projectName, cat, existing);
+      const costs = defaultWorkroomCosts();
+      let bucket = "panelProducts";
+      const named = String(sub.workroomCostCategory || "");
+      if (named && costs[named] && named !== "lining" && named !== "installation" && named !== "shipping" && named !== "labor") bucket = named;
+      else if (/hardware/i.test(sub.title || "")) bucket = "hardware";
+      const unit = parseFloat(sub.unitCost || sub.cost) || 0;
+      costs[bucket] = {
+        amount: unit.toFixed(2),
+        qty: String(Math.max(1, parseInt(sub.qty, 10) || 1)),
+        note: ""
+      };
+      const scope = splitLongWorkOrderScope(String(sub.description || sub.title || "").trim(), "");
+      const ref = await col.add({
+        category: cat,
+        projectId: projectId,
+        projectName: projectName,
+        address: d.address || "",
+        workroomId: d.workroomId || "",
+        workroomName: d.workroomName || selectedWorkroomVendorName(d) || "",
+        workOrderNumber: num,
+        room: String(sub.room || g.room || "").trim(),
+        location: String(g.lineTag || "").trim(),
+        designIntent: scope.intent.slice(0, 500),
+        workroomDescription: scope.extra.slice(0, 2000),
+        workroomCosts: costs,
+        proposalMarkupPct: String(markupPct || d.proposalMarkupPct || "100"),
+        revision: 1,
+        date: new Date().toLocaleDateString("en-US"),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      existing.push({ workOrderNumber: num });
+      sub.workOrderId = ref.id;
+      sub.workOrderNumber = num;
+      if (!g.workOrderNumber) {
+        g.workOrderNumber = num;
+        g.workOrderId = ref.id;
+        if (!String(g.lineTag || "").trim()) g.lineTag = num;
+      }
+      count++;
+    }
+  }
+  state.workOrdersByProject = await listWorkOrders(projectId);
+  return count;
+}
+
 async function importBartoloEstimatePdf(file) {
   const d = getCatData(state.category);
   const projectId = (d.projectId || "").trim();
@@ -10279,9 +10779,6 @@ async function importBartoloEstimatePdf(file) {
     const sample = lines.join("\n");
     const fmt = detectBartoloFormat(lines);
     console.log("[Builder] Workroom estimate import | format:", fmt, "| vendor:", meta.vendor, "| lines:", lines.length);
-    if (fmt === "unknown") {
-      if (!await cchConfirm("This PDF layout was not auto-detected. Try parsing as QuickBooks PO / invoice anyway?", "CCH Studio")) return;
-    }
     const groups = parseBartoloPdfLines(lines);
     if (!groups.length) {
       console.warn("[Builder] Workroom estimate parse failed", { fmt, lineSample: lines.slice(0, 20) });
@@ -10304,7 +10801,7 @@ async function importBartoloEstimatePdf(file) {
       return;
     }
     const markupPct = markupRaw || d.proposalMarkupPct || "100";
-    let allItems = bartoloGroupsToProposalItems(groups, markupPct, meta.vendor);
+    const woCount = countBartoloWorkOrders(groups);
     await ensureProductLibraryLoaded();
     const matLines = buildProposalMaterialLinesFromWorkOrder(d, state.category, {
       workOrderId: state.currentWorkOrderId || "",
@@ -10314,15 +10811,12 @@ async function importBartoloEstimatePdf(file) {
     if (matLines.length) {
       if (statusEl) statusEl.textContent = "Choose work order materials…";
       selectedMats = await pickWorkOrderMaterialLinesForProposal(matLines, { defaultAll: fmt !== "budget-proposal" });
-      if (selectedMats.length) {
-        allItems = mergeWorkOrderMaterialsIntoProposalItems(allItems, selectedMats, {
-          workOrderNumber: d.workOrder || d.workOrderNumber || "",
-          lineTag: d.location || "",
-          room: d.room || ""
-        });
-      }
     }
-    const lineCount = allItems.filter(i => i.lineKind !== "group").length;
+    let costLines = 0;
+    groups.forEach(g => (g.lines || []).forEach(sub => {
+      if ((parseFloat(sub.unitCost || sub.cost) || 0) > 0) costLines++;
+    }));
+    const lineCount = costLines + selectedMats.length;
     const matCount = selectedMats.length;
     if (!lineCount) {
       alert("Parsed " + groups.length + " group(s) but found no cost lines. The PDF layout may differ from expected.");
@@ -10336,9 +10830,19 @@ async function importBartoloEstimatePdf(file) {
     const more = groups.length > 8 ? "\n… and " + (groups.length - 8) + " more groups" : "";
     const matNote = matCount ? ("\nIncludes " + matCount + " selected fabric/trim line(s) from this work order.") : "";
     if (statusEl) statusEl.textContent = "Confirm proposal…";
-    if (!await cchConfirm("Found " + groups.length + " room group(s), " + lineCount + " total line(s).\n\n" + preview + more + matNote + "\n\nCreate draft proposal?", "CCH Studio")) {
+    if (!await cchConfirm("Found " + groups.length + " room group(s), " + lineCount + " total line(s).\n\n" + preview + more + matNote + "\n\nCreate " + woCount + " work order(s) with the description and the cost, and a draft proposal?", "CCH Studio")) {
       if (statusEl) statusEl.textContent = "Import cancelled.";
       return;
+    }
+    if (statusEl) statusEl.textContent = "Saving work orders…";
+    if (woCount) await saveWorkOrdersFromBartoloGroups(projectId, d, groups, markupPct);
+    let allItems = bartoloGroupsToProposalItems(groups, markupPct, meta.vendor);
+    if (selectedMats.length) {
+      allItems = mergeWorkOrderMaterialsIntoProposalItems(allItems, selectedMats, {
+        workOrderNumber: d.workOrder || d.workOrderNumber || "",
+        lineTag: d.location || "",
+        room: d.room || ""
+      });
     }
     const defName = builderProposalDefaultName(d, { poNumber: meta.poNumber, workOrderNumber: d.workOrder, pdfProjectName: meta.projectName, workroomVendor: workroomVendor });
     await createProposalFromItems(projectId, allItems, {
@@ -10351,6 +10855,7 @@ async function importBartoloEstimatePdf(file) {
       workOrderId: state.currentWorkOrderId || "",
       defaultName: defName
     });
+    try { await renderForm(); } catch (eRender) {}
   } catch (e) {
     console.error("[Builder] Bartolo import", e);
     alert("Import failed: " + (e && e.message ? e.message : String(e)));
@@ -11029,6 +11534,7 @@ async function renderForm() {
   syncLibraryRailToTemplateIfAllowed();
   renderLibraryRail().catch(e => console.warn("[Builder] renderLibraryRail", e));
   const pane = document.getElementById("formPane");
+  const keepFormScroll = pane ? pane.scrollTop : 0;
   state.formSectionsOpen = saveFormSectionOpenState();
   pane.innerHTML = "";
   if (stale()) return;
@@ -11066,7 +11572,8 @@ async function renderForm() {
       const exists = state.projectRooms.some(r => String(r.name || "").toLowerCase() === String(d.room || "").toLowerCase());
       if (!exists) d.room = "";
     } else d.room = "";
-    maybeRestoreBuilderLocalDraft(cat);
+    builderDirtySinceSave = false;
+    await maybeRestoreBuilderLocalDraft(cat);
     writeBuilderSession();
     syncBuilderUrl();
     renderForm();
@@ -11108,7 +11615,7 @@ async function renderForm() {
   const woSelRow = el("div", { style:"display:flex;gap:6px;align-items:center" });
   const sel = el("select", { html:"<option value=''>New Work Order</option>", style:"flex:1" });
   state.workOrdersByProject.forEach(row => {
-    const opt = el("option", { value: row.id }, escapeHtml((row.workOrderNumber || row.id) + " — " + [row.room, row.location].filter(Boolean).join(" · ")));
+    const opt = el("option", { value: row.id }, escapeHtml(workOrderSelectLabel(row)));
     if (state.currentWorkOrderId === row.id) opt.selected = true;
     sel.append(opt);
   });
@@ -11258,6 +11765,21 @@ async function renderForm() {
   });
   intentWrap.append(intentTa);
   sec2Inner.append(intentWrap);
+  const wrWrap = el("div", { class:"field" });
+  wrWrap.append(el("label", {}, "Workroom Description"));
+  wrWrap.append(el("div", { style:"font-size:11px;color:var(--muted);margin:0 0 6px;line-height:1.35" }, "Fabrication spec for the workroom. Design intent stays the client description."));
+  const wrTa = el("textarea", {
+    placeholder: "1 Lutron QS motorized sunscreen roller shade, Sivoia QS Wireless Roller 100 drive; 4\u00BE\" \u00D7 5\" metal box pocket (black); Fabric SW 90-3% \u2014 Color [TBD].",
+    style: "width:100%;min-height:88px;padding:8px;font-family:inherit;font-size:13px;line-height:1.45;border:1px solid var(--border);resize:vertical"
+  });
+  wrTa.value = d.workroomDescription || "";
+  wrTa.addEventListener("input", function(e) {
+    d.workroomDescription = e.target.value;
+    updatePreview();
+    scheduleBuilderDraftSave();
+  });
+  wrWrap.append(wrTa);
+  sec2Inner.append(wrWrap);
   const sec4Inner = el("div");
   if (currentGroupFromCategory(cat) === "windows") {
     const layerWrap = el("div", { class:"field" });
@@ -11388,7 +11910,6 @@ async function renderForm() {
         const prev = JSON.stringify(d.specs[s.id] || []);
         d.specs[s.id] = picked;
         if (prev !== JSON.stringify(picked) && d.specAttachments && d.specAttachments[s.id]) delete d.specAttachments[s.id];
-        if (prev !== JSON.stringify(picked) && d.specAttachmentNotes && d.specAttachmentNotes[s.id]) delete d.specAttachmentNotes[s.id];
         autoPickForSpec(cat, s.id, picked.join(" "));
         if (cat === "upholstery" && s.id === "piece") maybeSyncRailToUpholsteryPiece(cat, d);
         renderForm();
@@ -11439,7 +11960,6 @@ async function renderForm() {
           delete d.specCustomText[s.id];
         }
         if (prev !== String(v) && d.specAttachments && d.specAttachments[s.id]) delete d.specAttachments[s.id];
-        if (prev !== String(v) && d.specAttachmentNotes && d.specAttachmentNotes[s.id]) delete d.specAttachmentNotes[s.id];
         d.specs[s.id] = v;
         autoPickForSpec(cat, s.id, v);
         if (cat === "drapery" && s.id === "pleat") maybeOpenPleatLibraryAfterSpecChange(cat, s.id, d);
@@ -11475,14 +11995,13 @@ async function renderForm() {
           setSpecAttachment(cat, s.id, null);
           if (state.uploads[cat]) delete state.uploads[cat]["specAttach_" + s.id];
           if (state.uploadFiles[cat]) delete state.uploadFiles[cat]["specAttach_" + s.id];
-          if (d.specAttachmentNotes && d.specAttachmentNotes[s.id]) delete d.specAttachmentNotes[s.id];
           renderForm();
         }
       }, "Clear"));
       wrap.append(attach);
       if (!d.specAttachmentNotes || typeof d.specAttachmentNotes !== "object") d.specAttachmentNotes = {};
       const specImgNote = el("textarea", {
-        placeholder: "Optional — what this reference image shows (placement, edge, dimensions).",
+        placeholder: "Prints under this spec on the work order (with or without a photo).",
         style: "width:100%;min-height:44px;margin-top:8px;padding:6px 8px;font-size:12px;border:1px solid var(--border);font-family:inherit;resize:vertical"
       });
       specImgNote.value = d.specAttachmentNotes[s.id] || "";
@@ -11513,9 +12032,13 @@ async function renderForm() {
   sec3Inner.append(buildImageUploadWithCaption(cat, "rendering", mainImgHint, mainImgLabel));
   if (cat === "roller") {
     sec3Inner.append(el("div", { class:"notice", style:"margin:10px 0;font-size:11px;line-height:1.4;padding:8px 10px" },
-      "Optional reference images print under the main rendering. Shade style and valance slots below; add lift/mount as an optional detail when needed."));
+      "Main rendering plus Shade Style, Lift / Mount, Valance, and dual-shade detail slots. Saved photos print under the rendering — Clear here to remove them."));
     pickerDetailSlotsForForm(cfg).forEach(p => sec3Inner.append(buildPickerDetailSlot(cat, p)));
-    sec3Inner.append(buildImageUploadWithCaption(cat, "wtDetail0", "Optional detail — lift / mount / bracket", "e.g. Chain side, cassette, bracket detail", "wtDetail0"));
+    sec3Inner.append(buildImageUploadWithCaption(cat, "wtDetail0", "Optional note — prints under this image. Clear removes it from the work order.", "Lift / mount / bracket detail", "wtDetail0"));
+    ["Dual shade style", "Dual shade / detail 2", "Detail 3"].forEach((lbl, i) => {
+      const k = "rollerSlot" + i;
+      sec3Inner.append(buildImageUploadWithCaption(cat, k, "Optional note — prints under this image. Clear removes it from the work order.", lbl, k));
+    });
   } else if (isWindowTreatmentCategory(cat)) {
     sec3Inner.append(el("div", { class:"notice", style:"margin:10px 0;font-size:11px;line-height:1.4;padding:8px 10px" },
       "Optional reference images print under the main rendering. Browse the library or upload; add a note under each."));
@@ -11571,13 +12094,16 @@ async function renderForm() {
   }
   pane.append(wrapFormCollapsible("Design intent", sec2Inner, true));
   pane.append(wrapFormCollapsible("Design specs", sec4Inner, true));
-  pane.append(wrapFormCollapsible("Rendering & reference images", sec3Inner, false));
+  pane.append(wrapFormCollapsible("Main rendering and details", sec3Inner, cat === "roller" || isWindowTreatmentCategory(cat)));
   const fabricDefs = getFabricRoleDefs(cat, d);
   let windowMaterialsInner = null;
   const secDetailsInner = el("div");
   if (isWindowTreatmentCategory(cat)) {
+    if (isShadeRollCategory(cat)) {
+      hydrateShadeVendorIntoMaterialA(cat, d);
+      hydrateShadeOpennessIntoSwatchNote(cat, d);
+    }
     windowMaterialsInner = el("div");
-    if (isShadeRollCategory(cat)) windowMaterialsInner.append(buildShadeVendorMaterialBlock(cat, d));
     windowMaterialsInner.append(el("div", {
       class: "notice",
       style: "margin:0 0 12px;font-size:11px;line-height:1.45;padding:8px 10px"
@@ -11678,7 +12204,8 @@ async function renderForm() {
     const fab = d.fabrics[fr.id];
     const isVendor = fabricIsWorkroomMaterial(fab);
     const isTrimSlot = fr.slotKind === "trim";
-    sec.append(el("h2", {}, "Material " + fr.id + (fr.role ? " — " + fr.role : "")));
+    sec.append(el("h2", {}, "Material " + fr.id));
+    appendMaterialRoleControl(sec, cat, fr, d);
     const chipRow = el("div", { style: "display:flex;flex-wrap:wrap;gap:14px 28px;align-items:flex-start;margin-bottom:12px" });
     const srcWrap = el("div");
     srcWrap.append(el("div", { style: "font-size:10px;letter-spacing:1px;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase" }, "Source"));
@@ -11804,30 +12331,19 @@ async function renderForm() {
       // —— Vendor: upload swatch ——
       sec.append(el("div", { class: "notice", style: "margin:0 0 12px;font-size:12px;line-height:1.45;padding:10px 12px" },
         "Vendor — upload a swatch image and enter part # / SKU. Not pulled from Product Library (workroom material)."));
+      sec.append(field("Manufacturer / vendor name", "text", fab.vendor, v => { fab.vendor = v; updatePreview(); scheduleBuilderDraftSave(); }, "e.g. Lutron, Phifer, Hartmann & Forbes"));
       sec.append(field("Part # / SKU", "text", fab.sku, v => { fab.sku = v; updatePreview(); scheduleBuilderDraftSave(); }, "Workroom vendor fabric code"));
       sec.append(field("Color / name", "text", fab.color, v => { fab.color = v; updatePreview(); scheduleBuilderDraftSave(); }, "Optional label for the swatch"));
       sec.append(buildImageSlotRow(cat, {
         imageKey: "swatch_" + fr.id,
         label: "Swatch image",
         libraryCategory: "vendor_fabrics",
-        notePlaceholder: "Optional note for this vendor swatch"
+        noteLabel: "Note",
+        notePlaceholder: "e.g. 5% open — prints in Materials"
       }));
       appendFabricWhereItGoesField(sec, fab);
     }
 
-    sec.append(field("Role Label", "text", fr.role, v => {
-      if (fr.extra) {
-        const target = (d.extraFabricRoles || []).find(x => x.id === fr.id);
-        if (target) {
-          target.role = v || (target.slotKind === "trim" ? "TRIM " + fr.id : "FABRIC " + fr.id);
-        }
-      } else {
-        if (!d.fabricRoleOverrides) d.fabricRoleOverrides = {};
-        const cfgRole = ((CATS[cat] || {}).fabricRoles || []).find(x => x.id === fr.id);
-        d.fabricRoleOverrides[fr.id] = v || (cfgRole && cfgRole.role) || "";
-      }
-      renderForm();
-    }));
     if (fr.extra) {
       sec.append(el("button", {
         type:"button",
@@ -11959,6 +12475,7 @@ async function renderForm() {
   );
   pane.append(actions);
   if (stale()) return;
+  try { pane.scrollTop = keepFormScroll; } catch (eScr) {}
   updatePreview();
   updateHeaderSaveUI();
 }
@@ -12021,6 +12538,311 @@ document.getElementById("tabs").addEventListener("click", e => {
   if (!btn || btn.dataset.bound) return;
   btn.dataset.bound = "1";
   btn.addEventListener("click", () => saveWorkOrder(false));
+})();
+
+function pptRoomCanon(s) {
+  let t = String(s || "").toLowerCase().replace(/&/g, " and ").replace(/#/g, " ");
+  t = t.replace(/craftroom/g, "craft room");
+  t = t.replace(/reading nook/g, "reading room");
+  t = t.replace(/\bworkout\b(?!\s+room)/g, "workout room");
+  return t.replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}
+function pptRoomTokens(s) {
+  const stop = { the: 1, and: 1, windows: 1, window: 1, sliders: 1, slider: 1 };
+  return pptRoomCanon(s).split(" ").filter(w => w && !stop[w]);
+}
+function pptRoomScore(woRoom, slideLoc) {
+  if (/great room dormer/i.test(woRoom) && /stair tower/i.test(slideLoc)) return 100;
+  const a = pptRoomTokens(woRoom);
+  const b = pptRoomTokens(slideLoc);
+  if (!a.length || !b.length) return 0;
+  const as = a.join(" ");
+  const bs = b.join(" ");
+  if (as === bs) return 100;
+  if (bs.indexOf(as) >= 0 || as.indexOf(bs) >= 0) return 90 - Math.min(20, Math.abs(as.length - bs.length));
+  const setb = {};
+  b.forEach(t => { setb[t] = 1; });
+  const hit = a.filter(t => setb[t]).length;
+  if (hit >= 2 && (hit === a.length || hit >= b.length)) return hit === a.length ? 80 : 78;
+  return 0;
+}
+function pptSlideLocation(texts) {
+  for (let i = 0; i < texts.length; i++) {
+    const s = String(texts[i] || "").replace(/\s+/g, " ").trim();
+    if (/^location\s*:/i.test(s)) {
+      const rest = s.replace(/^location\s*:/i, "").trim();
+      if (rest) return rest;
+      const nxt = String(texts[i + 1] || "").trim();
+      if (nxt && !/^arch/i.test(nxt)) return nxt;
+    }
+  }
+  return "";
+}
+function pptSlideTag(texts) {
+  for (let i = 0; i < texts.length; i++) {
+    let s = String(texts[i] || "").replace(/\s+/g, " ").trim();
+    if (!/^W\s*\d/i.test(s)) continue;
+    if (/hold|\bno\b/i.test(s)) continue;
+    if (/[\(&]$/.test(s) && texts[i + 1]) s = (s + " " + texts[i + 1]).replace(/\s+/g, " ").trim();
+    return s.slice(0, 80);
+  }
+  return "";
+}
+function pptSlideDesignNotes(texts) {
+  const i = texts.findIndex(t => /^design specifications$/i.test(String(t || "").trim()));
+  if (i < 0) return [];
+  const out = [];
+  for (let k = i + 1; k < texts.length; k++) {
+    const s = String(texts[k] || "").replace(/\s+/g, " ").trim();
+    if (!s) continue;
+    if (/^(project|date|revision|work order)\b/i.test(s)) break;
+    out.push(s);
+  }
+  return out.slice(0, 16);
+}
+function pptZipIndex(buf) {
+  const bytes = new Uint8Array(buf);
+  const view = new DataView(buf);
+  let eocd = -1;
+  const min = Math.max(0, bytes.length - 22 - 65535);
+  for (let i = bytes.length - 22; i >= min; i--) {
+    if (bytes[i] === 0x50 && bytes[i + 1] === 0x4b && bytes[i + 2] === 0x05 && bytes[i + 3] === 0x06) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error("This file is not a PowerPoint.");
+  const cdCount = view.getUint16(eocd + 10, true);
+  let p = view.getUint32(eocd + 16, true);
+  const entries = {};
+  for (let n = 0; n < cdCount; n++) {
+    if (view.getUint32(p, true) !== 0x02014b50) break;
+    const method = view.getUint16(p + 10, true);
+    const compSize = view.getUint32(p + 20, true);
+    const nameLen = view.getUint16(p + 28, true);
+    const extraLen = view.getUint16(p + 30, true);
+    const commentLen = view.getUint16(p + 32, true);
+    const localOffset = view.getUint32(p + 42, true);
+    const name = new TextDecoder("utf-8").decode(bytes.subarray(p + 46, p + 46 + nameLen));
+    entries[name] = { method: method, compSize: compSize, localOffset: localOffset };
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return { bytes: bytes, view: view, entries: entries };
+}
+async function pptZipInflate(zip, entry) {
+  const o = entry.localOffset;
+  const nameLen = zip.view.getUint16(o + 26, true);
+  const extraLen = zip.view.getUint16(o + 28, true);
+  const start = o + 30 + nameLen + extraLen;
+  const comp = zip.bytes.subarray(start, start + entry.compSize);
+  if (entry.method === 0) return comp;
+  if (entry.method !== 8 || typeof DecompressionStream !== "function") throw new Error("This browser cannot read the PowerPoint.");
+  const stream = new Blob([comp]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+function pptXmlTexts(xml) {
+  const out = [];
+  const re = /<a:t[^>]*>([^<]*)<\/a:t>/g;
+  let m;
+  while ((m = re.exec(xml))) {
+    const s = m[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#10;/g, " ").trim();
+    if (s) out.push(s);
+  }
+  return out;
+}
+function pptRelTargets(xml) {
+  const map = {};
+  const re = /<Relationship\b([^>]*)\/?>/g;
+  let m;
+  while ((m = re.exec(xml))) {
+    const id = (m[1].match(/\bId="([^"]+)"/) || [])[1];
+    const target = (m[1].match(/\bTarget="([^"]+)"/) || [])[1];
+    if (id && target) map[id] = target;
+  }
+  return map;
+}
+function pptResolveTarget(target) {
+  const parts = ("ppt/slides/" + target).split("/");
+  const out = [];
+  parts.forEach(part => {
+    if (part === "..") out.pop();
+    else if (part && part !== ".") out.push(part);
+  });
+  return out.join("/");
+}
+function pptSlidePictures(xml) {
+  const doc = new DOMParser().parseFromString(xml, "application/xml");
+  const blips = doc.getElementsByTagNameNS("http://schemas.openxmlformats.org/drawingml/2006/main", "blip");
+  const pics = [];
+  for (let i = 0; i < blips.length; i++) {
+    const blip = blips[i];
+    const rid = blip.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "embed") || "";
+    let node = blip;
+    while (node && node.localName !== "pic") node = node.parentNode;
+    let cx = 0;
+    let cy = 0;
+    if (node) {
+      const ext = node.getElementsByTagNameNS("http://schemas.openxmlformats.org/drawingml/2006/main", "ext")[0];
+      if (ext) {
+        cx = parseInt(ext.getAttribute("cx") || "0", 10) || 0;
+        cy = parseInt(ext.getAttribute("cy") || "0", 10) || 0;
+      }
+    }
+    if (rid) pics.push({ rid: rid, area: cx * cy });
+  }
+  pics.sort((a, b) => b.area - a.area);
+  return pics;
+}
+async function pptReadDesignSlides(file) {
+  const zip = pptZipIndex(await file.arrayBuffer());
+  const names = Object.keys(zip.entries).filter(n => /^ppt\/slides\/slide\d+\.xml$/.test(n));
+  names.sort((a, b) => parseInt(a.match(/\d+/)[0], 10) - parseInt(b.match(/\d+/)[0], 10));
+  const slides = [];
+  for (let i = 0; i < names.length; i++) {
+    const xmlBytes = await pptZipInflate(zip, zip.entries[names[i]]);
+    const xml = new TextDecoder("utf-8").decode(xmlBytes);
+    const texts = pptXmlTexts(xml);
+    const loc = pptSlideLocation(texts);
+    if (!loc) continue;
+    const num = names[i].match(/\d+/)[0];
+    slides.push({
+      loc: loc,
+      tag: pptSlideTag(texts),
+      notes: pptSlideDesignNotes(texts),
+      pics: pptSlidePictures(xml),
+      relName: "ppt/slides/_rels/slide" + num + ".xml.rels",
+      zip: zip
+    });
+  }
+  return slides;
+}
+function pptMatchSlidesToWorkOrders(slides, rows) {
+  const chosen = [];
+  const usedSlide = {};
+  const pending = rows.map(wo => ({ wo: wo }));
+  let guard = 0;
+  while (pending.length && guard < 40) {
+    guard++;
+    let bestRow = -1;
+    let best = null;
+    pending.forEach((row, idx) => {
+      const cands = [];
+      slides.forEach((s, i) => {
+        if (usedSlide[i]) return;
+        const sc = pptRoomScore(row.wo.room, s.loc);
+        if (sc >= 64) cands.push({ i: i, sc: sc, s: s });
+      });
+      cands.sort((a, b) => b.sc - a.sc || b.s.pics.length - a.s.pics.length);
+      let pick = cands[0] || null;
+      if (pick && cands[1] && pick.sc - cands[1].sc <= 8 && cands[1].s.pics.length >= pick.s.pics.length + 3) pick = cands[1];
+      if (pick && (!best || pick.sc > best.sc)) { best = pick; bestRow = idx; }
+    });
+    if (!best) break;
+    usedSlide[best.i] = 1;
+    chosen.push({ wo: pending[bestRow].wo, slide: best.s, score: best.sc });
+    pending.splice(bestRow, 1);
+  }
+  const matchedIds = {};
+  chosen.forEach(c => { matchedIds[c.wo.id] = 1; });
+  const unmatched = rows.filter(r => !matchedIds[r.id]).map(r => r.room || r.workOrderNumber);
+  return { chosen: chosen, unmatched: unmatched };
+}
+async function pptUploadWorkOrderImage(projectId, workOrderId, key, bytes, filename) {
+  const ext = ((String(filename || "").split(".").pop() || "jpg").toLowerCase()).replace(/[^a-z0-9]/g, "") || "jpg";
+  const type = ext === "png" ? "image/png" : (ext === "gif" ? "image/gif" : (ext === "webp" ? "image/webp" : "image/jpeg"));
+  const dest = "projects/" + projectId + "/workOrders/" + workOrderId + "/ppt/" + Date.now() + "-" + key + "." + ext;
+  const ref = storage.ref(dest);
+  await ref.put(new Blob([bytes], { type: type }), { contentType: type });
+  return ref.getDownloadURL();
+}
+async function applyPptDesignToWorkOrder(projectId, match) {
+  const wo = match.wo;
+  const slide = match.slide;
+  const relEntry = slide.zip.entries[slide.relName];
+  const relXml = relEntry ? new TextDecoder("utf-8").decode(await pptZipInflate(slide.zip, relEntry)) : "";
+  const rels = pptRelTargets(relXml);
+  const raster = [];
+  for (let i = 0; i < slide.pics.length; i++) {
+    const target = rels[slide.pics[i].rid];
+    if (!target) continue;
+    const mediaName = pptResolveTarget(target);
+    if (!/\.(png|jpe?g|gif|webp)$/i.test(mediaName)) continue;
+    const media = slide.zip.entries[mediaName];
+    if (!media) continue;
+    raster.push({ name: mediaName, entry: media });
+    if (raster.length >= 5) break;
+  }
+  const keys = ["rendering", "wtDetail0", "rollerSlot0", "rollerSlot1", "rollerSlot2"];
+  const urls = {};
+  for (let i = 0; i < raster.length && i < keys.length; i++) {
+    const bytes = await pptZipInflate(slide.zip, raster[i].entry);
+    urls[keys[i]] = await pptUploadWorkOrderImage(projectId, wo.id, keys[i], bytes, raster[i].name);
+  }
+  const patch = { updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+  if (/stair tower/i.test(slide.loc) && /great room dormer|stair tower/i.test(String(wo.room || ""))) patch.room = "Stair Tower";
+  if (slide.tag && !String(wo.location || "").trim()) patch.location = slide.tag;
+  if (slide.notes && slide.notes.length) patch.notes = slide.notes;
+  if (urls.rendering) patch.renderingUrl = urls.rendering;
+  const sw = Object.assign({}, wo.swatchUrls || {});
+  ["wtDetail0", "rollerSlot0", "rollerSlot1", "rollerSlot2"].forEach(k => { if (urls[k]) sw[k] = urls[k]; });
+  if (urls.wtDetail0 || urls.rollerSlot0) patch.swatchUrls = sw;
+  await db.collection("boards").doc(projectId).collection("workOrders").doc(wo.id).set(patch, { merge: true });
+  try { localStorage.removeItem(builderLocalDraftKey(projectId, wo.category || "roller", wo.id)); } catch (eDraft) {}
+}
+async function importDesignFromPowerPoint(file) {
+  const d = getCatData(state.category);
+  const projectId = (d.projectId || "").trim();
+  if (!projectId) { await cchAlert("Open a work order on the project first, so the design deck knows which rooms to fill.", "CCH Studio"); return; }
+  if (!auth.currentUser) { await cchAlert("Sign in before bringing in the PowerPoint.", "CCH Studio"); return; }
+  const btn = document.getElementById("headerPptDesignBtn");
+  const prevLabel = btn ? btn.textContent : "";
+  if (btn) { btn.disabled = true; btn.textContent = "Reading PowerPoint…"; }
+  try {
+    const slides = await pptReadDesignSlides(file);
+    const snap = await db.collection("boards").doc(projectId).collection("workOrders").limit(200).get();
+    const rows = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(r => {
+      const cat = r.category || "";
+      return !cat || isWindowTreatmentCategory(cat);
+    });
+    const match = pptMatchSlidesToWorkOrders(slides, rows);
+    if (!match.chosen.length) {
+      await cchAlert("No slide matched a work order on this project. Open a Cloud Rolling Hills work order and use the window-treatment design deck.", "CCH Studio");
+      return;
+    }
+    const lines = match.chosen.map(c => (c.wo.workOrderNumber || "WO") + "  " + (c.wo.room || "") + "  ←  " + c.slide.loc + (c.slide.tag ? "  " + c.slide.tag : ""));
+    const missed = match.unmatched.length ? ("\n\nNo slide for: " + match.unmatched.join(", ")) : "";
+    const ok = await cchConfirm(
+      "Copy the pictures, the tag, and the design notes onto " + match.chosen.length + " work order(s)? The price and the vendor description stay as they are.\n\n" + lines.join("\n") + missed,
+      "CCH Studio",
+      { confirmText: "Bring in design", cancelText: "Cancel" }
+    );
+    if (!ok) return;
+    for (let i = 0; i < match.chosen.length; i++) {
+      if (btn) btn.textContent = "Saving " + (i + 1) + " of " + match.chosen.length + "…";
+      await applyPptDesignToWorkOrder(projectId, match.chosen[i]);
+    }
+    const cur = state.currentWorkOrderId || "";
+    if (cur && match.chosen.some(c => c.wo.id === cur)) await loadWorkOrderById(cur);
+    state.workOrdersByProject = await listWorkOrders(projectId);
+    await cchAlert("Design is on " + match.chosen.length + " work order(s). Open one to see the pictures.", "CCH Studio");
+  } catch (e) {
+    console.error("[Builder] ppt design import", e);
+    await cchAlert("Could not read that PowerPoint. " + (e && e.message ? e.message : ""), "CCH Studio");
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = prevLabel || "Bring in design from PowerPoint"; }
+  }
+}
+(function setupHeaderPptDesign() {
+  const btn = document.getElementById("headerPptDesignBtn");
+  if (!btn || btn.dataset.bound) return;
+  btn.dataset.bound = "1";
+  btn.addEventListener("click", () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation";
+    input.addEventListener("change", () => {
+      const file = input.files && input.files[0];
+      if (file) importDesignFromPowerPoint(file);
+    });
+    input.click();
+  });
 })();
 
 (function setupHeaderBartoloImport() {

@@ -1,0 +1,76 @@
+---
+description: CCH standing rules — canonical repo, work-order numbering, staging/print gates, code grounding, secrets
+alwaysApply: true
+---
+
+# CCH standing rules
+
+These were previously Cursor **User Rules**, which live in Cursor's settings and are wiped
+by a reset. Moved into the repo Aug 30, 2026 so they survive one. Nothing to paste.
+
+## Workspace
+
+- Canonical repo: `C:\dev\CCH-Platform-Deploy\cch-deploy` **only**.
+- Never read or write `C:\Users\cindy\Dropbox\CCH-Platform-Deploy\`.
+
+## Work orders — every change gets a number
+
+A code change is a work order, whether it came from the queue or from a chat message.
+
+- Before the first edit: read `loop/LOOP_LEDGER.md`, take the next number, add an
+  `IN PROGRESS` row, and say the number in chat.
+- On finish, all three steps: `loop/WO-###_DONE_CR_[MonDD].md`; a `_DEPLOY_QUEUE.md` line
+  **with the WO number after the date stamp**; the ledger row set to `DONE-UNVERIFIED`.
+- Never set `VERIFIED` yourself. No size floor. No "too small for a WO."
+
+Detail: `wo-number-every-change.mdc`.
+
+## Staging is the default; print is not waivable
+
+- Staging (`cch-platform-staging.web.app`) and production (`cch-platform.web.app`) are
+  **different Firebase projects**. No shared data. A prod doc may not exist on staging;
+  that is expected, not a bug.
+- The chat that builds a feature deploys it to **staging** and keeps fixing there. Canon: `loop/CCH_STUDIO_DEPLOY_RULE_CW_Oct16.md` (Cindy Oct 16, 2026).
+- Production hosting needs Cindy's explicit typed **GO**, every time. Only Cursor #1 deploys production.
+- Before a production deploy, check what is already live so nothing newer gets overwritten.
+- Anything paid, ordered, or approved is locked.
+- Changes to the print/PDF layer (`@media print`, `@page`, Bill To / Ship To, the line-item
+  block) go to **staging only** and do **not** take a same-session production GO.
+
+## Print is shared by four documents
+
+Proposals, invoices, POs, tear sheets. Verify a print change against **all four**, not
+against the one that prompted it. Verifying 9.9.278 on a proposal alone is how PO print
+broke. Never restyle Bill To / Ship To / line items to make one document "match" another
+unless Cindy asked for that specific change.
+
+Detail: `print-surface-lock.mdc`.
+
+## Code grounding — mandatory, no guessing
+
+Before any claim about code behavior, root cause, or any code edit: grep 3+ aliases, read
+the function body **this turn**, cite `file:line`. Memory, session logs, and handoff notes
+are **not** evidence. If unsure, say what you searched. On **RELOOK** or **GROUNDING CHECK**:
+stop recommending, show grep results.
+
+Canon: `CODE_GROUNDING_PROTOCOL_MH_May13_v1.0.md` in repo root.
+
+## Asymmetric gates get reported, not silently half-fixed
+
+When a gate names some document types and not others (for example
+`type === 'proposal' || type === 'invoice'` with POs excluded), that asymmetry is usually
+the real bug rather than the thing you were sent to fix. Say so before editing.
+
+## Secrets
+
+Never paste API keys, PATs, or secrets in chat. Use local `*-pat.env` files and
+`firebase secrets:set`.
+
+## Studio vocabulary
+
+"Preview" often means the client PDF popup. Client invoice UX belongs on the **main invoice
+page** (Client View / Manage / Print), not only in Preview.
+
+## Deploys
+
+Explain deploy steps in plain PowerShell, one command per step. No `curl` for secrets.

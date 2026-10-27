@@ -2,7 +2,7 @@
 // Houzz-style project sub-panel — panel #2 only. Does NOT touch the CCH Studio rail (#1).
 // Spec: Docs/NAV_SPEC_FOR_CURSOR.png + Docs/NAV_SUBPANEL_SPEC_CW_Jul11_v1.2.html
 // Feature-flagged: OFF only when localStorage cchNavPanel=0. Admin default ON all hosts.
-// Build 20260826sp16 — Purchase Orders open-count badge (same rule as firm-wide All POs)
+// Build 20260829sp17 — Invoices open-count badge (same rule as client portal)
 
 (function() {
   'use strict';
@@ -11,7 +11,7 @@
   window._cchProjSubPanelLoaded = true;
 
   var PANEL_W = 216;
-  var spState = { projId: null, woCount: 0, filesBadge: 0, poOpenCount: 0 };
+  var spState = { projId: null, woCount: 0, filesBadge: 0, poOpenCount: 0, invOpenCount: 0, varOpenCount: 0, openCredits: [], creditProjId: null };
   /** Bumped on every afterRender / setNav — stale spLoadCounts must not re-open panel after Tabs. */
   var _spRenderGen = 0;
 
@@ -149,11 +149,24 @@
     if (spEnabled() && spOnProjectPage()) spRenderPanel(window._currentProject);
   };
 
+  window._cchSpReloadCounts = function(projId) {
+    if (!projId) return Promise.resolve();
+    return spLoadCounts(projId).then(function() {
+      if (spEnabled() && spOnProjectPage() && window._currentProject && window._currentProject.id === projId) {
+        spRenderPanel(window._currentProject);
+      }
+    });
+  };
+
   async function spLoadCounts(projId) {
     spState.projId = projId;
     spState.woCount = 0;
     spState.filesBadge = 0;
     spState.poOpenCount = 0;
+    spState.invOpenCount = 0;
+    spState.varOpenCount = 0;
+    spState.openCredits = [];
+    spState.creditProjId = null;
     try {
       var database = (typeof db !== 'undefined' && db) || firebase.firestore();
       var woSnap = await database.collection('boards').doc(projId).collection('workOrders').limit(200).get();
@@ -169,6 +182,7 @@
       });
       spState.filesBadge = n;
     } catch (e) {}
+    var creditRows = [];
     try {
       var database3 = (typeof db !== 'undefined' && db) || firebase.firestore();
       var poSnap = await database3.collection('boards').doc(projId).collection('purchaseOrders').limit(500).get();
@@ -176,6 +190,20 @@
       poSnap.forEach(function(d) {
         var po = d.data() || {};
         po.id = d.id;
+        var poNum = po.number || po.num || po.poNum || po.name || '';
+        (po.vendorCredits || []).forEach(function(c) {
+          if (!c || !c.id) return;
+          var rem = (c.remaining != null && c.remaining !== '') ? (parseFloat(c.remaining) || 0) : (parseFloat(c.amount) || 0);
+          rem = Math.round(rem * 100) / 100;
+          if (rem <= 0.009) return;
+          creditRows.push({
+            kind: 'vendor',
+            poId: d.id,
+            creditId: c.id,
+            remaining: rem,
+            label: (poNum || 'PO') + ' — $' + rem.toFixed(2) + (c.note ? ' — ' + c.note : '')
+          });
+        });
         if (typeof window.cchPoIsOpen === 'function') {
           if (window.cchPoIsOpen(po)) openN++;
         } else {
@@ -188,6 +216,83 @@
       });
       spState.poOpenCount = openN;
     } catch (ePo) {}
+    try {
+      var database4 = (typeof db !== 'undefined' && db) || firebase.firestore();
+      var invSnap = await database4.collection('boards').doc(projId).collection('invoices').limit(500).get();
+      var invOpenN = 0;
+      invSnap.forEach(function(d) {
+        var inv = d.data() || {};
+        inv.id = d.id;
+        if (spInvoiceCountsAsOpen(inv)) invOpenN++;
+        var stInv = String(inv.status || '').toLowerCase();
+        if (stInv === 'void' || stInv === 'voided' || stInv === 'draft') return;
+        var invNum = String(inv.invoiceNum || inv.number || inv.name || '').trim();
+        (inv.items || []).forEach(function(it) {
+          if (!it || String(it.expenseType || '') !== 'retainer_credit') return;
+          var amt = Math.abs(parseFloat(it.amount != null ? it.amount : it.clientPrice) || 0);
+          if (amt < 0.01) return;
+          creditRows.push({
+            kind: 'retainer',
+            invId: d.id,
+            remaining: Math.round(amt * 100) / 100,
+            label: 'Retainer ' + (invNum || 'invoice') + ' — $' + amt.toFixed(2)
+          });
+        });
+        (inv.clientCredits || []).forEach(function(c) {
+          if (!c || !c.id) return;
+          var rem = (c.remaining != null && c.remaining !== '') ? (parseFloat(c.remaining) || 0) : (parseFloat(c.amount) || 0);
+          rem = Math.round(rem * 100) / 100;
+          if (rem <= 0.009) return;
+          creditRows.push({
+            kind: 'client',
+            invId: d.id,
+            creditId: c.id,
+            remaining: rem,
+            label: 'Client credit ' + (invNum || 'invoice') + ' — $' + rem.toFixed(2) + (c.note ? ' — ' + c.note : '')
+          });
+        });
+      });
+      spState.invOpenCount = invOpenN;
+    } catch (eInv) {}
+    try {
+      if (typeof window.cchPoCollectVarianceRows === 'function') {
+        var vrows = await window.cchPoCollectVarianceRows(projId);
+        var vn = 0;
+        (vrows || []).forEach(function(r) {
+          if (!r || r.rowKind !== 'component') return;
+          if (typeof window.cchPoVarianceNeedsCategory === 'function') {
+            if (!window.cchPoVarianceNeedsCategory(r)) return;
+          } else {
+            if (r.invoicedOnId) return;
+            if (r.disposition === 'absorbed' || r.disposition === 'billable') return;
+            var code = String(r.reasonCode || r.reason || '').toLowerCase();
+            if (code === 'prepaid_tax' || code === 'tax' || code === 'vendor_tax') return;
+          }
+          vn++;
+        });
+        spState.varOpenCount = vn;
+      }
+    } catch (eVar) {}
+    spState.openCredits = creditRows;
+    spState.creditProjId = projId;
+  }
+
+  /** Open studio INV-* (Sent / unpaid / due / partial) — matches client portal badge, not KPI balance count. */
+  function spInvoiceCountsAsOpen(inv) {
+    inv = inv || {};
+    if (typeof window.cpPortalIsStudioPortalInvoice === 'function') {
+      if (!window.cpPortalIsStudioPortalInvoice(inv)) return false;
+    } else {
+      if (String(inv.importedFrom || '').toLowerCase() === 'houzz') return false;
+      if (String(inv.id || '').indexOf('houzz-') === 0) return false;
+      var stFb = String(inv.status || '').toLowerCase();
+      if (stFb === 'void' || stFb === 'voided' || stFb === 'draft') return false;
+      var invNum = String(inv.invoiceNum || inv.number || inv.name || '').trim();
+      if (!/^INV-/i.test(invNum)) return false;
+    }
+    if (typeof window.cpPortalInvoiceIsOpen === 'function') return window.cpPortalInvoiceIsOpen(inv);
+    var stL = String(inv.status || '').toLowerCase();
+    return stL === 'sent' || stL === 'unpaid' || stL === 'due' || stL === 'overdue' || stL === 'partial' || stL === 'partially paid';
   }
 
   function spInjectStyles() {
@@ -245,6 +350,61 @@
     return '<button type="button" class="cch-sp-item' + active + ghost + '" onclick="' + onclick + '" title="' + esc(opts.title || label) + '">' +
       '<span>' + esc(label) + (opts.external ? ' ↗' : '') + '</span>' + badge + '</button>';
   }
+
+  function spOpenCreditSelect(projId) {
+    var list = (spState.creditProjId === projId) ? (spState.openCredits || []) : [];
+    var opts = '<option value="">Open credits</option>';
+    if (!list.length) opts += '<option value="" disabled>None recorded yet</option>';
+    list.forEach(function(c) {
+      var val = c.kind === 'retainer'
+        ? ('retainer|' + c.invId)
+        : (c.kind === 'client'
+          ? ('client|' + c.invId + '|' + c.creditId)
+          : ('vendor|' + c.poId + '|' + c.creditId));
+      opts += '<option value="' + esc(val) + '">' + esc(c.label) + '</option>';
+    });
+    return '<div style="padding:2px 14px 8px;">' +
+      '<select aria-label="Open credits" onchange="if(this.value&&window.cchSpPickCredit)window.cchSpPickCredit(this.value);this.selectedIndex=0;" ' +
+      'style="width:100%;font-size:11px;padding:6px 4px;border:1px solid #E2E2E2;border-radius:0;background:#fff;color:#1B3352;font-family:inherit;">' +
+      opts + '</select></div>';
+  }
+
+  window.cchSpPickCredit = function(key) {
+    key = String(key || '');
+    var proj = window._currentProject;
+    if (!proj || !key) return;
+    var bits = key.split('|');
+    var kind = bits[0];
+    if (kind === 'retainer' && bits[1]) {
+      var invHash = '#/project/' + proj.id + '/invoice/' + bits[1];
+      if (typeof window.navigate === 'function') window.navigate(invHash);
+      return;
+    }
+    if (kind === 'client' && bits[1] && bits[2]) {
+      window.__cchPreselectClientCredit = bits[1] + '|' + bits[2];
+      var invMatch = (window.location.hash || '').match(/\/invoice\/([^/?#]+)/);
+      var currentInv = invMatch ? decodeURIComponent(invMatch[1]) : '';
+      if (currentInv && currentInv !== bits[1] && window._docEdit && window._docEdit.docId === currentInv && typeof window.docEditAddPayment === 'function') {
+        window.docEditAddPayment();
+        return;
+      }
+      if (typeof window.navigate === 'function') window.navigate('#/project/' + proj.id + '/invoice/' + bits[1]);
+      return;
+    }
+    if (kind !== 'vendor' || !bits[1] || !bits[2]) return;
+    var sourcePoId = bits[1];
+    var creditId = bits[2];
+    var hash = window.location.hash || '';
+    var m = hash.match(/\/po\/([^/?#]+)/);
+    var currentPo = m ? decodeURIComponent(m[1]) : '';
+    if (currentPo && currentPo !== sourcePoId && typeof window.cchPoOpenPaymentModal === 'function') {
+      window.__cchPoPreselectCredit = sourcePoId + '|' + creditId;
+      window.cchPoOpenPaymentModal(proj.id, currentPo);
+      return;
+    }
+    var poHash = '#/project/' + proj.id + '/po/' + encodeURIComponent(sourcePoId);
+    if (typeof window.navigate === 'function') window.navigate(poHash);
+  };
 
   function spRenderPanel(proj) {
     spInjectStyles();
@@ -304,12 +464,20 @@
     html += spItem('Files & Docs', 'files', { badge: spState.filesBadge });
 
     html += '<div class="cch-sp-grp">Money</div>';
-    html += spItem('Invoices', 'invoices');
+    html += spItem('Invoices', 'invoices', {
+      badge: spState.invOpenCount,
+      title: 'Open invoices — Sent / unpaid / due (same as client portal)'
+    });
     html += spItem('Purchase Orders', 'pos', {
       badge: spState.poOpenCount,
       title: 'Open POs — not received / paid / closed'
     });
-    html += spItem('Bill Variances', 'discrepancies');
+    html += spItem('Bill Variances', 'discrepancies', {
+      badge: spState.varOpenCount,
+      hot: spState.varOpenCount > 0,
+      title: 'Variances still waiting for Pass on or Bury'
+    });
+    html += spOpenCreditSelect(proj.id);
     if (isAdmin) html += spItem('Financials', 'financials');
 
     html += '<div class="cch-sp-grp">Operations</div>';
@@ -326,9 +494,10 @@
    * innerHTML=… and was wiping any button placed inside the actions div.
    * Also: local setTopbarActions() bypasses window.setTopbarActions hooks.
    *
-   * Layout (Aug 6): actions | Panel | Pepper+Chat — nowrap. Old flex-wrap put
-   * Panel/Pepper/Chat on a clipped first row when Overview topbar was crowded
-   * (.topbar fixed 52px + .main overflow:hidden).
+   * Layout (Oct 7 / WO-286): cluster stays nowrap so Panel/Pepper stay on the
+   * right. Action buttons wrap. Topbar is min-height 52px / height auto so the
+   * second row is not clipped. Old nowrap + overflowX:auto hid buttons unless
+   * the window was widened (Aug 6 nowrap was to keep Panel off a clipped row).
    */
   function spLayoutTopbarCluster(cluster, actions) {
     if (!cluster || !actions) return;
@@ -336,8 +505,10 @@
     actions.style.minWidth = '0';
     actions.style.flex = '1 1 auto';
     actions.style.justifyContent = 'flex-end';
-    actions.style.flexWrap = 'nowrap';
-    actions.style.overflowX = 'auto';
+    actions.style.flexWrap = 'wrap';
+    actions.style.overflowX = 'visible';
+    actions.style.overflowY = 'visible';
+    actions.style.rowGap = '6px';
     if (actions.parentNode !== cluster) cluster.appendChild(actions);
     else if (cluster.firstChild !== actions) cluster.insertBefore(actions, cluster.firstChild);
     var toggleHost = document.getElementById('cchNavPanelToggleHost');

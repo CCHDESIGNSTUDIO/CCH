@@ -20,7 +20,7 @@ Staging and production are **different Firebase projects**. Invoices, POs, and a
 
 ## Deploy (PowerShell — one command per step)
 
-**Staging hosting** (default test path; no Cindy GO needed):
+**Staging hosting** — the builder chat deploys this. No Cindy GO needed:
 
 ```powershell
 cd C:\dev\CCH-Platform-Deploy\cch-deploy
@@ -30,7 +30,7 @@ cd C:\dev\CCH-Platform-Deploy\cch-deploy
 firebase deploy --only hosting:platform --project staging
 ```
 
-**Production hosting** — only on Cindy's explicit typed **GO/YES**; agents never deploy prod solo:
+**Production hosting** — Cursor #1 only, after Cindy's typed **GO**. Check what is already live first:
 
 ```powershell
 firebase deploy --only hosting:platform --project cch-design-boards

@@ -1,0 +1,67 @@
+CURSOR USER RULES — v2, Aug 30 2026
+(v1 = USER-RULES-PASTE.txt, Jul 12. Kept, not deleted. This supersedes it.)
+
+WHY THIS FILE EXISTS AND WHY THE RESET HURT
+Project rules in .cursor/rules/*.mdc live in the repo and survive any Cursor reset.
+User Rules live in Cursor's own settings, NOT in the repo, so a reset wipes them.
+That is the set that went missing. Re-paste the block below and it is back.
+
+WHERE: Cursor Settings -> Rules -> User Rules. Applies to every agent, every window.
+Paste everything between the lines.
+
+------------------------------------------------------------------------
+CCH canonical repo: C:\dev\CCH-Platform-Deploy\cch-deploy only.
+Never read/write C:\Users\cindy\Dropbox\CCH-Platform-Deploy\.
+
+WORK ORDERS — EVERY CHANGE GETS A NUMBER.
+A code change is a work order, whether it came from the queue or from a chat message.
+Before the first edit: read loop/LOOP_LEDGER.md, take the next number, add an IN PROGRESS
+row, and say the number in chat. On finish, all three steps: loop/WO-###_DONE_CR_[MonDD].md,
+a _DEPLOY_QUEUE.md line WITH the WO number after the date stamp, and the ledger row set to
+DONE-UNVERIFIED. Never VERIFIED. No size floor, no "too small for a WO."
+
+STAGING IS THE DEFAULT AND PRINT IS NOT WAIVABLE.
+Staging (cch-platform-staging.web.app) and production (cch-platform.web.app) are DIFFERENT
+Firebase projects. No shared data. A prod doc may not exist on staging; that is expected.
+Production hosting needs Cindy's explicit typed GO, every time, and agents never deploy
+prod solo. Changes to the print/PDF layer (@media print, @page, Bill To / Ship To, the
+line-item block) go to staging ONLY and do not take a same-session production GO.
+
+PRINT IS SHARED BY FOUR DOCUMENTS.
+proposals, invoices, POs, tear sheets. Verify a print change against all four, not against
+the one that prompted it. Verifying 9.9.278 on a proposal alone is how PO print broke.
+Never restyle Bill To / Ship To / line items to make one document "match" another unless
+Cindy asked for that specific change.
+
+CODE GROUNDING (mandatory — no guessing):
+Before any claim about code behavior, root cause, or any code edit: grep 3+ aliases, read
+the function body THIS turn, cite file:line. Memory, session logs, and handoff notes are
+NOT evidence. If unsure, say what you searched. On "RELOOK" or "GROUNDING CHECK": stop
+recommending, show grep results. Canon: CODE_GROUNDING_PROTOCOL_MH_May13_v1.0.md in repo root.
+
+WHEN A GATE NAMES SOME DOCUMENT TYPES AND NOT OTHERS, SAY SO.
+An asymmetric `type ===` gate is usually the real bug, not the thing you were sent to fix.
+Report it before editing rather than fixing one branch and leaving the other.
+
+Never paste API keys, PATs, or secrets in chat. Use local *-pat.env files + firebase secrets:set.
+
+In CCH Studio: "Preview" often means client PDF popup — client invoice UX belongs on the
+MAIN invoice page (Client View / Manage / Print), not only Preview.
+
+Explain deploy steps in plain PowerShell, one command per step. No curl for secrets.
+------------------------------------------------------------------------
+
+AFTER PASTING
+1. Reload any Cursor window opened on the Dropbox path.
+2. Reopen the workspace as C:\dev\CCH-Platform-Deploy\cch-deploy so .cursor/rules/ loads.
+3. Confirm the project rules are live: ask the agent "list your always-apply rules."
+   It should name wo-number-every-change and print-surface-lock among them.
+
+PROJECT RULES ADDED Aug 30, 2026 (in the repo, reset-proof):
+  .cursor/rules/wo-number-every-change.mdc
+  .cursor/rules/print-surface-lock.mdc
+
+FIRST THING TO ASK CURSOR AFTER RESTORING THE RULES
+Reconcile the ledger. 39 deploy-queue rows since Aug 22 carry a build number and no WO
+number; builds 9.9.261 through 9.9.300 have no ledger rows. Back-fill them from
+_DEPLOY_QUEUE.md as one pass, numbered from WO-122, before taking any new work.

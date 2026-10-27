@@ -53,7 +53,6 @@
         var gate = (typeof proposalInvoiceGateSummary === 'function')
           ? proposalInvoiceGateSummary(prop, prop.items || [])
           : { pendingCount: 0, approvedCount: 1 };
-        if ((gate.pendingCount || 0) > 0) { if (typeof cchAlert === 'function') await cchAlert('Please resolve pending line decisions first.', 'Approve for Client'); return; }
         if ((gate.approvedCount || 0) < 1) { if (typeof cchAlert === 'function') await cchAlert('At least one line must be approved.', 'Approve for Client'); return; }
         if (!(await cchConfirm('Mark this proposal as approved for the client?', 'Approve for Client', { confirmText: 'Approve Total' }))) return;
         var nowIso = new Date().toISOString();
@@ -558,9 +557,11 @@
     .cch-doc-view-rail-card { background: #FAFAF8; border: 1px solid rgba(27,51,82,0.1); padding: 10px 12px; }
     .cch-doc-view-rail-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #5C6B80; margin-bottom: 6px; }
     .cch-doc-view-rail-row { display: flex; justify-content: space-between; font-size: 11px; color: #5C6B80; margin-bottom: 2px; gap: 8px; line-height: 1.35; }
-    .cch-doc-view-rail-row strong { font-family: var(--font-mono); color: #1B3352; font-weight: 600; font-size: 11px; }
-    .cch-doc-view-rail-grand { font-size: 13px; font-weight: 700; padding-top: 6px; margin-top: 4px; border-top: 1px solid #1B3352; }
-    .cch-doc-view-rail-balance { font-size: 14px !important; }
+    .cch-doc-view-rail-row strong { font-family: var(--font-mono); color: #1B3352; font-weight: 600; font-size: 14px; }
+    .cch-doc-view-rail-grand { font-size: 16px; font-weight: 700; padding-top: 6px; margin-top: 4px; border-top: 1px solid #1B3352; }
+    .cch-doc-view-rail-grand strong { font-size: 16px; }
+    .cch-doc-view-rail-balance { font-size: 16px !important; }
+    .cch-doc-view-rail-balance strong { font-size: 16px !important; }
     .cch-doc-view-rail-actions { display: flex; flex-direction: column; gap: 4px; }
     .cch-doc-view-rail-actions .btn { width: 100%; justify-content: center; font-size: 11px; padding: 6px 10px; }
     .cch-doc-line-totals-footer { display: flex; justify-content: flex-end; margin-top: 16px; padding-top: 14px; border-top: 2px solid #1B3352; }
@@ -591,13 +592,23 @@
     .cch-doc-view-billto { font-size: 12px; line-height: 1.45; color: #1B3352; }
     .cch-doc-view-client-edit { display: none; margin-top: 8px; }
     .cch-doc-view-client-edit.is-open { display: block; }
-    .cch-inv-pay-row { font-size: 11px; padding: 5px 0; border-bottom: 1px solid rgba(27,51,82,0.06); color: #5C6B80; line-height: 1.35; }
+    .cch-inv-pay-row { font-size: 13px; padding: 5px 0; border-bottom: 1px solid rgba(27,51,82,0.06); color: #5C6B80; line-height: 1.35; }
     .cch-inv-pay-row:last-child { border-bottom: none; }
     .cch-inv-dup-warn { margin-bottom: 10px; padding: 8px 12px; background: rgba(245,158,11,0.1); border: 1px solid rgba(217,119,6,0.35); font-size: 11px; line-height: 1.4; color: #92400E; }
     .cch-doc-foot-meta { margin-top: 10px; margin-bottom: 0; }
     .cch-doc-foot-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 16px; }
     @media (max-width: 960px) { .cch-doc-foot-grid { grid-template-columns: 1fr; } }
     .cch-doc-view-page .cch-inv-line-group { margin-bottom: 14px !important; }
+    .cch-doc-view-page table.cch-doc-view-items-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .cch-doc-view-page table.cch-doc-view-items-table td:nth-child(2) {
+      overflow-wrap: break-word;
+      word-break: break-word;
+      min-width: 0;
+    }
     @media (max-width: 1100px) {
       .cch-doc-view-grid { grid-template-columns: 1fr; }
       .cch-doc-view-rail { position: static; }
@@ -664,6 +675,8 @@
     /* Fix: Print preview images — ensure visible at 64px */
     @media print {
       .doc-edit-img img { width: 64px !important; height: 64px !important; }
+      .cch-var-line-edit { display: none !important; }
+      .cch-var-line-print { display: block !important; }
     }
 
     /* Fix: Proposal view toggle buttons */
@@ -847,6 +860,7 @@
         cchPropMoreItem(publishLabel, publishJs) +
         cchPropMoreItem('Document timeline', "toggleDocTimeline('" + projectId + "','proposals','" + proposalId + "')") +
         cchPropMoreItem('Tear Sheets', tearJs) +
+        cchPropMoreItem('Request Pricing', "void window.cchRfqOpenFromProposal('" + projectId + "','" + proposalId + "')") +
         cchPropMoreItem('Place this document on Room Boards', "cchPlaceDocLinesOnRoomBoards('" + projectId + "','proposals','" + proposalId + "')") +
         cchPropMoreItem('Check all documents on Room Boards', "cchPlaceDocLinesOnRoomBoards('" + projectId + "','','',true)") +
         invBtn +
@@ -864,6 +878,7 @@
         cchPropMoreItem(publishLabel, publishJs) +
         cchPropMoreItem('Document timeline', "toggleDocTimeline('" + projectId + "','proposals','" + proposalId + "')") +
         cchPropMoreItem('Tear Sheets', tearJs) +
+        cchPropMoreItem('Request Pricing', "void window.cchRfqOpenFromProposal('" + projectId + "','" + proposalId + "')") +
         cchPropMoreItem('Place this document on Room Boards', "cchPlaceDocLinesOnRoomBoards('" + projectId + "','proposals','" + proposalId + "')") +
         cchPropMoreItem('Check all documents on Room Boards', "cchPlaceDocLinesOnRoomBoards('" + projectId + "','','',true)") +
         invBtn +
@@ -912,7 +927,7 @@
 
     var escA = typeof escAttr === 'function' ? escAttr : function(s) { return String(s || '').replace(/"/g, '&quot;'); };
     var invOk = invGate && invGate.ok;
-    var invDis = invOk ? '' : ' disabled title="Complete client approvals first" style="opacity:0.45;pointer-events:none;"';
+    var invDis = invOk ? '' : ' disabled title="Approve at least one line first" style="opacity:0.45;pointer-events:none;"';
 
     var addItemOnclick = typeof openDocItemsSidebar === 'function'
       ? "openDocItemsSidebar({mode:'proposal',projectId:'" + projectId + "',proposalId:'" + proposalId + "'})"
@@ -927,10 +942,10 @@
     var moreView = cchProposalMoreMenuWrap(projectId, proposalId, false, invDis, tearJs, false, !!prop.published);
     var moreEdit = cchProposalMoreMenuWrap(projectId, proposalId, true, invDis, tearJs, !!myItemsBtn, !!prop.published);
 
-    var invMsgs = (invGate && invGate.msgs && invGate.msgs.length) ? invGate.msgs.join(' ') : 'Complete client approvals before converting.';
+    var invMsgs = (invGate && invGate.msgs && invGate.msgs.length) ? invGate.msgs.join(' ') : 'Approve at least one line before converting.';
     var invTitleAttr = invOk ? '' : (' title="' + escA(invMsgs) + '"');
     var convertGold = '<button type="button" class="btn btn-sm" style="font-size:13px;font-weight:700;padding:8px 18px;border-radius:0;background:linear-gradient(180deg,#E8C97A,#C9A227);color:#1a1508;border:1px solid #A88420;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-right:8px;' + (invOk ? '' : 'opacity:0.55;pointer-events:none;') + '"' + invTitleAttr + ' onclick="convertProposalToInvoice(\'' + projectId + '\',\'' + proposalId + '\')">Convert to Invoice</button>';
-    var canStaffApproveClientTotal = !prop.clientApprovedTotalAt && String(prop.status || '') !== 'Invoiced';
+    var canStaffApproveClientTotal = !prop.clientApprovedTotalAt && !(String(prop.status || '') === 'Invoiced' && !(typeof proposalHasPendingClientLines === 'function' && proposalHasPendingClientLines(prop)));
     var approveForClientBtn = canStaffApproveClientTotal
       ? '<button class="btn btn-secondary btn-sm" onclick="approveProposalTotalForClient(\'' + projectId + '\',\'' + proposalId + '\')">✅ Approve for Client</button>'
       : '';
@@ -1078,9 +1093,7 @@
           if (st === 'pending') pendingN++;
           if (st === 'approved') approvedN++;
         });
-        if (pendingN > 0) gateMsgs.push(pendingN + ' line(s) still Pending — set each to Approved or Declined.');
         if (approvedN < 1 && productLines.length > 0) gateMsgs.push('At least one line must be Approved to invoice.');
-        if (!prop.clientApprovedTotalAt) gateMsgs.push('Click Approve for Client after all line decisions are set.');
       }
       if (gateMsgs.length > 0) {
         if (typeof cchAlert === 'function') await cchAlert('Cannot create invoice yet:\n\n• ' + gateMsgs.join('\n• '), 'Convert to Invoice');
@@ -1213,8 +1226,13 @@
         if (!_lineEligibleForInvoice(item)) return item;
         return Object.assign({}, item, { invoicedOnInvoiceId: invRef.id, invoicedAt: invoicedAt });
       });
-      var propAfterInv = { status: 'Invoiced', linkedInvoiceId: invRef.id, items: updatedProposalItems };
-      var stillOpen = typeof proposalHasEditableUninvoicedLines === 'function' && proposalHasEditableUninvoicedLines(propAfterInv);
+      var stillOpen = updatedProposalItems.some(function(item) {
+        if (_isGroupRow(item)) return false;
+        var st = _lineApprovalState(item);
+        if (st === 'pending') return true;
+        if (st !== 'approved') return true;
+        return !item.invoicedOnInvoiceId;
+      });
       await db.collection('boards').doc(projectId).collection('proposals').doc(proposalId).update({
         status: stillOpen ? 'Partially Invoiced' : 'Invoiced',
         linkedInvoiceId: invRef.id,
@@ -1227,9 +1245,10 @@
         logDocActivity(projectId, 'proposals', proposalId, 'converted', 'Converted to Invoice ' + invNum);
       }
 
-      if (typeof cchAlert === 'function') await cchAlert('Invoice ' + invNum + ' created with ' + items.length + ' items!\nImages and pricing transferred.', 'Convert to Invoice');
+      if (typeof cchAlert === 'function') await cchAlert('Invoice ' + invNum + ' created with ' + items.length + ' items!\nImages and pricing transferred.' + (stillOpen ? '\n\nPending lines stay on this proposal.' : ''), 'Convert to Invoice');
       if (typeof _cacheTime !== 'undefined') _cacheTime = 0;
-      navigate('#/project/' + projectId + '/invoice/' + invRef.id);
+      if (stillOpen) navigate('#/project/' + projectId + '/proposal/' + proposalId + '/edit');
+      else navigate('#/project/' + projectId + '/invoice/' + invRef.id);
     } catch(e) {
       console.error('Convert failed:', e);
       if (typeof cchAlert === 'function') await cchAlert('Error: ' + e.message, 'Convert to Invoice');
@@ -1899,16 +1918,17 @@
           defaultTaxRate: parseFloat(d.defaultTaxRate) || 0,
           taxable_product: d.taxable_product !== false,
           taxable_service: d.taxable_service === true,
-          taxable_shipping: d.taxable_shipping === true,
+          taxable_shipping: false,
+          taxable_freight: false,
           taxable_expense: d.taxable_expense === true,
           taxable_handling: d.taxable_handling === true,
           taxable_other_expense: d.taxable_other_expense === true
         };
       } else {
-        window._companyTaxConfig = { defaultTaxRate: 0, taxable_product: true, taxable_service: false, taxable_shipping: true, taxable_expense: false, taxable_handling: false, taxable_other_expense: false };
+        window._companyTaxConfig = { defaultTaxRate: 0, taxable_product: true, taxable_service: false, taxable_shipping: false, taxable_freight: false, taxable_expense: false, taxable_handling: false, taxable_other_expense: false };
       }
     } catch(e) {
-      window._companyTaxConfig = { defaultTaxRate: 0, taxable_product: true, taxable_service: false, taxable_shipping: true, taxable_expense: false, taxable_handling: false, taxable_other_expense: false };
+        window._companyTaxConfig = { defaultTaxRate: 0, taxable_product: true, taxable_service: false, taxable_shipping: false, taxable_freight: false, taxable_expense: false, taxable_handling: false, taxable_other_expense: false };
     }
     return window._companyTaxConfig;
   }
@@ -1918,9 +1938,11 @@
 
   // Helper: get taxable default for an expense type
   window.getDefaultTaxable = function(expenseType) {
+    var et = String(expenseType || 'product').toLowerCase();
+    if (et === 'freight' || et === 'shipping' || et === 'expedited') return false;
     var cfg = window._companyTaxConfig || {};
-    var key = 'taxable_' + (expenseType || 'product');
-    return cfg[key] !== undefined ? cfg[key] : (expenseType === 'product');
+    var key = 'taxable_' + et;
+    return cfg[key] !== undefined ? cfg[key] : (et === 'product');
   };
 
   // Patch showNewInvoiceModal to use company default tax rate
@@ -2251,9 +2273,10 @@
 
       var now = new Date().toISOString();
       var today = now.split('T')[0];
-
-      // Update invoice — Sent always includes published
-      await db.collection('boards').doc(projectId).collection('invoices').doc(invoiceId).update({
+      var _fbTax = typeof window.cchInvoiceTaxInclusivePersistFields === 'function'
+        ? window.cchInvoiceTaxInclusivePersistFields(inv, {})
+        : null;
+      var _sentPatch = {
         status: 'Sent',
         published: true,
         publishedAt: now,
@@ -2261,7 +2284,14 @@
         sentAt: now,
         sentTo: clientEmail || clientName || 'client',
         updatedAt: now
-      });
+      };
+      if (_fbTax && _fbTax.total > 0.01) {
+        _sentPatch.taxRate = _fbTax.taxRate;
+        _sentPatch.taxAmount = _fbTax.taxAmount;
+        _sentPatch.tax = _fbTax.tax;
+        _sentPatch.total = _fbTax.total;
+      }
+      await db.collection('boards').doc(projectId).collection('invoices').doc(invoiceId).update(_sentPatch);
 
       // Log activity
       if (typeof logDocActivity === 'function') {
@@ -2754,6 +2784,7 @@
       html += '<button class="btn btn-secondary btn-sm" onclick="' + previewJs + '">🖨 Print / PDF</button>';
       html += '<button class="btn btn-primary btn-sm" onclick="cchEnterDocEditMode(\'' + pj + '\',\'' + dj + '\',\'po\')" style="background:#1B3352;color:#EDE8E0;">\u270F\uFE0F Edit PO</button>';
       var poMore = '';
+      poMore += cchDocMoreItem('\uD83D\uDCE7 Email PO to vendor', "emailVendorPO('" + pj + "','" + dj + "')");
       poMore += cchDocMoreItem('🖨 Print / PDF', previewJs);
       poMore += cchDocMoreDivider();
       poMore += cchDocMoreItem('🕐 Timeline', "toggleDocTimeline('" + pj + "','" + collection + "','" + dj + "')");
@@ -2778,8 +2809,6 @@
       if (typeof window.cchPoOpenStatusModal === 'function') {
         poMore += cchDocMoreItem('📋 Change fulfillment status', "cchPoOpenStatusModal('" + pj + "','" + dj + "')");
       }
-      var poPub = docData.published ? '🔒 Unpublish from dashboard' : '🌐 Publish to client dashboard';
-      poMore += cchDocMoreItem(poPub, "togglePublished('" + pj + "','" + dj + "'," + (!docData.published ? 'true' : 'false') + ",'purchaseOrders')");
       if (typeof linkDocModal === 'function') {
         poMore += cchDocMoreItem('📂 Attach from Files', "linkDocModal('" + pj + "','purchaseOrders','" + dj + "')");
       }
@@ -2873,6 +2902,7 @@
       }
     }
     if (type === 'po') {
+      more += cchDocMoreItem('\uD83D\uDCE7 Email PO to vendor', "emailVendorPO('" + pj + "','" + dj + "')");
       var qbRealIdPo = typeof getQbId === 'function' ? getQbId(docData) : '';
       if (typeof window.cchPoOpenStatusModal === 'function') {
         more += cchDocMoreItem('📋 Change fulfillment status', "cchPoOpenStatusModal('" + pj + "','" + dj + "')");
@@ -2890,7 +2920,7 @@
       more += cchDocMoreDivider();
       more += cchDocMoreItem('📂 Attach from Files', "linkDocModal('" + pj + "','" + collection + "','" + dj + "')");
     }
-    if (type === 'invoice' || type === 'po' || type === 'proposal') {
+    if (type === 'invoice' || type === 'proposal') {
       var pubLabel = docData.published ? '🔒 Unpublish from dashboard' : '🌐 Publish to client dashboard';
       more += cchDocMoreItem(pubLabel, "togglePublished('" + pj + "','" + dj + "'," + (!docData.published ? 'true' : 'false') + ",'" + collection + "')");
     }
@@ -3015,7 +3045,8 @@
     } else if (!invVoidEarly) {
       if (type === 'po' && typeof window.cchPoMerchandiseTotal === 'function') {
         subtotal = window.cchPoMerchandiseTotal(docData);
-        grandTotal = subtotal;
+        totalShipping = typeof window.cchPoShippingTotal === 'function' ? window.cchPoShippingTotal(docData) : 0;
+        grandTotal = Math.round((subtotal + totalShipping) * 100) / 100;
         taxRate = 0;
         tax = 0;
       } else {
@@ -3039,6 +3070,9 @@
           if (type === 'invoice' && typeof invoiceLineIsDesignServicesNoMarkup === 'function' && invoiceLineIsDesignServicesNoMarkup(i)) mkup = 0;
           var amt = parseFloat(i.amount) || 0;
           lineAmt = (cost > 0 ? cost * qty * (1 + mkup / 100) : amt);
+        }
+        if (type === 'proposal' && typeof window.proposalLineClientTotal === 'function') {
+          lineAmt = window.proposalLineClientTotal(i);
         }
         subtotal += lineAmt;
         var isTaxable = (typeof window.cchInvoiceLineIsTaxable === 'function') ? window.cchInvoiceLineIsTaxable(i) : (i.taxable !== false && (i.taxable === true || i.expenseType === 'product' || (!i.expenseType && i.taxable !== false)));
@@ -3224,19 +3258,36 @@
     }
 
     var _showLineTagCol = type === 'invoice' || type === 'proposal' || type === 'po';
-    var _showPoVendorCol = type !== 'po';
+    var _showPoVendorCol = type !== 'po' && (type !== 'invoice' || window.cchInvoiceShowVendorToClient(docData));
     var _showPoLineEtaCol = type === 'po' && typeof window.cchPoLineEtaHtml === 'function';
-    var _showPoShippingCol = type !== 'po';
+    var _showPoShippingCol = (type !== 'po' && type !== 'invoice');
     /** Invoices: tax is footer-only (Totals rail), not per-line — no Tax column on product rows. */
     var _showPoSalesTaxCol = (type === 'proposal');
     /** Invoice + PO main page: room per line (PO = scan without Edit). */
     var _showRoomCol = (type === 'invoice' || type === 'po');
     var _showMarkupCol = (type !== 'po' && type !== 'invoice');
+    /** Invoice Client View: unit = client sell (line ÷ qty), never trade item.cost. PO still shows trade Cost. */
     var _poExtraCols = (_showPoLineEtaCol ? 1 : 0) + (type === 'po' && _showRoomCol ? 1 : 0);
     var _invTableColspan = type === 'invoice' ? 10 : (type === 'proposal' ? 10 : (9 + _poExtraCols));
 
+    var _docViewColgroup = '<colgroup>' +
+      '<col style="width:80px">' +
+      '<col>' +
+      (_showPoVendorCol ? '<col style="width:120px">' : '') +
+      (_showRoomCol ? '<col style="width:110px">' : '') +
+      (_showLineTagCol ? '<col style="width:52px">' : '') +
+      (_showPoLineEtaCol ? '<col style="width:110px">' : '') +
+      (type === 'invoice' ? '<col style="width:76px">' : '') +
+      '<col style="width:48px">' +
+      '<col style="width:88px">' +
+      (_showMarkupCol ? '<col style="width:64px">' : '') +
+      (_showPoShippingCol ? '<col style="width:88px">' : '') +
+      (_showPoSalesTaxCol ? '<col style="width:50px">' : '') +
+      '<col style="width:96px">' +
+      '</colgroup>';
     var _docViewTableHeadHtml =
-        '<table style="width:100%;border-collapse:collapse;">' +
+        '<table class="cch-doc-view-items-table" style="width:100%;border-collapse:collapse;table-layout:fixed;">' +
+        _docViewColgroup +
         '<thead><tr style="border-bottom:1px solid var(--gray-200);">' +
           '<th style="width:80px;padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;"></th>' +
           '<th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Item</th>' +
@@ -3246,7 +3297,7 @@
           (_showPoLineEtaCol ? '<th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;min-width:110px;" title="Line ship status and ETA from Confirm order / vendor invoices">Ship / ETA</th>' : '') +
           (type === 'invoice' ? '<th style="padding:8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;width:64px;">Notes</th>' : '') +
           '<th style="padding:8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Qty</th>' +
-          '<th style="padding:8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Cost</th>' +
+          '<th style="padding:8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;"' + (type === 'invoice' ? ' title="Client price each"' : '') + '>' + (type === 'invoice' ? 'Price' : 'Cost') + '</th>' +
           (_showMarkupCol ? '<th style="padding:8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Markup</th>' : '') +
           (_showPoShippingCol ? '<th style="padding:8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;">Shipping</th>' : '') +
           (_showPoSalesTaxCol ? '<th style="padding:8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);font-weight:600;width:50px;">Tax</th>' : '') +
@@ -3268,7 +3319,9 @@
             : ((cost * qty) + ship))
           : ((type === 'invoice' && typeof window.invoiceLineAmountForTotals === 'function')
             ? window.invoiceLineAmountForTotals(item).lineAmt
-            : (cost > 0 ? cost * qty * (1 + mkup / 100) : amt));
+            : (type === 'proposal' && typeof window.proposalLineClientTotal === 'function'
+              ? window.proposalLineClientTotal(item)
+              : (cost > 0 ? cost * qty * (1 + mkup / 100) : amt)));
         var isTaxable = (typeof window.cchInvoiceLineIsTaxable === 'function') ? window.cchInvoiceLineIsTaxable(item) : (item.taxable !== false && (item.taxable === true || item.expenseType === 'product' || (!item.expenseType && item.taxable !== false)));
         var isSvcRow = item.expenseType === 'service' || item.itemType === 'service';
         if (type === 'invoice' && typeof window.cchInvoiceLineUseServiceStyleInView === 'function' && window.cchInvoiceLineUseServiceStyleInView(item)) {
@@ -3280,6 +3333,16 @@
           imgTag = window.cchBuildInvoiceLineImgHtml(item, _lineIdxImg);
         } else if (type === 'invoice' && typeof window.cchInvoiceViewLineThumbHtml === 'function') {
           imgTag = window.cchInvoiceViewLineThumbHtml(item, _lineIdxImg);
+        } else if (type === 'po' && typeof window.cchPoLineDisplayImageUrl === 'function') {
+            var _thumbUrl = window.cchPoLineDisplayImageUrl(item) || '';
+            if (_thumbUrl) {
+              var _iconAttrPo = (typeof cchLineIconImgDataAttr === 'function') ? cchLineIconImgDataAttr(item) : '';
+              imgTag = '<img src="' + _escImgSrcAttr(_thumbUrl) + '"' + _iconAttrPo + ' style="width:64px;height:64px;object-fit:contain;object-position:center;border-radius:4px;background:var(--gray-50);" referrerpolicy="no-referrer" onerror="typeof cchImgTryFallbacks===\'function\'&&cchImgTryFallbacks(this)">';
+            } else {
+              imgTag = (typeof cchLineIconPlaceholderHtml === 'function')
+                ? cchLineIconPlaceholderHtml(item, 64)
+                : '<div style="width:64px;height:64px;background:var(--gray-50);display:flex;align-items:center;justify-content:center;font-size:24px;border-radius:4px;border:1px solid var(--gray-100);">📦</div>';
+            }
         } else {
             var _thumbUrl = (typeof window.getBestImageUrl === 'function'
               ? window.getBestImageUrl(item, _lineIdxImg)
@@ -3291,7 +3354,7 @@
                 : (item.imageUrl || ''));
             if (_thumbUrl) {
               var _iconAttr = (typeof cchLineIconImgDataAttr === 'function') ? cchLineIconImgDataAttr(item) : '';
-              imgTag = '<img src="' + _escImgSrcAttr(_thumbUrl) + '"' + _iconAttr + ' style="width:64px;height:64px;object-fit:cover;border-radius:4px;background:var(--gray-50);" referrerpolicy="no-referrer" onerror="typeof cchImgTryFallbacks===\'function\'&&cchImgTryFallbacks(this)">';
+              imgTag = '<img src="' + _escImgSrcAttr(_thumbUrl) + '"' + _iconAttr + ' style="width:64px;height:64px;object-fit:' + (type === 'po' ? 'contain' : 'cover') + ';object-position:center;border-radius:4px;background:var(--gray-50);" referrerpolicy="no-referrer" onerror="typeof cchImgTryFallbacks===\'function\'&&cchImgTryFallbacks(this)">';
             } else {
               imgTag = (typeof cchLineIconPlaceholderHtml === 'function')
                 ? cchLineIconPlaceholderHtml(item, 64)
@@ -3308,6 +3371,9 @@
             ? window.cchLineExplicitNotesText(item)
             : String(item.lineNotes || '').trim());
         var descRaw = item.description || '';
+        if (type === 'invoice' && typeof window.cchStripInvoiceVendorParens === 'function') {
+          descRaw = window.cchStripInvoiceVendorParens(descRaw, item);
+        }
         if (type === 'invoice' && typeof window.sanitizeInvoicePreviewLineText === 'function') {
           descRaw = window.sanitizeInvoicePreviewLineText(descRaw);
           lineNotes = window.sanitizeInvoicePreviewLineText(lineNotes);
@@ -3320,18 +3386,23 @@
           descTrim = window.invoiceSuppressGenericServiceDescription(descTrim, item);
         }
         var expandDetail = type === 'invoice' ? (descTrim.length > 200) : false;
-        var poSpecsHtml = (type === 'po' && typeof window.cchPoLineSpecsBlockHtml === 'function')
-          ? window.cchPoLineSpecsBlockHtml(item, { includeDescription: true, omitRoom: true })
-          : '';
+        var poSpecsHtml = '';
+        if (typeof window.cchPoLineSpecsBlockHtml === 'function') {
+          if (type === 'po') {
+            poSpecsHtml = window.cchPoLineSpecsBlockHtml(item, { includeDescription: true, omitRoom: true });
+          } else if ((type === 'invoice' || type === 'proposal') && !isSvcRow) {
+            poSpecsHtml = window.cchPoLineSpecsBlockHtml(item, { includeDescription: false, omitRoom: true, forceVendorFields: false, omitTag: true });
+          }
+        }
         var descHtmlInner = (type === 'po')
           ? poSpecsHtml
-          : (descTrim ? '<div style="margin-top:6px;"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Description</div><div style="font-size:12px;color:var(--gray-400);margin-top:2px;white-space:pre-wrap;line-height:1.45;">' + esc(descRaw) + '</div></div>' : '');
+          : (poSpecsHtml + (descTrim ? '<div style="margin-top:6px;"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Description</div><div style="font-size:12px;color:var(--gray-400);margin-top:2px;white-space:pre-wrap;line-height:1.45;">' + esc(descRaw) + '</div></div>' : ''));
         var notesHtmlInner = '';
-        if (lineNotes && type !== 'invoice') {
+        if (lineNotes) {
           if (_nl.length <= 1) {
-            notesHtmlInner = '<div style="margin-top:6px;"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Notes</div><div style="font-size:11px;color:var(--gray-500);margin-top:2px;white-space:pre-wrap;line-height:1.45;">' + esc(lineNotes) + '</div></div>';
+            notesHtmlInner = '<div style="margin-top:6px;margin-bottom:8px;"><div style="font-size:10px;font-weight:700;color:#1B3352;letter-spacing:0.04em;">NOTE:</div><div style="font-size:11px;color:#1B3352;margin-top:2px;white-space:pre-wrap;line-height:1.45;">' + esc(lineNotes) + '</div></div>';
           } else {
-            notesHtmlInner = '<div style="margin-top:6px;"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Notes</div><ul style="font-size:11px;color:var(--gray-500);margin:4px 0 0 1.1em;padding:0;line-height:1.45;list-style:disc;">' +
+            notesHtmlInner = '<div style="margin-top:6px;margin-bottom:8px;"><div style="font-size:10px;font-weight:700;color:#1B3352;letter-spacing:0.04em;">NOTE:</div><ul style="font-size:11px;color:#1B3352;margin:4px 0 0 1.1em;padding:0;line-height:1.45;list-style:disc;">' +
               _nl.map(function(l) { return '<li style="margin:2px 0;">' + esc(l) + '</li>'; }).join('') + '</ul></div>';
           }
         }
@@ -3361,6 +3432,21 @@
               '</div>' +
             '</td></tr>';
         }
+        var varLineHtml = '';
+        if (type === 'invoice' && item && item.source === 'po_bill_variance' && lineIdx >= 0) {
+          descHtmlInner = '';
+          var _peV = cchEscJsStr(projectId);
+          var _deV = cchEscJsStr(docId);
+          var _itemLbl = String(item.varianceItemLabel || '').trim();
+          varLineHtml = '<div class="cch-var-line-edit">' +
+            (_itemLbl ? '<div style="font-size:12px;color:#1B3352;margin-top:4px;">' + esc(_itemLbl) + '</div>' : '') +
+            '<textarea rows="3" aria-label="Variance description" style="width:100%;margin-top:6px;font-size:12px;line-height:1.45;min-height:64px;border:1px solid #E2E2E2;padding:6px;font-family:inherit;box-sizing:border-box;" onblur="event.stopPropagation();saveInvoiceVarianceDescription(\'' + _peV + '\',\'' + _deV + '\',' + lineIdx + ',this.value)">' + esc(descRaw) + '</textarea>' +
+            '<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:#1B3352;cursor:pointer;" onclick="event.stopPropagation()"><input type="checkbox"' + (item.taxable === true ? ' checked' : '') + ' onchange="event.stopPropagation();saveInvoiceVarianceTax(\'' + _peV + '\',\'' + _deV + '\',' + lineIdx + ',this.checked)"> Tax this line</label>' +
+            '</div>' +
+            '<div class="cch-var-line-print" style="display:none;font-size:12px;color:#1B3352;margin-top:4px;white-space:pre-wrap;">' +
+            (_itemLbl ? esc(_itemLbl) : '') + (descRaw ? ( _itemLbl ? '<br>' : '') + esc(descRaw) : '') +
+            '</div>';
+        }
         var detailBlock = '';
         if (expandDetail) {
           var qtyStr = (Math.abs(qty - Math.round(qty)) < 0.001) ? String(Math.round(qty)) : String(qty);
@@ -3370,9 +3456,9 @@
             : 'Details — click to expand';
           detailBlock = '<details class="cch-inv-line-details" style="margin-top:6px;">' +
             '<summary style="cursor:pointer;font-size:12px;font-weight:600;color:#1B3352;list-style:none;">' + esc(hint) + '</summary>' +
-            '<div style="margin-top:8px;padding-left:8px;border-left:2px solid rgba(200,169,110,0.4);">' + descHtmlInner + notesHtmlInner + '</div></details>';
+            '<div style="margin-top:8px;padding-left:8px;border-left:2px solid rgba(200,169,110,0.4);">' + notesHtmlInner + descHtmlInner + '</div></details>';
         } else {
-          detailBlock = descHtmlInner + notesHtmlInner;
+          detailBlock = notesHtmlInner + descHtmlInner;
         }
         var _lineTitle = typeof window.invoiceLineDisplayTitle === 'function' ? window.invoiceLineDisplayTitle(item) : (item.title || 'Untitled');
         var _poRoomTagHtml = '';
@@ -3383,7 +3469,9 @@
           }
         }
         var typeBadgeHtml = '';
-        if (type === 'invoice') {
+        if (type === 'invoice' && item && item.source === 'po_bill_variance') {
+          typeBadgeHtml = '';
+        } else if (type === 'invoice') {
           if (typeof invoiceLineIsDesignServicesNoMarkup === 'function' && invoiceLineIsDesignServicesNoMarkup(item)) {
             typeBadgeHtml = '<div style="font-size:10px;margin-top:4px;"><span style="padding:2px 8px;border-radius:8px;background:rgba(200,169,110,0.12);color:var(--gold);font-weight:600;">service</span></div>';
           } else if (typeof window.cchInvoiceLineIsTeTravelPresentation === 'function' && window.cchInvoiceLineIsTeTravelPresentation(item)) {
@@ -3400,6 +3488,7 @@
         rows += '<tr style="border-bottom:1px solid var(--gray-100);">' +
           '<td style="padding:10px 8px;">' + imgTag + '</td>' +
           '<td style="padding:10px 8px;"><div style="font-size:14px;font-weight:600;">' + esc(_lineTitle) + '</div>' +
+            varLineHtml +
             _poRoomTagHtml +
             _libSuggestHtml +
             detailBlock +
@@ -3412,7 +3501,9 @@
           (_showPoLineEtaCol ? '<td style="padding:10px 8px;vertical-align:top;font-size:12px;">' + _poEtaHtml + '</td>' : '') +
           (type === 'invoice' ? '<td style="padding:10px 8px;text-align:center;vertical-align:middle;">' + invNoteBtnHtml + '</td>' : '') +
           '<td style="padding:10px 8px;text-align:center;font-size:14px;">' + qty + '</td>' +
-          '<td style="padding:10px 8px;text-align:right;font-size:13px;font-family:monospace;">' + (cost > 0 ? formatMoney(cost) : '—') + '</td>' +
+          '<td style="padding:10px 8px;text-align:right;font-size:13px;font-family:monospace;"' + (type === 'invoice' ? ' title="Client price each"' : '') + '>' + (type === 'invoice'
+            ? formatMoney(qty > 0 ? (lineAmtForRow / qty) : lineAmtForRow)
+            : (cost > 0 ? formatMoney(cost) : '—')) + '</td>' +
           (_showMarkupCol ? '<td style="padding:10px 8px;text-align:right;font-size:13px;color:' + (mkup > 0 ? 'var(--green)' : 'var(--gray-400)') + ';">' + (mkup > 0 ? mkup + '%' : '—') + '</td>' : '') +
           (_showPoShippingCol ? '<td style="padding:10px 8px;text-align:right;font-size:13px;color:var(--gray-400);">' + (ship > 0 ? formatMoney(ship) : '—') + '</td>' : '') +
           (_showPoSalesTaxCol ? '<td style="padding:10px 8px;text-align:center;">' + (isTaxable ? '<span style="color:#5FA56B;font-weight:700;">✓</span>' : '<span style="color:#ccc;">—</span>') + '</td>' : '') +
@@ -3612,7 +3703,7 @@
               '<div class="cch-doc-view-rail-title" style="margin:0;">Totals</div>' + _statusInline +
             '</div>' +
             '<div class="cch-doc-view-rail-row"><span>Merchandise subtotal</span><strong>' + formatMoney(subtotal) + '</strong></div>' +
-            '<div class="cch-doc-view-rail-row"><span>Sales tax' + (taxRate > 0 ? ' (' + taxRate + '%)' : '') + '</span><strong>' + formatMoney(tax) + '</strong></div>' +
+            '<div class="cch-doc-view-rail-row"><span>Sales tax' + (taxRate > 0 ? ' (' + taxRate + '% on ' + formatMoney(taxableSubtotal) + ')' : '') + '</span><strong>' + formatMoney(tax) + '</strong></div>' +
             '<div class="cch-doc-view-rail-row"><span>Shipping</span><strong>' + formatMoney(totalShipping) + '</strong></div>' +
             (typeof window.invoiceTotalsCreditsRailHtml === 'function' ? window.invoiceTotalsCreditsRailHtml({ credits: _invCredits }) : '') +
             '<div class="cch-doc-view-rail-row cch-doc-view-rail-grand"><span>Total</span><strong>' + formatMoney(grandTotal) + '</strong></div>' +
@@ -3628,8 +3719,13 @@
               : (showPaymentTotals && !_railPayCompact && _railQbPaidDate
                 ? '<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(27,51,82,0.08);font-size:11px;color:#5C6B80;">No payment lines in Studio yet — use <strong>Refresh from QB</strong>.</div>'
                 : '')) +
+            '<label style="display:flex;align-items:flex-start;gap:8px;font-size:11px;color:#5C6B80;line-height:1.4;margin-top:10px;cursor:pointer;">' +
+              '<input type="checkbox" style="margin-top:2px;"' + (docData.showVendorToClient ? ' checked' : '') +
+              ' onchange="cchInvoiceSetShowVendorToClient(\'' + projectId + '\',\'' + docId + '\',this.checked)">' +
+              'Show vendor to client (default off)</label>' +
           '</div>' +
           _railAttach +
+          (typeof window.cchInvoiceDueNowRailHtml === 'function' ? window.cchInvoiceDueNowRailHtml(projectId, docId, docData) : '') +
           '<div class="cch-doc-view-rail-card cch-doc-view-rail-actions">' +
             '<button type="button" class="btn btn-primary btn-sm" style="background:#1B3352;color:#EDE8E0;" onclick="sendInvoiceToClient(\'' + projectId + '\',\'' + docId + '\')">\uD83D\uDCE7 Send</button>' +
             '<button type="button" class="btn btn-secondary btn-sm" onclick="quickRecordPayment(\'' + projectId + '\',\'' + collection + '\',\'' + docId + '\')">\uD83D\uDCB3 Record payment</button>' +
@@ -3745,6 +3841,18 @@
         ? window.cchPoBillFreightTotal(docData) : 0;
       var _poBillVariance = typeof window.cchPoListVarianceForRow === 'function'
         ? window.cchPoListVarianceForRow(docData) : null;
+      var _poPrepaid = typeof window.cchPoPrepaidTaxTotal === 'function' ? window.cchPoPrepaidTaxTotal(docData) : 0;
+      var _poPrepaidRow = (Math.abs(_poPrepaid) > 0.01)
+        ? '<div class="cch-doc-view-rail-row"><span>Pre-paid tax</span><strong id="cchPoRailTax" style="color:#E16A5B;">' + formatMoney(_poPrepaid) + '</strong></div>'
+        : '';
+      var _poPayable = (_poHasVendorBill && typeof window.cchPoPayableBillTotal === 'function')
+        ? window.cchPoPayableBillTotal(docData)
+        : (_poBillTotal != null ? _poBillTotal : grandTotal);
+      var _poPaidShow = (_poHasVendorBill && typeof window.cchPoVendorBillPaidAmount === 'function')
+        ? window.cchPoVendorBillPaidAmount(docData) : totalPaid;
+      var _poDue = (_poHasVendorBill && typeof window.cchPoAmountDue === 'function')
+        ? window.cchPoAmountDue(docData)
+        : Math.max(0, (balance > 0 ? balance : grandTotal));
       var _poStatusRail = typeof window.cchPoStatusPanelsHtml === 'function'
         ? window.cchPoStatusPanelsHtml(projectId, docId, docData, items) : '';
       var _poLineTotalsFooter = typeof window.cchPoViewLineTotalsFooterHtml === 'function'
@@ -3756,30 +3864,33 @@
           (_poHasVendorBill && typeof window.cchPoOpenPaymentModal === 'function'
             ? '<button type="button" class="btn btn-secondary btn-sm" style="background:#1B3352;color:#EDE8E0;border-color:#1B3352;" onclick="cchPoOpenPaymentModal(\'' + projectId + '\',\'' + docId + '\')">💳 Pay bill</button>'
             : '') +
+          (typeof window.cchPoOpenRecordCreditModal === 'function'
+            ? '<button type="button" class="btn btn-secondary btn-sm" onclick="cchPoOpenRecordCreditModal(\'' + projectId + '\',\'' + docId + '\')">Record credit</button>'
+            : '') +
           (lineItemsQbBtn ? '<div style="margin-top:6px;">' + lineItemsQbBtn + '</div>' : '') +
         '</div>';
       var poRailHTML =
         '<aside class="cch-doc-view-rail">' +
           '<div class="cch-doc-view-rail-card">' +
             '<div class="cch-doc-view-rail-title" style="margin:0 0 6px;">Totals</div>' +
-            '<div class="cch-doc-view-rail-row"><span>Merchandise</span><strong>' + formatMoney(subtotal) + '</strong></div>' +
-            (_poHasVendorBill && Math.abs(_poBillFreight) >= 0.01
-              ? '<div class="cch-doc-view-rail-row"><span>Bill shipping</span><strong>' + formatMoney(_poBillFreight) + '</strong></div>'
-              : '') +
+            '<div class="cch-doc-view-rail-row"><span>Merchandise</span><strong id="cchPoRailMerch">' + formatMoney(subtotal) + '</strong></div>' +
+            '<div class="cch-doc-view-rail-row"><span>Shipping</span><strong id="cchPoRailShip">' + formatMoney(_poHasVendorBill ? _poBillFreight : totalShipping) + '</strong></div>' +
+            _poPrepaidRow +
+            '<div class="cch-doc-view-rail-row cch-doc-view-rail-grand"><span>' + (_poHasVendorBill ? 'Bill total' : 'PO total') + '</span><strong id="cchPoRailBillTotal" data-paid="' + _poPaidShow + '">' + formatMoney(_poPayable) + '</strong></div>' +
             (_poBillVariance != null && Math.abs(_poBillVariance) >= 0.01
-              ? '<div class="cch-doc-view-rail-row"><span>Variance</span><strong style="color:' + (_poBillVariance > 0 ? '#B45309' : '#15803D') + ';">' +
+              ? '<div class="cch-doc-view-rail-row"><span>Variance vs PO</span><strong id="cchPoRailVariance" style="color:' + (_poBillVariance > 0 ? '#B45309' : '#15803D') + ';">' +
                 (_poBillVariance > 0 ? '+' : '−') + formatMoney(Math.abs(_poBillVariance)) + '</strong></div>'
-              : '') +
-            '<div class="cch-doc-view-rail-row cch-doc-view-rail-grand"><span>' + (_poHasVendorBill ? 'Bill total' : 'PO total') + '</span><strong>' + formatMoney(_poHasVendorBill && _poBillTotal != null ? _poBillTotal : grandTotal) + '</strong></div>' +
+              : '<div class="cch-doc-view-rail-row" id="cchPoRailVarianceRow" style="display:none;"><span>Variance vs PO</span><strong id="cchPoRailVariance"></strong></div>') +
             (showPaymentTotals
-              ? '<div class="cch-doc-view-rail-row"><span>Paid</span><strong style="color:#2E7D32;">-' + formatMoney(totalPaid) + '</strong></div>' +
-                '<div class="cch-doc-view-rail-row cch-doc-view-rail-balance"><span>' + (_poHasVendorBill ? 'Bill balance' : 'Balance') + '</span><strong style="color:' + (balance <= 0.01 ? '#2E7D32' : 'var(--gold)') + ';">' + formatMoney(balance) + '</strong></div>'
-              : '<div class="cch-doc-view-rail-row cch-doc-view-rail-balance"><span>Balance due</span><strong>' + formatMoney(balance > 0 ? balance : grandTotal) + '</strong></div>') +
-            '<p style="margin:8px 0 0;font-size:10px;color:#5C6B80;line-height:1.35;">Sales tax on vendor bill only</p>' +
+              ? '<div class="cch-doc-view-rail-row"><span>Paid</span><strong style="color:#2E7D32;">-' + formatMoney(_poPaidShow) + '</strong></div>' +
+                '<div class="cch-doc-view-rail-row cch-doc-view-rail-balance"><span>' + (_poHasVendorBill ? 'Bill balance' : 'Balance') + '</span><strong id="cchPoRailBalance" style="color:' + (_poDue <= 0.01 ? '#2E7D32' : 'var(--gold)') + ';">' + formatMoney(_poDue) + '</strong></div>'
+              : '<div class="cch-doc-view-rail-row cch-doc-view-rail-balance"><span>Balance due</span><strong id="cchPoRailBalance">' + formatMoney(_poDue) + '</strong></div>') +
+            (Math.abs(_poPrepaid) > 0.01 ? '' : '<p style="margin:8px 0 0;font-size:10px;color:#5C6B80;line-height:1.35;">Sales tax on vendor bill only</p>') +
             '<div class="cch-doc-view-rail-row" style="margin-top:4px;"><span>Lines</span><strong>' + items.length + '</strong></div>' +
             (_poRailPayCompact
               ? '<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(27,51,82,0.08);"><div class="cch-doc-view-rail-title">Applied payments</div>' + _poRailPayCompact + '</div>'
               : '') +
+            (typeof window.cchPoVendorCreditsRailHtml === 'function' ? window.cchPoVendorCreditsRailHtml(docData, projectId, docId) : '') +
           '</div>' +
           _poRailActions +
           (_poStatusRail
@@ -4144,7 +4255,7 @@
     var section = 0;
     var sub = 0;
     var openGroupGid = null;
-    var tableColspan = 16;
+    var tableColspan = 17;
     var idx;
     for (idx = 0; idx < items.length; idx++) {
       var item = items[idx];
@@ -4165,7 +4276,7 @@
           '<td colspan="' + tableColspan + '" style="padding:10px 12px;vertical-align:middle;">' +
           '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
           '<button type="button" title="' + (collapsed ? 'Expand group' : 'Collapse group') + '" onclick="event.stopPropagation();toggleInvoiceGroupCollapse(\'' + pe + '\',\'' + ie + '\',\'' + (typeof escAttr === 'function' ? escAttr(gid) : gid) + '\')" style="width:30px;height:30px;margin-right:4px;border:1px solid rgba(15,26,46,0.2);background:#fff;color:var(--navy);font-size:16px;font-weight:700;cursor:pointer;vertical-align:middle;border-radius:2px;line-height:1;">' + (collapsed ? '+' : '−') + '</button>' +
-          '<span draggable="true" style="cursor:grab;color:var(--gray-500);padding:4px 8px 4px 2px;user-select:none;display:inline-block;" title="Drag here to move group" ondragstart="invoiceRowDragStart(\'' + pe + '\',\'' + ie + '\',' + idx + ')">⋮⋮</span>' +
+          '<span draggable="true" style="cursor:grab;color:var(--gray-500);padding:4px 8px 4px 2px;user-select:none;display:inline-block;" title="Drag here to move group" ondragstart="invoiceRowDragStart(\'' + pe + '\',\'' + ie + '\',' + idx + ',event)">⋮⋮</span>' +
           '<div style="flex:1;min-width:240px;">' + groupDisplayHtml + '</div>' +
           '<button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation();removeInvoiceCustomGroup(\'' + pe + '\',\'' + ie + '\',' + idx + ')">Ungroup</button>' +
           '</div></td></tr>'
@@ -4188,6 +4299,7 @@
       var markupPct = parseFloat(item.markupPct) || 0;
       var shipping = parseFloat(item.shipping) || 0;
       var lineTotal = invLineAmt(item);
+      var unitClientPrice = qty > 0 ? (lineTotal / qty) : lineTotal;
       var curRoom = String(item.room || '').trim();
       var roomOpts = '<option value="">— Room —</option>';
       if (curRoom && rooms.indexOf(curRoom) < 0) {
@@ -4226,19 +4338,20 @@
         '<tr style="' + trStyle + '" data-idx="' + idx + '"' +
         ' ondragover="event.preventDefault();this.classList.add(\'prop-drag-over\');" ondragleave="this.classList.remove(\'prop-drag-over\');"' +
         ' ondrop="invoiceRowDropOn(\'' + pe + '\',\'' + ie + '\',' + idx + ',event)">' +
-        '<td draggable="true" style="text-align:center;color:var(--gray-400);cursor:grab;padding:6px;width:28px;" ondragstart="invoiceRowDragStart(\'' + pe + '\',\'' + ie + '\',' + idx + ')">⋮⋮</td>' +
+        '<td draggable="true" style="text-align:center;color:var(--gray-400);cursor:grab;padding:6px;width:28px;user-select:none;" ondragstart="invoiceRowDragStart(\'' + pe + '\',\'' + ie + '\',' + idx + ',event)">⋮⋮</td>' +
         '<td style="text-align:center;padding:4px;"><input type="checkbox" class="invBulkSelectCb" data-idx="' + idx + '" onclick="event.stopPropagation()" onchange="invBulkUpdateGroupBtnState()"></td>' +
         '<td style="font-size:11px;font-weight:600;color:var(--gray-500);text-align:center;width:32px;">' + esc(numLabel) + '</td>' +
         '<td style="padding:4px;width:54px;">' + thumbHtml + '</td>' +
-        '<td class="prop-item-cell"><strong style="font-size:12px;display:block;">' + esc(item.title || 'Untitled') + '</strong>' +
-          '<span style="font-size:11px;color:var(--gray-400);">' + esc((item.description || '').substring(0, 80)) + '</span></td>' +
-        '<td style="font-size:12px;padding:4px;"><input class="form-input" style="font-size:11px;padding:3px 4px;width:100%;box-sizing:border-box;" value="' + escAttr(item.vendor || '') + '" onchange="updateProposalItemField(\'' + pe + '\',\'' + ie + '\',' + idx + ',\'vendor\',this.value)"></td>' +
+        '<td class="prop-item-cell"><strong style="font-size:12px;display:block;">' + esc((typeof window.invoiceLineDisplayTitle === 'function' ? window.invoiceLineDisplayTitle(item) : (item.title || 'Untitled'))) + '</strong>' +
+          '<span style="font-size:11px;color:var(--gray-400);">' + esc((typeof window.cchStripInvoiceVendorParens === 'function' ? window.cchStripInvoiceVendorParens(item.description || '', item) : (item.description || '')).substring(0, 80)) + '</span></td>' +
+        '<td style="font-size:12px;padding:4px;"><input class="form-input" style="font-size:11px;padding:3px 4px;width:100%;box-sizing:border-box;" value="' + escAttr((typeof window.cchInvoiceLineVendorName === 'function' ? window.cchInvoiceLineVendorName(item) : (item.vendor || ''))) + '" onchange="updateProposalItemField(\'' + pe + '\',\'' + ie + '\',' + idx + ',\'vendor\',this.value)"></td>' +
         '<td style="font-size:12px;padding:4px;"><select class="form-input" style="font-size:10px;padding:2px;width:100%;box-sizing:border-box;" onchange="updateProposalItemField(\'' + pe + '\',\'' + ie + '\',' + idx + ',\'room\',this.value)">' + roomOpts + '</select></td>' +
         '<td style="text-align:center;padding:4px;"><input class="form-input" style="font-size:11px;font-weight:700;padding:3px;width:48px;text-align:center;box-sizing:border-box;" value="' + escAttr(lineTagTxt) + '" maxlength="32" placeholder="—" onchange="updateProposalItemField(\'' + pe + '\',\'' + ie + '\',' + idx + ',\'lineTag\',this.value)"></td>' +
         '<td style="text-align:center;padding:4px;">' + noteBtnHtml + '</td>' +
         '<td class="amount" style="font-size:12px;padding:4px;text-align:right;"><input type="text" inputmode="decimal" class="form-input cch-no-spin" style="font-size:11px;padding:3px;width:44px;text-align:right;" value="' + qty + '" onchange="updateProposalItemField(\'' + pe + '\',\'' + ie + '\',' + idx + ',\'qty\',this.value)"></td>' +
-        '<td class="amount" style="font-size:12px;padding:4px;text-align:right;"><input type="text" inputmode="decimal" class="form-input cch-no-spin" style="font-size:11px;padding:3px;width:58px;text-align:right;" value="' + (cost > 0 ? cost.toFixed(2) : '') + '" onchange="updateProposalItemField(\'' + pe + '\',\'' + ie + '\',' + idx + ',\'cost\',this.value||0)"></td>' +
+        '<td class="amount" style="font-size:12px;padding:4px;text-align:right;"><input type="text" inputmode="decimal" class="form-input cch-no-spin" style="font-size:11px;padding:3px;width:58px;text-align:right;" value="' + (cost > 0 ? cost.toFixed(2) : '') + '" onchange="updateProposalItemField(\'' + pe + '\',\'' + ie + '\',' + idx + ',\'cost\',this.value||0)" title="Trade cost each"></td>' +
         '<td class="amount" style="font-size:12px;padding:4px;text-align:right;"><input type="text" inputmode="decimal" class="form-input cch-no-spin" style="font-size:11px;padding:3px;width:44px;text-align:right;color:var(--green);" value="' + (markupPct || '') + '" onchange="updateProposalItemField(\'' + pe + '\',\'' + ie + '\',' + idx + ',\'markupPct\',this.value||0)"></td>' +
+        '<td class="amount" style="font-size:12px;padding:4px;text-align:right;font-weight:700;color:var(--gold);" title="Client cost each (cost + markup)">' + (lineTotal ? formatMoney(unitClientPrice) : '—') + '</td>' +
         '<td class="amount" style="font-size:12px;padding:4px;text-align:right;"><input type="text" inputmode="decimal" class="form-input cch-no-spin" style="font-size:11px;padding:3px;width:52px;text-align:right;" value="' + (shipping > 0 ? shipping.toFixed(2) : '') + '" onchange="updateProposalItemField(\'' + pe + '\',\'' + ie + '\',' + idx + ',\'shipping\',this.value||0)"></td>' +
         '<td style="text-align:center;padding:4px;">' + (isTaxable ? '<span style="color:#5FA56B;font-weight:700;">✓</span>' : '—') + '</td>' +
         '<td class="amount prop-col-total" style="padding:4px;text-align:right;font-weight:600;">' + formatMoney(lineTotal) + '</td>' +
@@ -4270,8 +4383,8 @@
       '<th style="width:24px;" title="Drag"></th><th style="width:28px;" title="Select"></th><th style="width:32px;">#</th>' +
       '<th style="width:54px;">IMG</th><th style="min-width:18%;">ITEM</th><th>VENDOR</th><th>ROOM</th>' +
       '<th style="width:52px;text-align:center;">Tag</th><th style="width:64px;">Notes</th>' +
-      '<th class="amount">QTY</th><th class="amount">COST</th><th class="amount">Mkup %</th><th class="amount">SHIP</th>' +
-      '<th style="width:42px;text-align:center;">TAX</th><th class="amount">TOTAL</th><th style="width:44px;"></th></tr></thead>';
+      '<th class="amount">QTY</th><th class="amount" title="Trade cost each">COST</th><th class="amount">Mkup %</th><th class="amount" title="Client cost each (cost + markup)">Sell/ea</th><th class="amount">SHIP</th>' +
+      '<th style="width:42px;text-align:center;">TAX</th><th class="amount" title="Sell/ea × qty">TOTAL</th><th style="width:44px;"></th></tr></thead>';
 
     var tableHtml = items.length
       ? bulkBar + '<div id="invoiceManageArea" data-cch-invoice-manage="1" class="proposal-table-wrap proposal-landing-manage-border"><table class="data-table" style="margin-bottom:0;" ondragover="event.preventDefault()">' + thead + '<tbody>' + rows.join('') + '</tbody></table></div>'
@@ -4377,7 +4490,7 @@
             '<div class="cch-doc-view-rail-title" style="margin:0;">Totals</div>' + _statusInline +
           '</div>' +
           '<div class="cch-doc-view-rail-row"><span>Merchandise subtotal</span><strong>' + formatMoney(subtotal) + '</strong></div>' +
-          '<div class="cch-doc-view-rail-row"><span>Sales tax' + (taxRate > 0 ? ' (' + taxRate + '%)' : '') + '</span><strong>' + formatMoney(tax) + '</strong></div>' +
+          '<div class="cch-doc-view-rail-row"><span>Sales tax' + (taxRate > 0 ? ' (' + taxRate + '% on ' + formatMoney(_invT.taxableSubtotal || 0) + ')' : '') + '</span><strong>' + formatMoney(tax) + '</strong></div>' +
           '<div class="cch-doc-view-rail-row"><span>Shipping</span><strong>' + formatMoney(totalShipping) + '</strong></div>' +
           (typeof window.invoiceTotalsCreditsRailHtml === 'function' ? window.invoiceTotalsCreditsRailHtml({ credits: _invCredits }) : '') +
           '<div class="cch-doc-view-rail-row cch-doc-view-rail-grand"><span>Total</span><strong>' + formatMoney(grandTotal) + '</strong></div>' +
@@ -4393,8 +4506,13 @@
             : (showPaymentTotals && !_railPayCompact && _railQbPaidDate
               ? '<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(27,51,82,0.08);font-size:11px;color:#5C6B80;">No payment lines in Studio yet \u2014 use <strong>Refresh from QB</strong>.</div>'
               : '')) +
+          '<label style="display:flex;align-items:flex-start;gap:8px;font-size:11px;color:#5C6B80;line-height:1.4;margin-top:10px;cursor:pointer;">' +
+            '<input type="checkbox" style="margin-top:2px;"' + (docData.showVendorToClient ? ' checked' : '') +
+            ' onchange="cchInvoiceSetShowVendorToClient(\'' + pid + '\',\'' + iid + '\',this.checked)">' +
+            'Show vendor to client (default off)</label>' +
         '</div>' +
         _railAttach +
+        (typeof window.cchInvoiceDueNowRailHtml === 'function' ? window.cchInvoiceDueNowRailHtml(pid, iid, docData) : '') +
         '<div class="cch-doc-view-rail-card cch-doc-view-rail-actions">' +
           '<button type="button" class="btn btn-primary btn-sm" style="background:#1B3352;color:#EDE8E0;" onclick="sendInvoiceToClient(\'' + pid + '\',\'' + iid + '\')">\uD83D\uDCE7 Send</button>' +
           '<button type="button" class="btn btn-secondary btn-sm" onclick="quickRecordPayment(\'' + pid + '\',\'' + collection + '\',\'' + iid + '\')">\uD83D\uDCB3 Record payment</button>' +
@@ -4420,16 +4538,27 @@
         dsEditorHtml +
         tagsMemoHtml +
         tableHtml +
+        (function() {
+          var taxLbl = 'Tax';
+          if ((_invT.taxRate || 0) > 0 && (_invT.taxableSubtotal || 0) > 0.01) {
+            taxLbl = 'Tax (' + _invT.taxRate + '% on ' + formatMoney(_invT.taxableSubtotal) + ')';
+          } else if ((_invT.taxRate || 0) > 0) {
+            taxLbl = 'Tax (' + _invT.taxRate + '%)';
+          }
+          return '<div style="margin:12px 0 20px;display:flex;justify-content:flex-end;">' +
+            '<div style="min-width:280px;text-align:right;">' +
+              '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--gray-500);margin-bottom:4px;"><span>Subtotal</span><span>' + formatMoney(_invT.subtotal) + '</span></div>' +
+              '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--gray-500);margin-bottom:4px;"><span>Shipping</span><span>' + formatMoney(_invT.totalShipping) + '</span></div>' +
+              '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--gray-500);margin-bottom:4px;"><span>' + taxLbl + '</span><span>' + formatMoney(_invT.tax) + '</span></div>' +
+              (typeof window.invoiceTotalsCreditsFlexHtml === 'function' ? window.invoiceTotalsCreditsFlexHtml(_invT) : '') +
+              '<div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700;padding-top:8px;border-top:2px solid var(--navy);"><span>Total</span><span>' + formatMoney(_invT.grandTotal) + '</span></div>' +
+            '</div></div>';
+        })() +
         (typeof window.cchDocAttachmentsSectionHtml === 'function'
           ? window.cchDocAttachmentsSectionHtml(pid, collection, iid, docData)
           : '') +
         '<div style="margin-top:20px;display:flex;justify-content:flex-end;">' +
           '<div style="min-width:260px;text-align:right;">' +
-            '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--gray-500);margin-bottom:4px;"><span>Subtotal</span><span>' + formatMoney(_invT.subtotal) + '</span></div>' +
-            '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--gray-500);margin-bottom:4px;"><span>Shipping</span><span>' + formatMoney(_invT.totalShipping) + '</span></div>' +
-            '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--gray-500);margin-bottom:4px;"><span>Tax</span><span>' + formatMoney(_invT.tax) + '</span></div>' +
-            (typeof window.invoiceTotalsCreditsFlexHtml === 'function' ? window.invoiceTotalsCreditsFlexHtml(_invT) : '') +
-            '<div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700;padding-top:8px;border-top:2px solid var(--navy);"><span>Total</span><span>' + formatMoney(_invT.grandTotal) + '</span></div>' +
             (function() {
               if (invVoidEarly || typeof window.invoiceDocPaymentSummary !== 'function') return '';
               var ps = window.invoiceDocPaymentSummary(docData, _invT.grandTotal, 'invoice');
@@ -4659,9 +4788,56 @@
     };
 
     /** Client-facing / PDF line label: real service name, not blank or generic "Item". */
+    window.cchStripTrailingVendorParen = function(title) {
+      return String(title || '').replace(/\s*\(([^)]+)\)\s*$/, '').trim();
+    };
+    window.cchVendorFromTrailingParen = function(title) {
+      var m = String(title || '').match(/\s*\(([^)]+)\)\s*$/);
+      return m ? String(m[1] || '').trim() : '';
+    };
+    window.cchStripInvoiceVendorParens = function(text, item) {
+      var t = String(text || '');
+      if (!t) return t;
+      var v = String((item && item.vendor) || '').trim();
+      if (!v) v = window.cchVendorFromTrailingParen((item && (item.title || item.name)) || '') || window.cchVendorFromTrailingParen(t);
+      if (v) {
+        var escV = v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        t = t.replace(new RegExp('\\s*\\(' + escV + '\\)', 'gi'), '');
+      }
+      var looksVar = /^po\s/i.test(t) || /\bfreight\b/i.test(t) || /\bprice\s+increase\b/i.test(t) ||
+        /\bprice\s+change\b/i.test(t) || /\bvendor\s+bill\s+variance\b/i.test(t);
+      if (looksVar) t = t.replace(/\s*\(([^)]+)\)/g, '');
+      return t.replace(/\s{2,}/g, ' ').replace(/\s[-–—]\s*$/, '').trim();
+    };
+    window.cchInvoiceLineVendorName = function(item) {
+      var v = String((item && item.vendor) || '').trim();
+      if (v) return v;
+      return window.cchVendorFromTrailingParen((item && (item.title || item.name)) || '') ||
+        window.cchVendorFromTrailingParen((item && item.description) || '');
+    };
+    window.cchInvoiceShowVendorToClient = function(docData) {
+      return !!(docData && docData.showVendorToClient === true);
+    };
+    window.cchInvoiceSetShowVendorToClient = async function(projectId, invoiceId, on) {
+      if (!projectId || !invoiceId || typeof db === 'undefined') return;
+      try {
+        await db.collection('boards').doc(projectId).collection('invoices').doc(invoiceId).set({
+          showVendorToClient: !!on,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+        if (typeof window._cacheTime !== 'undefined') window._cacheTime = 0;
+        if (typeof window.showToast === 'function') window.showToast(on ? 'Vendor will show to the client' : 'Vendor hidden from client (default)');
+        if (typeof window.renderInvoiceDetail === 'function') await window.renderInvoiceDetail(projectId, invoiceId);
+      } catch (e) {
+        if (typeof window.cchAlert === 'function') await window.cchAlert((e && e.message) ? e.message : String(e), 'Vendor');
+      }
+    };
     window.invoiceLineDisplayTitle = function(it) {
       if (!it) return 'Item';
       var t = String(it.title || it.name || '').trim();
+      if (typeof window.cchStripInvoiceVendorParens === 'function') t = window.cchStripInvoiceVendorParens(t, it) || t;
+      else t = window.cchStripTrailingVendorParen(t) || t;
+      if (/^t\s*&\s*e\s+vh$/i.test(t)) t = 'T&E';
       var low = t.toLowerCase();
       if (t && low !== 'item' && low !== 'general item' && low !== 'general' && low !== 'untitled') return t;
       var svc = String(it.service || it.billingCategory || '').trim();
@@ -4917,15 +5093,15 @@
     var subtotal = 0, taxableSubtotal = 0, totalShipping = 0;
     // Show thumbnails on invoices/proposals/POs (vendor PDF includes line images).
     var _showPremiumImgCol = true;
-    var _showRoomTagCols = (type === 'proposal' || type === 'invoice');
-    var _premiumGroupColSpan = type === 'po' ? 6 : (type === 'invoice' ? 7 : 8);
+    var _showRoomTagCols = (type === 'proposal' || type === 'invoice' || type === 'po');
+      var _premiumGroupColSpan = type === 'po' ? 7 : (type === 'invoice' ? 6 : 8);
     var _hasProposalSectionGroups = type === 'proposal' && items.some(function(it) { return it && it.lineKind === 'group'; });
     /** One Item column (thumb + text in a grid) — avoids squeezing text when tag/notes add height. */
     var _premiumColgroup = '';
     if (type === 'invoice') {
-      _premiumColgroup = '<colgroup><col class="pc-item"><col class="pc-room"><col class="pc-tag"><col class="pc-qty"><col class="pc-money"><col class="pc-money"><col class="pc-money"></colgroup>';
+      _premiumColgroup = '<colgroup><col class="pc-item"><col class="pc-room"><col class="pc-tag"><col class="pc-qty"><col class="pc-money"><col class="pc-money"></colgroup>';
     } else if (type === 'po') {
-      _premiumColgroup = '<colgroup><col class="pc-item"><col class="pc-sidemark"><col class="pc-qty"><col class="pc-money"><col class="pc-money"><col class="pc-money"></colgroup>';
+      _premiumColgroup = '<colgroup><col class="pc-item"><col class="pc-room"><col class="pc-tag"><col class="pc-sidemark"><col class="pc-qty"><col class="pc-money"><col class="pc-money"></colgroup>';
     } else {
       _premiumColgroup = '<colgroup><col class="pc-item"><col class="pc-room"><col class="pc-tag"><col class="pc-qty"><col class="pc-money"><col class="pc-money"><col class="pc-tax"><col class="pc-money"></colgroup>';
     }
@@ -4957,6 +5133,13 @@
       var tg = '';
       if (typeof window.cchLineTagExplicit === 'function') tg = String(window.cchLineTagExplicit(it) || '').trim();
       else tg = String((it && (it.lineTag || it.lineTagCode || it.fixtureTag)) || '').trim();
+      if (!tg && type === 'po' && typeof window.cchLineTagText === 'function') {
+        tg = String(window.cchLineTagText(it) || '').trim();
+      }
+      if (!tg && type === 'po' && typeof window.cchPoSplitPrintDescription === 'function') {
+        var _splitTag = window.cchPoSplitPrintDescription(it);
+        tg = String((_splitTag && _splitTag.tag) || '').trim();
+      }
       if (/^\d{4}-\d{2}-\d{2}\b/.test(tg)) tg = '';
       return '<td class="cch-prem-room-cell">' + (rm ? esc(rm) : '\u2014') + '</td>' +
         '<td class="cch-prem-tag-cell">' + (tg ? esc(tg) : '\u2014') + '</td>';
@@ -4975,16 +5158,22 @@
       return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
     }
 
-    function _lineNotesHtml(raw) {
+    function _cchLabeledNoteHtml(raw) {
       if (raw == null || raw === '') return '';
       var lines = String(raw).split(/\r?\n/).map(function(l) { return l.trim(); }).filter(Boolean);
       if (!lines.length) return '';
-      if (lines.length === 1) {
-        return '<div class="item-desc item-desc-multiline line-notes">' + esc(lines[0]) + '</div>';
-      }
-      return '<ul class="line-notes-ul">' + lines.map(function(l) {
-        return '<li>' + esc(l) + '</li>';
-      }).join('') + '</ul>';
+      var body = (lines.length === 1)
+        ? '<div class="cch-line-note-text" style="font-size:11px;color:#1B3352;line-height:1.45;margin-top:2px;white-space:pre-wrap;">' + esc(lines[0]) + '</div>'
+        : '<ul class="line-notes-ul" style="margin-top:2px;color:#1B3352;">' + lines.map(function(l) {
+          return '<li>' + esc(l) + '</li>';
+        }).join('') + '</ul>';
+      return '<div class="cch-line-note-block" style="margin:6px 0 8px 0;">' +
+        '<div class="cch-line-note-label" style="font-size:10px;font-weight:700;color:#1B3352;letter-spacing:0.04em;">NOTE:</div>' +
+        body + '</div>';
+    }
+
+    function _lineNotesHtml(raw) {
+      return _cchLabeledNoteHtml(raw);
     }
 
     /** Invoice/proposal preview/PDF: lineTag + lineNotes body (no vendor under item). */
@@ -5067,12 +5256,10 @@
       return 'Item';
     }
 
-    /** Vendor PO PDF sidemark — line tag only (room is not shown on vendor PO print). */
+    /** Vendor PO PDF sidemark column — product sideMark only (tag is its own column). */
     function _poVendorSidemarkText(it) {
       it = it || {};
-      var tag = (typeof window.cchLineTagText === 'function') ? String(window.cchLineTagText(it) || '').trim() : '';
-      if (!tag) tag = String(it.lineTag || it.lineTagCode || it.fixtureTag || '').trim();
-      return tag;
+      return String(it.sideMark || it.sidemark || it.side_mark || '').trim();
     }
 
     function _premiumAppendLineRow(it, groupLabel) {
@@ -5092,11 +5279,15 @@
           : ((cost > 0) ? (cost * qty) : 0))
         : ((type === 'invoice' && typeof window.invoiceLineAmountForTotals === 'function')
           ? window.invoiceLineAmountForTotals(it).lineAmt
-          : (cost > 0 ? cost * qty * (1 + mkup / 100) : amt));
+          : (type === 'proposal' && typeof window.proposalLineClientTotal === 'function'
+            ? window.proposalLineClientTotal(it)
+            : (cost > 0 ? cost * qty * (1 + mkup / 100) : amt)));
       var unitPrice = type === 'po' ? ((cost > 0) ? cost : (qty > 0 ? amt / qty : 0)) : (qty > 0 ? lineAmt / qty : lineAmt);
       var displayLineTotal = lineAmt;
       if (type === 'po') {
-        displayLineTotal = (cost > 0 ? (cost * qty + ship) : ship);
+        displayLineTotal = typeof window.cchPoLineMerchandiseAmount === 'function'
+          ? window.cchPoLineMerchandiseAmount(it)
+          : (cost > 0 ? cost * qty : 0);
         displayLineTotal = Math.round(displayLineTotal * 100) / 100;
       }
       var isTaxable = (typeof window.cchInvoiceLineIsTaxable === 'function') ? window.cchInvoiceLineIsTaxable(it) : (it.taxable !== false && (it.taxable === true || it.expenseType === 'product' || (!it.expenseType && it.taxable !== false)));
@@ -5114,7 +5305,9 @@
       var imgTag = '';
       if (_showPremiumImgCol) {
         var imgSrc = '';
-        if (typeof window.getBestImageUrl === 'function') {
+        if (type === 'po' && typeof window.cchPoLineDisplayImageUrl === 'function') {
+          imgSrc = String(window.cchPoLineDisplayImageUrl(it) || '').trim();
+        } else if (typeof window.getBestImageUrl === 'function') {
           imgSrc = String(window.getBestImageUrl(it) || '').trim();
         }
         if (!imgSrc && type === 'invoice' && typeof window.getInvoiceLineDisplayImageUrl === 'function') {
@@ -5139,6 +5332,9 @@
       }
       var _rawNotes = (typeof window.cchLineExplicitNotesText === 'function') ? window.cchLineExplicitNotesText(it) : ((it.lineNotes || '') || '');
       var _rawDesc = (it.description || '');
+      if (type === 'invoice' && typeof window.cchStripInvoiceVendorParens === 'function') {
+        _rawDesc = window.cchStripInvoiceVendorParens(_rawDesc, it);
+      }
       if (type === 'invoice' && typeof window.sanitizeInvoicePreviewLineText === 'function') {
         _rawNotes = window.sanitizeInvoicePreviewLineText(_rawNotes);
         _rawDesc = window.sanitizeInvoicePreviewLineText(_rawDesc);
@@ -5155,7 +5351,18 @@
           periodHtml = '<div class="item-svc-period cch-inv-disp-dates">Service date: ' + esc(p0) + '</div>';
         }
       }
-      var notesUnder = (type === 'invoice' || type === 'proposal') ? _invoicePreviewTagNotesHtml(it) : _lineNotesHtml(_rawNotes);
+      var notesSrc = (typeof window.cchLineNotesBodyText === 'function')
+        ? window.cchLineNotesBodyText(it)
+        : ((typeof window.cchLineExplicitNotesText === 'function')
+          ? window.cchLineExplicitNotesText(it)
+          : String(it.lineNotes || it.notes || '').trim());
+      if (type === 'invoice' && notesSrc && typeof window.cchStripDateOnlyNoteLines === 'function') {
+        notesSrc = window.cchStripDateOnlyNoteLines(notesSrc);
+      }
+      if (type === 'invoice' && notesSrc && typeof window.sanitizeInvoicePreviewLineText === 'function') {
+        notesSrc = window.sanitizeInvoicePreviewLineText(notesSrc);
+      }
+      var notesUnder = _cchLabeledNoteHtml(notesSrc);
       if (type === 'invoice' && notesUnder) notesUnder = '<div class="cch-inv-disp-notes">' + notesUnder + '</div>';
       var _poLineNote = (typeof cchLineAdditionalNotesText === 'function')
         ? cchLineAdditionalNotesText(it)
@@ -5171,10 +5378,15 @@
       if (type === 'invoice' && typeof window.invoiceSuppressGenericServiceDescription === 'function') {
         descBody = window.invoiceSuppressGenericServiceDescription(descBody, it);
       }
-      // PO vendor print: Room / SKU / Color / Finish / Dimensions only when filled (no empty — rows).
-      var poSpecsUnder = (type === 'po' && typeof window.cchPoLineSpecsBlockHtml === 'function')
-        ? window.cchPoLineSpecsBlockHtml(it, { includeDescription: true, omitRoom: false, forceVendorFields: false })
-        : '';
+      // Invoice/proposal Print: same filled specs as PO (SKU / finish / dimensions). Was PO-only — INV-6068 Essentials printed name+price with no dims.
+      var poSpecsUnder = '';
+      if (typeof window.cchPoLineSpecsBlockHtml === 'function') {
+        if (type === 'po') {
+          poSpecsUnder = window.cchPoLineSpecsBlockHtml(it, { includeDescription: true, omitRoom: true, forceVendorFields: false, omitTag: true });
+        } else if ((type === 'invoice' || type === 'proposal') && !isSvc) {
+          poSpecsUnder = window.cchPoLineSpecsBlockHtml(it, { includeDescription: false, omitRoom: true, forceVendorFields: false, omitTag: true });
+        }
+      }
       var poShipToUnder = '';
       if (type === 'po') {
         var _lineShip = String(it.shipTo || it.deliverTo || '').trim();
@@ -5195,12 +5407,12 @@
         '<div class="cch-premium-item-grid' + (imgBlock ? '' : ' cch-premium-item-grid--no-thumb') + '">' +
           imgBlock +
           '<div class="cch-premium-item-text">' +
-            '<strong>' + esc(lineLabel) + '</strong>' +
+            '<strong' + (type === 'po' ? ' class="cch-po-item-title"' : '') + '>' + esc(lineLabel) + '</strong>' +
+            notesUnder +
             poSpecsUnder +
             (type === 'po' ? '' : ('<div class="prop-line-detail-stack">' +
             (descBody ? '<div style="margin-top:6px;"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Description</div><div class="item-desc item-desc-multiline">' + esc(descBody) + '</div></div>' : '') +
             periodHtml +
-            notesUnder +
             '</div>')) +
             workroomUnder +
             poShipToUnder +
@@ -5214,23 +5426,26 @@
         priceCell = '<span class="cch-inv-disp-rate">' + formatMoney(unitPrice) + '</span>';
       }
       itemsHtml += '<tr><td class="line-item-main">' + itemInner + '</td>' +
-        (type === 'po' ? '<td class="sidemark-cell">' + (function() {
-          var sm = _poVendorSidemarkText(it);
-          return sm ? esc(sm) : '<span style="color:#C4C4C4;">—</span>';
-        })() + '</td>' : _premiumRoomTagTd(it)) +
+        (type === 'po'
+          ? (_premiumRoomTagTd(it) +
+            '<td class="sidemark-cell">' + (function() {
+              var sm = _poVendorSidemarkText(it);
+              return sm ? esc(sm) : '<span style="color:#C4C4C4;">—</span>';
+            })() + '</td>')
+          : _premiumRoomTagTd(it)) +
         '<td style="text-align:center;">' + qtyCell + '</td>' +
         '<td class="r">' + priceCell + '</td>' +
-        '<td class="r ship">' + (ship > 0 ? formatMoney(ship) : '\u2014') + '</td>' +
+        (type === 'po' || type === 'invoice' ? '' : '<td class="r ship">' + (ship > 0 ? formatMoney(ship) : '\u2014') + '</td>') +
         (type === 'po' || type === 'invoice' ? '' : '<td style="text-align:center;">' + (isTaxable ? '<span class="tax-yes">✓</span>' : '<span class="tax-no">—</span>') + '</td>') +
         '<td class="r total-cell">' + formatMoney(displayLineTotal) + '</td></tr>';
     }
 
     var _thItemLabel = type === 'invoice' ? 'Item' : 'Item';
     var _premLineHead = '<th>' + (type === 'invoice' ? _premiumInvoiceColLabel(items) : _thItemLabel) + '</th>' +
-      (type === 'po' ? '<th>Sidemark</th>' : _premiumRoomTagTh()) +
+      (type === 'po' ? (_premiumRoomTagTh() + '<th class="cch-prem-sidemark-th">Sidemark</th>') : _premiumRoomTagTh()) +
       '<th style="text-align:center;">Qty</th>' +
       '<th class="r">Price</th>' +
-      '<th class="r">Shipping</th>' +
+      (type === 'po' || type === 'invoice' ? '' : '<th class="r">Shipping</th>') +
       (type === 'po' || type === 'invoice' ? '' : '<th style="text-align:center;width:60px;">Tax</th>') +
       '<th class="r">Total</th>';
     if (_hasProposalSectionGroups) {
@@ -5305,7 +5520,7 @@
           (type === 'po' ? '<th>Sidemark</th>' : _premiumRoomTagTh()) +
           '<th style="text-align:center;">Qty</th>' +
           '<th class="r">Price</th>' +
-          '<th class="r">Shipping</th>' +
+          (type === 'po' || type === 'invoice' ? '' : '<th class="r">Shipping</th>') +
           (type === 'po' || type === 'invoice' ? '' : '<th style="text-align:center;width:60px;">Tax</th>') +
           '<th class="r">Total</th></tr></thead><tbody>';
 
@@ -5352,7 +5567,7 @@
       ? window.cchVendorPrepaidSalesTaxTotal(items) : 0;
     var _subDisp = (_pdfPrepaid > 0.01) ? Math.max(0, (subtotal || 0) - _pdfPrepaid) : subtotal;
     var totalsHtml = '<div class="total-row"><span>Subtotal</span><span>' + formatMoney(_subDisp) + '</span></div>';
-    if (totalShipping > 0) totalsHtml += '<div class="total-row"><span>Shipping</span><span>' + formatMoney(totalShipping) + '</span></div>';
+    if (type === 'po' || totalShipping > 0) totalsHtml += '<div class="total-row"><span>Shipping</span><span>' + formatMoney(totalShipping) + '</span></div>';
     if (type !== 'po') {
       totalsHtml += '<div class="total-row"><span>Sales Tax' + (taxRate > 0 ? ' (' + taxRate + '% on taxable items)' : ' (none set)') + '</span><span>' + formatMoney(taxAmt) + '</span></div>';
       if (_pdfPrepaid > 0.01) totalsHtml += '<div class="total-row" style="color:#E16A5B;"><span>Pre-Paid Sales Tax</span><span>' + formatMoney(_pdfPrepaid) + '</span></div>';
@@ -5390,19 +5605,19 @@
 
     var shipToHtml = '';
     if (shipToDisplay) {
-      // Match vendor bill-to hierarchy: first line = name (16px bold), rest = address/phone (12px).
+      // First line = project/name (16px bold, same as vendor). Rest = address navy 13px, stacked.
       var _shipLines = String(shipToDisplay).split(/\r?\n/).map(function(l) { return String(l || '').trim(); }).filter(Boolean);
-      if (_shipLines.length === 1 && /[·•\u2014]/.test(_shipLines[0])) {
+      if (_shipLines.length && /[·•\u2014]/.test(_shipLines[0])) {
         var _shipParts = _shipLines[0].split(/\s*[·•\u2014]\s*/).map(function(l) { return String(l || '').trim(); }).filter(Boolean);
-        if (_shipParts.length > 1) _shipLines = _shipParts;
+        if (_shipParts.length > 1) _shipLines = _shipParts.concat(_shipLines.slice(1));
       }
       if (!_shipLines.length) {
         shipToHtml = esc(shipToDisplay).replace(/\n/g, '<br>');
       } else {
-        shipToHtml = '<div class="cch-po-ship-name" style="font-size:16px;font-weight:700;color:#0F1A2E;line-height:1.35;">' +
+        shipToHtml = '<div class="cch-po-ship-name" style="font-size:13px;font-weight:600;color:#0F1A2E;line-height:1.35;">' +
           esc(_shipLines[0]) + '</div>';
         if (_shipLines.length > 1) {
-          shipToHtml += '<div class="cch-po-ship-addr" style="margin-top:6px;color:#5C6B80;font-size:12px;line-height:1.55;">' +
+          shipToHtml += '<div class="cch-po-ship-addr" style="margin-top:6px;color:#0F1A2E;font-size:13px;line-height:1.5;">' +
             _shipLines.slice(1).map(function(l) { return esc(l); }).join('<br>') + '</div>';
         }
       }
@@ -5453,10 +5668,10 @@
         if (vendorContactPremium && typeof window.cchVendorContactBlockHtml === 'function') {
           vendorBlockHtml = window.cchVendorContactBlockHtml(
             { name: docData.vendor, address: vendorContactPremium.address || vendorAddrPremium, phone: vendorContactPremium.phone, email: vendorContactPremium.email },
-            { labelColor: '#5C6B80', addrColor: '#5C6B80', fontSize: '12px' }
+            { labelColor: '#5C6B80', addrColor: '#5C6B80', fontSize: '12px', nameFontSize: '12px', nameFontWeight: '500' }
           );
         } else {
-          vendorBlockHtml = '<strong>' + esc(docData.vendor) + '</strong>';
+          vendorBlockHtml = '<strong class="cch-po-vendor-name">' + esc(docData.vendor) + '</strong>';
           if (vendorAddrPremium) {
             vendorBlockHtml += '<div style="margin-top:6px;color:#5C6B80;font-size:12px;line-height:1.55;">' +
               esc(vendorAddrPremium).replace(/\n/g, '<br>') + '</div>';
@@ -5466,13 +5681,6 @@
       infoSectionHtml = '<div class="info-section info-section-po">' +
         (vendorBlockHtml ? '<div class="info-block"><div class="info-label">Bill to (vendor)</div><div class="info-value">' + vendorBlockHtml + '</div></div>' : '') +
         '<div class="info-block info-block-ship-to"><div class="info-label">Ship To</div><div class="info-value">' + shipToHtml + '</div></div>' +
-        (function() {
-          var _poDocTag = (typeof window.documentTagDisplayText === 'function')
-            ? String(window.documentTagDisplayText(docData) || '').trim()
-            : String(docData.documentTags || docData.shortDescription || docData.tags || '').trim();
-          if (!_poDocTag) return '';
-          return '<div class="info-block"><div class="info-label">Document Tags</div><div class="info-value" style="font-size:12px;font-weight:600;">' + esc(_poDocTag) + '</div></div>';
-        })() +
       '</div>';
     } else {
       infoSectionHtml = '<div class="info-section info-section-invoice">' +
@@ -5500,7 +5708,12 @@
       ? '<span class="toolbar-sep"></span>' +
         '<label class="toolbar-check"><input type="checkbox" id="cchPremDispRoom" checked onchange="cchPremColToggle(\'room\',this.checked)"> Show room</label>' +
         '<label class="toolbar-check"><input type="checkbox" id="cchPremDispTag" checked onchange="cchPremColToggle(\'tag\',this.checked)"> Show tags</label>'
-      : '';
+      : (!_portalOpen && type === 'po'
+      ? '<span class="toolbar-sep"></span>' +
+        '<label class="toolbar-check"><input type="checkbox" id="cchPremDispRoom" checked onchange="cchPremColToggle(\'room\',this.checked)"> Show room</label>' +
+        '<label class="toolbar-check"><input type="checkbox" id="cchPremDispTag" checked onchange="cchPremColToggle(\'tag\',this.checked)"> Show tags</label>' +
+        '<label class="toolbar-check"><input type="checkbox" id="cchPremDispSidemark" checked onchange="cchPremColToggle(\'sidemark\',this.checked)"> Show sidemark</label>'
+      : '');
     var premiumDispToolbarHtml = premiumColToolbarHtml + ((premiumIsTimeInv && !_portalOpen)
       ? '<span class="toolbar-sep"></span>' +
         '<label class="toolbar-check"><input type="checkbox" id="cchPremDispDates" checked onchange="cchPremInvDispToggle(\'dates\',this.checked)"> Show dates</label>' +
@@ -5512,8 +5725,8 @@
     var poPrintHint = _portalOpen
       ? ''
       : (type === 'po'
-      ? 'Print dialog opens automatically. Turn off <strong>Headers and footers</strong> in print settings for a clean PDF.'
-      : 'For a clean PDF: in Print → <strong>More settings</strong>, turn off <strong>Headers and footers</strong>, and set <strong>Margins</strong> to Default (not None). Otherwise Chrome adds the date and title at the top and <strong>about:blank</strong> (or the page URL) at the bottom — that is not part of your invoice.');
+      ? '<strong class="print-hint-label">NOTE</strong> Use <strong>Show room / tags / sidemark</strong>, then Print / PDF. Turn off <strong>Headers and footers</strong>.'
+      : '<strong class="print-hint-label">NOTE</strong> For a clean PDF: in Print → <strong>More settings</strong>, turn off <strong>Headers and footers</strong>, and set <strong>Margins</strong> to Default (not None). Otherwise Chrome adds the date and title at the top and <strong>about:blank</strong> (or the page URL) at the bottom — that is not part of your invoice.');
 
     var _invPay = Object.assign({ id: docId }, docData);
     /* One Pay in toolbar only — CC + Zelle are on the portal Pay page. */
@@ -5537,7 +5750,8 @@
       '.toolbar { position:fixed;top:0;left:0;right:0;z-index:999;background:#1B3352;display:flex;align-items:flex-start;justify-content:space-between;padding:10px 24px;gap:16px; }' +
       '.toolbar-left { flex:1;min-width:0; }' +
       '.toolbar-title { color:#C4A464;font-size:13px;font-weight:600;letter-spacing:0.5px; }' +
-      '.print-hint-screen { font-size:10px;color:rgba(196,164,100,0.88);margin-top:6px;line-height:1.4;font-weight:400;max-width:520px; }' +
+      '.print-hint-screen { font-size:10px;color:rgba(200,185,154,0.92);margin-top:6px;line-height:1.45;font-weight:400;max-width:540px; }' +
+      '.print-hint-screen .print-hint-label { display:inline;font-size:10px;font-weight:700;letter-spacing:0.12em;color:#C4A464;margin-right:6px; }' +
       '.toolbar-actions { display:flex;gap:8px;flex-shrink:0;padding-top:2px;flex-wrap:wrap;align-items:center; }' +
       '.toolbar-sep { width:1px;height:20px;background:rgba(196,164,100,0.35);margin:0 4px; }' +
       '.toolbar-check { display:inline-flex;align-items:center;gap:5px;color:#C8B99A;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap; }' +
@@ -5569,8 +5783,8 @@
       '.info-section-po .info-block { flex:1 1 40%; min-width:200px; max-width:48%; text-align:left; }' +
       '.info-section-po .info-block-ship-to { margin-left:0; text-align:left; }' +
       '.info-section-po .info-block-ship-to .info-value { text-align:left; white-space:normal; word-wrap:break-word; overflow-wrap:break-word; }' +
-      '.info-section-po .cch-po-ship-name { font-size:16px !important; font-weight:700 !important; color:#0F1A2E !important; line-height:1.35 !important; }' +
-      '.info-section-po .cch-po-ship-addr { font-size:12px !important; color:#5C6B80 !important; line-height:1.55 !important; }' +
+      '.info-section-po .cch-po-ship-name { font-size:13px !important; font-weight:600 !important; color:#0F1A2E !important; line-height:1.35 !important; }' +
+      '.info-section-po .cch-po-ship-addr { font-size:13px !important; color:#0F1A2E !important; font-weight:400 !important; line-height:1.5 !important; }' +
       '.info-block { flex:1 1 160px; min-width:0; }' +
       '.info-label { font-size:8px; text-transform:uppercase; letter-spacing:1.5px; color:#C4A464; font-weight:700; margin-bottom:3px; }' +
       '.info-value { font-size:12px; color:#1B3352; line-height:1.45; }' +
@@ -5600,10 +5814,10 @@
       'col.pc-tax { width:6%; }' +
       'th, td { min-width:0; }' +
       'td.line-item-main { word-wrap:break-word; overflow-wrap:break-word; vertical-align:top; }' +
-      '.cch-premium-item-grid { display:grid; grid-template-columns:72px minmax(0,1fr); gap:10px; align-items:start; width:100%; box-sizing:border-box; }' +
+      '.cch-premium-item-grid { display:grid; grid-template-columns:88px minmax(0,1fr); gap:10px; align-items:start; width:100%; box-sizing:border-box; }' +
       '.cch-premium-item-grid--no-thumb { grid-template-columns:minmax(0,1fr); }' +
-      '.cch-premium-item-thumb { width:72px; flex-shrink:0; background:#fff; border:1px solid #E8ECF3; box-sizing:border-box; padding:3px; }' +
-      '.cch-premium-item-thumb img { width:64px; height:64px; object-fit:contain; border-radius:0; display:block; }' +
+      '.cch-premium-item-thumb { width:88px; flex-shrink:0; background:#fff; border:1px solid #E8ECF3; box-sizing:border-box; padding:3px; }' +
+      '.cch-premium-item-thumb img { width:80px; height:80px; object-fit:contain; border-radius:0; display:block; }' +
       '.cch-premium-item-text { min-width:0; width:100%; max-width:100%; }' +
       '.prop-line-detail-stack { width:100%; min-width:0; max-width:100%; box-sizing:border-box; }' +
       'th { text-align:left; padding:10px 8px 8px; font-size:8px; text-transform:uppercase; letter-spacing:1px; color:#5C6B80; font-weight:600; border-bottom:1px solid #E8ECF3; background:#F4F6FA; }' +
@@ -5618,6 +5832,7 @@
       'td.cch-prem-tag-cell { font-size:11px; white-space:nowrap; }' +
       'body.cch-prem-hide-room .cch-prem-room-cell, body.cch-prem-hide-room .cch-prem-room-th, body.cch-prem-hide-room col.pc-room { display:none !important; }' +
       'body.cch-prem-hide-tag .cch-prem-tag-cell, body.cch-prem-hide-tag .cch-prem-tag-th, body.cch-prem-hide-tag col.pc-tag { display:none !important; }' +
+      'body.cch-prem-hide-sidemark .sidemark-cell, body.cch-prem-hide-sidemark .cch-prem-sidemark-th, body.cch-prem-hide-sidemark col.pc-sidemark { display:none !important; }' +
       'body.cch-prem-hide-room.cch-prem-hide-tag col.pc-item { width:55%; }' +
       'body.cch-prem-hide-room:not(.cch-prem-hide-tag) col.pc-item { width:50%; }' +
       'body.cch-prem-hide-tag:not(.cch-prem-hide-room) col.pc-item { width:47%; }' +
@@ -5653,22 +5868,55 @@
       '.footer-tagline { font-size:9px; color:#9E9A8F; font-style:italic; margin-top:1px; }' +
       '.footer-contact { font-size:9px; color:#bbb; margin-top:3px; }' +
 
-      /* PO vendor print — screen matches print (no preview/print mismatch) */
-      'body.cch-po-vendor-print { display:block; min-height:auto; background:#fff; }' +
-      'body.cch-po-vendor-print .page { min-height:auto; box-shadow:none; flex:none; max-width:100%; margin:0; }' +
-      'body.cch-po-vendor-print .page-body { flex:none; }' +
-      'body.cch-po-vendor-print .items-section { padding:16px 32px 12px; }' +
-      'body.cch-po-vendor-print .totals-section { padding:0 32px 20px; }' +
-      'body.cch-po-vendor-print .info-section { padding:16px 32px; }' +
-      'body.cch-po-vendor-print .doc-footer { margin-top:16px; }' +
-      'body.cch-po-vendor-print .cch-po-line-specs { margin-top:4px; }' +
+      /* PO vendor preview — letter-width column. Fill the window so a short PO is not a postcard at the top. */
+      'body.cch-po-vendor-print { display:flex; flex-direction:column; min-height:100vh; height:auto; background:#F4F6FA; }' +
+      'html:has(body.cch-po-vendor-print) { height:100%; min-height:100%; }' +
+      'body.cch-po-vendor-print .page { min-height:calc(100vh - 52px); height:auto; flex:1; max-width:850px; width:100%; margin:0 auto; display:flex; flex-direction:column; box-shadow:0 0 0 1px rgba(27,51,82,0.06); }' +
+      'body.cch-po-vendor-print .page-body { flex:1; display:flex; flex-direction:column; min-height:0; }' +
+      'body.cch-po-vendor-print .items-section { padding:22px 28px 16px; }' +
+      'body.cch-po-vendor-print .totals-section { padding:0 28px 20px; }' +
+      'body.cch-po-vendor-print .info-section { padding:20px 28px 22px; }' +
+      'body.cch-po-vendor-print .doc-header { padding:22px 28px 18px; }' +
+      'body.cch-po-vendor-print col.pc-room { width:12%; }' +
+      'body.cch-po-vendor-print col.pc-tag { width:8%; }' +
+      'body.cch-po-vendor-print .doc-footer { margin-top:auto; padding:16px 28px 20px; }' +
+      'body.cch-po-vendor-print .doc-status { display:none; }' +
+      'body.cch-po-vendor-print .toolbar { position:relative; }' +
+      'body.cch-po-vendor-print .toolbar-spacer { display:none; height:0; }' +
+      'body.cch-po-vendor-print .cch-premium-item-grid { grid-template-columns:110px minmax(0,1fr); }' +
+      'body.cch-po-vendor-print .cch-premium-item-thumb { width:110px; }' +
+      'body.cch-po-vendor-print .cch-premium-item-thumb img { width:104px; height:auto; max-height:70px; object-fit:contain; object-position:center; image-orientation:from-image; }' +
+      'body.cch-po-vendor-print td strong { font-size:11px; font-weight:500; color:#1B3352; }' +
+      'body.cch-po-vendor-print .cch-po-item-title { font-size:11px !important; font-weight:500 !important; color:#1B3352 !important; display:block; }' +
+      'body.cch-po-vendor-print .info-value strong, body.cch-po-vendor-print .cch-po-vendor-name { font-size:12px !important; font-weight:500 !important; color:#0F1A2E !important; }' +
+      'body.cch-po-vendor-print .info-section-po .info-value > div:first-child { font-size:12px !important; font-weight:500 !important; color:#0F1A2E !important; }' +
       'body.cch-po-vendor-print .cch-po-line-specs div { display:block; margin-top:2px; }' +
       'body.cch-po-vendor-print .cch-po-line-specs div span:first-child { margin-right:4px; }' +
 
       /* Print — hide screen toolbar AND its spacer (was leaving ~44px blank at top of every PDF) */
-      /* no-thumb: print must NOT force 56px|1fr — sole child would land in 56px track and shred titles. */
-      '@media print { .toolbar{display:none!important;} .cch-inv-pay-bar{display:none!important;} .toolbar-spacer{display:none!important;height:0!important;} .print-hint-screen{display:none!important;} html,body{height:auto!important;overflow:visible!important;background:white;display:block;min-height:auto;} .page{max-width:none!important;width:100%!important;margin:0!important;min-height:auto;box-shadow:none;flex:none;} .page-body{flex:none;} .doc-footer{position:relative;margin-top:8px;} .cch-po-vendor-pdf tr{page-break-inside:avoid;} .room-section{page-break-inside:auto;margin-bottom:32px!important;} .room-header{page-break-after:avoid;} table.cch-premium-items-table{page-break-inside:auto;} table.cch-premium-items-table thead{display:table-header-group;} table.cch-premium-items-table tr{page-break-inside:avoid;} .info-section{padding:12px 40px 20px 48px!important;gap:10px 20px!important;} .items-section{padding:20px 40px 12px 48px!important;} .totals-section{padding:0 40px 12px 48px!important;} .memo-block{margin:0 40px 16px 48px!important;} .doc-header{padding:12px 40px 10px 48px!important;} .doc-footer{padding:10px 40px 12px 48px!important;} .cch-premium-item-grid{grid-template-columns:56px minmax(0,1fr)!important;gap:8px!important;} .cch-premium-item-grid--no-thumb,.cch-premium-item-grid--no-thumb.cch-premium-item-grid{grid-template-columns:minmax(0,1fr)!important;} .cch-premium-item-thumb{width:56px!important;padding:2px!important;} .cch-premium-item-thumb img,.img-cell img{width:48px!important;height:48px!important;} td{padding:4px 4px!important;} th{padding:6px 4px!important;} .room-header{padding:4px 0 2px!important;margin-bottom:2px!important;} td.line-item-main,td.line-item-main strong,.cch-premium-item-text{word-break:normal;overflow-wrap:break-word;} }' +
+      /* no-thumb: print must NOT force 88px|1fr — sole child would land in 88px track and shred titles. */
+      '@media print { .toolbar{display:none!important;} .cch-inv-pay-bar{display:none!important;} .toolbar-spacer{display:none!important;height:0!important;} .print-hint-screen{display:none!important;} html,body{height:auto!important;overflow:visible!important;background:white;display:block;min-height:auto;} .page{max-width:none!important;width:100%!important;margin:0!important;min-height:auto;box-shadow:none;flex:none;} .page-body{flex:none;} .doc-footer{position:relative;margin-top:8px;} .cch-po-vendor-pdf tr{page-break-inside:avoid;} .room-section{page-break-inside:auto;margin-bottom:32px!important;} .room-header{page-break-after:avoid;} table.cch-premium-items-table{page-break-inside:auto;} table.cch-premium-items-table thead{display:table-header-group;} table.cch-premium-items-table tr{page-break-inside:avoid;} .info-section{padding:12px 40px 20px 48px!important;gap:10px 20px!important;} .items-section{padding:20px 40px 12px 48px!important;} .totals-section{padding:0 40px 12px 48px!important;} .memo-block{margin:0 40px 16px 48px!important;} .doc-header{padding:12px 40px 10px 48px!important;} .doc-footer{padding:10px 40px 12px 48px!important;} .cch-premium-item-grid{grid-template-columns:88px minmax(0,1fr)!important;gap:10px!important;} .cch-premium-item-grid--no-thumb,.cch-premium-item-grid--no-thumb.cch-premium-item-grid{grid-template-columns:minmax(0,1fr)!important;} .cch-premium-item-thumb{width:88px!important;padding:3px!important;} .cch-premium-item-thumb img,.img-cell img{width:80px!important;height:80px!important;object-fit:contain!important;} td{padding:4px 4px!important;} th{padding:6px 4px!important;} .room-header{padding:4px 0 2px!important;margin-bottom:2px!important;} td.line-item-main,td.line-item-main strong,.cch-premium-item-text{word-break:normal;overflow-wrap:break-word;} }' +
       '@page { size:letter; margin:0.7in 0.55in 0.6in 0.8in; }' +
+      (type === 'po' ? (
+        '@page { size:letter; margin:0.55in 0.5in 0.5in 0.5in; }' +
+        '@media print { ' +
+          'html,body{height:auto!important;min-height:0!important;}' +
+          'body.cch-po-vendor-print .page{min-height:0!important;height:auto!important;display:flex!important;flex-direction:column!important;flex:none!important;}' +
+          'body.cch-po-vendor-print .page-body{flex:1 1 auto!important;display:flex!important;flex-direction:column!important;min-height:0!important;}' +
+          'body.cch-po-vendor-print .doc-status{display:none!important;}' +
+          'body.cch-po-vendor-print .doc-footer{margin-top:28px!important;padding:16px 20px 14px!important;}' +
+          'body.cch-po-vendor-print .info-section{padding:18px 20px 22px!important;gap:14px 28px!important;}' +
+          'body.cch-po-vendor-print .items-section{padding:20px 20px 14px!important;}' +
+          'body.cch-po-vendor-print .totals-section{padding:0 20px 18px!important;}' +
+          'body.cch-po-vendor-print .memo-block{margin:0 20px 16px!important;}' +
+          'body.cch-po-vendor-print .doc-header{padding:18px 20px 16px!important;}' +
+          'body.cch-po-vendor-print .cch-premium-item-grid{grid-template-columns:110px minmax(0,1fr)!important;gap:10px!important;}' +
+          'body.cch-po-vendor-print .cch-premium-item-thumb{width:110px!important;padding:3px!important;}' +
+          'body.cch-po-vendor-print .cch-premium-item-thumb img,body.cch-po-vendor-print td.img-cell img{width:104px!important;height:auto!important;max-height:70px!important;object-fit:contain!important;image-orientation:from-image!important;}' +
+          'body.cch-po-vendor-print .cch-po-item-title,body.cch-po-vendor-print td strong.cch-po-item-title{font-size:11px!important;font-weight:500!important;color:#1B3352!important;}' +
+          'body.cch-po-vendor-print .info-section-po .info-value>div:first-child,body.cch-po-vendor-print .info-value strong,body.cch-po-vendor-print .cch-po-vendor-name{font-size:12px!important;font-weight:500!important;color:#0F1A2E!important;}' +
+        '}'
+      ) : '') +
 
       /* Tear sheet pages (preview only — scoped; do not inject _getTearSheetCSSRedesign; it overrides body/toolbar) */
       '.ts-page { page-break-before:always; padding:48px; }' +
@@ -5692,7 +5940,8 @@
         '</div>' +
         '<div class="toolbar-actions">' +
           (type === 'po'
-            ? '<button class="tb-btn" onclick="window.close()">Close</button>' +
+            ? premiumDispToolbarHtml +
+              '<button class="tb-btn" onclick="window.close()">Close</button>' +
               '<button class="tb-btn tb-btn-primary" onclick="window.print()">🖨️ Print / PDF</button>'
             : payTb +
               '<button class="tb-btn" onclick="window.print()">🖨️ Print / PDF</button>' +
@@ -5716,11 +5965,9 @@
             premiumDocTypeHtml +
             '<div class="doc-num">' + esc(docNum) + '</div>' +
             premiumDocDateHtml +
-            '<div class="doc-status">' + esc(type === 'invoice'
+            (type === 'po' ? '' : ('<div class="doc-status">' + esc(type === 'invoice'
               ? cchInvoiceClientDisplayStatus(docData)
-              : (typeof window.cchPoShippingStatus === 'function'
-                ? (window.cchPoShippingStatus(docData, items) || docData.status || 'Draft')
-                : (docData.status || 'Draft'))) + '</div>' +
+              : (docData.status || 'Draft')) + '</div>')) +
           '</div>' +
         '</div>' +
         '<div class="gold-line"></div>' +
@@ -5745,10 +5992,6 @@
           '<div class="footer-contact">www.cchdesign.com · @cchdesigninc · Thank you for your business</div>' +
         '</div>' +
       '</div>');
-
-    if (type === 'po') {
-      win.document.write('<script>window.addEventListener("load",function(){setTimeout(function(){try{window.focus();window.print();}catch(_e){}},400);});<\/script>');
-    }
 
     // Tear sheet pages (hidden by default, toggled by button)
     if (type !== 'po') {
@@ -5790,6 +6033,10 @@
       ' function cchPremColToggle(k,on){document.body.classList.toggle("cch-prem-hide-"+k,!on);try{var o=JSON.parse(localStorage.getItem("cchPremPropCols")||"{}");o[k]=!!on;localStorage.setItem("cchPremPropCols",JSON.stringify(o));}catch(e){}} (function(){try{var o=JSON.parse(localStorage.getItem("cchPremPropCols")||"{}");["room","tag"].forEach(function(k){if(o[k]===false){cchPremColToggle(k,false);var el=document.getElementById("cchPremDisp"+k.charAt(0).toUpperCase()+k.slice(1));if(el)el.checked=false;}});}catch(e2){}})();' +
       (premiumIsTimeInv ? ' var _cchPremDisp={dates:true,hours:false,rate:false,notes:true}; function cchPremInvDispToggle(k,on){_cchPremDisp[k]=!!on;var sel={dates:".cch-inv-disp-dates",hours:".cch-inv-disp-hours",rate:".cch-inv-disp-rate",notes:".cch-inv-disp-notes"}[k];if(sel)document.querySelectorAll(sel).forEach(function(el){el.style.display=on?"":"none";});try{localStorage.setItem("cchPremInvDisplay",JSON.stringify(_cchPremDisp));}catch(_e){}} (function(){try{var s=localStorage.getItem("cchPremInvDisplay");if(s)_cchPremDisp=JSON.parse(s);}catch(_e2){} ["dates","hours","rate","notes"].forEach(function(k){cchPremInvDispToggle(k,!!_cchPremDisp[k]);var el=document.getElementById("cchPremDisp"+k.charAt(0).toUpperCase()+k.slice(1));if(el)el.checked=!!_cchPremDisp[k];});})();' : '') +
       '<\/script>');
+    }
+
+    if (type === 'po') {
+      win.document.write('<script>function cchPremColToggle(k,on){document.body.classList.toggle("cch-prem-hide-"+k,!on);try{var o=JSON.parse(localStorage.getItem("cchPremPoCols")||"{}");o[k]=!!on;localStorage.setItem("cchPremPoCols",JSON.stringify(o));}catch(e){}} (function(){try{var o=JSON.parse(localStorage.getItem("cchPremPoCols")||"{}");["room","tag","sidemark"].forEach(function(k){if(o[k]===false){cchPremColToggle(k,false);var id="cchPremDisp"+k.charAt(0).toUpperCase()+k.slice(1);var el=document.getElementById(id);if(el)el.checked=false;}});}catch(e2){}})();<\/script>');
     }
 
     win.document.write('</body></html>');

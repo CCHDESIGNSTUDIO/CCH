@@ -1,7 +1,8 @@
-# CCH Studio Loop Protocol
-**File:** loop/LOOP_PROTOCOL_CW_Jul10_v1.1.md · **Version:** 1.1 · **Status:** ACTIVE
+﻿# CCH Studio Loop Protocol
+**File:** loop/LOOP_PROTOCOL_CW_Jul10_v1.1.md (rev 1.2) · **Version:** 1.2 · **Status:** ACTIVE
 
 ## Revision history
+- v1.2 (Sep 25, CW / New Bot): Cindy standing rule — production bugs skip staging; features stay on staging first. See `loop/CCH_STANDING_RULE_prod-bugs-skip-staging_CW_Sep25.md`.
 - v1.0 (Jul 10, CW): Draft, delivered to Cindy for review.
 - v1.1 (Jul 10, CW): Installed on Cindy's GO. Reworked to plug into the existing `_DEPLOY_QUEUE.md` / Deploy Master #1 pipeline instead of a parallel deploy lane. Work orders now carry BF-###/FT-### change IDs from `Docs/CHANGE_REGISTER.md`.
 
@@ -32,6 +33,14 @@ DISCOVER (Claude, from KNOWN_ISSUES / CURRENT_PRIORITIES / _DEPLOY_QUEUE / track
 - **Lane suffix (optional):** `WO-###-B_*.md` / ledger id `###-B` = **Custom Order Builder** (`platform/builder/`). Use so Builder work is obvious next to Studio platform WOs. Other lanes may get letter suffixes later if needed.
 - `loop/WO-###_DONE_CR_[MonDD].md` — completion notes (Cursor). Files touched, what changed (file:line), self-test, queue line appended yes/no. Cursor never sets VERIFIED and never deploys or commits (commit-deploy-policy.mdc governs).
 - `loop/verify/` — Claude's verification evidence (screenshots, console output).
+
+
+## Deploy lanes (Cindy Sep 25, 2026)
+
+- **Production bug** (already wrong on live Studio): queue to **production**. Cursor #1 deploys after Cindy GO. Cindy verifies on live. **No staging lap.**
+- **New feature / risky redesign**: **staging** first, then production on Cindy GO.
+- Only Cursor #1 deploys. Mixed batches: split bugs from features.
+- Standing rule: `loop/CCH_STANDING_RULE_prod-bugs-skip-staging_CW_Sep25.md`
 
 ## Boundaries unchanged
 

@@ -1,29 +1,30 @@
----
-description: Shared C:\dev working copy — only repo owner #1 commits/deploys
+﻿---
+description: Shared working copy. Builders deploy staging. Only #1 commits and deploys production.
 alwaysApply: true
 ---
 
-# Commit / deploy policy — only #1 commits
+# Commit / deploy policy — Cindy Oct 16, 2026
+
+Canon: `loop/CCH_STUDIO_DEPLOY_RULE_CW_Oct16.md`. It replaces the Sep 25 rule where they conflict.
 
 All sessions share ONE working copy at `C:\dev\CCH-Platform-Deploy\cch-deploy`. A commit here
-sweeps up **every session's** uncommitted edits, and a deploy ships them all. So:
+sweeps up **every session's** uncommitted edits. A hosting deploy ships the whole `platform` folder.
 
-## Do NOT (any session except #1)
-- Do NOT run `git add`, `git commit`, `git push`, `git stash`, or anything that stages/commits.
-- Do NOT run any `firebase deploy` (hosting, functions, rules) — staging OR production.
+## Staging — the builder chat does this
+- The chat that builds a feature deploys it to **staging** and re-deploys staging after her fixes.
+- Do not hand staging off to Cursor #1.
+- Append the `_DEPLOY_QUEUE.md` line and mark it done with the staging time. Do not leave it pending for #1.
 
-## Do
-- Edit your files normally.
-- When ready, **append one line to `_DEPLOY_QUEUE.md`** (repo root) instead of messaging Cindy:
-  `[YYYY-MM-DD HH:MM] #<n> <name> — <files changed> — <staging|production> — <one-line desc> — STATUS: pending`
-- #1 (Deploy Master) reads `_DEPLOY_QUEUE.md` **hourly (automation)** and on demand, then commits/deploys
-  in coordinated batches and flips your line to `STATUS: done`.
+## Production — Cursor #1 only, after her typed GO
+- Only Cursor #1 deploys to production, and only after Cindy's typed GO.
+- Production bugs: #1 fixes and deploys straight to production after that GO. No staging lap.
+- Before any production deploy, check what is already live so a newer live fix is not overwritten.
+- Anything paid, ordered, or approved is locked. Never change it.
+
+## Commits
+- Do NOT run `git add`, `git commit`, `git push`, or `git stash` unless Cindy asks or you are #1 and she asked.
 - `git pull` / `git fetch` / read-only `git status` are fine.
 
-## Staging vs production
-- **Staging** (`cch-platform-staging.web.app`) is a safe test sandbox — **no per-deploy approval from
-  Cindy needed**. #1 deploys queued staging items, serialized so staging stays readable (one session's
-  work at a time). Just queue it.
-- **Production** (`cch-platform.web.app`) ships **only on Cindy's explicit typed GO**.
-
-Only **#1** commits and deploys.
+## Keep going
+- Work the whole list. Stop only for her GO, a money question, or a real blocker.
+- If it is not verified, say so. Do not make it up.

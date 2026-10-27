@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CCH Open Items Board v2.1 · Aug 13 2026</title>
+<style>
+  :root{
+    --navy:#0F1A2E; --navy-2:#16233c; --gold:#C4A464; --gold-dim:#8f7745;
+    --cream:#F5F1E8; --muted:#8792a6; --red:#C25B4E; --amber:#C9922F;
+    --green:#5E8C61; --cyan:#4FA3B8; --line:rgba(196,164,100,.22);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--navy);color:var(--cream);
+    font-family:"DM Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:48px 28px 90px}
+  header{border-bottom:1px solid var(--line);padding-bottom:26px;margin-bottom:30px}
+  .eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin-bottom:12px}
+  h1{font-family:Georgia,"Playfair Display",serif;font-weight:400;font-size:38px;line-height:1.15;margin:0 0 12px}
+  .meta{font-size:13px;color:var(--muted)}
+  .lead{margin-top:20px;font-size:16px;max-width:840px;color:#dcd6c8}
+
+  .hero{
+    background:linear-gradient(180deg,rgba(194,91,78,.13),rgba(194,91,78,.05));
+    border:1px solid rgba(194,91,78,.45);border-radius:4px;padding:26px 28px;margin:30px 0;
+  }
+  .hero .tagline{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#e79589;margin-bottom:12px}
+  .hero h2{font-family:Georgia,serif;font-weight:400;font-size:27px;margin:0 0 14px;border:0;padding:0;color:#fff}
+  .hero p{margin:0 0 10px;font-size:15px}
+  .hero p:last-child{margin-bottom:0}
+  .hero code{background:rgba(0,0,0,.3);padding:2px 6px;border-radius:2px;font-size:13px}
+
+  .ratio{display:flex;align-items:baseline;gap:16px;margin:22px 0 6px;flex-wrap:wrap}
+  .ratio .big{font-family:Georgia,serif;font-size:64px;color:var(--gold);line-height:1}
+  .ratio .vs{font-size:20px;color:var(--muted)}
+  .ratio .small{font-family:Georgia,serif;font-size:64px;color:#e79589;line-height:1}
+  .ratio .cap{font-size:13px;color:var(--muted);flex-basis:100%;margin-top:6px}
+
+  .counts{display:flex;flex-wrap:wrap;gap:14px;margin:26px 0 8px}
+  .count{flex:1 1 150px;background:var(--navy-2);border:1px solid var(--line);border-radius:3px;padding:16px 18px}
+  .count .n{font-family:Georgia,serif;font-size:30px;color:var(--gold);line-height:1}
+  .count .l{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-top:8px}
+
+  h2{font-family:Georgia,serif;font-weight:400;font-size:24px;margin:52px 0 6px;
+    padding-bottom:10px;border-bottom:1px solid var(--line)}
+  h2 .num{color:var(--gold);font-size:14px;letter-spacing:.14em;margin-right:12px;vertical-align:2px}
+  .sub{font-size:14px;color:var(--muted);margin:0 0 20px}
+
+  table{width:100%;border-collapse:collapse;margin:18px 0 8px;font-size:14px}
+  th{text-align:left;font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--gold);font-weight:500;padding:0 12px 10px 0;border-bottom:1px solid var(--line)}
+  td{padding:13px 12px 13px 0;border-bottom:1px solid rgba(255,255,255,.06);vertical-align:top}
+  td.id{color:var(--gold);font-weight:500;white-space:nowrap;width:92px}
+  tr:hover td{background:rgba(196,164,100,.045)}
+  .strike{color:var(--muted);text-decoration:line-through}
+
+  .tag{display:inline-block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+    padding:3px 9px;border-radius:2px;white-space:nowrap}
+  .t-live{background:rgba(194,91,78,.16);color:#e79589;border:1px solid rgba(194,91,78,.4)}
+  .t-you{background:rgba(201,146,47,.15);color:#e0b562;border:1px solid rgba(201,146,47,.38)}
+  .t-fixed{background:rgba(94,140,97,.15);color:#8fb992;border:1px solid rgba(94,140,97,.38)}
+  .t-block{background:rgba(135,146,166,.14);color:#a6b0c2;border:1px solid rgba(135,146,166,.34)}
+
+  .callout{background:var(--navy-2);border-left:2px solid var(--gold);
+    padding:20px 24px;margin:24px 0;border-radius:0 3px 3px 0}
+  .callout h3{font-family:Georgia,serif;font-weight:400;font-size:18px;margin:0 0 10px;color:var(--gold)}
+  .callout p{margin:0 0 10px;font-size:14px}
+  .callout p:last-child{margin-bottom:0}
+  .q{font-style:italic;color:#c8c0ae}
+
+  ol.top5{counter-reset:t;list-style:none;padding:0;margin:22px 0 0}
+  ol.top5 li{counter-increment:t;position:relative;padding:16px 0 16px 54px;
+    border-bottom:1px solid rgba(255,255,255,.06);font-size:15px}
+  ol.top5 li::before{content:counter(t);position:absolute;left:0;top:14px;
+    font-family:Georgia,serif;font-size:22px;color:var(--gold);width:34px;text-align:center}
+  ol.top5 b{color:#fff;font-weight:500}
+
+  @media(max-width:760px){h1{font-size:28px}.wrap{padding:32px 18px 60px}.ratio .big,.ratio .small{font-size:44px}}
+  footer{margin-top:70px;padding-top:22px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">CCH Studio · Open Items Board · v2.1</div>
+  <h1>What is still open</h1>
+  <div class="meta">C-Team_Aug13_v2.1 · 146 Claude project docs + LOOP_LEDGER (96 rows) + Cursor's Aug 13 audit + live repo read</div>
+  <p class="lead">
+    v1.0 read the Claude project only. Cursor's audit read the repo only. Neither was complete and the two disagreed.
+    This version reads both. Five things in v1.0 were wrong and are corrected below rather than quietly folded in.
+  </p>
+</header>
+
+<div class="hero">
+  <div class="tagline">The finding that reframes everything else</div>
+  <h2>Sixty-one shipped. Four verified.</h2>
+  <div class="ratio">
+    <span class="big">61</span>
+    <span class="vs">DONE-UNVERIFIED</span>
+    <span class="small">4</span>
+    <span class="vs">ever verified</span>
+    <span class="cap">Plus 32 non-terminal rows. Many of the 61 are in production right now.</span>
+  </div>
+  <p>
+    The ledger's own state machine is <code>OPEN → IN PROGRESS → DONE-UNVERIFIED → VERIFIED / FAILED → PROD</code>.
+    Only WO-042, 043, 044 and 064 ever reached a verified state, and 064 is asterisked because the heal does not persist.
+  </p>
+  <p class="q">
+    "Cursor DONE now means awaiting Fable. If Cindy is testing it, the loop is broken." — your own rule, Jul 30.
+  </p>
+  <p>Verification is not a bottleneck in the process. It is a step that essentially does not happen.</p>
+</div>
+
+<h2><span class="num">01</span>Corrections to v1.0</h2>
+<p class="sub">Five things I got wrong, in order of how much they mattered.</p>
+<table>
+  <tr><th>#</th><th>v1.0 said</th><th>Grounded truth</th></tr>
+  <tr><td class="id">1.1</td><td class="strike">Variance tax double-charge is live; backfill audit not run. Priority #2.</td><td><b>No client was double-charged.</b> The §6 audit ran Aug 12 and found <b>zero linked variances on prod</b>. WO-DRAFT-A shipped, PROD v9.9.151. <span class="tag t-fixed">closed</span><div class="sub" style="margin:8px 0 0">Residual: Cursor's own two docs disagree. The DONE_CR says the audit ran; the reconciliation handoff still says "not run."</div></td></tr>
+  <tr><td class="id">1.2</td><td class="strike">WO-064 follow-up "never cut, called a one-liner."</td><td>It was cut as <b>WO-065</b> on Aug 01 and shipped. The Jul 30 ledger simply predates it. <span class="tag t-fixed">closed</span></td></tr>
+  <tr><td class="id">1.3</td><td class="strike">All three canary fixtures empty.</td><td><b>Two of three are documented</b> in <code>FIXTURES.md</code> with real values. Only <code>STAGING_BOARD_HASH</code> still needs a paste. Console whitelist is written too.<div class="sub" style="margin:8px 0 0">Still true: the canary has not run since <b>Aug 04</b>. Last score 13 of 16.</div></td></tr>
+  <tr><td class="id">1.4</td><td class="strike">WO-091, WO-093, WO-087 open pending your decisions.</td><td>All decided and shipped. WO-091 "Immediate" Aug 07. WO-093 <span class="q">"Cindy locked unit"</span> Aug 07. WO-087 images: <span class="q">"skip, Fable handles."</span> <span class="tag t-fixed">closed</span></td></tr>
+  <tr><td class="id">1.5</td><td class="strike">Bugle Trail gap ~$13,599, derived and unconfirmed.</td><td><b>Much larger.</b> A repo dry run lists <b>44 Houzz POs missing entirely from Studio</b>, including PO-400024 <b>$34,972.76</b> and PO-400025 <b>$17,098.37</b>. Dry run only; no apply report exists. <span class="tag t-live">worse</span></td></tr>
+</table>
+
+<h2><span class="num">02</span>P0 — a production break open for one month</h2>
+<div class="callout" style="border-left-color:var(--red)">
+  <h3 style="color:#e79589">HOTFIX-032 · OPEN-URGENT · since Jul 13</h3>
+  <p><b>You cannot edit or delete a payment on a production invoice or PO, and have not been able to since July 13.</b></p>
+  <p class="q">"Payment ✎/× buttons dead on PROD (onclick quote collision) — 'Unexpected end of input'. LIVE PROD BREAK. Single-quote the attr or &amp;quot;-escape. Cindy: 'I can't edit'"</p>
+  <p>The Jul 13 log names the cause: <span class="q">"this went to prod unverified and mid-day — reinforce staging-verify-first + the daytime prod freeze."</span> Cursor's Aug 13 audit confirms it is still open. This never appeared anywhere in the Claude project, which is why v1.0 missed it entirely.</p>
+</div>
+
+<h2><span class="num">03</span>Data loss that already happened</h2>
+<table>
+  <tr><th>Item</th><th>What was lost</th><th>Recoverable</th></tr>
+  <tr><td class="id">Copy-to-room</td><td>Every clip copied into a room silently dropped <code>images[]</code>, website URL, spec URL, manufacturer, client title and description. Price copied as <b>0</b>. Category rewritten to an invalid value. Confirmed on the live build.</td><td><span class="tag t-live">No</span><div class="sub" style="margin:8px 0 0">"can't recover what was never copied." Fix specified, not coded.</div></td></tr>
+  <tr><td class="id">WES-U-03</td><td>Labor entered on all three West Avalon upholstery WOs; WES-U-03 came back <b>empty in prod Firestore</b>.</td><td><span class="tag t-you">Re-enter</span><div class="sub" style="margin:8px 0 0">Fix <code>ft066</code> queued, not deployed.</div></td></tr>
+  <tr><td class="id">Pepper notes</td><td>Aug 2: agents crashed your computer; session death wiped the Rolling Hills notes. Pepper chat is DOM-only, never written to Firestore.</td><td><span class="tag t-live">No</span><div class="sub" style="margin:8px 0 0">Persistence "needs Cindy GO". Exposure is live.</div></td></tr>
+</table>
+
+<h2><span class="num">04</span>Money defects, with their real WO numbers</h2>
+<p class="sub">Two of these are new. They were in the ledger and never made it into the Claude project.</p>
+<table>
+  <tr><th>WO</th><th>Issue</th><th>State</th></tr>
+  <tr><td class="id">WO-027</td><td><b>NEW.</b> PO summary tiles hide <b>~$169,634</b> of ordered-but-unbilled cost. Paid ($177,495.79) + Bill-due ($27,068.05) falls $169,634.20 short of Total ($374,198.04).</td><td><span class="tag t-live">OPEN since Jul 12</span></td></tr>
+  <tr><td class="id">WO-032</td><td><b>NEW.</b> INV-6051: a $2,500 retainer applied twice (credit line AND payment ref). Balance clamps to $0; true owed <b>$1,807.50</b>.</td><td><span class="tag t-block">Guard shipped; row still says OPEN</span></td></tr>
+  <tr><td class="id">WO-034</td><td>QB marks fees and services taxable. Extended to the retainer→QB negative-line mapping and a re-push mismatch: <span class="q">"platform $1,807.50 vs QB $4,428.21"</span>.</td><td><span class="tag t-live">OPEN since Jul 13, never started</span></td></tr>
+  <tr><td class="id">WO-067</td><td>Phantom 9.5% tax on a pure DS invoice (INV-6055), and AI redraft destroying your manual edits.</td><td><span class="tag t-live">Ledger says PROD; project doc dated a day later says FAIL</span></td></tr>
+  <tr><td class="id">WO-069-B</td><td>Builder cost blank on picked lines, so those lines have a total and no margin basis.</td><td><span class="tag t-live">Ledger says PROD; project doc dated a day later reopens it</span></td></tr>
+  <tr><td class="id">WO-040<br>WO-020</td><td>Bugle Trail: 44 POs missing from Studio, $2,869.27 paid with no QB bill, no PO-9### ever in QB.</td><td><span class="tag t-you">040 open · 020 needs your GO</span></td></tr>
+</table>
+
+<h2><span class="num">05</span>Where the repo and the project disagree</h2>
+<p class="sub">Three cases where Cursor's ledger says shipped and the Claude project holds later evidence. In each, the project doc is the newer artifact and Cursor could not read it.</p>
+<table>
+  <tr><th>WO</th><th>Ledger</th><th>Project doc, dated later</th></tr>
+  <tr><td class="id">WO-067</td><td>PROD v9.9.86, Aug 03</td><td>VERIFY_FAIL, <b>Aug 04</b>. Voice fixed. Phantom DS tax and the manual-edit overwrite have no closing evidence in either source.</td></tr>
+  <tr><td class="id">WO-069-B</td><td>PROD Aug 03, "Canary unitCost=114.33"</td><td>COST_STILL_BLANK, <b>Aug 04</b>. The canary asserted the resolver, not the created line. <span class="q">"Reopen pending decisive test."</span> Test still unrun.</td></tr>
+  <tr><td class="id">WO-041</td><td>Row reads DONE-UNVERIFIED</td><td>Ledger's <i>own log</i>, Jul 17: <span class="q">"VERIFY = FAILED (partial)"</span>. The per-product button still calls the old generator. That is what printed full-bleed for Peek Can. WO-048 exists to fix it and is still open.</td></tr>
+</table>
+
+<h2><span class="num">06</span>Decisions blocking a build right now</h2>
+<table>
+  <tr><th>#</th><th>Decision</th><th>Blocked since</th></tr>
+  <tr><td class="id">1</td><td><b>SEL-1 — Selections edit persistence: (a), (b) or (c).</b> Edits show a success toast and do not persist. Your oldest blocked item, and WO-113 Part 1 is about to add new row types to the same broken surface.</td><td><span class="tag t-live">Jul 10</span></td></tr>
+  <tr><td class="id">2</td><td><b>WO-113 Part 2 — flip the clip-ensure write gate on.</b> Default OFF since Jul 27, which is why the RH backfill was one-time and new lines stopped syncing.</td><td><span class="tag t-you">Aug 13</span></td></tr>
+  <tr><td class="id">3</td><td><b>WO-113 Part 3 — pick one visibility rule.</b> The spec hands you the choice: both loaders or neither.</td><td><span class="tag t-you">Aug 13</span></td></tr>
+  <tr><td class="id">4</td><td><b>WO-008</b> room board notifications. "Schema changes = needs Cindy GO."</td><td><span class="tag t-block">Jul 11</span></td></tr>
+  <tr><td class="id">5</td><td><b>WO-020</b> staging Houzz close-out. Prod is clean (2,248 hidden); staging has 30 open. Data parity, not a code bug.</td><td><span class="tag t-block">Jul 11</span></td></tr>
+  <tr><td class="id">6</td><td><b>Room placement model</b> scoping. <span class="q">"No code until scoped. Do NOT hand to Cursor until scoped."</span></td><td><span class="tag t-block">Jul 29</span></td></tr>
+  <tr><td class="id">7</td><td><b>Client-visibility confirm.</b> Do Room Boards, Documents and Updates stay client-facing. Flagged "NOT silently dropped."</td><td><span class="tag t-you">Aug 07</span></td></tr>
+  <tr><td class="id">8</td><td><b>Does Vanessa log in as herself?</b> Never answered. It silently gates WO-105 and WO-108, both of which scope by signed-in identity and both of which already shipped.</td><td><span class="tag t-live">Jul 11</span></td></tr>
+</table>
+
+<h2><span class="num">07</span>The tracking problem is now the real problem</h2>
+<p class="sub">Five artifacts each hold part of the truth and disagree with each other.</p>
+<table>
+  <tr><th>Artifact</th><th>Blind to</th><th>Freshness</th></tr>
+  <tr><td class="id">LOOP_LEDGER</td><td>Everything in the Claude project</td><td>Table current; <b>log stops Aug 10</b></td></tr>
+  <tr><td class="id">Claude project</td><td>Everything in <code>loop/</code></td><td>Current</td></tr>
+  <tr><td class="id">KNOWN_ISSUES</td><td>Both August defects</td><td><span class="tag t-block">Aug 02 · 12 days stale</span></td></tr>
+  <tr><td class="id">CURRENT_PRIORITIES</td><td>The entire WO stream, Pepper, Smart Time</td><td><span class="tag t-live">Jun 09 · says "URGENT: none"</span></td></tr>
+  <tr><td class="id">Aug 06 board</td><td>~21 other open ledger rows</td><td>Aug 06</td></tr>
+</table>
+<p class="sub" style="margin-top:18px">
+  Consequences already visible: <b>CURRENT_PRIORITIES says URGENT is empty</b> while a prod break has been live for a month.
+  <b>KNOWN_ISSUES has no row</b> for either August defect, violating its own rule. <b>RB-1 and RB-2</b> have sat at
+  "awaiting Cynthia test → prod" since Jun 07. The ledger table and its own log contradict each other on WO-032, WO-105 and WO-078.
+  Six numbering collisions are recorded. WO-060 was never cut and sits as a permanent GAP.
+  On Jul 12 the ledger file was found truncated with WO-012 through 026 missing.
+</p>
+
+<h2><span class="num">08</span>The full open roster</h2>
+<p class="sub">
+  Every open item, from Cursor's Aug 13 audit plus the LOOP_LEDGER extraction. Ledger rows are authoritative on state.
+  WO-112 and the glyph fix are <b>not</b> here: Cursor's morning audit listed them open, its own EOD reconciliation moved both to done.
+</p>
+
+<h3 style="font-family:Georgia,serif;font-weight:400;font-size:17px;color:var(--gold);margin:28px 0 4px">Ledger OPEN · platform</h3>
+<table>
+  <tr><th>WO</th><th>What</th><th>Owner</th><th>Blocker</th></tr>
+  <tr><td class="id">HOTFIX-032</td><td><b>Payment edit/delete buttons dead on prod</b> (onclick quote collision)</td><td>Cursor</td><td><span class="tag t-live">LIVE PROD BREAK · Jul 13</span></td></tr>
+  <tr><td class="id">WO-027</td><td>PO summary tiles do not reconcile; hides ~$169,634 ordered-but-unbilled</td><td>Cursor</td><td>none stated</td></tr>
+  <tr><td class="id">WO-032</td><td>Edit/delete payments on detail view + retainer double-count guard</td><td>Cursor</td><td>row still OPEN though log says shipped</td></tr>
+  <tr><td class="id">WO-034</td><td><b>QB sync marks fees/services taxable</b>; audit TaxCodeRef per line</td><td>Cursor</td><td>none stated</td></tr>
+  <tr><td class="id">WO-040</td><td>Bulk-link unlinked invoices/POs to QB by DocNumber</td><td>Cursor</td><td>IDs must come from QB API</td></tr>
+  <tr><td class="id">WO-033</td><td>Invoice/PO line editor live-recalc footer totals</td><td>Cursor</td><td>none stated</td></tr>
+  <tr><td class="id">WO-038</td><td>Retainer/credit as deduction under subtotal, not a grid line</td><td>Cursor</td><td>none stated</td></tr>
+  <tr><td class="id">WO-036</td><td>Finance pages default YTD + scoped load</td><td>Cursor</td><td>none stated</td></tr>
+  <tr><td class="id">WO-007</td><td>Project PO tab reuses Order Management layout</td><td>Cursor</td><td>ground cch-order-management.js first</td></tr>
+  <tr><td class="id">WO-046</td><td>Request for Pricing (RFQ) to vendors</td><td>Cursor</td><td>none stated</td></tr>
+  <tr><td class="id">WO-047</td><td>Client Updates "Build from project" auto-draft</td><td>Cursor</td><td>Decisions data source unlocated</td></tr>
+  <tr><td class="id">WO-048</td><td>Unify tear-sheet engine across all entry points</td><td>Cursor</td><td>after WO-041 verify FAIL, old generator still live</td></tr>
+  <tr><td class="id">WO-028</td><td>Bi-weekly Progress Update Phase B editor</td><td>Cursor</td><td>none stated</td></tr>
+  <tr><td class="id">WO-029</td><td>Wire CCH voice into invoice AI + bi-weekly composer</td><td>Cursor</td><td>prod invoice AI = GO required</td></tr>
+  <tr><td class="id">WO-030</td><td>In-app Release Notes current through recent builds</td><td>Cursor</td><td>none stated</td></tr>
+  <tr><td class="id">WO-031</td><td>Inspiration lightbox "Find similar" + placeholder clip fix</td><td>Cursor</td><td>none stated</td></tr>
+  <tr><td class="id">WO-037</td><td>Client Portal Updates list as magazine-style cards</td><td>Cursor</td><td>none stated</td></tr>
+  <tr><td class="id">WO-039</td><td>Log Correspondence real file upload (URL-only today)</td><td>Cursor</td><td>none stated</td></tr>
+  <tr><td class="id">WO-026</td><td>Window-treatment icon leaking onto expense lines</td><td>Cursor</td><td>none stated</td></tr>
+  <tr><td class="id">WO-025</td><td>Fix-It AI first-responder on Bugs &amp; Requests</td><td>Cursor</td><td>none stated</td></tr>
+  <tr><td class="id">WO-054-B</td><td>Builder: update proposal from WO + multi-select + close-out</td><td>Cursor Raul</td><td>build after prod ft020–022 ship</td></tr>
+  <tr><td class="id">WO-085 A/B</td><td>Activity recency filter + missing Studio event capture (§C shipped)</td><td>Cursor</td><td>none stated</td></tr>
+  <tr><td class="id">WO-087</td><td>Release notes current + image-based</td><td>Fable</td><td>Cindy Aug 06: skip image/design</td></tr>
+  <tr><td class="id">WO-094</td><td>Clipper "Add images" on existing product + Studio ID stamp</td><td>Cursor</td><td>sequenced after WO-092 merge</td></tr>
+  <tr><td class="id">WO-109</td><td>Bug-work visible, never bill, hours-lost tally</td><td>Cursor</td><td>after WO-108</td></tr>
+  <tr><td class="id">WO-001</td><td>Staging verification sweep RB-1 + DOC-1, verify only</td><td>Claude</td><td>none stated</td></tr>
+</table>
+
+<h3 style="font-family:Georgia,serif;font-weight:400;font-size:17px;color:var(--gold);margin:28px 0 4px">Ledger BLOCKED · needs you</h3>
+<table>
+  <tr><th>Item</th><th>What</th><th>State</th><th>Since</th></tr>
+  <tr><td class="id">SEL-1</td><td>Selections edit persistence; needs your a/b/c</td><td><span class="tag t-you">BLOCKED-DECISION</span></td><td>Jul 10</td></tr>
+  <tr><td class="id">WO-008</td><td>Room board approve/decline notifications + badge</td><td><span class="tag t-you">BLOCKED-DISCUSSION</span> schema changes = GO</td><td>Jul 11</td></tr>
+  <tr><td class="id">WO-020</td><td>Staging Houzz OM parity, data reconcile</td><td><span class="tag t-you">BLOCKED-DISCUSSION</span> bulk close-out = GO</td><td>Jul 11</td></tr>
+  <tr><td class="id">Room placement</td><td>One placement per (item, room); coordinated WO not cut</td><td><span class="tag t-block">BLOCKED-SCOPING</span> no code until scoped</td><td>Jul 29</td></tr>
+  <tr><td class="id">WO-060</td><td>Design Board tile-name hide fix (Arcillas)</td><td><span class="tag t-block">GAP</span> no WO file, never cut</td><td>Jul 30</td></tr>
+</table>
+
+<h3 style="font-family:Georgia,serif;font-weight:400;font-size:17px;color:var(--gold);margin:28px 0 4px">Sync / Selections · added EOD Aug 13</h3>
+<table>
+  <tr><th>Item</th><th>What</th><th>State</th></tr>
+  <tr><td class="id">WO-113</td><td>Proposal → Selections → Room Boards. PRO-3035 lines invisible in Selections. <b>Display defect, no data lost.</b></td><td>Part 1 coded <b>9.9.168</b>, not deployed. Parts 2–3 open</td></tr>
+  <tr><td class="id">WO-092 Pt 2–3</td><td>Library duplicate rows + Studio ID stamp (Part 1 shipped 9.9.107)</td><td>open</td></tr>
+  <tr><td class="id">WO-045 durability</td><td>Default-on <code>_cchDocLineClipEnsureApply</code> so new lines keep creating clips</td><td>folded into WO-113 Part 2; gate still OFF since Jul 27</td></tr>
+  <tr><td class="id">Copy-clip carry</td><td>Copy-to-room drops images, URLs, manufacturer; price copies as 0; category invalidated</td><td><span class="tag t-live">grounded, not coded</span></td></tr>
+</table>
+
+<h3 style="font-family:Georgia,serif;font-weight:400;font-size:17px;color:var(--gold);margin:28px 0 4px">Pepper / activity</h3>
+<table>
+  <tr><th>WO</th><th>What</th><th>Blocker</th></tr>
+  <tr><td class="id">WO-100</td><td>Project Tasks in Pepper per-project digest</td><td><code>buildFullDigest</code> still has no <code>buildTasksDigest</code></td></tr>
+  <tr><td class="id">WO-101 (a)</td><td>Pepper Desktop installable shell (PWA)</td><td>no <code>pepper.html</code> in repo; voice loop = WO-102 next</td></tr>
+  <tr><td class="id">WO-101 (b)</td><td>Pepper follow-up loops, PO + client</td><td><span class="tag t-live">number collision with the PWA WO-101</span></td></tr>
+  <tr><td class="id">WO-106</td><td>Firm-wide all-seeing rollup cache</td><td>spec only, not in ledger as done</td></tr>
+  <tr><td class="id">WO-110</td><td>Idempotent activity rebuild, real timestamps, Studio-only</td><td>code still uses <code>activity.add()</code>, not upsert</td></tr>
+  <tr><td class="id">WO-111</td><td>Daily per-person timeline / Day in Review</td><td>depends on WO-110 data quality</td></tr>
+  <tr><td class="id">WO-105 follow-ons</td><td>Client-activity money cues, Timely missing-day names, drafts per bucket</td><td>not full WO-106 yet</td></tr>
+</table>
+
+<h3 style="font-family:Georgia,serif;font-weight:400;font-size:17px;color:var(--gold);margin:28px 0 4px">Variance follow-ons · Smart Time · E-Spec</h3>
+<table>
+  <tr><th>Item</th><th>What</th><th>Note</th></tr>
+  <tr><td class="id">Variance</td><td>Inline disposition picker for undecided components</td><td>"blocks billing until remapped"</td></tr>
+  <tr><td class="id">Variance</td><td>Dry-run Firestore migration writes</td><td>not in this pass</td></tr>
+  <tr><td class="id">Variance</td><td>QB taxable mapping follow-on §7</td><td>pairs with WO-034</td></tr>
+  <tr><td class="id">Smart Time</td><td>Time Ledger: prevent duplicate invoice create</td><td>deploy queue, pending</td></tr>
+  <tr><td class="id">Smart Time</td><td>Project-grouped Day table (Phase D)</td><td>not built; your preferred daily layout</td></tr>
+  <tr><td class="id">E-Spec</td><td>Typed <code>productDocs[]</code> multi-link</td><td>not in code; only single <code>specUrl</code></td></tr>
+  <tr><td class="id">E-Spec</td><td>Reece N-up download modal (1/2/4/6 per page)</td><td>wizard shipped staging 9.9.153–158; modal absent</td></tr>
+  <tr><td class="id">E-Spec</td><td>Shareable token live book</td><td>not found in code Aug 13</td></tr>
+  <tr><td class="id">E-Spec</td><td>Cloud Function PDF engine</td><td><span class="tag t-you">your call</span> vs throwaway client-side</td></tr>
+  <tr><td class="id">E-Spec</td><td>Pre-build grounding §9 incl. spec-URL coverage audit</td><td>this number decides whether the book is 90% there or mostly empty</td></tr>
+</table>
+
+<h3 style="font-family:Georgia,serif;font-weight:400;font-size:17px;color:var(--gold);margin:28px 0 4px">Project-only · Cursor cannot read these</h3>
+<p class="sub">Cursor has no <code>project_read</code>. It flagged these as unverified; I read them, and they are real.</p>
+<table>
+  <tr><th>Item</th><th>State per the project docs</th></tr>
+  <tr><td class="id">WO-095</td><td>Star icon renders as "?" across Inspiration. Flagged <b>High, client-facing</b>. Absent from the ledger entirely.</td></tr>
+  <tr><td class="id">WO-096/097/098</td><td>Timely page titles, Smart Time sync 60s timeout, portal domain. <b>097 gates the Pepper morning brief.</b> No ledger rows.</td></tr>
+  <tr><td class="id">WO-102 vendor</td><td>Vendor reply ingest. Zero POs ever sent through Studio. Phase 1 subject-line fix is unfixable in retrospect.</td></tr>
+  <tr><td class="id">WO-088-B</td><td>Builder finish picker. May be absorbed by WO-090; acceptance never run.</td></tr>
+  <tr><td class="id">079 / 080 / 081</td><td>Design Board PDF autofill, rotate, text styling. <b>No ledger rows at all.</b> Lane still undecided.</td></tr>
+  <tr><td class="id">Safety nets</td><td>Layers 2–5 proposed, not built. Layer 4 gate waived once already.</td></tr>
+  <tr><td class="id">Skill audit</td><td>Six systemic errors identified, none fixed. Two "corrected" skills still carry them.</td></tr>
+  <tr><td class="id">Marketing / RH</td><td>Entire lane unread by Cursor: 27 brand plates unshot, site on unpatched WooCommerce 3.7.3, six RH Stone &amp; Tile decisions holding the flagship at PROTOTYPE.</td></tr>
+</table>
+
+<h2><span class="num">09</span>If you only do five things</h2>
+<ol class="top5">
+  <li><b>Fix HOTFIX-032.</b> One month of not being able to edit a payment on production. It is described as a single-quote change.</li>
+  <li><b>Paste STAGING_BOARD_HASH and run the canary.</b> Two of three fixtures are already documented. Exit 0 starts converting 61 unverified rows into something real.</li>
+  <li><b>Answer SEL-1 (a/b/c).</b> Blocked since Jul 10, and WO-113 is about to pile new row types onto the same broken edit surface.</li>
+  <li><b>Ship the copy-to-room field fix</b>, then decide what to re-copy. Every copy so far lost its images, URLs and price.</li>
+  <li><b>Pick one tracker.</b> The ledger is the only artifact with a state machine. Five disagreeing artifacts hid a production break for a month.</li>
+</ol>
+
+<footer>
+  C-Team_Aug13_v2.1 · Adds the full open roster from Cursor's Aug 13 audit. Supersedes v1.0 and v2.0. Merged from 146 project docs, LOOP_LEDGER (96 rows, 79 log entries),
+  Cursor's OPEN_ITEMS_AUDIT_CR_Aug13_v1.0, and a live read of Docs/, loop/ and _scripts/.
+  Where sources conflicted, the later-dated artifact wins and the conflict is named rather than resolved silently.
+  Full detail with file paths and verbatim quotes: CCH_OPEN_ITEMS_LEDGER_C-Team_Aug13_v2.0.md
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CCH Tear Sheet — Landscape Redesign Concept</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0A1F3D;
+    --navy-soft:#33445E;
+    --gold:#B08D4C;
+    --gold-soft:#C4A464;
+    --ink:#2A3242;
+    --line:#E2E4E8;
+    --line-soft:#ECEEF1;
+    --paper:#FFFFFF;
+    --bg:#E9EBEE;
+    --muted:#8A8A92;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:"DM Sans",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);
+    -webkit-font-smoothing:antialiased;padding:40px 20px 80px;
+  }
+  .wrap{max-width:1000px;margin:0 auto;}
+  .note{
+    margin:0 auto 30px;padding:18px 24px;background:#fff;
+    border:1px solid var(--line);border-left:3px solid var(--gold);
+    font-size:13px;line-height:1.6;color:var(--navy-soft);
+  }
+  .note b{color:var(--navy);font-weight:600;}
+  .variant-tag{
+    font-size:11px;letter-spacing:0.16em;text-transform:uppercase;
+    color:var(--muted);padding:0 4px 10px;
+  }
+
+  /* ---------- LANDSCAPE SHEET 11 x 8.5 ---------- */
+  .sheet{
+    width:100%;aspect-ratio:11 / 8.5;margin:0 auto 46px;background:var(--paper);
+    box-shadow:0 8px 30px rgba(10,31,61,0.10);border:1px solid var(--line-soft);
+    display:flex;flex-direction:column;overflow:hidden;
+  }
+  .ts-head{
+    flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+    padding:7px 34px 6px;border-bottom:1px solid var(--line);
+  }
+  .ts-logo{
+    font-family:"Playfair Display",Georgia,serif;font-weight:600;
+    font-size:11px;letter-spacing:0.20em;text-transform:uppercase;color:var(--navy);
+  }
+  .ts-head-meta{display:flex;align-items:center;gap:12px;}
+  .ts-head-proj{font-size:9.5px;letter-spacing:0.05em;color:var(--navy);font-weight:500;}
+  .ts-head-date{font-size:8px;letter-spacing:0.10em;text-transform:uppercase;color:var(--muted);}
+
+  .ts-body{flex:1;display:grid;grid-template-columns:2.15fr 1fr;min-height:0;}
+
+  /* Left: photography */
+  .ts-gallery{
+    padding:24px 20px 24px 34px;display:grid;
+    grid-template-columns:1fr 132px;gap:12px;min-height:0;
+  }
+  .ts-hero{
+    position:relative;border:1px solid var(--line-soft);
+    background:radial-gradient(120% 90% at 50% 30%, #FFFFFF 0%, #F7F8FA 100%);
+    display:flex;align-items:center;justify-content:center;min-height:0;
+  }
+  .ts-hero .ph-label{font-size:9.5px;letter-spacing:0.24em;text-transform:uppercase;color:#B8B2A4;}
+  .ts-thumbcol{display:flex;flex-direction:column;gap:10px;min-height:0;}
+  .ts-thumb{
+    flex:1;border:1px solid var(--line-soft);
+    background:linear-gradient(160deg,#FFFFFF,#F4F5F7);
+    display:flex;align-items:center;justify-content:center;
+    font-size:8.5px;letter-spacing:0.16em;text-transform:uppercase;color:#B9BCC4;
+  }
+
+  /* Right: content */
+  .ts-content{padding:22px 30px 18px 24px;display:flex;flex-direction:column;min-height:0;}
+  .ts-room{
+    font-size:6px;letter-spacing:0.18em;text-transform:uppercase;
+    color:var(--gold);border:1px solid var(--gold);padding:3px 7px;
+  }
+  .ts-name{
+    font-family:"Playfair Display",Georgia,serif;font-weight:600;
+    font-size:12px;line-height:1.15;color:var(--navy);
+  }
+  .ts-vendor{font-size:6.5px;letter-spacing:0.16em;text-transform:uppercase;color:var(--navy-soft);margin-top:5px;}
+  .ts-desc{font-size:7px;line-height:1.4;color:var(--navy-soft);margin-top:8px;max-width:46ch;}
+
+  .ts-specs{
+    margin-top:13px;border-top:1px solid var(--line);padding-top:11px;
+    display:grid;grid-template-columns:1fr;gap:9px 0;
+  }
+  .spec-k{font-size:6px;letter-spacing:0.14em;text-transform:uppercase;color:var(--gold);margin-bottom:2px;}
+  .spec-v{font-size:7px;line-height:1.38;color:var(--navy);}
+  .spec-full{grid-column:1 / -1;}
+
+  .ts-price{margin-top:auto;padding-top:11px;border-top:1px solid var(--line);}
+  .ts-price-label{font-size:6px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+  .ts-price-val{font-size:7px;color:var(--navy);line-height:1.45;}
+  .ts-price-val b{font-weight:600;}
+
+  .ts-foot{
+    flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+    padding:11px 34px;border-top:1px solid var(--line);
+  }
+  .ts-tag{font-family:"Playfair Display",serif;font-style:italic;font-size:12.5px;color:var(--gold);}
+  .ts-conf{font-size:8.5px;letter-spacing:0.14em;text-transform:uppercase;color:#BEB8AA;}
+
+  /* ---- PRINT: landscape US Letter (11 x 8.5), one sheet per page ---- */
+  @page{ size:11in 8.5in; margin:0.3in; }
+  @media print{
+    body{ background:#fff; padding:0; }
+    .note,.variant-tag{ display:none !important; }
+    .wrap{ max-width:none; margin:0; }
+    .sheet{
+      width:100%; aspect-ratio:auto; height:7.9in; margin:0;
+      box-shadow:none; border:none;
+      page-break-after:always; break-after:page;
+    }
+    .sheet:last-child{ page-break-after:auto; break-after:auto; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="note">
+    <b>Tear sheet — landscape redesign.</b> Same 11×8.5 sheet you generate now, re-composed: photography holds the left, the story and a clean deduped spec grid read down the right, pricing is one quiet line you can switch off. Grey panels are where real product photos sit. First sheet <b>with pricing</b>, second <b>without</b>.
+  </div>
+
+  <!-- ============ SHEET 1 — WITH PRICING ============ -->
+  <div class="variant-tag">Sheet 1 · client copy · pricing on</div>
+  <div class="sheet">
+    <div class="ts-head">
+      <span class="ts-logo">CCH Design</span>
+      <span class="ts-head-meta">
+        <span class="ts-room">Game Room</span>
+        <span class="ts-head-proj">Holtz Hill</span>
+        <span class="ts-head-date">July 15, 2026</span>
+      </span>
+    </div>
+    <div class="ts-body">
+      <div class="ts-gallery">
+        <div class="ts-hero"><span class="ph-label">Product photography</span></div>
+        <div class="ts-thumbcol">
+          <div class="ts-thumb">Detail</div>
+          <div class="ts-thumb">Alt finish</div>
+          <div class="ts-thumb">In situ</div>
+        </div>
+      </div>
+      <div class="ts-content">
+        <h1 class="ts-name">Stellar Single Tail Sconce</h1>
+        <div class="ts-vendor">ELU Atelier</div>
+        <p class="ts-desc">
+          Single tapered arm, hand-finished shade.
+        </p>
+        <div class="ts-specs">
+          <div class="spec-full">
+            <div class="spec-k">Dimensions</div>
+            <div class="spec-v">28&quot; H &nbsp;·&nbsp; 2.5&quot; W &nbsp;·&nbsp; 3.25&quot; Extension &nbsp;·&nbsp; Backplate 2.5&quot; × 4.25&quot;</div>
+          </div>
+          <div>
+            <div class="spec-k">Finish</div>
+            <div class="spec-v">Gild</div>
+          </div>
+          <div>
+            <div class="spec-k">Light source</div>
+            <div class="spec-v">Dedicated LED · 6W / 500 lm</div>
+          </div>
+        </div>
+        <div class="ts-price">
+          <div class="ts-price-label">Investment</div>
+          <div class="ts-price-val">Qty 4 &nbsp;·&nbsp; $2,103 each &nbsp;·&nbsp; <b>$8,411 total</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="ts-foot">
+      <span class="ts-tag">Designing Your Story…</span>
+      <span class="ts-conf">Confidential · CCH Design Inc.</span>
+    </div>
+  </div>
+
+  <!-- ============ SHEET 2 — WITHOUT PRICING ============ -->
+  <div class="variant-tag">Sheet 2 · client copy · pricing off</div>
+  <div class="sheet">
+    <div class="ts-head">
+      <span class="ts-logo">CCH Design</span>
+      <span class="ts-head-meta">
+        <span class="ts-room">Music Room</span>
+        <span class="ts-head-proj">Holtz Hill</span>
+        <span class="ts-head-date">July 15, 2026</span>
+      </span>
+    </div>
+    <div class="ts-body">
+      <div class="ts-gallery">
+        <div class="ts-hero"><span class="ph-label">Product photography</span></div>
+        <div class="ts-thumbcol">
+          <div class="ts-thumb">Detail</div>
+          <div class="ts-thumb">Profile</div>
+          <div class="ts-thumb">In situ</div>
+        </div>
+      </div>
+      <div class="ts-content">
+        <h1 class="ts-name">Spur Wall</h1>
+        <div class="ts-vendor">ELU Atelier</div>
+        <p class="ts-desc">
+          Modern linear sconce in aged brass.
+        </p>
+        <div class="ts-specs">
+          <div class="spec-full">
+            <div class="spec-k">Dimensions</div>
+            <div class="spec-v">29.8&quot; H &nbsp;·&nbsp; 4.3&quot; L &nbsp;·&nbsp; 2.7&quot; W</div>
+          </div>
+          <div>
+            <div class="spec-k">Finish</div>
+            <div class="spec-v">Aged Brass</div>
+          </div>
+          <div>
+            <div class="spec-k">Light source</div>
+            <div class="spec-v">120V · 11W · 729 lm · 2700K LED</div>
+          </div>
+          <div class="spec-full">
+            <div class="spec-k">Dimming</div>
+            <div class="spec-v">Most ELV and TRIAC dimmers; 277V with 0–10V dimmers</div>
+          </div>
+        </div>
+        <div class="ts-price" style="margin-top:auto;"></div>
+      </div>
+    </div>
+    <div class="ts-foot">
+      <span class="ts-tag">Designing Your Story…</span>
+      <span class="ts-conf">Confidential · CCH Design Inc.</span>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

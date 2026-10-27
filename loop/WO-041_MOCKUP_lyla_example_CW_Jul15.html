@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CCH Tear Sheet — Lyla Chandelier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0A1F3D; --navy-soft:#33445E; --gold:#B08D4C; --gold-soft:#C4A464;
+    --ink:#2A3242; --line:#E2E4E8; --line-soft:#ECEEF1; --paper:#FFFFFF;
+    --bg:#E9EBEE; --muted:#8A8A92;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"DM Sans",system-ui,sans-serif;background:var(--bg);color:var(--ink);
+    -webkit-font-smoothing:antialiased;padding:40px 20px 80px;}
+  .wrap{max-width:1000px;margin:0 auto;}
+  .note{margin:0 auto 30px;padding:16px 22px;background:#fff;border:1px solid var(--line);
+    border-left:3px solid var(--gold);font-size:12.5px;line-height:1.6;color:var(--navy-soft);}
+  .note b{color:var(--navy);font-weight:600;}
+  .variant-tag{font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);padding:0 4px 10px;}
+
+  .sheet{width:100%;aspect-ratio:11 / 8.5;margin:0 auto 46px;background:var(--paper);
+    box-shadow:0 8px 30px rgba(10,31,61,0.10);border:1px solid var(--line-soft);
+    display:flex;flex-direction:column;overflow:hidden;}
+  .ts-head{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+    padding:7px 34px 6px;border-bottom:1px solid var(--line);}
+  .ts-logo{font-family:"Playfair Display",Georgia,serif;font-weight:600;font-size:11px;
+    letter-spacing:0.22em;text-transform:uppercase;color:var(--navy);}
+  .ts-head-meta{display:flex;align-items:center;gap:12px;}
+  .ts-head-proj{font-size:9.5px;letter-spacing:0.05em;color:var(--navy);font-weight:500;}
+  .ts-head-date{font-size:8px;letter-spacing:0.10em;text-transform:uppercase;color:var(--muted);}
+
+  .ts-body{flex:1;display:grid;grid-template-columns:2.15fr 1fr;min-height:0;}
+  .ts-gallery{padding:24px 20px 24px 34px;display:grid;grid-template-columns:1fr 132px;gap:12px;min-height:0;}
+  .ts-hero{position:relative;border:1px solid var(--line-soft);
+    background:radial-gradient(120% 90% at 50% 30%, #FFFFFF 0%, #F7F8FA 100%);
+    display:flex;align-items:center;justify-content:center;min-height:0;}
+  .ts-hero .ph-label{font-size:9.5px;letter-spacing:0.24em;text-transform:uppercase;color:#B8B2A4;}
+  .ts-thumbcol{display:flex;flex-direction:column;gap:10px;min-height:0;}
+  .ts-thumb{flex:1;border:1px solid var(--line-soft);
+    background:linear-gradient(160deg,#FFFFFF,#F4F5F7);display:flex;align-items:center;justify-content:center;
+    font-size:8.5px;letter-spacing:0.16em;text-transform:uppercase;color:#B9BCC4;}
+
+  .ts-content{padding:22px 30px 18px 24px;display:flex;flex-direction:column;min-height:0;}
+  .ts-room{font-size:6px;letter-spacing:0.18em;text-transform:uppercase;
+    color:var(--gold);border:1px solid var(--gold);padding:3px 7px;}
+  .ts-name{font-family:"Playfair Display",Georgia,serif;font-weight:600;font-size:12px;line-height:1.15;color:var(--navy);}
+  .ts-vendor{font-size:6.5px;letter-spacing:0.16em;text-transform:uppercase;color:var(--navy-soft);margin-top:5px;}
+  .ts-desc{font-size:7px;line-height:1.4;color:var(--navy-soft);margin-top:8px;max-width:46ch;}
+  .ts-specs{margin-top:13px;border-top:1px solid var(--line);padding-top:11px;
+    display:grid;grid-template-columns:1fr;gap:9px 0;}
+  .spec-k{font-size:6px;letter-spacing:0.14em;text-transform:uppercase;color:var(--gold);margin-bottom:2px;}
+  .spec-v{font-size:7px;line-height:1.38;color:var(--navy);}
+  .spec-full{grid-column:1 / -1;}
+
+  .ts-foot{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+    padding:11px 34px;border-top:1px solid var(--line);}
+  .ts-tag{font-family:"Playfair Display",serif;font-style:italic;font-size:12.5px;color:var(--gold);}
+  .ts-conf{font-size:8.5px;letter-spacing:0.14em;text-transform:uppercase;color:#BEB8AA;}
+
+  @page{ size:11in 8.5in; margin:0.3in; }
+  @media print{
+    body{background:#fff;padding:0;}
+    .note,.variant-tag{display:none !important;}
+    .wrap{max-width:none;margin:0;}
+    .sheet{width:100%;aspect-ratio:auto;height:7.9in;margin:0;box-shadow:none;border:none;
+      page-break-after:always;break-after:page;}
+    .sheet:last-child{page-break-after:auto;break-after:auto;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="note">
+    <b>Lyla Chandelier — example tear sheet.</b> Populated from the Product Library record: maker pulls from the product's vendor field (<b>Arhaus</b>), dimensions and SKU are the real stored values. Pricing is off because a library item only carries trade cost (DNET), which never appears on a client sheet. Grey panels are where the product's five photos drop in.
+  </div>
+
+  <div class="variant-tag">Client copy · pricing off</div>
+  <div class="sheet">
+    <div class="ts-head">
+      <span class="ts-logo">CCH Design</span>
+      <span class="ts-head-meta">
+        <span class="ts-room">Lighting</span>
+        <span class="ts-head-proj">Holtz Hill</span>
+        <span class="ts-head-date">July 15, 2026</span>
+      </span>
+    </div>
+    <div class="ts-body">
+      <div class="ts-gallery">
+        <div class="ts-hero"><span class="ph-label">Product photography</span></div>
+        <div class="ts-thumbcol">
+          <div class="ts-thumb">Detail</div>
+          <div class="ts-thumb">Canopy</div>
+          <div class="ts-thumb">In situ</div>
+        </div>
+      </div>
+      <div class="ts-content">
+        <h1 class="ts-name">Lyla Chandelier</h1>
+        <div class="ts-vendor">Arhaus</div>
+        <p class="ts-desc">
+          Two-tier frosted-glass halo chandelier.
+        </p>
+        <div class="ts-specs">
+          <div class="spec-full">
+            <div class="spec-k">Dimensions</div>
+            <div class="spec-v">47&quot; W &nbsp;·&nbsp; 47&quot; D &nbsp;·&nbsp; 28.75&quot; H &nbsp;·&nbsp; 47&quot; Diameter</div>
+          </div>
+          <div>
+            <div class="spec-k">Finish</div>
+            <div class="spec-v">Brass · Frosted glass</div>
+          </div>
+          <div>
+            <div class="spec-k">SKU / Model</div>
+            <div class="spec-v">6610031H650</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="ts-foot">
+      <span class="ts-tag">Designing Your Story…</span>
+      <span class="ts-conf">Confidential · CCH Design Inc.</span>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
