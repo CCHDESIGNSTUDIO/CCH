@@ -261,9 +261,9 @@
     price_increase: { id: 'price_increase', label: 'Price/quantity change', defaultRes: 'pending', disposition: 'undecided', taxable: true },
     cost_difference: { id: 'cost_difference', label: 'Difference in cost', defaultRes: 'pending', disposition: 'undecided', taxable: true },
     larger_size: { id: 'larger_size', label: 'Purchased a larger size', defaultRes: 'pending', disposition: 'undecided', taxable: true },
-    prepaid_tax: { id: 'prepaid_tax', label: 'Pre-paid tax (paid at source)', defaultRes: 'absorbed', disposition: 'absorbed', taxable: null },
-    tax: { id: 'tax', label: 'Pre-paid tax', defaultRes: 'absorbed', disposition: 'absorbed', taxable: null },
-    vendor_tax: { id: 'vendor_tax', label: 'Tax charged by vendor', defaultRes: 'absorbed', disposition: 'absorbed', taxable: null },
+    prepaid_tax: { id: 'prepaid_tax', label: 'Pre-paid tax (paid at source)', defaultRes: 'pending', disposition: 'prepaid_tax', taxable: null },
+    tax: { id: 'tax', label: 'Pre-paid tax', defaultRes: 'pending', disposition: 'prepaid_tax', taxable: null },
+    vendor_tax: { id: 'vendor_tax', label: 'Tax charged by vendor', defaultRes: 'pending', disposition: 'prepaid_tax', taxable: null },
     designer_discount: { id: 'designer_discount', label: 'Designer discount', defaultRes: 'pending', disposition: 'undecided', taxable: null },
     shop_discount: { id: 'shop_discount', label: 'Shop discount', defaultRes: 'pending', disposition: 'undecided', taxable: null },
     finish_less_money: { id: 'finish_less_money', label: 'Finish selected was less money', defaultRes: 'pending', disposition: 'undecided', taxable: false },
@@ -378,7 +378,7 @@
       var cid = String(c.id || ('vc_' + i + '_' + code));
       var okey = cid;
       var disp = c.disposition || (overrides[okey] && overrides[okey].disposition) || meta.disposition;
-      if (cchPoIsTaxFamilyReason(code)) disp = 'absorbed';
+      if (VARIANCE_TAX_FAMILY[code] && disp !== 'billable') disp = 'prepaid_tax';
       var taxable = c.taxable;
       if (taxable == null && overrides[okey] && overrides[okey].taxable != null) taxable = overrides[okey].taxable;
       if (taxable == null) taxable = meta.taxable;
@@ -401,6 +401,20 @@
     });
     return { needsAllocation: false, components: components };
   }
+  window.cchPoDeriveVarianceComponents = cchPoDeriveVarianceComponents;
+
+  function cchPoClientFaceText(s) {
+    var t = String(s || '');
+    t = t.replace(/\bPO-\d+\b/gi, '');
+    t = t.replace(/\bPO\s+line\b[^\n]*/gi, '');
+    t = t.replace(/\bpurchase\s+order\b/gi, '');
+    t = t.replace(/^.*\bInvoice\s*#.*$/gim, '');
+    t = t.replace(/\bvariances?\b/gi, '');
+    t = t.replace(/\bbills?\b/gi, '');
+    t = t.replace(/[ \t]{2,}/g, ' ').replace(/\n{2,}/g, '\n').trim();
+    return t;
+  }
+  window.cchPoClientFaceText = cchPoClientFaceText;
 
   function esc(s) { return typeof window.esc === 'function' ? window.esc(s) : String(s == null ? '' : s); }
   function escAttr(s) { return typeof window.escAttr === 'function' ? window.escAttr(s) : esc(s); }
@@ -818,7 +832,7 @@
     for (var i = 0; i < groups.length; i++) {
       var g = groups[i] || {};
       if (String(g.documentType || '').trim() === 'confirmation') continue;
-      var st = cchPoShippingStatusCanonicalId(String(g.status || '').trim());
+      var st = cchPoShippingStatusCanonicalId(cchPoOrderStatusForShipDate(g.status, g.actualShipDate));
       if (!cchPoShippingStatusDef(st)) continue;
       var r = Object.prototype.hasOwnProperty.call(rank, st) ? rank[st] : 5;
       if (r > bestR) {
@@ -1623,10 +1637,31 @@
     return window.cchPoListPoTotal(po);
   };
 
-  /** Vendor bill total when a bill exists; otherwise null. */
+  /**
+   * Sum of the ship invoices still on the PO. Confirmations are not bills.
+   * Null when no ship invoice has been recorded, so callers keep the stored bill total.
+   * Does not read or write PO line cost.
+   */
+  function cchPoRecordedShipBillTotal(doc) {
+    if (!doc || typeof window.cchPoShipInvoiceMoney !== 'function') return null;
+    var groups = typeof window.cchPoVendorInvoiceGroupsUser === 'function'
+      ? window.cchPoVendorInvoiceGroupsUser(doc) : [];
+    var ship = (groups || []).filter(function(g) {
+      return String(g.documentType || '').trim() !== 'confirmation';
+    });
+    if (!ship.length) return null;
+    var money = window.cchPoShipInvoiceMoney(doc);
+    if (!money) return null;
+    return Math.round((parseFloat(money.bills) || 0) * 100) / 100;
+  }
+
+  /** Vendor bill total when a bill exists; otherwise null. A saved received bill wins over a partial ship-invoice sum. */
   window.cchPoListBillTotalForRow = function(po) {
     if (!po) return null;
     var bill = po.bill || {};
+    if ((bill.received || bill.qbBillId) && bill.billTotal != null) return window.cchPoVendorBillTotal(po);
+    var recorded = cchPoRecordedShipBillTotal(po);
+    if (recorded != null) return recorded;
     if (bill.received || bill.billTotal != null) return window.cchPoVendorBillTotal(po);
     return null;
   };
@@ -1667,6 +1702,12 @@
    * and the stored total left it out, add it. Do not add it twice.
    */
   window.cchPoPayableBillTotal = function(doc) {
+    var bill0 = (doc && doc.bill) || {};
+    var hasSaved = (bill0.received || bill0.qbBillId) && bill0.billTotal != null;
+    if (!hasSaved) {
+      var recorded = cchPoRecordedShipBillTotal(doc);
+      if (recorded != null) return recorded;
+    }
     var stored = window.cchPoVendorBillTotal(doc);
     var prepaid = window.cchPoPrepaidTaxTotal(doc);
     if (Math.abs(prepaid) < 0.01) return stored;
@@ -1859,6 +1900,43 @@
       console.warn('[cchLookupVendorRecordByName]', e);
       return null;
     }
+  };
+
+  /** Address, phone, email, and contact for a vendor or workroom name. Ignores the address already typed on the PO. */
+  window.cchPoDirectoryContactByName = async function(name) {
+    name = String(name || '').trim();
+    var out = { address: '', phone: '', email: '', contact: '' };
+    if (!name) return out;
+    var low = name.toLowerCase();
+    function fill(rec) {
+      if (!rec) return;
+      var address = '';
+      if (typeof window.cchVendorCatalogAddressText === 'function') address = String(window.cchVendorCatalogAddressText(rec) || '').trim();
+      if (!address) address = String(rec.address || rec.addr || rec.vendorAddress || rec.displayText || '').trim();
+      if (!out.address && address) out.address = address;
+      if (!out.phone) out.phone = String(rec.phone || rec.contactPhone || rec.tel || '').trim();
+      if (!out.email) out.email = String(rec.email || rec.contactEmail || '').trim();
+      if (!out.contact) out.contact = String(rec.contact || '').trim();
+    }
+    try {
+      var rec = null;
+      if (typeof window.cchLookupVendorRecordByName === 'function') rec = await window.cchLookupVendorRecordByName(name);
+      if (rec && rec.id && !rec.address && !rec.addressLine1 && !rec.city) {
+        var full = await firebase.firestore().collection('vendors').doc(rec.id).get();
+        if (full.exists) rec = Object.assign({ id: full.id }, full.data() || {});
+      }
+      fill(rec);
+    } catch (_eVend) {}
+    if (out.address && out.phone && out.email) return out;
+    try {
+      var ws = await firebase.firestore().collection('workrooms').get();
+      ws.forEach(function(d) {
+        var w = d.data() || {};
+        var n = String(w.name || w.title || w.workroomName || '').trim().toLowerCase();
+        if (n === low) fill(w);
+      });
+    } catch (_eWr) {}
+    return out;
   };
 
   /** PO vendor address: saved on doc, else vendors catalog. */
@@ -2428,6 +2506,38 @@
     }).filter(Boolean);
   }
 
+  /** Vendor invoices already on the purchase order. Bill charge rows first. Payments carry the invoice number when the bill has no invoice lines. */
+  function cchPoRecordedVendorBills(doc) {
+    doc = doc || {};
+    var out = [];
+    var seen = {};
+    function add(num, date, amount) {
+      num = String(num || '').trim();
+      if (!num) return;
+      var key = num.toLowerCase().replace(/\s+/g, '');
+      amount = Math.round((parseFloat(amount) || 0) * 100) / 100;
+      if (seen[key]) {
+        seen[key].amount = Math.round((seen[key].amount + amount) * 100) / 100;
+        if (!seen[key].date && date) seen[key].date = String(date).slice(0, 10);
+        return;
+      }
+      var row = { number: num, date: String(date || '').slice(0, 10), amount: amount };
+      seen[key] = row;
+      out.push(row);
+    }
+    var charges = (doc.bill && Array.isArray(doc.bill.vendorInvoices)) ? doc.bill.vendorInvoices : [];
+    charges.forEach(function(r) {
+      if (!r) return;
+      add(r.vendorInvoiceNumber, r.vendorInvoiceDate, r.amount);
+    });
+    if (out.length) return out;
+    (doc.payments || []).forEach(function(p) {
+      if (!p) return;
+      add(p.vendorInvoiceNumber || p.invoiceNumber, p.date || p.paidAt || '', p.amount);
+    });
+    return out;
+  }
+
   function cchPoBillBilledLineIds(bill, allPoLines) {
     bill = bill || {};
     if (Array.isArray(bill.billedPoLineIds) && bill.billedPoLineIds.length) return bill.billedPoLineIds.slice();
@@ -2556,13 +2666,27 @@
         if (linkedTitles.length) title += ': ' + linkedTitles.join(', ');
         if (String(r.description || '').trim()) title += ' — ' + String(r.description).trim();
       }
-      if (cchPoChargeUsesLinePricing(src) && r.invoiceUnitPrice != null && r.invoiceUnitPrice !== '' && r.poUnitPrice != null && r.poUnitPrice !== '') {
-        var pcQty = r.qty != null && r.qty !== '' ? r.qty : 1;
-        var pcTitle = src === 'qty_change' ? 'Quantity change' : 'Price/quantity change';
-        if (linkedTitles.length) pcTitle += ': ' + linkedTitles[0];
-        pcTitle += ' — inv ' + fmt(parseFloat(r.invoiceUnitPrice)) + '/ea × ' + pcQty + ' (PO ' + fmt(parseFloat(r.poUnitPrice)) + '/ea)';
-        title = String(r.description || '').trim() ? String(r.description).trim() + ' — ' + pcTitle : pcTitle;
-      } else if (linkedTitles.length && src !== 'cancelled') {
+      if (src === 'qty_change' && !String(r.description || '').trim()) {
+        var fromQ = r.poQty;
+        var toQ = r.qty;
+        var unitQ = '';
+        if (poLineIds.length && poLines && poLines.length) {
+          for (var qi = 0; qi < poLines.length; qi++) {
+            if (poLineIds.indexOf(poLines[qi].lineId) >= 0 && poLines[qi].unit) {
+              unitQ = String(poLines[qi].unit).trim();
+              break;
+            }
+          }
+        }
+        if (fromQ != null && fromQ !== '' && toQ != null && toQ !== '') {
+          title = 'Quantity change from ' + fromQ + ' to ' + toQ + (unitQ ? ' ' + unitQ : '');
+        } else {
+          title = 'Quantity change';
+        }
+      } else if (src === 'price_change' && !String(r.description || '').trim()) {
+        title = 'Price change';
+        if (linkedTitles.length) title += ': ' + linkedTitles[0];
+      } else if (linkedTitles.length && src !== 'cancelled' && src !== 'qty_change' && src !== 'price_change') {
         title = title + ' [' + linkedTitles.join(', ') + ']';
       }
       var item = {
@@ -2573,6 +2697,7 @@
         vendorInvoiceDate: String(r.vendorInvoiceDate || '').trim(),
         poLineIds: poLineIds
       };
+      if (r.clientNote) item.clientNote = r.clientNote;
       if (cchPoChargeUsesLinePricing(src)) {
         if (r.invoiceUnitPrice != null && r.invoiceUnitPrice !== '') item.invoiceUnitPrice = parseFloat(r.invoiceUnitPrice);
         if (r.poUnitPrice != null && r.poUnitPrice !== '') item.poUnitPrice = parseFloat(r.poUnitPrice);
@@ -2755,11 +2880,11 @@
     var invNum = meta.vendorInvoiceNumber || '';
     var invDate = meta.vendorInvoiceDate || '';
     var conf = String(meta.orderConfNumber || window.__cchBillOrderConf || '').trim();
-    if (conf && !String(invNum || '').trim()) {
+    if (!isAdd && conf && !String(invNum || '').trim()) {
       invNum = conf;
       meta.useConfAsInvoice = true;
     }
-    var useConfChecked = !!(meta.useConfAsInvoice) || !!(conf && invNum && String(invNum).trim() === conf);
+    var useConfChecked = !isAdd && (!!(meta.useConfAsInvoice) || !!(conf && invNum && String(invNum).trim() === conf));
     var label = isAdd ? 'Vendor invoice # (this invoice)' : 'Vendor invoice #';
     var confCheck = conf
       ? '<label style="display:flex;align-items:flex-start;gap:8px;margin-top:8px;font-size:12px;cursor:pointer;line-height:1.4;">' +
@@ -2843,7 +2968,74 @@
   }
   var _hasBillShipmentMeta = cchPoHasBillShipmentMeta;
 
-  /** One charge line on the vendor invoice (type, amount, description — no per-row invoice #). */
+  function cchPoChargeBelongsOnHeaderBill(r, headerInv) {
+    var n = String(r && r.vendorInvoiceNumber || '').trim();
+    headerInv = String(headerInv || '').trim();
+    if (!n || !headerInv) return true;
+    return cchPoNormVendorInvNum(n) === cchPoNormVendorInvNum(headerInv);
+  }
+
+  function cchPoBillExtraChargeRowHtml(row) {
+    row = row || {};
+    var type = row.type || row.source || 'extra';
+    var opts = CCH_VENDOR_INVOICE_TYPES.filter(function(t) { return t.id !== 'merchandise'; }).map(function(t) {
+      return '<option value="' + escAttr(t.id) + '"' + (type === t.id ? ' selected' : '') + '>' + esc(t.label) + '</option>';
+    }).join('');
+    var amtVal = row.amount != null && row.amount !== '' ? String(row.amount) : '';
+    var ids = (row.poLineIds || []).join(',');
+    var note = String(row.clientNote || row.description || row.note || '').trim();
+    return '<div class="cch-bill-extra-row" data-id="' + escAttr(row.id || '') + '" data-date="' + escAttr(row.vendorInvoiceDate || '') + '" data-lines="' + escAttr(ids) + '" style="border:1px solid rgba(15,26,46,0.1);padding:10px;margin-bottom:8px;background:#fff;">' +
+      '<div style="display:grid;grid-template-columns:1.2fr 1fr 120px;gap:8px;">' +
+        '<div><label class="form-label">Invoice #</label><input type="text" class="form-input cch-bill-extra-inv" value="' + escAttr(row.vendorInvoiceNumber || '') + '" placeholder="This charge’s invoice #" oninput="cchPoUpdateBillPreview(window.__cchBillPoAtSend)"></div>' +
+        '<div><label class="form-label">Type</label><select class="form-input cch-bill-extra-type" onchange="cchPoUpdateBillPreview(window.__cchBillPoAtSend)">' + opts + '</select></div>' +
+        '<div><label class="form-label">Amount</label><input type="number" step="0.01" class="form-input cch-bill-extra-amt" value="' + escAttr(amtVal) + '" oninput="cchPoUpdateBillPreview(window.__cchBillPoAtSend)"></div>' +
+        '<div style="grid-column:1/-1;"><label class="form-label">Note</label><textarea class="form-textarea cch-bill-extra-note" rows="2" placeholder="What this charge is" style="min-height:52px;font-size:12px;">' + esc(note) + '</textarea></div>' +
+      '</div>' +
+      '<button type="button" class="btn btn-sm" style="margin-top:6px;color:#B91C1C;border-color:rgba(185,28,28,0.35);" onclick="cchPoRemoveBillExtraCharge(this)">Remove</button>' +
+    '</div>';
+  }
+
+  function cchPoReadBillExtraChargesFromDom() {
+    var header = cchPoReadBillVendorInvoiceMetaFromDom();
+    var out = [];
+    document.querySelectorAll('#cchBillExtraCharges .cch-bill-extra-row').forEach(function(row, i) {
+      var amt = parseFloat(row.querySelector('.cch-bill-extra-amt') && row.querySelector('.cch-bill-extra-amt').value) || 0;
+      if (Math.abs(amt) < 0.01) return;
+      var inv = String(row.querySelector('.cch-bill-extra-inv') && row.querySelector('.cch-bill-extra-inv').value || '').trim();
+      if (!inv) inv = header.vendorInvoiceNumber;
+      var note = String(row.querySelector('.cch-bill-extra-note') && row.querySelector('.cch-bill-extra-note').value || '').trim();
+      var ids = String(row.getAttribute('data-lines') || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+      out.push({
+        id: row.getAttribute('data-id') || ('vi_extra_' + Date.now() + '_' + i),
+        vendorInvoiceNumber: inv,
+        vendorInvoiceDate: row.getAttribute('data-date') || header.vendorInvoiceDate || '',
+        type: String(row.querySelector('.cch-bill-extra-type') && row.querySelector('.cch-bill-extra-type').value || 'extra').trim(),
+        description: note,
+        clientNote: note,
+        amount: Math.round(amt * 100) / 100,
+        poLineIds: ids
+      });
+    });
+    return out;
+  }
+
+  window.cchPoAddBillExtraCharge = function() {
+    var list = document.getElementById('cchBillExtraCharges');
+    if (!list) return;
+    var header = cchPoReadBillVendorInvoiceMetaFromDom();
+    list.insertAdjacentHTML('beforeend', cchPoBillExtraChargeRowHtml({
+      type: 'extra',
+      vendorInvoiceNumber: header.vendorInvoiceNumber || '',
+      vendorInvoiceDate: header.vendorInvoiceDate || ''
+    }));
+    if (typeof window.cchPoUpdateBillPreview === 'function') window.cchPoUpdateBillPreview(window.__cchBillPoAtSend);
+  };
+
+  window.cchPoRemoveBillExtraCharge = function(btn) {
+    var row = btn && btn.closest ? btn.closest('.cch-bill-extra-row') : null;
+    if (row) row.remove();
+    if (typeof window.cchPoUpdateBillPreview === 'function') window.cchPoUpdateBillPreview(window.__cchBillPoAtSend);
+  };
   function cchPoVendorChargeRowHtml(row) {
     row = row || {};
     var type = row.type || 'freight';
@@ -3350,7 +3542,435 @@
     });
   }
 
+  function cchPoBillLineMerch(line) {
+    line = line || {};
+    if (line.merch != null && line.merch !== '' && isFinite(parseFloat(line.merch))) {
+      return Math.round(parseFloat(line.merch) * 100) / 100;
+    }
+    var qty = parseFloat(line.qty) || 1;
+    var cost = parseFloat(line.cost) || 0;
+    if (cost > 0) {
+      var fromCost = Math.round(cost * qty * 100) / 100;
+      var amt = parseFloat(line.amount) || 0;
+      if (amt > 0.01 && qty > 1.5 && fromCost > amt * 1.5 + 1) return Math.round(amt * 100) / 100;
+      return fromCost;
+    }
+    return Math.round((parseFloat(line.amount) || 0) * 100) / 100;
+  }
+
+  function cchPoBillLineShipInside(line) {
+    line = line || {};
+    var explicit = parseFloat(line.shipping);
+    if (isFinite(explicit) && explicit > 0.009) return Math.round(explicit * 100) / 100;
+    var gap = Math.round(((parseFloat(line.amount) || 0) - cchPoBillLineMerch(line)) * 100) / 100;
+    return gap > 0.009 ? gap : 0;
+  }
+
+  function cchPoBillChargeMapsToOneLine(row, lineIds) {
+    var ids = (row && row.poLineIds) || [];
+    if (ids.length !== 1 || !lineIds[String(ids[0])]) return false;
+    var src = cchPoVendorInvoiceSource(row.type || row.source);
+    return src === 'freight' || src === 'tax' || src === 'price_change' || src === 'qty_change';
+  }
+
+  function cchPoBillChargesOnLine(charges, lineId) {
+    return (charges || []).filter(function(r) {
+      var ids = r.poLineIds || [];
+      return ids.length === 1 && String(ids[0]) === String(lineId);
+    });
+  }
+
+  function cchPoBillNoteFromCharges(charges, line) {
+    var i;
+    for (i = 0; i < (charges || []).length; i++) {
+      var note = cchPoVarianceNoteFromBill(charges[i]);
+      if (note) return note;
+    }
+    return String((line && line.billNote) || '').trim();
+  }
+
+  function cchPoBillMoneyInput(cls, value, locked) {
+    var shown = (value != null && isFinite(value) && Math.abs(value) > 0.0001) ? String(Math.round(value * 100) / 100) : '';
+    return '<input type="number" step="0.01" class="form-input cch-bill-num ' + cls + '" value="' + escAttr(shown) + '"' +
+      (locked ? ' disabled' : '') +
+      ' oninput="cchPoUpdateBillPreview(window.__cchBillPoAtSend)" style="text-align:right;padding:6px 8px;font-size:13px;">';
+  }
+
+  /** Receive bill: one PO row. Qty, price, tax, shipping, and the item note. */
+  function cchPoInvoiceDateLabel(raw) {
+    raw = String(raw || '').trim().slice(0, 10);
+    if (!raw) return '';
+    if (typeof formatDate === 'function') {
+      var labeled = formatDate(raw);
+      if (labeled) return labeled;
+    }
+    return raw;
+  }
+
+  /** Line → invoice date and number, only when a saved shipment lists that line. */
+  function cchPoLineInvoiceStampMap(doc, poItems) {
+    doc = doc || {};
+    var bill = doc.bill || {};
+    var headerNum = String(bill.vendorInvoiceNumber || '').trim();
+    var headerDate = String(bill.vendorInvoiceDate || '').trim().slice(0, 10);
+    var map = {};
+    var groups = typeof window.cchPoVendorInvoiceGroupsUser === 'function'
+      ? window.cchPoVendorInvoiceGroupsUser(doc) : [];
+    groups.forEach(function(g) {
+      if (String(g.documentType || '').trim() === 'confirmation') return;
+      var ids = g.poLineIds || [];
+      if (!ids.length) return;
+      var num = String(g.vendorInvoiceNumber || '').trim();
+      var date = String(g.vendorInvoiceDate || '').trim().slice(0, 10);
+      if (!date && num && headerNum && num === headerNum) date = headerDate;
+      if (!date && !num) return;
+      ids.forEach(function(id) {
+        var key = String(id);
+        var prev = map[key];
+        if (!prev) { map[key] = { date: date, number: num }; return; }
+        if (date && (!prev.date || date > prev.date)) map[key] = { date: date, number: num };
+      });
+    });
+    return map;
+  }
+  window.cchPoLineInvoiceStampMap = cchPoLineInvoiceStampMap;
+
+  function cchPoLineBillParts(doc, item, lineIdx) {
+    doc = doc || {};
+    item = item || {};
+    var bill = doc.bill || {};
+    var lid = typeof window.cchPoResolveLineId === 'function'
+      ? window.cchPoResolveLineId(item, lineIdx) : String(item.lineId || item.id || '');
+    var charges = cchPoBillVendorInvoicesFromBill(bill);
+    var onLine = cchPoBillChargesOnLine(charges, lid);
+    var billLine = null;
+    (bill.poLines || []).forEach(function(l) {
+      if (l && String(l.lineId) === String(lid)) billLine = l;
+    });
+    var priceRow = null;
+    var tax = 0;
+    var ship = 0;
+    var invNum = '';
+    onLine.forEach(function(r) {
+      var src = cchPoVendorInvoiceSource(r.type || r.source);
+      if ((src === 'price_change' || src === 'qty_change') && !priceRow) priceRow = r;
+      else if (src === 'tax') tax += parseFloat(r.amount) || 0;
+      else if (src === 'freight') ship += parseFloat(r.amount) || 0;
+      if (!invNum && r.vendorInvoiceNumber) invNum = String(r.vendorInvoiceNumber).trim();
+    });
+    var stamp = cchPoLineInvoiceStampMap(doc, doc.items || [])[String(lid)];
+    if (!invNum && stamp && stamp.number) invNum = stamp.number;
+    var poMerch = cchPoBillLineMerch(item);
+    var qty = parseFloat(item.qty) || 1;
+    var billMerch = poMerch;
+    var billPrice = qty > 0 ? Math.round((poMerch / qty) * 10000) / 10000 : poMerch;
+    if (priceRow) {
+      if (priceRow.qty != null && priceRow.qty !== '' && isFinite(parseFloat(priceRow.qty))) qty = parseFloat(priceRow.qty);
+      if (isFinite(parseFloat(priceRow.invoiceLineTotal))) billMerch = parseFloat(priceRow.invoiceLineTotal);
+      if (isFinite(parseFloat(priceRow.invoiceUnitPrice))) billPrice = parseFloat(priceRow.invoiceUnitPrice);
+      else if (qty > 0) billPrice = Math.round((billMerch / qty) * 10000) / 10000;
+    }
+    var note = cchPoBillNoteFromCharges(onLine, billLine || item);
+    var groups = doc.vendorInvoiceGroups || [];
+    groups.forEach(function(g) {
+      var ids = g.poLineIds || [];
+      if (ids.indexOf(lid) < 0 && ids.indexOf(String(lid)) < 0) return;
+      var gn = String(g.notes || '').trim();
+      if (!gn || gn === note) return;
+      note = note ? (note + '\n' + gn) : gn;
+    });
+    tax = Math.round(tax * 100) / 100;
+    ship = Math.round(ship * 100) / 100;
+    billMerch = Math.round(billMerch * 100) / 100;
+    var billSum = Math.round((billMerch + tax + ship) * 100) / 100;
+    var diff = Math.round((billSum - poMerch) * 100) / 100;
+    var onBill = (bill.billedPoLineIds || []).some(function(id) { return String(id) === String(lid); });
+    if (!onBill && onLine.length) onBill = true;
+    if (!onBill && stamp) onBill = true;
+    return {
+      onBill: !!bill.received && onBill,
+      invNum: invNum,
+      date: stamp && stamp.date,
+      qty: qty,
+      billPrice: billPrice,
+      tax: tax,
+      ship: ship,
+      note: note,
+      billSum: billSum,
+      diff: diff
+    };
+  }
+
+  window.cchPoLineInvoiceHtml = function(doc, item, lineIdx, poItems) {
+    var lid = typeof window.cchPoResolveLineId === 'function'
+      ? window.cchPoResolveLineId(item, lineIdx) : String((item && (item.lineId || item.id)) || '');
+    var parts = cchPoLineBillParts(doc, item, lineIdx);
+    if (!parts.onBill) {
+      var stamp = cchPoLineInvoiceStampMap(doc, poItems || [])[String(lid)];
+      if (!stamp) return '<div style="font-size:11px;color:#9CA3AF;margin-top:4px;">Not invoiced</div>';
+    }
+    if (!parts.onBill) return '<div style="font-size:11px;color:#9CA3AF;margin-top:4px;">Not invoiced</div>';
+    var date = cchPoInvoiceDateLabel(parts.date);
+    var diffColor = Math.abs(parts.diff) > 0.009 ? '#B45309' : '#15803D';
+    var noteHtml = parts.note
+      ? '<div style="margin-top:4px;font-size:12px;color:#1B3352;white-space:pre-wrap;line-height:1.4;">' + esc(parts.note) + '</div>'
+      : '';
+    return '<div style="margin-top:6px;padding:6px 8px;background:rgba(27,51,82,0.04);border-left:2px solid #C4A464;">' +
+      '<div style="font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#5C6B80;">Bill line</div>' +
+      '<div style="font-size:12px;color:#1B3352;margin-top:2px;">' +
+        (parts.invNum ? '#' + esc(parts.invNum) : 'No invoice #') +
+        (date ? ' · ' + esc(date) : '') +
+        ' · Price ' + fmt(parts.billPrice) +
+        ' · Tax ' + fmt(parts.tax) +
+        ' · Shipping ' + fmt(parts.ship) +
+      '</div>' +
+      '<div style="font-size:12px;margin-top:2px;color:#1B3352;">Bill ' + fmt(parts.billSum) +
+        ' · <span style="color:' + diffColor + ';font-weight:700;">Difference ' + fmt(parts.diff) + '</span></div>' +
+      noteHtml +
+      '</div>';
+  };
+
+  function cchPoBillItemTableHtml(poLines, selectedIds, lockedIds, charges, stampMap, headerInv) {
+    poLines = poLines || [];
+    selectedIds = selectedIds || [];
+    lockedIds = lockedIds || [];
+    if (!poLines.length) {
+      return '<p style="font-size:12px;color:#5C6B80;margin:0 0 12px;">This purchase order has no line items.</p>';
+    }
+    var body = poLines.map(function(line) {
+      var lid = String(line.lineId);
+      var stamp = stampMap ? (stampMap[lid] || null) : null;
+      var locked = lockedIds.indexOf(line.lineId) >= 0 || lockedIds.indexOf(lid) >= 0;
+      var checked = locked || selectedIds.indexOf(line.lineId) >= 0 || selectedIds.indexOf(lid) >= 0;
+      var onLine = cchPoBillChargesOnLine(charges, lid);
+      var priceRow = null;
+      var taxAmt = 0;
+      var shipAmt = 0;
+      var taxId = '';
+      var shipId = '';
+      var taxInv = '';
+      var shipInv = '';
+      var taxDisp = '';
+      var shipDisp = '';
+      onLine.forEach(function(r) {
+        if (!cchPoChargeBelongsOnHeaderBill(r, headerInv)) return;
+        var src = cchPoVendorInvoiceSource(r.type || r.source);
+        if ((src === 'price_change' || src === 'qty_change') && !priceRow) priceRow = r;
+        else if (src === 'tax') {
+          taxAmt += parseFloat(r.amount) || 0;
+          if (!taxId) {
+            taxId = r.id || '';
+            taxInv = r.invoicedOnId || '';
+            taxDisp = r.disposition || '';
+          }
+        } else if (src === 'freight') {
+          shipAmt += parseFloat(r.amount) || 0;
+          if (!shipId) {
+            shipId = r.id || '';
+            shipInv = r.invoicedOnId || '';
+            shipDisp = r.disposition || '';
+          }
+        }
+      });
+      var poQty = parseFloat(line.qty) || 1;
+      var poMerch = cchPoBillLineMerch(line);
+      var poPrice = poQty > 0 ? Math.round((poMerch / poQty) * 10000) / 10000 : poMerch;
+      var poAmt = Math.round((parseFloat(line.amount) || (poMerch + cchPoBillLineShipInside(line))) * 100) / 100;
+      var shipInside = cchPoBillLineShipInside(line);
+      var qtyShown = poQty;
+      var priceShown = poPrice;
+      if (priceRow) {
+        if (priceRow.qty != null && priceRow.qty !== '' && isFinite(parseFloat(priceRow.qty))) qtyShown = parseFloat(priceRow.qty);
+        if (priceRow.invoiceUnitPrice != null && priceRow.invoiceUnitPrice !== '' && isFinite(parseFloat(priceRow.invoiceUnitPrice))) {
+          priceShown = parseFloat(priceRow.invoiceUnitPrice);
+        } else if (isFinite(parseFloat(priceRow.invoiceLineTotal)) && qtyShown > 0) {
+          priceShown = Math.round((parseFloat(priceRow.invoiceLineTotal) / qtyShown) * 10000) / 10000;
+        }
+      }
+      var shipShown = onLine.some(function(r) { return cchPoVendorInvoiceSource(r.type || r.source) === 'freight'; })
+        ? Math.round(shipAmt * 100) / 100
+        : shipInside;
+      var taxShown = Math.round(taxAmt * 100) / 100;
+      var note = cchPoBillNoteFromCharges(onLine, line);
+      var storedShip = onLine.some(function(r) { return cchPoVendorInvoiceSource(r.type || r.source) === 'freight'; }) ? '1' : '0';
+      var rowHtml = '<tr class="cch-bill-item-row" data-locked="' + (locked ? '1' : '0') + '"' +
+        ' data-force-line="' + (priceRow ? '1' : '0') + '"' +
+        ' data-stored-ship="' + storedShip + '"' +
+        ' data-po-qty="' + poQty + '" data-po-price="' + poPrice + '" data-po-merch="' + poMerch + '" data-po-amt="' + poAmt + '"' +
+        ' data-ship-inside="' + shipInside + '"' +
+        ' data-init-qty="' + qtyShown + '" data-init-price="' + priceShown + '" data-init-tax="' + taxShown + '" data-init-ship="' + shipShown + '"' +
+        ' data-price-id="' + escAttr(priceRow && priceRow.id || '') + '"' +
+        ' data-price-invoiced="' + escAttr(priceRow && priceRow.invoicedOnId || '') + '"' +
+        ' data-price-disp="' + escAttr(priceRow && priceRow.disposition || '') + '"' +
+        ' data-tax-id="' + escAttr(taxId) + '" data-tax-invoiced="' + escAttr(taxInv) + '" data-tax-disp="' + escAttr(taxDisp) + '"' +
+        ' data-ship-id="' + escAttr(shipId) + '" data-ship-invoiced="' + escAttr(shipInv) + '" data-ship-disp="' + escAttr(shipDisp) + '"' +
+        ' style="border-bottom:1px solid rgba(15,26,46,0.06);">' +
+        '<td style="padding:8px 6px;vertical-align:middle;">' +
+          '<input type="checkbox" class="cch-bill-po-line-cb" value="' + escAttr(lid) + '"' +
+            (checked ? ' checked' : '') + (locked ? ' disabled' : '') +
+            ' onchange="cchPoUpdateBillPreview(window.__cchBillPoAtSend)" style="accent-color:var(--gold);">' +
+        '</td>' +
+        '<td style="padding:8px 6px;font-size:13px;color:#1B3352;line-height:1.35;">' + esc(line.title || 'Item') +
+          (locked ? ' <span style="font-size:10px;color:#9CA3AF;">(already on bill)</span>' : '') + '</td>' +
+        '<td style="padding:8px 4px;">' +
+          '<input type="number" step="0.001" min="0" class="form-input cch-bill-num cch-bill-qty" value="' + escAttr(String(qtyShown)) + '"' +
+            (locked ? ' disabled' : '') +
+            ' oninput="cchPoUpdateBillPreview(window.__cchBillPoAtSend)" style="text-align:right;padding:6px 8px;font-size:13px;"></td>' +
+        '<td style="padding:8px 4px;">' + cchPoBillMoneyInput('cch-bill-price', priceShown, locked) + '</td>' +
+        '<td style="padding:8px 4px;">' + cchPoBillMoneyInput('cch-bill-tax', taxShown, locked) + '</td>' +
+        '<td style="padding:8px 4px;">' + cchPoBillMoneyInput('cch-bill-ship', shipShown, locked) + '</td>' +
+        '<td style="padding:8px 4px;">' +
+          '<input type="text" class="form-input cch-bill-note" value="' + escAttr(note) + '" placeholder="Note for this item"' +
+            (locked ? ' disabled' : '') +
+            ' style="padding:6px 8px;font-size:13px;"></td>' +
+        '<td class="cch-bill-line-total" style="padding:8px 8px;text-align:right;font-size:13px;font-weight:600;white-space:nowrap;color:#1B3352;"></td>' +
+      '</tr>';
+      return { html: rowHtml, stamp: stamp };
+    });
+    var groups = [];
+    var groupIndex = {};
+    body.forEach(function(row) {
+      var key = row.stamp ? ((row.stamp.date || '') + '|' + (row.stamp.number || '')) : '';
+      if (!Object.prototype.hasOwnProperty.call(groupIndex, key)) {
+        groupIndex[key] = groups.length;
+        groups.push({ stamp: row.stamp, rows: [] });
+      }
+      groups[groupIndex[key]].rows.push(row.html);
+    });
+    groups.sort(function(a, b) {
+      if (!a.stamp && !b.stamp) return 0;
+      if (!a.stamp) return 1;
+      if (!b.stamp) return -1;
+      var ad = a.stamp.date || '9999-99-99';
+      var bd = b.stamp.date || '9999-99-99';
+      if (ad !== bd) return ad < bd ? -1 : 1;
+      return String(a.stamp.number || '').localeCompare(String(b.stamp.number || ''));
+    });
+    var bodyHtml = groups.map(function(g) {
+      var label = 'Not invoiced';
+      if (g.stamp) {
+        var bits = [];
+        var dl = cchPoInvoiceDateLabel(g.stamp.date);
+        if (dl) bits.push(dl);
+        if (g.stamp.number) bits.push(g.stamp.number);
+        label = 'Invoiced' + (bits.length ? ' ' + bits.join(' · ') : '');
+      }
+      return '<tr><td colspan="8" style="padding:10px 8px 4px;font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#1B3352;background:rgba(27,51,82,0.04);">' + esc(label) + '</td></tr>' + g.rows.join('');
+    }).join('');
+    return '<div style="margin:0 0 14px;overflow-x:auto;border:1px solid rgba(27,51,82,0.12);">' +
+      '<table id="cchBillItemTable" style="width:100%;border-collapse:collapse;min-width:760px;">' +
+      '<thead><tr style="background:rgba(27,51,82,0.04);">' +
+        '<th style="width:36px;"></th>' +
+        '<th style="padding:8px 6px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#5C6B80;">Item</th>' +
+        '<th style="padding:8px 4px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#5C6B80;width:72px;">Qty</th>' +
+        '<th style="padding:8px 4px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#5C6B80;width:100px;">Price</th>' +
+        '<th style="padding:8px 4px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#5C6B80;width:110px;">Pre-paid tax</th>' +
+        '<th style="padding:8px 4px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#5C6B80;width:100px;">Shipping</th>' +
+        '<th style="padding:8px 4px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#5C6B80;">Note</th>' +
+        '<th style="padding:8px 8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#5C6B80;width:90px;">Total</th>' +
+      '</tr></thead><tbody>' + bodyHtml + '</tbody></table></div>';
+  }
+
+  function cchPoBillItemNotesFromDom() {
+    var map = {};
+    document.querySelectorAll('#cchBillItemTable tr.cch-bill-item-row').forEach(function(tr) {
+      var cb = tr.querySelector('.cch-bill-po-line-cb');
+      if (!cb || !cb.value) return;
+      var noteEl = tr.querySelector('.cch-bill-note');
+      map[String(cb.value)] = noteEl ? String(noteEl.value || '').trim() : '';
+    });
+    return map;
+  }
+
+  function cchPoNumAttr(el, name) {
+    var n = parseFloat(el && el.getAttribute(name));
+    return isFinite(n) ? n : 0;
+  }
+
+  function cchPoPushBillCharge(out, base) {
+    var amt = Math.round((parseFloat(base.amount) || 0) * 100) / 100;
+    if (Math.abs(amt) < 0.01 && !(base.invoiceLineTotal != null && isFinite(base.invoiceLineTotal))) return;
+    if (Math.abs(amt) < 0.01 && base.type !== 'price_change' && base.type !== 'qty_change') return;
+    base.amount = amt;
+    out.push(base);
+  }
+
+  function cchPoReadBillItemRowsFromDom() {
+    var billInv = cchPoReadBillVendorInvoiceMetaFromDom();
+    var out = [];
+    var n = 0;
+    document.querySelectorAll('#cchBillItemTable tr.cch-bill-item-row').forEach(function(tr) {
+      if (tr.getAttribute('data-locked') === '1') return;
+      var cb = tr.querySelector('.cch-bill-po-line-cb');
+      if (!cb || !cb.checked) return;
+      var id = cb.value;
+      var note = String(tr.querySelector('.cch-bill-note') && tr.querySelector('.cch-bill-note').value || '').trim();
+      var poQty = cchPoNumAttr(tr, 'data-po-qty') || 1;
+      var poPrice = cchPoNumAttr(tr, 'data-po-price');
+      var poMerch = cchPoNumAttr(tr, 'data-po-merch');
+      var shipInside = cchPoNumAttr(tr, 'data-ship-inside');
+      var qty = parseFloat(tr.querySelector('.cch-bill-qty') && tr.querySelector('.cch-bill-qty').value);
+      if (!isFinite(qty) || qty < 0) qty = poQty;
+      var price = parseFloat(tr.querySelector('.cch-bill-price') && tr.querySelector('.cch-bill-price').value);
+      if (!isFinite(price)) price = poPrice;
+      var tax = parseFloat(tr.querySelector('.cch-bill-tax') && tr.querySelector('.cch-bill-tax').value) || 0;
+      var ship = parseFloat(tr.querySelector('.cch-bill-ship') && tr.querySelector('.cch-bill-ship').value) || 0;
+      var invMerch = Math.round(qty * price * 100) / 100;
+      var priceChanged = Math.abs(price - poPrice) > 0.009 || Math.abs(qty - poQty) > 0.0001 || Math.abs(invMerch - poMerch) > 0.01;
+      var hadStoredShip = tr.getAttribute('data-stored-ship') === '1';
+      var forceLine = tr.getAttribute('data-force-line') === '1';
+      function carry(prefix) {
+        var rowId = tr.getAttribute(prefix + '-id') || ('vi_item_' + (n++));
+        var invoiced = tr.getAttribute(prefix + '-invoiced') || '';
+        var disp = tr.getAttribute(prefix + '-disp') || '';
+        return { id: rowId, invoicedOnId: invoiced || null, disposition: disp };
+      }
+      var meta = {
+        vendorInvoiceNumber: billInv.vendorInvoiceNumber,
+        vendorInvoiceDate: billInv.vendorInvoiceDate,
+        description: note,
+        clientNote: note,
+        poLineIds: [id]
+      };
+      if (priceChanged || forceLine) {
+        var kind = (Math.abs(price - poPrice) <= 0.009 && Math.abs(qty - poQty) > 0.0001) ? 'qty_change' : 'price_change';
+        var kept = carry('data-price');
+        cchPoPushBillCharge(out, Object.assign({}, meta, kept, {
+          type: kind,
+          amount: Math.round((invMerch - poMerch) * 100) / 100,
+          invoiceUnitPrice: price,
+          poUnitPrice: poPrice,
+          qty: qty,
+          poQty: poQty,
+          invoiceLineTotal: invMerch
+        }));
+        if (Math.abs(ship) > 0.009) {
+          var shipKept = carry('data-ship');
+          cchPoPushBillCharge(out, Object.assign({}, meta, shipKept, { type: 'freight', amount: ship }));
+        }
+      } else if (hadStoredShip) {
+        if (Math.abs(ship) > 0.009) {
+          var shipKept2 = carry('data-ship');
+          cchPoPushBillCharge(out, Object.assign({}, meta, shipKept2, { type: 'freight', amount: ship }));
+        }
+      } else if (Math.abs(ship - shipInside) > 0.009) {
+        var shipKept3 = carry('data-ship');
+        cchPoPushBillCharge(out, Object.assign({}, meta, shipKept3, {
+          type: 'freight',
+          amount: Math.round((ship - shipInside) * 100) / 100
+        }));
+      }
+      if (Math.abs(tax) > 0.009) {
+        var taxKept = carry('data-tax');
+        cchPoPushBillCharge(out, Object.assign({}, meta, taxKept, { type: 'tax', amount: tax }));
+      }
+    });
+    cchPoReadBillExtraChargesFromDom().forEach(function(r) { out.push(r); });
+    return out;
+  }
+
   function cchPoReadVendorInvoiceRowsFromDom() {
+    if (document.getElementById('cchBillItemTable')) return cchPoReadBillItemRowsFromDom();
     var list = document.getElementById('cchVendorInvoicesList');
     if (!list) return [];
     var billInv = cchPoReadBillVendorInvoiceMetaFromDom();
@@ -3443,6 +4063,8 @@
         sku: it.sku || '',
         qty: parseFloat(it.qty) || 1,
         cost: parseFloat(it.cost) || 0,
+        shipping: parseFloat(it.shipping) || 0,
+        merch: Math.round((window.cchPoLineMerchandiseAmount ? window.cchPoLineMerchandiseAmount(it) : 0) * 100) / 100,
         amount: Math.round(cchPoLineItemAmount(it) * 100) / 100
       });
     });
@@ -3639,7 +4261,6 @@
       : [];
     var receivedStr = bill.receivedAt && typeof window.formatDate === 'function'
       ? window.formatDate(bill.receivedAt) : (bill.receivedAt ? String(bill.receivedAt).slice(0, 10) : '');
-    var billTotal = window.cchPoVendorBillTotal(docData);
     var paid = window.cchPoPaidTotal(docData);
     var due = window.cchPoAmountDue(docData);
     var blRef = typeof window.cchPoQbBillDocNumberFromPo === 'function' ? window.cchPoQbBillDocNumberFromPo(docData) : '';
@@ -3648,10 +4269,9 @@
     if (displayInvoices.length) {
       summaryLine.push('<span style="font-size:12px;color:#5C6B80;">' + displayInvoices.length + ' invoice' + (displayInvoices.length !== 1 ? 's' : '') + ' in table below</span>');
     }
-    summaryLine.push('<span style="font-family:var(--font-mono);">' + fmt(billTotal) + '</span>');
     if (paid > 0.01) summaryLine.push('<span style="color:#2E7D32;">' + fmt(paid) + ' paid</span>');
-    summaryLine.push('<span style="font-weight:700;color:' + (due > 0.01 ? '#B45309' : '#15803D') + ';">' + fmt(due) + ' due</span>');
-    if (due <= 0.01) summaryLine.push('<span style="color:#15803D;font-weight:600;">Paid</span>');
+    if (due > 0.01) summaryLine.push('<span style="font-weight:700;color:#B45309;">' + fmt(due) + ' due</span>');
+    else summaryLine.push('<span style="color:#15803D;font-weight:600;">Paid</span>');
 
     var metaLine = 'PO ' + esc(poNumStr) + (vendor ? ' · Mfg ' + esc(vendor) : '');
     var billPayee = typeof window.cchPoBillPayeeVendorName === 'function' ? window.cchPoBillPayeeVendorName(docData) : vendor;
@@ -3740,10 +4360,15 @@
         };
       });
     }
-    var useStoredBill = !!(invNum && bill && bill.received && bill.billTotal != null &&
-      cchPoNormVendorInvNum(invNum) === cchPoNormVendorInvNum(bill.vendorInvoiceNumber || ''));
+    var useStoredBill = cchPoSavedBillCoversInvoice(bill, invNum);
     if (useStoredBill) {
-      billedLines = billedLines.filter(function(it) { return cchPoLineHasInvoiceTotal(it, rawCharges); });
+      billedIds = cchPoBillBilledLineIds(bill, allPoLines);
+      billedLines = billedIds.length
+        ? allPoLines.filter(function(it) { return billedIds.indexOf(it.lineId) >= 0; })
+        : allPoLines;
+      billTotal = Math.round((parseFloat(bill.billTotal) || 0) * 100) / 100;
+      paid = Math.round((paid + cchPoUnallocatedPaymentTotal(payments)) * 100) / 100;
+      due = Math.max(0, Math.round((billTotal - paid) * 100) / 100);
     }
     var html = '<table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:8px;">';
     if (invNum) {
@@ -3806,12 +4431,35 @@
     { id: 'Confirmed', label: 'Confirmed' }
   ];
 
+  function cchPoIsHouzzSource(doc) {
+    doc = doc || {};
+    if (doc.houzzImport === true) return true;
+    var src = String(doc.source || doc.dataSource || doc.origin || '').trim().toLowerCase();
+    if (src.indexOf('houzz') >= 0) return true;
+    if (doc.houzzBalance != null && doc.houzzBalance !== '') return true;
+    if (String(doc._qbIdSource || '').toLowerCase() === 'houzz-import') return true;
+    var n = String(doc.number || doc.num || doc.poNum || doc.poNumber || '').trim();
+    if (/^(?:po[-\s]?)?400\d+$/i.test(n)) return true;
+    var pays = doc.payments || [];
+    for (var i = 0; i < pays.length; i++) {
+      if (String((pays[i] || {}).method || '').toLowerCase().indexOf('houzz') >= 0) return true;
+    }
+    return false;
+  }
+
+  function cchPoHouzzIsClosed(doc) {
+    var st = String((doc && doc.status) || '').trim().toLowerCase();
+    return st === 'closed' || st === 'paid' || st === 'installed' || st === 'received' || st === 'delivered' || st === 'cancelled';
+  }
+
   /** Canonical procurement lane: draft | waiting | confirmed */
   window.cchPoProcurementLaneId = function(doc) {
     doc = doc || {};
     var proc = String(doc.procurementStatus || '').trim();
     if (proc === 'Confirmed') return 'confirmed';
     if (typeof window.cchPoOrderConfNumber === 'function' && window.cchPoOrderConfNumber(doc)) return 'confirmed';
+    if (typeof window.cchPoBillIsPaidInFull === 'function' && window.cchPoBillIsPaidInFull(doc)) return 'confirmed';
+    if (cchPoIsHouzzSource(doc) && cchPoHouzzIsClosed(doc)) return 'confirmed';
     if (proc === 'Waiting for Confirmation' || proc === 'Sent to Vendor') return 'waiting';
     if (doc.poSentAt || doc.poLocked || String(doc.poStatus || '').trim().toLowerCase() === 'sent') return 'waiting';
     return 'draft';
@@ -4577,8 +5225,9 @@
       }
       return parts;
     }
-    var parts = shipGroups.length ? cchPoShipLaneEtaParts(shipGroups[0]) : [];
-    if (!parts.length && confGroups.length) parts = cchPoShipLaneEtaParts(confGroups[0]);
+    var laneG = shipGroups.length ? shipGroups[0] : (confGroups.length ? confGroups[0] : null);
+    var laneView = laneG ? Object.assign({}, laneG, cchPoInvoiceRowShipDisplay(docData, laneG, poItems).view) : null;
+    var parts = laneView ? cchPoShipLaneEtaParts(laneView) : [];
     if (!parts.length && docData.eta) {
       parts.push('ETA ' + esc(typeof window.cchPoFormatEtaDate === 'function'
         ? window.cchPoFormatEtaDate(docData.eta) : String(docData.eta).slice(0, 10)));
@@ -4702,6 +5351,13 @@
     }).join('');
   }
 
+  function cchPoOrderStatusForShipDate(status, actualShipDate) {
+    if (!String(actualShipDate || '').trim()) return String(status || '').trim();
+    var s = String(status || '').trim();
+    if (!s || s === 'Confirmed' || s === 'Pending' || s === 'Est. ship scheduled' || s === 'Ordered') return 'Shipped';
+    return s;
+  }
+
   function cchPoVendorInvOrderStatusOptionsHtml(current) {
     current = String(current || '').trim();
     var html = '<option value="">— Not set —</option>';
@@ -4755,6 +5411,7 @@
         title: String(it.title || it.name || 'Item').trim(),
         qty: parseFloat(it.qty) || 1,
         cost: parseFloat(it.cost) || 0,
+        unit: String(it.unit || it.units || it.uom || it.unitOfMeasure || '').trim(),
         amount: Math.round(cchPoLineItemAmount(it) * 100) / 100
       });
     });
@@ -4935,6 +5592,18 @@
 
   function cchPoPoLineIdsForBillInvoice(doc, poItems, invNum, userGroups) {
     var bill = doc.bill || {};
+    var charges = cchPoBillVendorInvoicesFromBill(bill).filter(function(r) {
+      return cchPoNormVendorInvNum(r.vendorInvoiceNumber) === cchPoNormVendorInvNum(invNum);
+    });
+    var fromCharges = [];
+    charges.forEach(function(r) {
+      (r.poLineIds || []).forEach(function(id) {
+        var key = String(id);
+        if (fromCharges.indexOf(key) < 0) fromCharges.push(key);
+      });
+    });
+    if (fromCharges.length) return fromCharges;
+    if (charges.length) return [];
     var allLines = cchPoPoLineMetaList(poItems || doc.items || []);
     var billedIds = cchPoBillBilledLineIds(bill, allLines);
     userGroups = userGroups || window.cchPoVendorInvoiceGroupsUser(doc);
@@ -5188,9 +5857,7 @@
       '<tr style="border-top:1px solid rgba(15,26,46,0.08);"><td style="padding:6px 0;font-weight:600;">Merchandise on this invoice</td><td style="text-align:right;font-weight:600;">' + fmt(thisMerch) + '</td></tr>' +
       invHdr + chargeDetail +
       (Math.abs(thisCharges) > 0.01 ? '<tr><td style="padding:4px 0;color:#5C6B80;">Charges on this invoice</td><td style="text-align:right;font-weight:600;color:#B45309;">' + cchPoFormatBillLineAmount(thisCharges) + '</td></tr>' : '') +
-      '<tr style="border-top:1px solid rgba(15,26,46,0.1);"><td style="padding:6px 0;font-weight:600;">This invoice subtotal</td><td style="text-align:right;font-weight:700;">' + fmt(thisInvTotal) + '</td></tr>' +
-      (bill.received ? '<tr style="border-top:1px solid rgba(15,26,46,0.12);"><td style="padding:8px 0;font-weight:700;">= Combined vendor bill total</td><td style="text-align:right;font-weight:700;">' + fmt(billTotal) + '</td></tr>' : '') +
-      '<tr><td style="padding:4px 0;font-size:11px;color:#5C6B80;">Variance vs PO at send (' + fmt(poAtSend) + ')</td><td style="text-align:right;font-size:11px;font-weight:600;color:' + (Math.abs(variance) > 0.01 ? '#B45309' : '#15803D') + ';">' + fmt(variance) + '</td></tr>' +
+      '<tr style="border-top:1px solid rgba(15,26,46,0.12);"><td style="padding:8px 0;font-weight:700;">This invoice total</td><td style="text-align:right;font-weight:700;">' + fmt(thisInvTotal) + '</td></tr>' +
       '</table>';
   };
 
@@ -5366,11 +6033,44 @@
     return Object.keys(byKey).map(function(k) { return byKey[k]; });
   }
 
+  /** PO total stays. Ship-invoice totals add up. Lines on no ship invoice are not billed yet. */
+  window.cchPoShipInvoiceMoney = function(doc) {
+    doc = doc || {};
+    var lines = cchPoPoLineMetaList(doc.items || []);
+    var groups = (typeof window.cchPoVendorInvoiceGroupsUser === 'function'
+      ? window.cchPoVendorInvoiceGroupsUser(doc) : []).filter(function(g) {
+      return String(g.documentType || '').trim() !== 'confirmation';
+    });
+    var billedIds = {};
+    var bills = 0;
+    groups.forEach(function(g) {
+      (g.poLineIds || []).forEach(function(id) { billedIds[String(id)] = true; });
+      bills += cchPoVendorInvoiceGroupTotal(doc.bill || {}, g.vendorInvoiceNumber, g.poLineIds || [], lines);
+    });
+    var unbilled = 0;
+    lines.forEach(function(l) {
+      if (!billedIds[String(l.lineId)]) unbilled += parseFloat(l.amount) || 0;
+    });
+    var poTotal = typeof window.cchPoDocTotal === 'function' ? window.cchPoDocTotal(doc) : 0;
+    return {
+      poTotal: Math.round(poTotal * 100) / 100,
+      bills: Math.round(bills * 100) / 100,
+      unbilled: Math.round(unbilled * 100) / 100
+    };
+  };
+
+  function cchPoSavedBillCoversInvoice(bill, invNum) {
+    bill = bill || {};
+    if (!(bill.received || bill.qbBillId) || bill.billTotal == null) return false;
+    var header = String(bill.vendorInvoiceNumber || '').trim();
+    invNum = String(invNum || '').trim();
+    if (!header || !invNum) return false;
+    return cchPoNormVendorInvNum(header) === cchPoNormVendorInvNum(invNum);
+  }
+
   function cchPoVendorInvoiceGroupTotal(bill, invNum, poLineIds, poLines) {
     bill = bill || {};
-    var billInv = String(bill.vendorInvoiceNumber || '').trim();
-    if (bill.received && bill.billTotal != null && billInv &&
-        cchPoNormVendorInvNum(invNum) === cchPoNormVendorInvNum(billInv)) {
+    if (cchPoSavedBillCoversInvoice(bill, invNum)) {
       return Math.round((parseFloat(bill.billTotal) || 0) * 100) / 100;
     }
     poLineIds = poLineIds || [];
@@ -5452,6 +6152,9 @@
   function cchPoVendorInvoiceBalanceDue(bill, invNum, poLineIds, poLines, payments, excludeIdx, groups) {
     var total = cchPoVendorInvoiceGroupTotal(bill, invNum, poLineIds, poLines);
     var paid = cchPoVendorInvoicePaidAmount(payments, invNum, excludeIdx);
+    if (cchPoSavedBillCoversInvoice(bill, invNum)) {
+      paid = Math.round((paid + cchPoUnallocatedPaymentTotal(payments)) * 100) / 100;
+    }
     var credit = cchPoConfirmationPaymentCredit(invNum, poLineIds, payments, groups, excludeIdx);
     return Math.max(0, Math.round((total - paid - credit) * 100) / 100);
   }
@@ -5803,7 +6506,7 @@
     var actions = '';
     if (lane === 'draft') {
       actions = '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:12px;">' +
-        '<button type="button" class="btn btn-primary btn-sm" style="background:#0277BD;" onclick="cchPoOpenMarkConfirmedModal(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\')">Confirm order</button>' +
+        '<button type="button" class="btn btn-primary btn-sm" style="background:#0277BD;" onclick="cchPoOpenMarkConfirmedModal(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\')">Mark as confirmed</button>' +
         '<button type="button" class="btn btn-secondary btn-sm" onclick="cchPoSendToVendor(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\')">Send PO</button>' +
         '<span style="font-size:11px;color:#5C6B80;line-height:1.45;max-width:560px;">Online / checkout orders: use <strong>Confirm order</strong> with SO# + per-line ETA (no email required). Formal vendor PDF/email: use <strong>Send PO</strong>, then confirm when their ack arrives.</span>' +
         '</div>';
@@ -5825,7 +6528,9 @@
         ? atts.map(function(a) {
             return '<a href="' + escAttr(a.url || '#') + '" target="_blank" rel="noopener" style="font-size:12px;color:#00796B;font-weight:600;margin-right:10px;">📎 ' + esc(a.name || 'Confirmation') + '</a>';
           }).join('')
-        : '<span style="font-size:11px;color:#B45309;font-weight:600;">No confirmation file attached</span>';
+        : (cchPoIsHouzzSource(docData) && cchPoHouzzIsClosed(docData)
+          ? ''
+          : '<span style="font-size:11px;color:#B45309;font-weight:600;">No confirmation file attached</span>');
       actions = '<div style="margin-top:12px;padding:10px 12px;background:rgba(2,119,189,0.06);border:1px solid rgba(2,119,189,0.18);border-radius:4px;">' +
         '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;">' +
           '<span style="font-size:12px;color:#1B3352;"><strong>Order conf #</strong> ' + (confNum ? esc(confNum) : '—') + '</span>' +
@@ -5899,6 +6604,11 @@
     var html = '<div id="cchMarkConfirmedModal" style="position:fixed;inset:0;background:rgba(15,26,46,0.45);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)this.remove()">' +
       '<div style="background:#fff;max-width:' + (_confLineRows ? '560' : '480') + 'px;width:100%;max-height:88vh;overflow:auto;padding:24px;border-radius:4px;box-shadow:0 16px 48px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">' +
       '<h3 style="margin:0 0 8px;font-size:18px;">' + esc(title) + '</h3>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin:0 0 14px;">' +
+        '<button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById(\'cchMarkConfirmedModal\').remove()">Cancel</button>' +
+        '<button type="button" class="btn btn-secondary btn-sm" onclick="cchPoSubmitMarkConfirmed(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\',false)">Save &amp; mark confirmed</button>' +
+        '<button type="button" class="btn btn-primary btn-sm" style="background:#0277BD;" onclick="cchPoSubmitMarkConfirmed(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\',true)">Confirm &amp; invoiced</button>' +
+      '</div>' +
       '<p style="font-size:12px;color:#5C6B80;margin:0 0 16px;line-height:1.5;">' + blurb + '</p>' +
       _confAmtHtml +
       '<div style="margin-bottom:12px;"><label class="form-label">Order conf # <span style="color:#B45309;">*</span></label>' +
@@ -5908,11 +6618,7 @@
       _confLineRows +
       '<div style="margin-bottom:16px;"><label class="form-label">Attach confirmation (PDF or image)</label>' +
         '<input type="file" id="cchMarkConfFile" class="form-input" accept=".pdf,image/*" style="font-size:12px;padding:6px;"></div>' +
-      '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">' +
-        '<button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById(\'cchMarkConfirmedModal\').remove()">Cancel</button>' +
-        '<button type="button" class="btn btn-secondary btn-sm" onclick="cchPoSubmitMarkConfirmed(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\',false)">Save &amp; mark confirmed</button>' +
-        '<button type="button" class="btn btn-primary btn-sm" style="background:#0277BD;" onclick="cchPoSubmitMarkConfirmed(\'' + escJs(projectId) + '\',\'' + escJs(poId) + '\',true)">Confirm &amp; create bill</button>' +
-      '</div></div></div>';
+      '</div></div>';
     document.body.insertAdjacentHTML('beforeend', html);
   };
 
@@ -5926,6 +6632,14 @@
       return;
     }
     var confirmedDate = String(dateEl && dateEl.value || '').trim();
+    if (openBill && !confirmedDate) {
+      var _invNow = new Date();
+      var _invM = String(_invNow.getMonth() + 1);
+      var _invD = String(_invNow.getDate());
+      if (_invM.length < 2) _invM = '0' + _invM;
+      if (_invD.length < 2) _invD = '0' + _invD;
+      confirmedDate = _invNow.getFullYear() + '-' + _invM + '-' + _invD;
+    }
     var file = fileEl && fileEl.files && fileEl.files[0];
     if (file && file.size > 15 * 1024 * 1024) {
       if (typeof window.cchAlert === 'function') await window.cchAlert('File must be under 15MB.', 'Attachment');
@@ -5978,6 +6692,7 @@
       confGroup.orderConfNumber = confNum;
       confGroup.vendorInvoiceNumber = confNum;
       confGroup.confirmedDate = confirmedDate;
+      if (openBill && confirmedDate) confGroup.vendorInvoiceDate = String(confirmedDate).slice(0, 10);
       if (lastAtt) {
         confGroup.attachmentName = lastAtt.name;
         confGroup.attachmentUrl = lastAtt.url;
@@ -6101,6 +6816,44 @@
     }
   };
 
+  /** Invoice row ship/delivery. Group fields win. Blank cells use the lines on that invoice, then the PO ship status. */
+  function cchPoInvoiceRowShipDisplay(doc, g, poItems) {
+    g = g || {};
+    var isConf = String(g.documentType || '').trim() === 'confirmation';
+    var status = cchPoOrderStatusForShipDate(g.status, g.actualShipDate);
+    var view = {
+      confirmedDate: String(g.confirmedDate || '').trim(),
+      estimatedShipDate: String(g.estimatedShipDate || '').trim(),
+      actualShipDate: String(g.actualShipDate || '').trim(),
+      etaDate: String(g.etaDate || '').trim(),
+      receivedDate: String(g.receivedDate || '').trim(),
+      trackingNumber: String(g.trackingNumber || '').trim(),
+      trackingCarrier: String(g.trackingCarrier || '').trim()
+    };
+    var ids = {};
+    (g.poLineIds || []).forEach(function(id) { ids[String(id)] = true; });
+    var hasIds = false;
+    Object.keys(ids).forEach(function() { hasIds = true; });
+    (poItems || []).forEach(function(it, i) {
+      if (!it) return;
+      if (typeof window.isProposalGroupHeaderItem === 'function' && window.isProposalGroupHeaderItem(it)) return;
+      var lid = window.cchPoResolveLineId(it, i);
+      if (!hasIds || !ids[String(lid)]) return;
+      if (!isConf && !status) status = String(it.lineShipStatus || '').trim();
+      if (!view.etaDate) view.etaDate = String(it.etaDate || '').trim();
+      if (!view.actualShipDate) view.actualShipDate = String(it.actualShipDate || '').trim();
+      if (!view.estimatedShipDate) view.estimatedShipDate = String(it.estimatedShipDate || '').trim();
+      if (!view.receivedDate) view.receivedDate = String(it.receivedDate || '').trim();
+      if (!view.confirmedDate) view.confirmedDate = String(it.confirmedDate || '').trim();
+    });
+    if (!isConf && !status && typeof window.cchPoShippingStatus === 'function') {
+      var poShip = String(window.cchPoShippingStatus(doc, poItems) || '').trim();
+      if (poShip && poShip !== 'Pending') status = poShip;
+    }
+    status = cchPoOrderStatusForShipDate(status, view.actualShipDate);
+    return { status: status, view: view };
+  }
+
   window.cchPoVendorInvoiceGroupsPanelHtml = function(projectId, poId, docData, poItems) {
     docData = docData || {};
     poItems = poItems || docData.items || [];
@@ -6117,7 +6870,8 @@
       var track = g.trackingNumber
         ? esc(g.trackingCarrier ? g.trackingCarrier + ' ' : '') + esc(g.trackingNumber)
         : '<span style="color:#9CA3AF;">—</span>';
-      var eta = window.cchPoVendorInvOrderTimelineHtml(g);
+      var shipView = cchPoInvoiceRowShipDisplay(docData, g, poItems);
+      var eta = window.cchPoVendorInvOrderTimelineHtml(shipView.view);
       var noteCell = g.notes
         ? '<span title="' + escAttr(g.notes) + '">' + esc(g.notes.length > 48 ? g.notes.slice(0, 46) + '…' : g.notes) + '</span>'
         : '<span style="color:#9CA3AF;">—</span>';
@@ -6165,7 +6919,7 @@
         '<td style="padding:10px 8px;font-size:11px;color:#5C6B80;max-width:180px;">' + esc(itemsLabel) + '</td>' +
         '<td style="padding:10px 8px;text-align:right;font-size:12px;">' + chargesCell + '</td>' +
         '<td style="padding:10px 8px;text-align:center;font-size:12px;white-space:nowrap;">' + payStatusCell + '</td>' +
-        '<td style="padding:10px 8px;">' + window.cchPoVendorInvoiceGroupStatusBadgeHtml(g.status) + '</td>' +
+        '<td style="padding:10px 8px;">' + window.cchPoVendorInvoiceGroupStatusBadgeHtml(shipView.status) + '</td>' +
         '<td style="padding:10px 8px;font-size:11px;">' + eta + '</td>' +
         '<td style="padding:10px 8px;font-size:11px;font-family:var(--font-mono);">' + track + '</td>' +
         '<td style="padding:10px 8px;font-size:11px;color:#5C6B80;max-width:140px;">' + noteCell + '</td>' +
@@ -6239,7 +6993,7 @@
         '<button type="button" class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="cchPoAddVigChargeRow()">+ Add charge line</button>' +
       '</div>'
     );
-    var statusOpts = cchPoVendorInvOrderStatusOptionsHtml(existing ? existing.status : '');
+    var statusOpts = cchPoVendorInvOrderStatusOptionsHtml(existing ? cchPoOrderStatusForShipDate(existing.status, existing.actualShipDate) : '');
     var docTypeOpts = cchPoVendorInvDocumentTypeOptionsHtml(existing ? existing.documentType : 'ship_invoice');
     var poAtSend = doc.poTotalAtSend != null ? doc.poTotalAtSend : (doc.bill && doc.bill.poTotalAtSend != null ? doc.bill.poTotalAtSend : window.cchPoDocTotal(doc));
     var canQbVig = !!(doc.bill && doc.bill.received) && cchPoCanPushBillToQb() && !isConfirmationDoc;
@@ -6280,7 +7034,7 @@
         '<div style="grid-column:1/-1;"><label class="form-label">Order status</label><select id="cchVigStatus" class="form-input">' + statusOpts + '</select></div>' +
         '<div><label class="form-label">Confirmed date</label><input type="date" id="cchVigConfirmedDate" class="form-input" value="' + escAttr(existing ? existing.confirmedDate : '') + '"></div>' +
         '<div><label class="form-label">Est. ship date</label><input type="date" id="cchVigEstShipDate" class="form-input" value="' + escAttr(existing ? existing.estimatedShipDate : '') + '" title="Vendor promised ship — before CC charge"></div>' +
-        '<div><label class="form-label">Actual ship date</label><input type="date" id="cchVigActualShipDate" class="form-input" value="' + escAttr(existing ? existing.actualShipDate : '') + '" title="Left vendor / CC charged"></div>' +
+        '<div><label class="form-label">Actual ship date</label><input type="date" id="cchVigActualShipDate" class="form-input" value="' + escAttr(existing ? existing.actualShipDate : '') + '" title="Left vendor / CC charged" onchange="cchPoVigActualShipDateChanged()"></div>' +
         '<div><label class="form-label">Delivery ETA</label><input type="date" id="cchVigEtaDate" class="form-input" value="' + escAttr(existing ? existing.etaDate : '') + '" title="Expected delivery to client/receiver"></div>' +
         '<div><label class="form-label">Received date</label><input type="date" id="cchVigReceivedDate" class="form-input" value="' + escAttr(existing ? String(existing.receivedDate || '').slice(0, 10) : '') + '" title="When these items arrived. Does not close the whole PO."></div>' +
         '<div><label class="form-label">Carrier <span style="font-weight:400;color:#9CA3AF;">(optional)</span></label><input type="text" id="cchVigCarrier" class="form-input" value="' + escAttr(existing ? existing.trackingCarrier : '') + '" placeholder="USPS, FedEx…"></div>' +
@@ -6312,10 +7066,21 @@
     window.cchPoUpdateVigBillPreview();
   };
 
+  window.cchPoVigActualShipDateChanged = function() {
+    var dateEl = document.getElementById('cchVigActualShipDate');
+    var statusEl = document.getElementById('cchVigStatus');
+    if (!dateEl || !statusEl) return;
+    var next = cchPoOrderStatusForShipDate(statusEl.value, dateEl.value);
+    if (next && next !== String(statusEl.value || '').trim()) statusEl.value = next;
+  };
+
   window.cchPoSaveVendorInvoiceGroup = async function(projectId, poId, pushQb) {
     var invNum = String(document.getElementById('cchVigInvNum') && document.getElementById('cchVigInvNum').value || '').trim();
     var invDate = String(document.getElementById('cchVigInvDate') && document.getElementById('cchVigInvDate').value || '').trim();
-    var status = String(document.getElementById('cchVigStatus') && document.getElementById('cchVigStatus').value || '').trim();
+    var status = cchPoOrderStatusForShipDate(
+      String(document.getElementById('cchVigStatus') && document.getElementById('cchVigStatus').value || '').trim(),
+      String(document.getElementById('cchVigActualShipDate') && document.getElementById('cchVigActualShipDate').value || '').trim()
+    );
     var carrier = String(document.getElementById('cchVigCarrier') && document.getElementById('cchVigCarrier').value || '').trim();
     var tracking = String(document.getElementById('cchVigTracking') && document.getElementById('cchVigTracking').value || '').trim();
     tracking = tracking.replace(/^tracking:\s*/i, '').trim();
@@ -6415,15 +7180,12 @@
       var chargeRows = cchPoReadVigChargeRowsFromDom();
       var merged = cchPoMergeVigChargesIntoBill(doc.bill, doc, oldInvNum, invNum, invDate, poLineIds, chargeRows);
       patch.bill = merged.bill;
+      var prevVar = doc.variance || {};
+      patch.variance = Object.assign({}, prevVar, {
+        amount: Math.round((parseFloat(merged.varianceAmt) || 0) * 100) / 100
+      });
       if (oldInvNum && String(doc.bill.vendorInvoiceNumber || '').trim() === oldInvNum && invNum !== oldInvNum) {
         patch.bill.vendorInvoiceNumber = invNum;
-      }
-      if (Math.abs(merged.varianceAmt) > 0.01) {
-        var prevVar = doc.variance || {};
-        patch.variance = Object.assign({}, prevVar, {
-          amount: Math.round(merged.varianceAmt * 100) / 100,
-          reason: prevVar.reason || cchPoPickVarianceReason(merged.bill.items || [], merged.varianceAmt)
-        });
       }
     }
     try {
@@ -6487,11 +7249,33 @@
         '<span style="font-family:var(--font-mono);font-weight:600;color:#1B3352;' + (strongStyle || '') + '">' + fmt(amt) + '</span></div>';
     }
 
-    var inner = footRow('Merchandise', merchandiseSubtotal);
+    var inner = '';
     var shipShow = hasBill
       ? freight
       : (typeof window.cchPoShippingTotal === 'function' ? window.cchPoShippingTotal(docData) : 0);
-    inner += footRow('Shipping', shipShow);
+    if (hasBill && billTotal != null) {
+      var footCharges = cchPoBillVendorInvoicesFromBill(docData.bill || {}).filter(function(r) {
+        if (cchPoVendorInvoiceSource(r.type) === 'merchandise') return false;
+        if (Math.abs(parseFloat(r.amount) || 0) < 0.01) return false;
+        if (cchPoChargeCountedAsInvoiceLine(r) || cchPoChargeIsFoldedIntoLine(r)) return false;
+        return true;
+      });
+      var footChargeSum = 0;
+      footCharges.forEach(function(r) { footChargeSum += parseFloat(r.amount) || 0; });
+      footChargeSum = Math.round(footChargeSum * 100) / 100;
+      var billedMerch = Math.round((billTotal - footChargeSum) * 100) / 100;
+      inner += footRow('Merchandise', billedMerch);
+      footCharges.forEach(function(r) {
+        var lbl = String(r.description || cchPoVendorInvoiceTypeLabel(r.type) || 'Charge').trim();
+        inner += footRow(lbl, parseFloat(r.amount) || 0);
+      });
+      inner += '<div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;padding-top:8px;margin-top:4px;border-top:2px solid #1B3352;color:#1B3352;">' +
+        '<span>Vendor bill</span>' +
+        '<span style="font-family:var(--font-mono);">' + fmt(billTotal) + '</span></div>';
+    } else {
+      inner += footRow('Merchandise', merchandiseSubtotal);
+      inner += footRow('Shipping', shipShow);
+    }
     if (variance != null && Math.abs(variance) >= 0.01) {
       var vCol = variance > 0 ? '#B45309' : '#15803D';
       var vAmt = (variance > 0 ? '+' : '−') + fmt(Math.abs(variance));
@@ -6501,17 +7285,15 @@
     }
     var prepaid = hasBill && typeof window.cchPoPrepaidTaxTotal === 'function'
       ? window.cchPoPrepaidTaxTotal(docData) : 0;
-    if (Math.abs(prepaid) > 0.01) inner += footRow('Pre-paid tax', prepaid);
-    var payable = hasBill && typeof window.cchPoPayableBillTotal === 'function'
-      ? window.cchPoPayableBillTotal(docData) : null;
-    var grand = payable != null
-      ? payable
-      : (billTotal != null
+    if (!(hasBill && billTotal != null) && Math.abs(prepaid) > 0.01) inner += footRow('Pre-paid tax', prepaid);
+    if (!hasBill) {
+      var grand = billTotal != null
         ? billTotal
-        : Math.round((merchandiseSubtotal + shipShow) * 100) / 100);
-    inner += '<div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;padding-top:8px;margin-top:4px;border-top:2px solid #1B3352;color:#1B3352;">' +
-      '<span>' + (hasBill ? 'Bill total' : 'PO total') + '</span>' +
-      '<span id="cchPoViewBillTotal" style="font-family:var(--font-mono);">' + fmt(grand) + '</span></div>';
+        : Math.round((merchandiseSubtotal + shipShow) * 100) / 100;
+      inner += '<div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;padding-top:8px;margin-top:4px;border-top:2px solid #1B3352;color:#1B3352;">' +
+        '<span>PO total</span>' +
+        '<span id="cchPoViewBillTotal" style="font-family:var(--font-mono);">' + fmt(grand) + '</span></div>';
+    }
 
     return '<div style="display:flex;justify-content:flex-end;margin-top:12px;padding-top:10px;border-top:1px solid rgba(27,51,82,0.1);">' +
       '<div style="min-width:240px;">' + inner + '</div></div>';
@@ -6535,12 +7317,14 @@
       : '';
 
     var varCard = '';
-    if (variance && Math.abs(parseFloat(variance.amount) || 0) > 0.01) {
+    var liveVar = typeof window.cchPoListVarianceForRow === 'function' ? window.cchPoListVarianceForRow(docData) : null;
+    var cardAmt = liveVar != null ? liveVar : (parseFloat(variance && variance.amount) || 0);
+    if (variance && Math.abs(cardAmt) > 0.01) {
       var pending = String(variance.resolution || 'pending') === 'pending';
       varCard = '<div class="card" style="padding:14px 16px;margin-bottom:14px;border-left:3px solid ' + (pending ? '#CA8A04' : '#2E7D32') + ';background:' + (pending ? 'rgba(202,138,4,0.08)' : 'rgba(46,125,50,0.06)') + ';">' +
         '<div style="font-size:13px;font-weight:700;color:#92400E;margin-bottom:6px;">' +
         (pending ? '⚠ Variance needs classification' : 'Variance resolved') + '</div>' +
-        '<div style="font-size:12px;margin-bottom:10px;">' + fmt(variance.amount) + ' vs PO at send (' + esc(variance.reason || '—') + ')</div>';
+        '<div style="font-size:16px;font-weight:700;color:#1B3352;margin-bottom:10px;">' + esc(cchPoVarianceReasonLabel(variance.reason)) + ' · ' + fmt(cardAmt) + '</div>';
       if (pending) {
         varCard += window.cchPoVarianceResolveFormHtml(projectId, poId, docData);
         varCard += '<div style="margin-top:10px;font-size:11px;"><a href="#" onclick="event.preventDefault();navigate(\'#/project/' + escJs(projectId) + '/discrepancies\');return false;" style="color:var(--cyan);font-weight:600;">Open Bill variances for this project →</a> · ' +
@@ -6675,9 +7459,19 @@
     var confNum = typeof window.cchPoOrderConfNumber === 'function' ? window.cchPoOrderConfNumber(d, d.items || []) : '';
     window.__cchBillOrderConf = confNum;
     billInvMeta.orderConfNumber = confNum;
-    if (!String(billInvMeta.vendorInvoiceNumber || '').trim() && confNum) {
+    window.__cchBillRecordedBills = isAdd ? cchPoRecordedVendorBills(d) : [];
+    window.__cchBillStoredPayable = (b.received && b.billTotal != null && b.billTotal !== '') ? (parseFloat(b.billTotal) || 0) : null;
+    if (!isAdd && !String(billInvMeta.vendorInvoiceNumber || '').trim() && confNum) {
       billInvMeta.vendorInvoiceNumber = confNum;
       billInvMeta.useConfAsInvoice = true;
+    }
+    if (!isAdd && !String(billInvMeta.vendorInvoiceDate || '').trim() && Array.isArray(d.vendorInvoiceGroups)) {
+      for (var _cgi = 0; _cgi < d.vendorInvoiceGroups.length; _cgi++) {
+        var _cg = d.vendorInvoiceGroups[_cgi] || {};
+        if (String(_cg.documentType || '').trim() !== 'confirmation') continue;
+        var _cgDate = String(_cg.vendorInvoiceDate || '').trim().slice(0, 10);
+        if (_cgDate) { billInvMeta.vendorInvoiceDate = _cgDate; break; }
+      }
     }
     if (!isAdd && !_hasBillShipmentMeta(billInvMeta)) {
       var _singleGrp = window.cchPoVendorInvoiceGroups(d, d.items || []);
@@ -6692,23 +7486,51 @@
     var title = isAdd ? 'Add vendor invoice' : (isEdit ? 'Edit vendor bill' : 'Receive vendor bill');
     var canQb = typeof window.userCanPushToQB === 'function' && window.userCanPushToQB();
     var blurb = isAdd
-      ? 'Check any <strong>new PO items</strong> to add to the bill, then add freight or fees. Use <strong>Save</strong> for Studio only, or <strong>Push to QuickBooks</strong> when ready to sync.'
-      : (isEdit
-        ? 'Change which PO items are on the bill, edit charges, and add tracking. <strong>Save</strong> updates Studio; <strong>Push to QuickBooks</strong> syncs the bill separately.'
-        : (canQb
-          ? 'Check the PO items on this vendor invoice, then add freight, tax, or other charges. <strong>Save</strong> records the bill in Studio; <strong>Push to QuickBooks</strong> when you are ready to sync.'
-          : 'Check PO items on this invoice and add any additional charges.'));
+      ? (window.__cchBillRecordedBills && window.__cchBillRecordedBills.length
+        ? 'The list at the bottom is the vendor bills already recorded. Check a line only when you are adding a new invoice.'
+        : 'Check the items on this invoice. Rows already on the bill stay as they are. Change quantity, price, pre-paid tax, shipping, or the note on a new row.')
+      : 'This bill starts as the purchase order. Change the quantity, price, pre-paid tax, or shipping to match the vendor invoice. The note stays on that item. Additional charges keep their own invoice #.';
     var snapshotPoLines = cchPoSnapshotPoLinesForBill(d.items || [], poAtSend);
     var poLines = snapshotPoLines.length ? snapshotPoLines : cchPoBillPoLines(b, d.items || [], poAtSend);
+    var savedNoteByLine = {};
+    (b.poLines || []).forEach(function(l) {
+      if (l && l.lineId && l.billNote) savedNoteByLine[String(l.lineId)] = l.billNote;
+    });
+    poLines = poLines.map(function(l) {
+      var savedNote = savedNoteByLine[String(l.lineId)];
+      return savedNote ? Object.assign({}, l, { billNote: savedNote }) : l;
+    });
     window.__cchBillPoLines = poLines;
-    var lockedIds = isAdd ? cchPoBillBilledLineIds(b, poLines) : [];
+    var storedBilledIds = cchPoBillBilledLineIds(b, poLines);
+    var useRecordedBills = isAdd && window.__cchBillRecordedBills && window.__cchBillRecordedBills.length;
+    var lockedIds = (isAdd && !useRecordedBills) ? storedBilledIds : [];
     window.__cchBillLockedPoLineIds = lockedIds;
+    window.__cchBillPreserveBilledIds = useRecordedBills ? storedBilledIds : [];
     var selectedIds = isEdit
-      ? cchPoBillBilledLineIds(b, poLines)
+      ? storedBilledIds
       : (isAdd ? lockedIds.slice() : poLines.map(function(l) { return l.lineId; }));
     if (!selectedIds.length && !isAdd) selectedIds = poLines.map(function(l) { return l.lineId; });
-    var poItemsHtml = cchPoBillPoLinePickerHtml(poLines, selectedIds, lockedIds, poAtSend);
-    var viListHtml = viRows.map(function(r) { return cchPoVendorChargeRowHtml(r); }).join('');
+    var savedCharges = (isAdd || isEdit || b.received) ? cchPoBillVendorInvoicesFromBill(b) : [];
+    var lineIdMap = {};
+    poLines.forEach(function(l) { lineIdMap[String(l.lineId)] = 1; });
+    var headerInvNum = String(billInvMeta.vendorInvoiceNumber || '').trim();
+    var keepCharges = [];
+    if (!isAdd) {
+      savedCharges.forEach(function(r) {
+        if (Math.abs(parseFloat(r.amount) || 0) < 0.009) return;
+        var onHeaderLine = cchPoBillChargeMapsToOneLine(r, lineIdMap) && cchPoChargeBelongsOnHeaderBill(r, headerInvNum);
+        if (!onHeaderLine) keepCharges.push(r);
+      });
+    }
+    window.__cchBillKeepCharges = keepCharges;
+    var poItemsHtml = cchPoBillItemTableHtml(poLines, selectedIds, lockedIds, savedCharges, cchPoLineInvoiceStampMap(d, d.items || []), headerInvNum);
+    var extraRowsHtml = keepCharges.map(function(r) { return cchPoBillExtraChargeRowHtml(r); }).join('');
+    var extraHtml = '<div style="margin:0 0 14px;padding:12px;background:rgba(27,51,82,0.03);border:1px solid rgba(27,51,82,0.12);">' +
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#1B3352;margin-bottom:6px;">Additional charges</div>' +
+      '<p style="font-size:11px;color:#5C6B80;margin:0 0 10px;line-height:1.45;">A charge that is not the tax or shipping already on a line. Put its invoice # here. Save keeps that bill separate.</p>' +
+      '<div id="cchBillExtraCharges">' + extraRowsHtml + '</div>' +
+      '<button type="button" class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="cchPoAddBillExtraCharge()">+ Add charge</button>' +
+      '</div>';
     var multiTrackHtml = (!isAdd && (isEdit || b.received)) ? cchPoBillMultiTrackingGroupsHtml(d, d.items || []) : '';
     var poVendorName = String(d.vendor || '').trim();
     var billFromHtml = (!isAdd && poVendorName)
@@ -6719,20 +7541,18 @@
     var viHeaderHtml = cchPoBillVendorInvoiceHeaderHtml(billInvMeta, isAdd, !!multiTrackHtml, poVendorName);
     document.querySelectorAll('#cchReceiveBillModal').forEach(function(el) { el.remove(); });
     var html = '<div id="cchReceiveBillModal" style="position:fixed;inset:0;background:rgba(15,26,46,0.45);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;">' +
-      '<div style="background:#fff;max-width:720px;width:100%;padding:24px;border-radius:4px;box-shadow:0 16px 48px rgba(0,0,0,0.2);max-height:90vh;overflow:auto;" onclick="event.stopPropagation()">' +
+      '<style>#cchReceiveBillModal input.cch-bill-num::-webkit-outer-spin-button,#cchReceiveBillModal input.cch-bill-num::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}#cchReceiveBillModal input.cch-bill-num{-moz-appearance:textfield;appearance:textfield;}</style>' +
+      '<div style="background:#fff;max-width:1080px;width:100%;padding:24px;border-radius:4px;box-shadow:0 16px 48px rgba(0,0,0,0.2);max-height:90vh;overflow:auto;" onclick="event.stopPropagation()">' +
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin:0 0 8px;">' +
       '<h3 style="margin:0;font-size:18px;">' + esc(title) + ' — ' + esc(num) + '</h3>' +
       '<button type="button" aria-label="Close" onclick="cchPoCloseModal()" style="border:none;background:none;font-size:22px;line-height:1;color:#5C6B80;cursor:pointer;padding:0 2px;">&times;</button>' +
       '</div>' +
       '<p style="font-size:12px;color:var(--gray-500);margin:0 0 14px;">' + blurb + '</p>' +
+      viHeaderHtml +
       poItemsHtml +
+      extraHtml +
       multiTrackHtml +
       billFromHtml +
-      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#B45309;margin:0 0 8px;">2. Vendor invoice &amp; additional charges</div>' +
-      '<p style="font-size:11px;color:#5C6B80;margin:0 0 10px;line-height:1.45;">Enter the <strong>vendor invoice #</strong> once, then add freight, tax, price changes, or fees on separate lines (same invoice). Lines with $0 are ignored. <strong>Cancelled</strong>: leave the item checked above, check it on the cancelled line, and write the reason. That line goes to $0 on this bill. The purchase order line stays.</p>' +
-      viHeaderHtml +
-      '<div id="cchVendorInvoicesList">' + viListHtml + '</div>' +
-      '<button type="button" class="btn btn-secondary btn-sm" style="margin:8px 0 14px;" onclick="cchPoAddVendorInvoiceRow()">+ Add charge line</button>' +
       '<div id="cchBillPreview" style="font-size:13px;padding:12px;background:rgba(27,51,82,0.04);border-radius:4px;border:1px solid rgba(27,51,82,0.1);"></div>' +
       '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;flex-wrap:wrap;">' +
       '<button type="button" class="btn btn-secondary" onclick="cchPoCloseModal()">Cancel</button>' +
@@ -6740,10 +7560,6 @@
       '</div></div></div></div>';
     document.body.insertAdjacentHTML('beforeend', html);
     window.__cchBillPoAtSend = poAtSend;
-    document.querySelectorAll('#cchVendorInvoicesList .cch-vi-row').forEach(function(row) {
-      cchPoRefreshPriceChangeRow(row, cchPoViPriceChangeCfg(row), { prefillQty: true });
-      cchPoRefreshCancelledRow(row);
-    });
     window.cchPoUpdateBillPreview(poAtSend);
   };
 
@@ -6877,7 +7693,7 @@
     if (billEl) billEl.textContent = fmt(billTotal);
     if (footEl) footEl.textContent = fmt(billTotal);
     var paid = billEl ? (parseFloat(billEl.getAttribute('data-paid')) || 0) : 0;
-    if (balEl) balEl.textContent = fmt(Math.round((billTotal - paid) * 100) / 100);
+    if (balEl) balEl.textContent = fmt(Math.max(0, Math.round((billTotal - paid) * 100) / 100));
     var variance = Math.round((billTotal - (parseFloat(poAtSend) || 0)) * 100) / 100;
     if (varEl) {
       varEl.textContent = (variance > 0 ? '+' : (variance < 0 ? '−' : '')) + fmt(Math.abs(variance));
@@ -6888,6 +7704,14 @@
 
   window.cchPoUpdateBillPreview = function(poAtSend) {
     poAtSend = poAtSend != null ? poAtSend : (window.__cchBillPoAtSend || 0);
+    document.querySelectorAll('#cchBillItemTable tr.cch-bill-item-row').forEach(function(tr) {
+      var qty = parseFloat(tr.querySelector('.cch-bill-qty') && tr.querySelector('.cch-bill-qty').value) || 0;
+      var price = parseFloat(tr.querySelector('.cch-bill-price') && tr.querySelector('.cch-bill-price').value) || 0;
+      var tax = parseFloat(tr.querySelector('.cch-bill-tax') && tr.querySelector('.cch-bill-tax').value) || 0;
+      var ship = parseFloat(tr.querySelector('.cch-bill-ship') && tr.querySelector('.cch-bill-ship').value) || 0;
+      var tot = tr.querySelector('.cch-bill-line-total');
+      if (tot) tot.textContent = fmt(Math.round((qty * price + tax + ship) * 100) / 100);
+    });
     var allPoLines = window.__cchBillPoLines || [];
     var selectedIds = cchPoReadBillPoLineIdsFromDom();
     if (window.__cchBillLockedPoLineIds && window.__cchBillLockedPoLineIds.length) {
@@ -6964,6 +7788,30 @@
           esc(billInv.vendorInvoiceNumber) + '</strong>' +
           (billInv.vendorInvoiceDate ? ' · ' + esc(billInv.vendorInvoiceDate) : '') + '</td></tr>';
       }
+      if (window.__cchBillAddMode && window.__cchBillRecordedBills && window.__cchBillRecordedBills.length) {
+        var recSum = 0;
+        var recRows = window.__cchBillRecordedBills.map(function(brow) {
+          var amt = parseFloat(brow.amount) || 0;
+          recSum += amt;
+          var when = brow.date ? (' · ' + (typeof window.formatDate === 'function' ? window.formatDate(brow.date) : brow.date)) : '';
+          return '<tr><td style="padding:4px 0;color:#1B3352;"><strong>' + esc(brow.number) + '</strong><span style="color:#5C6B80;">' + esc(when) + '</span></td>' +
+            '<td style="text-align:right;font-weight:600;">' + fmt(amt) + '</td></tr>';
+        }).join('');
+        recSum = Math.round(recSum * 100) / 100;
+        var thisInv = '';
+        if (selectedIds.length) {
+          thisInv = '<tr><td colspan="2" style="padding:10px 0 4px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#5C6B80;">THIS INVOICE</td></tr>' +
+            merchRows +
+            '<tr style="border-top:1px solid rgba(15,26,46,0.08);"><td style="padding:6px 0;font-weight:600;">This invoice</td><td style="text-align:right;font-weight:600;">' + fmt(invoiceMerch) + '</td></tr>';
+        }
+        el.innerHTML =
+          '<table style="width:100%;font-size:12px;border-collapse:collapse;">' +
+          '<tr><td colspan="2" style="padding:0 0 6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#5C6B80;">BILLS ON FILE</td></tr>' +
+          recRows +
+          '<tr style="border-top:1px solid rgba(15,26,46,0.12);"><td style="padding:8px 0;font-weight:700;">Bills total</td><td style="text-align:right;font-weight:700;">' + fmt(recSum) + '</td></tr>' +
+          thisInv +
+          '</table>';
+      } else {
       el.innerHTML =
         '<table style="width:100%;font-size:12px;border-collapse:collapse;">' +
         (merchRows || '<tr><td style="padding:4px 0;color:#9CA3AF;font-style:italic;">No PO items selected</td><td></td></tr>') +
@@ -6974,6 +7822,7 @@
         '<tr style="border-top:1px solid rgba(15,26,46,0.12);"><td style="padding:8px 0;font-weight:700;">= Vendor bill total</td><td style="text-align:right;font-weight:700;">' + fmt(billTotal) + '</td></tr>' +
         '<tr><td style="padding:4px 0;font-size:11px;color:#5C6B80;">Variance vs full PO</td><td style="text-align:right;font-size:11px;font-weight:600;color:' + (Math.abs(variance) > 0.01 ? '#B45309' : '#15803D') + ';">' + fmt(variance) + '</td></tr>' +
         '</table>';
+      }
     }
     var freightShow = 0;
     var taxShow = 0;
@@ -6983,7 +7832,13 @@
       if (src === 'freight') freightShow += amt;
       if (src === 'tax') taxShow += amt;
     });
-    cchPoSyncOpenBillTotals(billTotal, invoiceMerch, freightShow, taxShow, poAtSend);
+    var railBill = billTotal;
+    var railMerch = invoiceMerch;
+    if (window.__cchBillAddMode && window.__cchBillRecordedBills && window.__cchBillRecordedBills.length && window.__cchBillStoredPayable != null) {
+      railBill = window.__cchBillStoredPayable;
+      railMerch = window.__cchBillStoredPayable;
+    }
+    cchPoSyncOpenBillTotals(railBill, railMerch, freightShow, taxShow, poAtSend);
   };
 
   window.cchPoCloseModal = function() {
@@ -7024,8 +7879,8 @@
     var invNum = billInvMeta.vendorInvoiceNumber;
     var invDate = billInvMeta.vendorInvoiceDate;
     vendorInvoices.forEach(function(r) {
-      r.vendorInvoiceNumber = invNum;
-      r.vendorInvoiceDate = invDate;
+      if (!String(r.vendorInvoiceNumber || '').trim()) r.vendorInvoiceNumber = invNum;
+      if (!String(r.vendorInvoiceDate || '').trim()) r.vendorInvoiceDate = invDate;
     });
     var additionalSubtotal = vendorInvoices.reduce(function(s, r) {
       if (cchPoVendorInvoiceSource(r.type) === 'merchandise') return s;
@@ -7041,6 +7896,11 @@
       }
       return;
     }
+    if (window.__cchBillPreserveBilledIds && window.__cchBillPreserveBilledIds.length) {
+      window.__cchBillPreserveBilledIds.forEach(function(id) {
+        if (selectedIds.indexOf(id) < 0) selectedIds.push(id);
+      });
+    }
 
     var ref = firebase.firestore().collection('boards').doc(projectId).collection('purchaseOrders').doc(poId);
     var snap = await ref.get();
@@ -7048,6 +7908,11 @@
     var prevBill = d.bill || {};
     var snapshotPoLines = cchPoSnapshotPoLinesForBill(d.items || [], poAtSend);
     var allPoLines = snapshotPoLines.length ? snapshotPoLines : cchPoBillPoLines(prevBill, d.items || [], poAtSend);
+    var noteMap = cchPoBillItemNotesFromDom();
+    allPoLines = allPoLines.map(function(l) {
+      if (!Object.prototype.hasOwnProperty.call(noteMap, String(l.lineId))) return l;
+      return Object.assign({}, l, { billNote: noteMap[String(l.lineId)] });
+    });
     var billedPoLines = allPoLines.filter(function(l) { return selectedIds.indexOf(l.lineId) >= 0; });
     var poSubtotal = cchPoSumPoLineAmounts(allPoLines, selectedIds);
     var billMath = cchPoVendorBillMath(allPoLines, selectedIds, vendorInvoices);
@@ -7109,8 +7974,6 @@
     if (Math.abs(varianceAmt) > 0.01) {
       var def = cchPoVarianceReasonMeta(reason);
       var resolution = def.defaultRes === 'pending' ? 'pending' : def.defaultRes;
-      // Tax family is never billable to client (WO-DRAFT-A §3–§4.2)
-      if (cchPoIsTaxFamilyReason(reason)) resolution = 'absorbed';
       patch.variance = {
         amount: Math.round(varianceAmt * 100) / 100,
         reason: reason,
@@ -7142,6 +8005,9 @@
       window.__cchBillAddMode = false;
       window.__cchBillExistingVendorInvoices = [];
       window.__cchBillLockedPoLineIds = [];
+      window.__cchBillRecordedBills = [];
+      window.__cchBillPreserveBilledIds = [];
+      window.__cchBillStoredPayable = null;
 
       var canQbPush = cchPoCanPushBillToQb();
       var doPush = pushQb === true && canQbPush;
@@ -7204,6 +8070,10 @@
     if (fullyPaid) {
       patch.poStatus = 'paid';
       patch.paymentStatus = 'paid';
+      if (String(doc.procurementStatus || '').trim() !== 'Confirmed') {
+        patch.procurementStatus = 'Confirmed';
+        if (!doc.procurementConfirmedAt) patch.procurementConfirmedAt = new Date().toISOString();
+      }
     } else if (totalPaid > 0.02) {
       patch.poStatus = 'bill_received';
       patch.paymentStatus = 'partial';
@@ -7871,6 +8741,10 @@
   };
 
   window.cchPoResolveVariance = async function(projectId, poId) {
+    if (typeof window.cchAlert === 'function') {
+      await window.cchAlert('Each charge is its own line. Open Bill variances and choose Bill to client or Absorbed on that charge.', 'Bill variances');
+    }
+    return;
     var reason = document.getElementById('cchPoVarReason').value;
     var resolution = document.getElementById('cchPoVarResolution').value;
     var note = document.getElementById('cchPoVarNote').value || '';
@@ -7883,43 +8757,68 @@
       var variance = po.variance || {};
       var linkedLineId = null;
 
-      if (resolution === 'billable_to_client' && invId) {
-        if (cchPoIsTaxFamilyReason(reason)) {
-          throw new Error('Pre-paid tax cannot be added to a client invoice. Mark it absorbed — it is recovered on the taxable sell line.');
-        }
+        if (resolution === 'billable_to_client' && invId) {
         var invRef = firebase.firestore().collection('boards').doc(projectId).collection('invoices').doc(invId);
         var invSnap = await invRef.get();
         var inv = invSnap.data() || {};
         var items = (inv.items || []).slice();
         linkedLineId = 'var_' + Date.now();
-        var amt = parseFloat(variance.amount) || 0;
+        var amt = typeof window.cchPoListVarianceForRow === 'function' ? window.cchPoListVarianceForRow(po) : null;
+        if (amt == null) amt = parseFloat(variance.amount) || 0;
         var meta = cchPoVarianceReasonMeta(reason);
         var taxableFlag = meta.taxable === true;
         var isFreight = reason === 'freight' || reason === 'shipping' || reason === 'expedited';
-        var varNote = note || 'Vendor bill variance';
-        if (typeof window.cchStripInvoiceVendorParens === 'function') {
-          varNote = window.cchStripInvoiceVendorParens(varNote, { vendor: String(po.vendor || '').trim(), title: varNote });
-        }
+        var srcInvOne = await cchPoLinkedClientInvoice(projectId, po, poId);
+        var productOne = cchPoProductTitlesOnPo(po, '', amt) || cchPoProductNameFromText(note);
+        var kindOne = cchPoVarianceKindLabel({
+          varianceReasonCode: reason,
+          expenseType: isFreight ? 'freight' : 'expense',
+          category: isFreight ? 'Freight' : 'Expense',
+          description: note
+        }) || (isFreight ? 'Freight' : 'Expense');
+        var bucketOne = cchPoVarianceClientBucket({
+          varianceReasonCode: reason,
+          expenseType: isFreight ? 'freight' : 'expense',
+          category: isFreight ? 'Freight' : 'Expense',
+          description: note,
+          title: kindOne
+        });
+        var noteNums = [];
+        var lineNotesOne = (note && !cchPoTextHasPoInfo(note)) ? note : '';
+        var reasonLabelOne = cchPoVarianceReasonLabel(reason);
+        var lineTitleOne = productOne ? (productOne + ' — ' + reasonLabelOne) : reasonLabelOne;
         items.push({
           id: linkedLineId,
-          title: 'PO variance \u2014 ' + poNum(po) + ' \u2014 ' + (meta.label || reason),
-          description: varNote,
+          title: lineTitleOne,
+          description: note || '',
+          lineNotes: '',
+          sourceInvoiceId: srcInvOne.id || '',
+          sourceInvoiceNum: srcInvOne.num || '',
           qty: 1,
-          amount: amt,
-          cost: amt,
-          category: isFreight ? 'Freight' : 'Expense',
-          expenseType: isFreight ? 'freight' : (taxableFlag ? 'product' : 'expense'),
+          amount: isFreight ? 0 : amt,
+          cost: isFreight ? 0 : amt,
+          markupPct: 0,
+          shipping: isFreight ? amt : 0,
+          category: bucketOne.category,
+          expenseType: bucketOne.expenseType,
+          qbCategory: isFreight ? 'Freight' : bucketOne.category,
           taxable: isFreight ? false : !!taxableFlag,
           vendor: String(po.vendor || '').trim(),
-          room: 'General',
+          room: cchPoVarianceLineRoom(po, '', amt),
           source: 'po_bill_variance',
-          varianceReasonCode: reason
+          varianceReasonCode: reason,
+          varianceItemLabel: reasonLabelOne
         });
+        var imgOne = cchPoVarianceLineImageFields(po, '', amt);
+        if (imgOne) Object.assign(items[items.length - 1], imgOne);
         await invRef.update({ items: items, updatedAt: new Date().toISOString() });
       }
 
+      var resolvedAmt = typeof window.cchPoListVarianceForRow === 'function' ? window.cchPoListVarianceForRow(po) : null;
+      if (resolvedAmt == null) resolvedAmt = parseFloat(variance.amount) || 0;
       await poRef.update({
         variance: Object.assign({}, variance, {
+          amount: resolvedAmt,
           reason: reason,
           resolution: resolution,
           resolutionNote: note,
@@ -7999,7 +8898,6 @@
 
   window.cchPoSetVarianceLineDisposition = async function(projectId, poId, viIndex, source, disposition) {
     if (disposition !== 'billable' && disposition !== 'absorbed') return;
-    if (source === 'tax') return;
     window._cchVarDropOne = { poId: poId, source: source, viIndex: String(viIndex) };
     try {
       var ref = firebase.firestore().collection('boards').doc(projectId).collection('purchaseOrders').doc(poId);
@@ -8043,8 +8941,7 @@
   function cchPoVarianceComponentSelectable(comp) {
     comp = comp || {};
     if (comp.invoicedOnId) return false;
-    if (cchPoIsTaxFamilyReason(comp.reasonCode)) return false;
-    if (comp.disposition === 'absorbed' || comp.disposition === 'credit_to_client') return false;
+    if (comp.disposition !== 'billable') return false;
     return true;
   }
 
@@ -8057,7 +8954,6 @@
     }
     if (v.linkedClientInvoiceId) return false;
     var res = String(v.resolution || 'pending');
-    if (cchPoIsTaxFamilyReason(v.reason)) return false;
     return res === 'pending' || res === 'billable_to_client';
   }
 
@@ -8076,6 +8972,9 @@
         if (src !== 'po_bill_variance' && lid.indexOf('var_') !== 0) return;
         var hit = {
           invId: d.id,
+          invoiceNum: String(inv.invoiceNum || inv.number || ''),
+          invoiceDate: String(inv.date || inv.invoiceDate || ''),
+          invoiceStatus: String(inv.status || ''),
           componentId: String(it.varianceComponentId || ''),
           reason: String(it.varianceReasonCode || '')
         };
@@ -8108,15 +9007,9 @@
         if (h._used) continue;
         if (h.componentId && String(h.componentId) === String(c.id)) {
           c.invoicedOnId = h.invId;
-          h._used = true;
-          return;
-        }
-      }
-      for (i = 0; i < hits.length; i++) {
-        h = hits[i];
-        if (h._used) continue;
-        if (h.reason && String(h.reason) === String(c.reasonCode || '')) {
-          c.invoicedOnId = h.invId;
+          c.invoiceNum = h.invoiceNum || '';
+          c.invoiceDate = h.invoiceDate || '';
+          c.invoiceStatus = h.invoiceStatus || '';
           h._used = true;
           return;
         }
@@ -8166,7 +9059,9 @@
     bill = bill || {};
     var fields = [];
     try { fields = cchPoBillAdditionalExpenseFields(bill) || []; } catch (_e) { fields = []; }
-    fields = fields.filter(function(r) { return Math.abs(parseFloat(r.amount) || 0) > 0.01; });
+    fields = fields.filter(function(r) {
+      return Math.abs(parseFloat(r.amount) || 0) > 0.01 && String(r.disposition || '') !== 'absorbed';
+    });
     if (fields.length) {
       return fields.map(function(r) {
         var lbl = r.label || r.description || r.source || 'Charge';
@@ -8176,7 +9071,7 @@
     }
     if (!Array.isArray(bill.vendorInvoices) || !bill.vendorInvoices.length) return '';
     return bill.vendorInvoices.filter(function(r) {
-      return Math.abs(parseFloat(r.amount) || 0) > 0.01;
+      return Math.abs(parseFloat(r.amount) || 0) > 0.01 && String(r.disposition || '') !== 'absorbed';
     }).map(function(r) {
       var lbl = r.description || cchPoVendorInvoiceTypeLabel(r.type);
       if (r.vendorInvoiceNumber) lbl += ' #' + r.vendorInvoiceNumber;
@@ -8194,18 +9089,16 @@
   function cchPoVarianceNeedsCategory(c) {
     c = c || {};
     if (c.invoicedOnId) return false;
-    var code = String(c.reasonCode || c.reason || '').toLowerCase();
-    if (cchPoIsTaxFamilyReason(code)) return false;
     var d = String(c.disposition || 'undecided');
     return d === 'undecided' || d === 'pending' || d === '';
   }
   window.cchPoVarianceNeedsCategory = cchPoVarianceNeedsCategory;
 
   function cchPoVarianceInvoiceItemLabel(reasonCode) {
-    var code = String(reasonCode || '');
-    var lbl = cchPoVarianceReasonLabel(code);
-    if (code === 'freight' || code === 'shipping' || code === 'expedited') return 'Freight / shipping expense';
-    return 'Expense — ' + lbl;
+    var kind = cchPoVarianceKindLabel({ varianceReasonCode: reasonCode });
+    if (kind) return kind;
+    var meta = cchPoVarianceReasonMeta(reasonCode);
+    return (meta && meta.label) ? meta.label : 'Expense';
   }
 
   function cchPoStripDuplicateReason(desc) {
@@ -8214,52 +9107,439 @@
     return next;
   }
 
+  function cchPoLineLooksLikeOldVarianceTitle(title) {
+    return /^PO\s+PO-\d+\s*[—–\-]/i.test(String(title || '')) || /^PO variance\s*[—–\-]/i.test(String(title || '')) || /\bPO-\d+\b/i.test(String(title || ''));
+  }
+
+  function cchPoTextHasPoNumber(s) {
+    return /\bPO-\d+\b/i.test(String(s || ''));
+  }
+
+  function cchPoStripPoNumbersFromText(s) {
+    var t = String(s || '');
+    t = t.replace(/\bPO\s+variance\s*[—–\-:]+\s*/gi, '');
+    t = t.replace(/\bPO\s+PO-\d+\s*[—–\-:]+\s*/gi, '');
+    t = t.replace(/\bPO-\d+\s*[—–\-:]+\s*/gi, '');
+    t = t.replace(/\bPO\s+PO-\d+\b/gi, '');
+    t = t.replace(/\bPO-\d+\b/gi, '');
+    t = t.replace(/^[\s·•—–\-:]+/, '').replace(/[·•]\s*$/, '').replace(/\s{2,}/g, ' ').trim();
+    return t;
+  }
+  window.cchPoStripPoNumbersFromText = cchPoStripPoNumbersFromText;
+
+  function cchPoLineLooksLikeVariance(it, docData) {
+    if (!it) return false;
+    if (it.source === 'po_bill_variance') return true;
+    if (cchPoLineLooksLikeOldVarianceTitle(it.title)) return true;
+    return cchPoTextHasPoNumber(it.description);
+  }
+
+  function cchPoReasonFromOldTitle(title) {
+    var parts = String(title || '').split(/\s[—–\-]\s/);
+    var tail = parts.length > 1 ? parts[parts.length - 1] : '';
+    if (/freight|shipping/i.test(tail)) return 'freight';
+    if (/quantity|qty/i.test(tail)) return 'quantity_change';
+    if (/larger/i.test(tail)) return 'larger_size';
+    if (/price/i.test(tail)) return 'price_increase';
+    return '';
+  }
+
+  function cchPoProductNameFromVarianceDesc(desc) {
+    var m = String(desc || '').match(/#\s*[A-Za-z0-9][A-Za-z0-9.\-]*\s*[—–\-]\s*([^·\n]+)/);
+    if (!m || !m[1]) return '';
+    var name = String(m[1]).replace(/\s+PO line\b.*$/i, '').trim();
+    if (!name || name.length > 80) return '';
+    return name;
+  }
+
+  function cchPoCleanProductTitle(name) {
+    var t = String(name || '').trim();
+    t = t.replace(/\s+PO line\b.*$/i, '').replace(/\s*[·•]\s*$/, '').trim();
+    if (!t || t.length > 120) return '';
+    if (/^(item|untitled|general|vendor|expense|variance)$/i.test(t)) return '';
+    if (/^(freight|shipping|pre-paid tax|price\/quantity|price change|price increase|expense)$/i.test(t)) return '';
+    if (cchPoTitleIsInvoiceNumber(t)) return '';
+    if (/^PO-\d+/i.test(t) || /^INV-\d+/i.test(t)) return '';
+    return t;
+  }
+
+  function cchPoProductNameFromText(s) {
+    var sku = cchPoCleanProductTitle(cchPoProductNameFromVarianceDesc(s));
+    if (sku) return sku;
+    var parts = String(s || '').split(/\s*[·•]\s*/);
+    for (var i = 0; i < parts.length; i++) {
+      var bit = cchPoCleanProductTitle(parts[i]);
+      if (!bit) continue;
+      if (/^(invoice|difference|po line|po)\b/i.test(bit)) continue;
+      return bit;
+    }
+    return '';
+  }
+
+  function cchPoProductTitlesOnPo(po, componentId, amount) {
+    po = po || {};
+    var bill = po.bill || {};
+    var lines = (bill.poLines && bill.poLines.length) ? bill.poLines : (po.items || []);
+    var charges = [];
+    try { charges = cchPoBillAdditionalExpenseFields(bill) || []; } catch (eCh) { charges = []; }
+    var ids = [];
+    var cid = String(componentId || '');
+    var i;
+    for (i = 0; i < charges.length; i++) {
+      var c = charges[i];
+      var code = cchPoReasonCodeFromCharge(c);
+      var derived = String(c.id || ('vc_' + i + '_' + code));
+      if (cid && (derived === cid || String(c.id || '') === cid)) {
+        ids = c.poLineIds || [];
+        break;
+      }
+    }
+    if (!ids.length && amount != null && amount !== '') {
+      var want = Math.round((parseFloat(amount) || 0) * 100) / 100;
+      var hits = [];
+      for (i = 0; i < charges.length; i++) {
+        var a = Math.round((parseFloat(charges[i].amount) || 0) * 100) / 100;
+        if (Math.abs(a - want) < 0.02 && (charges[i].poLineIds || []).length) hits.push(charges[i]);
+      }
+      if (hits.length === 1) ids = hits[0].poLineIds;
+    }
+    var names = [];
+    function addName(raw) {
+      var n = cchPoCleanProductTitle(raw);
+      if (n && names.indexOf(n) < 0) names.push(n);
+    }
+    ids.forEach(function(id) {
+      var t = '';
+      for (var j = 0; j < lines.length; j++) {
+        if (String(lines[j].lineId || '') === String(id) || String(lines[j].id || '') === String(id)) {
+          t = lines[j].title || lines[j].name || '';
+          break;
+        }
+      }
+      addName(t);
+    });
+    if (!names.length && lines.length === 1) addName(lines[0].title || lines[0].name || '');
+    return names.join(', ');
+  }
+
+  function cchPoVarianceLinkedLines(po, componentId, amount) {
+    po = po || {};
+    var bill = po.bill || {};
+    var lines = (bill.poLines && bill.poLines.length) ? bill.poLines : (po.items || []);
+    var charges = [];
+    try { charges = cchPoBillAdditionalExpenseFields(bill) || []; } catch (eCh) { charges = []; }
+    var ids = [];
+    var cid = String(componentId || '');
+    var i;
+    for (i = 0; i < charges.length; i++) {
+      var c = charges[i];
+      var code = cchPoReasonCodeFromCharge(c);
+      var derived = String(c.id || ('vc_' + i + '_' + code));
+      if (cid && (derived === cid || String(c.id || '') === cid)) {
+        ids = c.poLineIds || [];
+        break;
+      }
+    }
+    if (!ids.length && amount != null && amount !== '') {
+      var want = Math.round((parseFloat(amount) || 0) * 100) / 100;
+      var hits = [];
+      for (i = 0; i < charges.length; i++) {
+        var a = Math.round((parseFloat(charges[i].amount) || 0) * 100) / 100;
+        if (Math.abs(a - want) < 0.02 && (charges[i].poLineIds || []).length) hits.push(charges[i]);
+      }
+      if (hits.length === 1) ids = hits[0].poLineIds;
+    }
+    var matched = [];
+    if (ids.length) {
+      ids.forEach(function(id) {
+        for (var j = 0; j < lines.length; j++) {
+          if (String(lines[j].lineId || '') === String(id) || String(lines[j].id || '') === String(id)) {
+            matched.push(lines[j]);
+            break;
+          }
+        }
+      });
+    }
+    if (!matched.length && lines.length === 1) matched = [lines[0]];
+    if (!matched.length && (po.items || []).length === 1) matched = [po.items[0]];
+    return matched;
+  }
+
+  function cchPoVarianceLineRoom(po, componentId, amount) {
+    var rooms = [];
+    cchPoVarianceLinkedLines(po, componentId, amount).forEach(function(it) {
+      var r = String((it && (it.room || it.roomLocation || it.projectRoom)) || '').trim();
+      if (r && rooms.indexOf(r) < 0) rooms.push(r);
+    });
+    return rooms.join(', ');
+  }
+
+  function cchPoVarianceLineImageFields(po, componentId, amount) {
+    var lines = cchPoVarianceLinkedLines(po, componentId, amount);
+    for (var i = 0; i < lines.length; i++) {
+      var it = lines[i] || {};
+      var url = String(it.imageUrl || it.image || it.thumbnail || '').trim();
+      if (!url) continue;
+      var fields = { imageUrl: url };
+      if (String(it.image || '').trim()) fields.image = String(it.image).trim();
+      if (Array.isArray(it.images) && it.images.length) fields.images = it.images;
+      return fields;
+    }
+    return null;
+  }
+
+  async function cchPoLinkedClientInvoice(projectId, po, poId) {
+    po = po || {};
+    var id = String(po.linkedInvoiceId || po.invoiceId || po.invoiceDocId || '').trim();
+    var num = String(po.linkedInvoiceNum || '').trim();
+    if (!id && poId) {
+      try {
+        var poSnap = await firebase.firestore().collection('boards').doc(projectId).collection('purchaseOrders').doc(poId).get();
+        if (poSnap.exists) {
+          po = poSnap.data() || {};
+          id = String(po.linkedInvoiceId || po.invoiceId || po.invoiceDocId || '').trim();
+          num = String(po.linkedInvoiceNum || '').trim();
+        }
+      } catch (ePoLink) { /* leave the line unlabeled */ }
+    }
+    if (id && !/^INV-\d+/i.test(num)) {
+      try {
+        var invSnap = await firebase.firestore().collection('boards').doc(projectId).collection('invoices').doc(id).get();
+        if (invSnap.exists) {
+          var inv = invSnap.data() || {};
+          num = String(inv.invoiceNum || inv.number || '').trim();
+        }
+      } catch (eInvLink) { /* number stays blank */ }
+    }
+    if (!/^INV-\d+/i.test(num)) num = '';
+    return { id: id, num: num };
+  }
+
+  async function cchPoDocForVarianceLine(projectId, it) {
+    var poId = String((it && it.poId) || '').trim();
+    if (!poId || !projectId) return null;
+    try {
+      var snap = await firebase.firestore().collection('boards').doc(projectId).collection('purchaseOrders').doc(poId).get();
+      if (snap.exists) return snap.data() || {};
+    } catch (ePoDoc) { /* title falls back to the caption */ }
+    return null;
+  }
+
+  async function cchPoVendorForVarianceLine(projectId, it) {
+    var v = String((it && it.vendor) || '').trim();
+    if (v) return v;
+    var poId = String((it && it.poId) || '').trim();
+    var num = String((it && it.poNumber) || '').trim();
+    if (!num) {
+      var tm = String((it && it.title) || '').match(/PO-\d+/i);
+      if (tm) num = tm[0].toUpperCase();
+    }
+    try {
+      var col = firebase.firestore().collection('boards').doc(projectId).collection('purchaseOrders');
+      if (poId) {
+        var one = await col.doc(poId).get();
+        if (one.exists) return String((one.data() || {}).vendor || '').trim();
+      }
+      if (num) {
+        var q = await col.where('number', '==', num).limit(1).get();
+        if (!q.empty) return String((q.docs[0].data() || {}).vendor || '').trim();
+      }
+    } catch (eVend) { /* title falls back to the reason */ }
+    return '';
+  }
+
+  function cchPoTextHasPoInfo(s) {
+    s = String(s || '');
+    return /\bPO-\d+\b/i.test(s) || /\bPO\s+line\b/i.test(s) || /\bpurchase\s+order\b/i.test(s);
+  }
+
+  function cchPoVarianceKindLabel(it) {
+    it = it || {};
+    var code = String(it.varianceReasonCode || '').toLowerCase();
+    if (code === 'freight' || code === 'shipping' || code === 'expedited') return 'Freight';
+    if (code === 'price_increase' || code === 'quantity_change' || code === 'cost_difference' || code === 'price_change_credit' || code === 'larger_size') return 'Price/qty change';
+    if (code && VARIANCE_REASON_META[code] && VARIANCE_REASON_META[code].label) return VARIANCE_REASON_META[code].label;
+    var exp = String(it.expenseType || '').toLowerCase();
+    var cat = String(it.category || '').toLowerCase();
+    if (exp === 'freight' || cat === 'freight') return 'Freight';
+    var blob = (String(it.description || '') + ' ' + String(it.varianceItemLabel || '') + ' ' + String(it.title || '')).toLowerCase();
+    if (/freight|shipping/.test(blob) && !/\bpo\s+line\b/.test(blob)) return 'Freight';
+    if (/price|qty|quantity|increase|\bpo\s+line\b/.test(blob)) return 'Price/qty change';
+    if (it.source === 'po_bill_variance' || cchPoTextHasPoInfo(it.description) || cchPoTextHasPoInfo(it.title)) {
+      if (exp === 'expense' || cat === 'expense') return 'Price/qty change';
+      return 'Expense';
+    }
+    return '';
+  }
+
+  function cchPoVendorInvNumsFromText(s) {
+    var out = [];
+    var re = /#\s*([A-Za-z0-9][A-Za-z0-9-]{2,})/g;
+    var m;
+    var t = String(s || '');
+    while ((m = re.exec(t))) {
+      var n = String(m[1] || '');
+      if (/^PO-?\d+$/i.test(n)) continue;
+      if (out.indexOf(n) < 0) out.push(n);
+    }
+    return out;
+  }
+
+  function cchPoTitleIsInvoiceNumber(title) {
+    var t = String(title || '').trim();
+    if (/^#\s*[A-Za-z][A-Za-z0-9-]{3,}$/.test(t)) return true;
+    if (/^#\s*\d{4,}[A-Za-z0-9-]*$/.test(t)) return true;
+    return /^#?\s*(?:(?:SO|INV)[-\s]?)?\d{4,}[A-Za-z0-9-]*$/i.test(t) || /^#?\s*SO\d+/i.test(t);
+  }
+
+  /** Client invoice: Freight or Expense. Not the product name, and not a sales-order number. */
+  function cchPoVarianceClientBucket(it) {
+    var kind = cchPoVarianceKindLabel(it);
+    if (kind === 'Freight') return { title: 'Freight', category: 'Freight', expenseType: 'freight' };
+    return { title: 'Expense', category: 'Expense', expenseType: 'expense' };
+  }
+
+  /** Client invoice lines: type as the description, vendor invoice #s in the notes, no purchase-order text. */
+  window.cchPoCleanClientInvoiceLines = function(items) {
+    return false;
+    (items || []).forEach(function(it) {
+      if (!it) return;
+      if (typeof window.isProposalGroupHeaderItem === 'function' && window.isProposalGroupHeaderItem(it)) return;
+      var isVar = it.source === 'po_bill_variance' || /\bPO\s+line\b/i.test(String(it.description || '')) || /\bPO\s+line\b/i.test(String(it.title || ''));
+      if (!isVar) return;
+      var bucket = cchPoVarianceClientBucket(it);
+      var nums = cchPoVendorInvNumsFromText(String(it.title || '') + ' ' + String(it.description || '') + ' ' + String(it.lineNotes || ''));
+      var notes = String(it.lineNotes || '');
+      notes = notes.replace(/\bPO-\d+\b/gi, '').replace(/\bPO\s+line\b[^\n]*/gi, '');
+      nums.forEach(function(n) {
+        if (notes.toLowerCase().indexOf(String(n).toLowerCase()) >= 0) return;
+        notes += (notes.trim() ? '\n' : '') + 'Invoice #' + n;
+      });
+      notes = notes.replace(/\n{2,}/g, '\n').trim();
+      if (it.description !== bucket.title) { it.description = bucket.title; changed = true; }
+      if (it.title !== bucket.title) { it.title = bucket.title; changed = true; }
+      if (it.category !== bucket.category) { it.category = bucket.category; changed = true; }
+      if (String(it.expenseType || '') !== bucket.expenseType) { it.expenseType = bucket.expenseType; changed = true; }
+      if (String(it.lineNotes || '') !== notes) { it.lineNotes = notes; changed = true; }
+      if (it.varianceItemLabel !== bucket.title) { it.varianceItemLabel = bucket.title; changed = true; }
+    });
+    return changed;
+  };
+
+  window.cchPoPersistCleanClientInvoiceLines = function(projectId, docId, docData, items) {
+    if (!projectId || !docId || !items) return items;
+    docData = docData || {};
+    if (docData._cchClientPoTextCleaned) return items;
+    if (!window.cchPoCleanClientInvoiceLines(items)) {
+      docData._cchClientPoTextCleaned = true;
+      return items;
+    }
+    docData._cchClientPoTextCleaned = true;
+    docData.items = items;
+    try {
+      firebase.firestore().collection('boards').doc(projectId).collection('invoices').doc(docId).update(cchPoSanitizeForFirestore({
+        items: items,
+        updatedAt: new Date().toISOString()
+      })).catch(function() {});
+    } catch (_eClean) { /* the screen still uses the cleaned lines */ }
+    return items;
+  };
+
   window.cchPoReshapeDraftVarianceInvoiceLines = async function(projectId, docData, items) {
-    items = Array.isArray(items) ? items.slice() : [];
+    return Array.isArray(items) ? items.slice() : [];
     if (!docData || !projectId) return items;
-    var st = String(docData.status || 'draft').toLowerCase();
-    if (st !== 'draft') return items;
-    if (docData.qbDocId) return items;
     var changed = false;
-    items.forEach(function(it) {
-      if (!it || it.source !== 'po_bill_variance') return;
-      if (it.varianceReasonCode === 'price_increase' || /price increase|price\/quantity increase/i.test(String(it.varianceItemLabel || ''))) {
-        var nextLbl = cchPoVarianceInvoiceItemLabel('price_increase');
-        if (it.varianceItemLabel !== nextLbl) {
-          it.varianceItemLabel = nextLbl;
-          it.varianceReasonCode = 'price_increase';
+    for (var vi = 0; vi < items.length; vi++) {
+      var it = items[vi];
+      if (!cchPoLineLooksLikeVariance(it, docData)) continue;
+      var priorTitle = String(it.title || '');
+      var priorDesc = String(it.description || '');
+      var stDraft = String((docData && docData.status) || '').toLowerCase();
+      var isDraft = !stDraft || stDraft === 'draft' || stDraft === 'unsent';
+      if (isDraft) {
+        var bucketNow = cchPoVarianceClientBucket(it);
+        if (it.title !== bucketNow.title) { it.title = bucketNow.title; changed = true; }
+        if (String(it.description || '') !== bucketNow.title) { it.description = bucketNow.title; changed = true; }
+        if (it.category !== bucketNow.category) { it.category = bucketNow.category; changed = true; }
+        if (String(it.expenseType || '') !== bucketNow.expenseType) { it.expenseType = bucketNow.expenseType; changed = true; }
+        if (it.varianceItemLabel !== bucketNow.title) { it.varianceItemLabel = bucketNow.title; changed = true; }
+      }
+      var title = String(it.title || '');
+      var headlineStuck = cchPoLineLooksLikeOldVarianceTitle(title) || /^PO\s+/i.test(title) || cchPoTextHasPoNumber(title);
+      var descHasPo = cchPoTextHasPoNumber(it.description);
+      var labelOld = /price increase|price\/quantity increase/i.test(String(it.varianceItemLabel || '') + ' ' + title);
+      var needSource = !/^INV-\d+/i.test(String(it.sourceInvoiceNum || ''));
+      var storedVend = String(it.vendor || '').trim();
+      var titleIsVendor = storedVend && title.trim().toLowerCase() === storedVend.toLowerCase();
+      var needProduct = headlineStuck || titleIsVendor || !storedVend || !cchPoCleanProductTitle(title);
+      if (it.varianceLineShaped && !headlineStuck && !descHasPo && !labelOld && !needSource && !needProduct) continue;
+      var code = String(it.varianceReasonCode || '') || cchPoReasonFromOldTitle(title);
+      if (labelOld || code === 'price_increase') code = 'price_increase';
+      if (code && it.varianceReasonCode !== code) {
+        it.varianceReasonCode = code;
+        changed = true;
+      }
+      var nextLbl = code ? cchPoVarianceInvoiceItemLabel(code) : String(it.varianceItemLabel || '');
+      if (!isDraft && nextLbl && it.varianceItemLabel !== nextLbl) {
+        it.varianceItemLabel = nextLbl;
+        changed = true;
+      }
+      if (needProduct || needSource || headlineStuck) {
+        var poDoc = await cchPoDocForVarianceLine(projectId, it);
+        var vend = String((poDoc && poDoc.vendor) || it.vendor || '').trim();
+        if (!vend) vend = await cchPoVendorForVarianceLine(projectId, it);
+        var product = poDoc ? cchPoProductTitlesOnPo(poDoc, it.varianceComponentId, it.amount) : '';
+        if (!product) product = cchPoProductNameFromText(priorDesc);
+        if (!product) product = cchPoCleanProductTitle(priorTitle);
+        var weakTitle = headlineStuck || (vend && title.trim().toLowerCase() === vend.toLowerCase()) || !cchPoCleanProductTitle(title);
+        var headline = product || (weakTitle ? (vend || nextLbl || 'Variance') : title);
+        if (!isDraft && headline && it.title !== headline) {
+          it.title = headline;
           changed = true;
         }
-      }
-      if (it.varianceLineShaped) return;
-      var vendor = String(it.vendor || '').trim();
-      var title = String(it.title || '');
-      if (/^PO\s+/i.test(title)) {
-        it.title = vendor || 'Vendor';
-        changed = true;
-      }
-      if (!it.varianceItemLabel) {
-        var code = String(it.varianceReasonCode || '');
-        if (!code) {
-          var tail = title.split(/\s[\u2014—-]\s/).pop() || '';
-          code = /freight|shipping/i.test(tail) ? 'freight' : '';
-          if (!code && /quantity|qty/i.test(tail)) code = 'quantity_change';
-          if (!code && /larger/i.test(tail)) code = 'larger_size';
-          if (!code && /price\s*increase/i.test(tail)) code = 'price_increase';
-          if (!code && /price\s*change|credit/i.test(tail)) code = 'price_change_credit';
+        if (isDraft && product) {
+          var noteFor = String(it.lineNotes || '');
+          if (noteFor.toLowerCase().indexOf(String(product).toLowerCase()) < 0) {
+            it.lineNotes = (noteFor.trim() ? noteFor.trim() + '\n' : '') + 'For: ' + product;
+            changed = true;
+          }
         }
-        it.varianceItemLabel = cchPoVarianceInvoiceItemLabel(code || 'other');
-        if (code) it.varianceReasonCode = it.varianceReasonCode || code;
+        if (vend && String(it.vendor || '').trim() !== vend) {
+          it.vendor = vend;
+          changed = true;
+        }
+        if (needSource && poDoc) {
+          var srcInv = await cchPoLinkedClientInvoice(projectId, poDoc, String(it.poId || '').trim());
+          if (srcInv.num && it.sourceInvoiceNum !== srcInv.num) {
+            it.sourceInvoiceNum = srcInv.num;
+            if (srcInv.id) it.sourceInvoiceId = srcInv.id;
+            changed = true;
+          }
+          needSource = false;
+        }
+      }
+      if (it.source !== 'po_bill_variance') {
+        it.source = 'po_bill_variance';
         changed = true;
       }
-      var stripped = cchPoStripDuplicateReason(it.description);
+      var stripped = cchPoStripPoNumbersFromText(cchPoStripDuplicateReason(it.description));
       if (stripped !== String(it.description || '').trim()) {
         it.description = stripped;
         changed = true;
       }
-      it.varianceLineShaped = true;
-      changed = true;
-    });
+      if (!it.varianceLineShaped) {
+        it.varianceLineShaped = true;
+        changed = true;
+      }
+      if (needSource) {
+        var srcInvLeft = await cchPoLinkedClientInvoice(projectId, null, String(it.poId || '').trim());
+        if (srcInvLeft.num && it.sourceInvoiceNum !== srcInvLeft.num) {
+          it.sourceInvoiceNum = srcInvLeft.num;
+          if (srcInvLeft.id) it.sourceInvoiceId = srcInvLeft.id;
+          changed = true;
+        }
+      }
+    }
     if (!changed) return items;
     try {
       await firebase.firestore().collection('boards').doc(projectId).collection('invoices').doc(docData.id).update({
@@ -8274,7 +9554,6 @@
   function cchPoVarianceLineIsPending(c) {
     c = c || {};
     if (c.invoicedOnId) return false;
-    if (cchPoIsTaxFamilyReason(c.reasonCode)) return false;
     return c.disposition === 'billable';
   }
 
@@ -8295,7 +9574,16 @@
       if (filter === 'all') return true;
       if (filter === 'on_invoice') return !!r.invoiceId || (r.components || []).some(function(c) { return !!c.invoicedOnId; });
       if (filter === 'absorbed') {
-        return r.resolution === 'absorbed' || (r.components || []).some(function(c) { return c.disposition === 'absorbed'; });
+        var nonTaxAbsorbed = (r.components || []).some(function(c) {
+          return c.disposition === 'absorbed' && !cchPoIsTaxFamilyReason(c.reasonCode);
+        });
+        if (nonTaxAbsorbed) return true;
+        var onlyTax = (r.components || []).length && (r.components || []).every(function(c) { return cchPoIsTaxFamilyReason(c.reasonCode); });
+        if (onlyTax) return false;
+        return r.resolution === 'absorbed';
+      }
+      if (filter === 'prepaid_tax') {
+        return (r.components || []).some(function(c) { return cchPoIsTaxFamilyReason(c.reasonCode); });
       }
       return r.resolution === filter;
     });
@@ -8304,9 +9592,13 @@
       out.push(p);
       var k = (p.projectId || '') + '_' + (p.poId || '');
       (kidsByParent[k] || []).forEach(function(c) {
+        if (filter === 'all') { out.push(c); return; }
         if (filter === 'ready_to_bill' && !cchPoVarianceNeedsCategory(c)) return;
         if (filter === 'pending' && !cchPoVarianceLineIsPending(c)) return;
-        if (filter === 'absorbed' && c.disposition !== 'absorbed' && !cchPoIsTaxFamilyReason(c.reasonCode)) return;
+        if (filter === 'on_invoice' && !c.invoicedOnId) return;
+        if (filter === 'absorbed' && (c.disposition !== 'absorbed' || cchPoIsTaxFamilyReason(c.reasonCode))) return;
+        if (filter === 'prepaid_tax' && !cchPoIsTaxFamilyReason(c.reasonCode)) return;
+        if (c.disposition === 'absorbed' && filter !== 'absorbed' && filter !== 'prepaid_tax' && filter !== 'all') return;
         out.push(c);
       });
     });
@@ -8328,10 +9620,17 @@
         btn.className = 'btn btn-sm ' + (on ? 'btn-primary' : 'btn-secondary');
       });
       var st = tr.querySelector('[data-var-status]');
-      if (st) st.textContent = disposition === 'billable' ? 'Pending' : 'Absorbed';
-      var filtNow = window._poDiscFilter || 'ready_to_bill';
+      if (st) st.textContent = disposition === 'billable' ? 'Bill to client' : 'Absorbed';
+      var filtNow = window._poDiscFilter || 'all';
       if (filtNow === 'billable_to_client') filtNow = 'pending';
-      if (disposition === 'billable' && filtNow === 'ready_to_bill') {
+      if (disposition === 'absorbed' && filtNow !== 'absorbed') {
+        var prevAbs = tr.previousElementSibling;
+        tr.remove();
+        if (prevAbs && !prevAbs.getAttribute('data-var-row')) {
+          var nextAbs = prevAbs.nextElementSibling;
+          if (!nextAbs || !nextAbs.getAttribute('data-var-row')) prevAbs.remove();
+        }
+      } else if (disposition === 'billable' && filtNow === 'ready_to_bill') {
         var prevRow = tr.previousElementSibling;
         tr.remove();
         if (prevRow && !prevRow.getAttribute('data-var-row')) {
@@ -8410,18 +9709,14 @@
 
   function cchPoVarianceStatusLabel(r) {
     if (r.rowKind === 'component') {
-      if (r.invoicedOnId) return 'On invoice';
-      if (r.disposition === 'billable') return 'Pending';
-      if (r.disposition === 'absorbed') return 'Absorbed';
+      if (r.invoicedOnId) return r.invoiceNum || 'On invoice';
+      if (cchPoIsTaxFamilyReason(r.reasonCode) && r.disposition !== 'billable') return 'Pre-paid tax';
+      if (r.disposition === 'billable') return 'Bill to client';
       if (r.disposition === 'credit_to_client') return 'Credit';
-      if (r.disposition === 'undecided') return 'Set disposition';
-      return r.disposition || '—';
+      if (r.disposition === 'absorbed') return 'Absorbed';
+      if (r.disposition === 'prepaid_tax' || cchPoIsTaxFamilyReason(r.reasonCode)) return 'Pre-paid tax';
+      return 'Undecided';
     }
-    if (r.needsAllocation) return 'Allocate';
-    if (r.invoiceId) return 'On invoice';
-    if (r.resolution === 'billable_to_client') return 'Pending';
-    if (r.resolution === 'pending') return '—';
-    if (r.resolution === 'absorbed') return 'Absorbed';
     return '—';
   }
 
@@ -8451,16 +9746,27 @@
 
   function cchPoVarianceFilterChipsHtml(activeFilter, refreshHandler) {
     if (activeFilter === 'billable_to_client') activeFilter = 'pending';
-    return ['ready_to_bill', 'all', 'pending', 'on_invoice', 'absorbed'].map(function(f) {
+    return ['all', 'ready_to_bill', 'pending', 'on_invoice', 'prepaid_tax', 'absorbed'].map(function(f) {
       var labels = {
         ready_to_bill: 'Ready to bill',
         all: 'All',
-        pending: 'Pending',
+        pending: 'Bill to client',
         on_invoice: 'On invoice',
+        prepaid_tax: 'Pre-paid tax',
         absorbed: 'Absorbed'
       };
       return '<button type="button" class="btn btn-sm ' + (activeFilter === f ? 'btn-primary' : 'btn-secondary') + '" style="margin-right:6px;margin-bottom:6px;" onclick="' + refreshHandler + '(\'' + f + '\')">' + labels[f] + '</button>';
     }).join('');
+  }
+
+  function cchPoVarianceInvoiceLinkHtml(r) {
+    if (!r || !r.invoicedOnId) return '—';
+    var num = r.invoiceNum || 'Invoice';
+    var bits = [];
+    if (r.invoiceDate) bits.push(r.invoiceDate);
+    if (r.invoiceStatus) bits.push(r.invoiceStatus);
+    var sub = bits.length ? '<div style="font-size:10px;color:#9CA3AF;">' + esc(bits.join(' · ')) + '</div>' : '';
+    return '<a href="#" onclick="event.preventDefault();navigate(\'#/project/' + escJs(r.projectId) + '/invoice/' + escJs(r.invoicedOnId) + '\')" style="color:#1B3352;font-weight:600;">' + esc(num) + '</a>' + sub;
   }
 
   function cchPoBuildVarianceTableRowsHtml(rows, showProject) {
@@ -8471,7 +9777,6 @@
     return rows.map(function(r) {
       if (r.rowKind === 'component') {
         var canSelect = !!r.readyToBill;
-        var isTax = cchPoIsTaxFamilyReason(r.reasonCode);
         var viArg = (r.viIndex != null && r.viIndex !== '') ? String(parseInt(r.viIndex, 10)) : '-1';
         var cb = '';
         if (canSelect) {
@@ -8484,27 +9789,22 @@
             ' data-taxable="' + escAttr(r.taxable === true ? '1' : '0') + '"' +
             ' data-amt="' + escAttr(String(r.amount)) + '"' +
             ' onchange="cchPoVarianceTabUpdateSelection()" style="accent-color:var(--gold);">';
-        } else if (isTax) {
-          cb = '<span title="Pre-paid tax stays absorbed. It is recovered on the client invoice tax line." style="font-size:12px;color:#9CA3AF;cursor:help;">🔒</span>';
         }
         var choice = '';
-        if (!isTax && !r.invoicedOnId) {
+        if (!r.invoicedOnId && !cchPoIsTaxFamilyReason(r.reasonCode)) {
           function choiceBtn(label, disp) {
             var on = r.disposition === disp;
             return '<button type="button" data-var-disp="' + disp + '" class="btn btn-sm ' + (on ? 'btn-primary' : 'btn-secondary') + '" style="margin:0 4px 0 0;padding:2px 8px;font-size:11px;" onclick="cchPoSetVarianceLineDisposition(\'' + escJs(r.projectId) + '\',\'' + escJs(r.poId) + '\',' + viArg + ',\'' + escJs(r.chargeSource || '') + '\',\'' + disp + '\')">' + label + '</button>';
           }
-          choice = choiceBtn('Pass on', 'billable') + choiceBtn('Bury', 'absorbed');
+          choice = choiceBtn('Bill to client', 'billable') + choiceBtn('Absorbed', 'absorbed');
         }
-        var noteHtml = '';
-        if (!isTax) {
-          noteHtml = '<input type="text" data-var-note value="' + escAttr(r.clientNote || '') + '" placeholder="Note for the invoice" style="display:block;width:100%;margin-top:6px;font-size:12px;padding:4px 6px;border:1px solid #E2E2E2;color:#1B3352;background:#fff;font-family:inherit;box-sizing:border-box;" onclick="event.stopPropagation()" onblur="cchPoSaveVarianceLineNote(\'' + escJs(r.projectId) + '\',\'' + escJs(r.poId) + '\',' + viArg + ',\'' + escJs(r.chargeSource || '') + '\',\'' + escJs(r.componentId) + '\',\'' + escJs(r.invoicedOnId || '') + '\', this.value)">';
-        }
+        var noteHtml = '<input type="text" data-var-note value="' + escAttr(r.clientNote || '') + '" placeholder="Note for the invoice" style="display:block;width:100%;margin-top:6px;font-size:12px;padding:4px 6px;border:1px solid #E2E2E2;color:#1B3352;background:#fff;font-family:inherit;box-sizing:border-box;" onclick="event.stopPropagation()" onblur="cchPoSaveVarianceLineNote(\'' + escJs(r.projectId) + '\',\'' + escJs(r.poId) + '\',' + viArg + ',\'' + escJs(r.chargeSource || '') + '\',\'' + escJs(r.componentId) + '\',\'' + escJs(r.invoicedOnId || '') + '\', this.value)">';
         var taxBit = (r.taxable === true) ? ' · taxable' : (r.taxable === false ? ' · non-tax' : '');
         return '<tr data-var-row="1" data-project-id="' + escAttr(r.projectId) + '" data-po-id="' + escAttr(r.poId) + '" data-charge-source="' + escAttr(r.chargeSource || '') + '" data-vi-index="' + escAttr(viArg) + '" style="background:#fff;">' +
           '<td style="padding:6px 8px 6px 28px;width:36px;" onclick="event.stopPropagation()">' + cb + '</td>' +
           (showProject ? '<td style="padding:6px 8px;font-size:11px;color:#9CA3AF;"></td>' : '') +
           '<td style="padding:6px 8px;font-size:12px;color:#5C6B80;" colspan="2">' +
-            '<span style="font-weight:600;color:#1B3352;">↳ ' + esc(cchPoVarianceReasonLabel(r.reasonCode)) + '</span>' +
+            '<span style="font-size:15px;font-weight:700;color:#1B3352;">↳ ' + esc(cchPoVarianceReasonLabel(r.reasonCode)) + '</span>' +
             '<span style="font-size:10px;color:#9CA3AF;">' + esc(taxBit) + (r.label && r.label !== cchPoVarianceReasonLabel(r.reasonCode) ? ' · ' + esc(r.label) : '') + '</span>' +
             (r.pricing ? '<div style="font-size:10px;font-weight:600;color:#1B3352;margin-top:2px;">' + esc(r.pricing) + '</div>' : '') +
             (choice ? '<div style="margin-top:6px;" onclick="event.stopPropagation()">' + choice + '</div>' : '') +
@@ -8512,9 +9812,9 @@
           '</td>' +
           '<td style="padding:6px 8px;text-align:right;font-size:12px;color:#9CA3AF;">—</td>' +
           '<td style="padding:6px 8px;text-align:right;font-weight:600;color:#1B3352;">' + fmt(r.amount) + '</td>' +
-          '<td style="padding:6px 8px;font-size:12px;">' + esc(cchPoVarianceReasonLabel(r.reasonCode)) + '</td>' +
+          '<td style="padding:6px 8px;font-size:14px;font-weight:700;color:#1B3352;">' + esc(cchPoVarianceReasonLabel(r.reasonCode)) + '</td>' +
           '<td data-var-status style="padding:6px 8px;font-size:12px;">' + esc(cchPoVarianceStatusLabel(r)) + '</td>' +
-          '<td style="padding:6px 8px;font-size:12px;">' + (r.invoicedOnId ? 'Linked' : '—') + '</td></tr>';
+          '<td style="padding:6px 8px;font-size:12px;">' + cchPoVarianceInvoiceLinkHtml(r) + '</td></tr>';
       }
 
       var detail = r.chargeSummary
@@ -8531,8 +9831,8 @@
         '<td style="padding:8px;">' + esc(r.vendor) + '</td>' +
         '<td style="padding:8px;text-align:right;">' + fmt(r.ordered) + '</td>' +
         '<td style="padding:8px;text-align:right;">' + fmt(r.billed) + '</td>' +
-        '<td style="padding:8px;text-align:right;font-weight:600;color:#5C6B80;">' + fmt(r.variance) + '</td>' +
-        '<td style="padding:8px;font-size:11px;color:#9CA3AF;">Net (not billable as lump)</td>' +
+        '<td style="padding:8px;text-align:right;font-weight:600;color:#5C6B80;">—</td>' +
+        '<td style="padding:8px;font-size:11px;color:#9CA3AF;"></td>' +
         '<td style="padding:8px;">' + esc(cchPoVarianceStatusLabel(r)) + '</td>' +
         '<td style="padding:8px;">—</td></tr>';
     }).join('');
@@ -8659,7 +9959,7 @@
     });
     (window.__cchVarBatchRows || []).forEach(function(r) {
       if (r.rowKind !== 'component') return;
-      if (r.disposition === 'absorbed' || cchPoIsTaxFamilyReason(r.reasonCode)) absorbed += parseFloat(r.amount) || 0;
+      if (r.disposition === 'absorbed') absorbed += parseFloat(r.amount) || 0;
       if (r.disposition === 'undecided') undecided += parseFloat(r.amount) || 0;
     });
     var pids = Object.keys(projectIds);
@@ -8712,20 +10012,6 @@
     var rowsByKey = {};
     (window.__cchVarBatchRows || []).forEach(function(r) { rowsByKey[cchPoVarianceRowKey(r)] = r; });
 
-    // Hard guard — tax family never reaches the invoice (WO-DRAFT-A §4.5)
-    for (var gi = 0; gi < checked.length; gi++) {
-      var gReason = String(checked[gi].getAttribute('data-reason') || '');
-      if (cchPoIsTaxFamilyReason(gReason)) {
-        if (typeof window.cchAlert === 'function') {
-          await window.cchAlert(
-            'Pre-paid tax cannot be added to a client invoice. It is recovered on the taxable sell line (Pub 35). Uncheck tax components and try again.',
-            'Bill variances'
-          );
-        }
-        return;
-      }
-    }
-
     var btn = document.getElementById('cchVarBatchAddBtn');
     if (btn) { btn.disabled = true; btn.textContent = createNew ? 'Creating…' : 'Adding…'; }
     try {
@@ -8754,7 +10040,7 @@
           status: 'Draft',
           items: [],
           total: 0,
-          notes: 'Vendor bill variances',
+          notes: '',
           source: 'po_bill_variance',
           clientName: board.clientName || '',
           clientEmail: board.clientEmail || '',
@@ -8788,8 +10074,6 @@
         var rowPid = checked[i].getAttribute('data-project-id') || projectId;
         var componentId = checked[i].getAttribute('data-component-id') || '';
         var reasonCode = String(checked[i].getAttribute('data-reason') || '');
-        if (cchPoIsTaxFamilyReason(reasonCode)) continue;
-
         var row = rowsByKey[rowPid + '_' + poId + '_' + componentId] || rowsByKey[rowPid + '_' + poId];
         if (!row) continue;
 
@@ -8809,31 +10093,54 @@
         noteEl = noteEl ? noteEl.querySelector('[data-var-note]') : null;
         if (noteEl) typedNote = String(noteEl.value || '').trim();
         if (!typedNote) typedNote = String(row.clientNote || '').trim();
-        var detail = typedNote;
-        if (!detail) detail = String(row.pricing || '').trim();
-        if (!detail) detail = cchPoStripDuplicateReason(row.note || row.label || '');
         var vendName = String(row.vendor || po.vendor || '').trim();
         var isFreight = (reasonUse === 'freight' || reasonUse === 'shipping' || reasonUse === 'expedited');
-        items.push({
-          id: linkedLineId,
-          title: vendName || 'Vendor',
-          description: detail,
-          qty: 1,
-          amount: amt,
-          cost: amt,
-          category: isFreight ? 'Freight' : 'Expense',
+        var srcInvBatch = await cchPoLinkedClientInvoice(projectId, po, poId);
+        var productBatch = cchPoProductTitlesOnPo(po, componentId, amt);
+        var kindBatch = cchPoVarianceKindLabel({
+          varianceReasonCode: reasonUse,
           expenseType: isFreight ? 'freight' : 'expense',
+          category: isFreight ? 'Freight' : 'Expense',
+          description: typedNote,
+          title: productBatch
+        }) || (isFreight ? 'Freight' : 'Expense');
+        var bucketBatch = cchPoVarianceClientBucket({
+          varianceReasonCode: reasonUse,
+          expenseType: isFreight ? 'freight' : 'expense',
+          category: isFreight ? 'Freight' : 'Expense',
+          description: typedNote,
+          title: kindBatch
+        });
+        var reasonLabel = cchPoVarianceReasonLabel(reasonUse);
+        var lineTitle = productBatch ? (productBatch + ' — ' + reasonLabel) : reasonLabel;
+        var batchNotes = '';
+        var imgBatch = cchPoVarianceLineImageFields(po, componentId, amt) || {};
+        items.push(Object.assign({
+          id: linkedLineId,
+          title: lineTitle,
+          description: typedNote,
+          lineNotes: batchNotes,
+          sourceInvoiceId: srcInvBatch.id || '',
+          sourceInvoiceNum: srcInvBatch.num || '',
+          qty: 1,
+          amount: isFreight ? 0 : amt,
+          cost: isFreight ? 0 : amt,
+          markupPct: 0,
+          shipping: isFreight ? amt : 0,
+          category: bucketBatch.category,
+          expenseType: bucketBatch.expenseType,
+          qbCategory: isFreight ? 'Freight' : bucketBatch.category,
           taxable: false,
           vendor: vendName,
-          room: 'General',
+          room: cchPoVarianceLineRoom(po, componentId, amt),
           source: 'po_bill_variance',
           poId: poId,
           poNumber: row.poNumber || poNum(po),
           varianceReasonCode: reasonUse,
-          varianceItemLabel: cchPoVarianceInvoiceItemLabel(reasonUse),
+          varianceItemLabel: reasonLabel,
           varianceComponentId: componentId,
           varianceLineShaped: true
-        });
+        }, imgBatch));
 
         var billPatch = null;
         if (bill && (Array.isArray(bill.items) || Array.isArray(bill.vendorInvoices))) {
@@ -8861,7 +10168,12 @@
         added++;
       }
 
-      var total = items.reduce(function(s, it) { return s + (parseFloat(it.amount) || 0); }, 0);
+      var total = items.reduce(function(s, it) {
+        var a = parseFloat(it.amount) || 0;
+        var ship = parseFloat(it.shipping) || 0;
+        if (Math.abs(a) < 0.005) return s + ship;
+        return s + a;
+      }, 0);
       if (createNew) {
         inv.items = items;
         inv.total = Math.round(total * 100) / 100;
@@ -8915,11 +10227,11 @@
         var invHits = cchPoBuildVarianceInvoiceHitIndex(pair[1]);
         pos.forEach(function(d) {
           var p = d.data() || {};
-          var v = p.variance;
-          if (!v || Math.abs(parseFloat(v.amount) || 0) < 0.01) return;
+          var v = p.variance || {};
           var poAt = (p.bill && p.bill.poTotalAtSend != null) ? p.bill.poTotalAtSend : window.cchPoDocTotal(p);
           var billed = (p.bill && p.bill.billTotal != null) ? p.bill.billTotal : poAt;
           var derived = cchPoDeriveVarianceComponents(p.bill, v);
+          if ((!derived.components || !derived.components.length) && Math.abs(parseFloat(v.amount) || 0) < 0.01) return;
           cchPoApplyVarianceInvoiceHits(derived, d.id, poNum(p), invHits);
           var parent = {
             rowKind: 'parent',
@@ -8965,8 +10277,12 @@
               taxable: c.taxable,
               priceBasis: c.priceBasis,
               invoicedOnId: c.invoicedOnId,
+              invoiceNum: c.invoiceNum || '',
+              invoiceDate: c.invoiceDate || '',
+              invoiceStatus: c.invoiceStatus || '',
               invoiceId: c.invoicedOnId || '',
               pricing: c.pricing || '',
+              vendorInvoiceNumber: c.vendorInvoiceNumber || '',
               clientNote: c.clientNote || '',
               resolution: c.disposition === 'billable' ? 'billable_to_client' : (c.disposition === 'absorbed' ? 'absorbed' : 'pending'),
               readyToBill: cchPoVarianceComponentSelectable(c) && !derived.needsAllocation,
@@ -8992,7 +10308,7 @@
     cchPoCaptureVarianceScroll();
     cchPoCaptureVarianceChecks();
     T.innerHTML = '<div style="padding:24px;color:var(--gray-500);">Loading bill variances…</div>';
-    var filter = window._poDiscFilter || 'ready_to_bill';
+    var filter = window._poDiscFilter || 'all';
     var allRows = await window.cchPoCollectVarianceRows(proj.id);
     window.__cchVarBatchRows = allRows.filter(function(r) { return r.rowKind === 'component' && r.readyToBill; });
     var rows = cchPoApplyVarianceRowFilter(allRows, filter);
@@ -9013,7 +10329,7 @@
       '<div><div class="page-title">Bill variances</div>' +
       '<div class="page-subtitle">This project · select multiple PO variances and add to one client invoice</div></div>' +
       '<button type="button" class="btn btn-secondary btn-sm" onclick="navigate(\'' + escJs(typeof window.cchPoFinanceRoute === 'function' ? window.cchPoFinanceRoute('variances') : '#/vendorbills/variances') + '\')">Open firm-wide Bill variances</button></div>' +
-      '<p style="font-size:12px;color:#5C6B80;max-width:720px;margin:0 0 14px;line-height:1.5;">Check a line, then Add to client invoice. Bury keeps that charge in the studio. Pre-paid tax is not billed again.</p>' +
+      '<p style="font-size:12px;color:#5C6B80;max-width:720px;margin:0 0 14px;line-height:1.5;">Each charge is its own line. Bill to client sends it to the client invoice. Absorbed keeps it in the studio. Pre-paid tax is its own tab. The client pays that tax on the invoice.</p>' +
       '<div style="margin-bottom:14px;">' + chips + '</div>' + batchBar +
       cchPoVarianceTableOpenHtml() + '<thead><tr><th style="width:36px;"></th><th>PO</th><th>Vendor</th>' +
       '<th style="text-align:right;">PO total</th><th style="text-align:right;">Bill total</th><th style="text-align:right;">Variance</th>' +
@@ -9109,7 +10425,7 @@
     var cardStyle = 'padding:14px 18px;min-width:160px;background:#fff;border:1px solid rgba(15,26,46,0.12);';
     var allRows = await window.cchPoCollectVarianceRows();
     window.__cchVarBatchRows = allRows.filter(function(r) { return r.rowKind === 'component' && r.readyToBill; });
-    var filter = window._poDiscFilter || 'ready_to_bill';
+    var filter = window._poDiscFilter || 'all';
     var firmProject = window._poVarFirmProject || 'all';
     var rows = cchPoApplyVarianceRowFilter(allRows, filter);
     if (firmProject !== 'all') rows = rows.filter(function(r) { return r.projectId === firmProject; });

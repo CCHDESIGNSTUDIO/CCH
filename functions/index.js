@@ -1595,6 +1595,18 @@ async function runPushInvoiceToQBCore(projectId, docId, sendEmail, opts) {
       proj
     );
 
+    let invoiceShipAddr = null;
+    if (customerId && /^\d+$/.test(String(customerId))) {
+      try {
+        const custFetched = await qbApiCall("GET", "customer/" + customerId, accessToken, realmId);
+        const cust = custFetched && custFetched.Customer;
+        invoiceShipAddr = qbPhysicalAddressForPush(cust && (cust.ShipAddr || cust.BillAddr));
+      } catch (addrErr) {
+        console.warn("[runPushInvoiceToQBCore] customer ship address skipped:", addrErr && addrErr.message ? addrErr.message : addrErr);
+      }
+    }
+    if (!invoiceShipAddr) invoiceShipAddr = qbStudioJobShipAddr(invoice, proj);
+
     const QB_ITEMS = QB_ITEM_IDS;
 
     function qbStripInvoiceVendorParens(text, item) {
@@ -1715,6 +1727,7 @@ async function runPushInvoiceToQBCore(projectId, docId, sendEmail, opts) {
       CustomerMemo: { value: "Thank you for your business — CCH Design" },
       PrivateNote: "Pushed from CCH Studio. Project: " + (proj.name || projectId)
     };
+    if (invoiceShipAddr) qbInvoice.ShipAddr = invoiceShipAddr;
     if (salesTaxForQb > 0.02) {
       qbInvoice.TxnTaxDetail = { TotalTax: salesTaxForQb };
     } else if (allowUpdate) {
@@ -2708,6 +2721,54 @@ function qbPhysicalAddressForPush(addr) {
     if (v != null && String(v).trim()) out[k] = String(v).trim();
   });
   return Object.keys(out).length ? out : null;
+}
+
+/** Job / invoice ship-to as a QBO PhysicalAddress. Used when the customer record has no ShipAddr. */
+function qbStudioJobShipAddr(invoice, proj) {
+  invoice = invoice || {};
+  proj = proj || {};
+  const raw = String(
+    invoice.shipToAddress ||
+    proj.projectAddress ||
+    proj.siteAddress ||
+    proj.jobSiteAddress ||
+    ""
+  ).trim();
+  if (!raw) return null;
+  const lines = raw.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+  const oneLine = raw.match(/^(.*?),\s*([^,]+),\s*([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+  if (lines.length === 1 && oneLine) {
+    return qbPhysicalAddressForPush({
+      Line1: oneLine[1].trim(),
+      City: oneLine[2].trim(),
+      CountrySubDivisionCode: oneLine[3].toUpperCase(),
+      PostalCode: oneLine[4],
+      Country: "USA"
+    });
+  }
+  let street = lines.slice();
+  let city = "";
+  let state = "";
+  let zip = "";
+  const last = street[street.length - 1] || "";
+  const tail = last.match(/^(.+?),\s*([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+  if (tail && street.length > 1) {
+    city = tail[1].trim();
+    state = tail[2].toUpperCase();
+    zip = tail[3];
+    street = street.slice(0, -1);
+  }
+  const out = { Country: "USA" };
+  if (street[0]) out.Line1 = street[0];
+  if (street[1]) out.Line2 = street[1];
+  if (street[2]) out.Line3 = street[2];
+  if (city) out.City = city;
+  if (state) out.CountrySubDivisionCode = state;
+  if (zip) out.PostalCode = zip;
+  if (!out.City && proj.city) out.City = String(proj.city).trim();
+  if (!out.CountrySubDivisionCode && proj.state) out.CountrySubDivisionCode = String(proj.state).trim();
+  if (!out.PostalCode && (proj.zip || proj.postalCode)) out.PostalCode = String(proj.zip || proj.postalCode).trim();
+  return qbPhysicalAddressForPush(out);
 }
 
 /** Create QBO PurchaseOrder from a Studio PO if qbDocId is missing. Used by pushPOToQB and pushBillToQB. */

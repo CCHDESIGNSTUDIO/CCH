@@ -131,7 +131,7 @@ service firebase.storage {
 
     match /specbook/{allPaths=**} {
       allow read: if true;
-      allow create, update: if allowedImageWrite();
+      allow create, update: if allowedProjectWrite();
       allow delete: if signedIn();
     }
 

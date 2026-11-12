@@ -164,9 +164,9 @@
   function _lineRate(it) {
     if (!it) return 0;
     var r = parseFloat(it.rate);
-    if (r > 0) return r;
-    var q = num(it.qty), a = num(it.amount);
-    if (q > 0 && a > 0) return Math.round((a / q) * 100) / 100;
+    if (isFinite(r) && (r > 0 || it.rate === 0 || it.rate === '0')) return r;
+    var u = parseFloat(it.hourlyRate || it.billableRate);
+    if (isFinite(u) && u > 0) return u;
     return 0;
   }
 
@@ -271,10 +271,18 @@
   }
 
   function _lineSubtotal(it) {
+    var base = 0;
     if (typeof global.invoiceLineAmountForTotals === 'function') {
-      return num(global.invoiceLineAmountForTotals(it).lineAmt);
+      base = num(global.invoiceLineAmountForTotals(it).lineAmt);
+    } else {
+      base = num(it && it.amount);
     }
-    return num(it && it.amount);
+    if (Math.abs(base) < 0.005 && it) {
+      var et = String(it.expenseType || '').toLowerCase();
+      var ship = num(it.shipping);
+      if ((et === 'freight' || et === 'shipping') && Math.abs(ship) > 0.005) return ship;
+    }
+    return base;
   }
 
   /** Product-style expense rows for Client View (never hrs/$/hr). */
@@ -342,18 +350,88 @@
     return null;
   }
 
-  /** Live invoice service lines win. Stale clientOutcomes never invent phantom rows. */
+  /** "CCH Client Project Support — Oct 2" → the service name. Other titles stay as typed. */
+  function _serviceGroupName(it) {
+    var title = String((it && (it.title || it.name)) || '').trim();
+    var stripped = title.replace(/\s+[\u2014\u2013\-]\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}(?:,\s*\d{4})?\s*$/i, '').trim();
+    if (stripped) return stripped;
+    var cat = String((it && (it.service || it.category)) || '').trim();
+    return cat || 'Design Services';
+  }
+
+  function _outcomeForServiceGroup(docData, name, rate, groupItems) {
+    var hours = 0;
+    var starts = [];
+    var ends = [];
+    var notes = [];
+    groupItems.forEach(function (it) {
+      var h = num(_lineHours(it));
+      if (h) hours += h;
+      var s = String(it.serviceDateStart || '').slice(0, 10);
+      var e = String(it.serviceDateEnd || '').slice(0, 10) || s;
+      if (s) starts.push(s);
+      if (e) ends.push(e);
+      var n = _lineNotesBody(it);
+      if (!n) {
+        n = String(it.description || '').trim();
+        n = n.replace(/^\s*[\d.]+\s*(?:hours?|hrs?)\b\s*[\u2014\u2013\-·:]*\s*(design\s+services)?\s*$/i, '').trim();
+      }
+      if (!n) return;
+      var when = _fmtDate(it.serviceDateStart);
+      var line = when ? (when + ' \u2014 ' + n) : n;
+      if (notes.indexOf(line) < 0) notes.push(line);
+    });
+    hours = Math.round(hours * 100) / 100;
+    starts.sort();
+    ends.sort();
+    var fake = {
+      title: name,
+      qty: hours,
+      hours: hours,
+      rate: rate,
+      serviceDateStart: starts[0] || '',
+      serviceDateEnd: ends.length ? ends[ends.length - 1] : '',
+      description: '',
+      lineNotes: ''
+    };
+    var co = docData && docData.clientOutcomes;
+    var ai = null;
+    if (Array.isArray(co)) {
+      var want = name.toLowerCase();
+      for (var j = 0; j < co.length; j++) {
+        var ot = String((co[j] && co[j].title) || '').trim().toLowerCase();
+        if (ot && ot === want) { ai = co[j]; break; }
+      }
+    }
+    var row = _outcomeFromLine(ai || {}, fake);
+    row.title = name;
+    row.hours = hours;
+    if (!row.desc && notes.length) row.desc = notes.join('\n');
+    return row;
+  }
+
+  /** Client letter: one row per service and rate. Edit still keeps one line per time entry. */
   function _outcomes(docData, items) {
     var svcItems = [];
     (items || []).forEach(function (it) { if (_isServiceLine(it)) svcItems.push(it); });
-    var co = docData && docData.clientOutcomes;
-    if (svcItems.length) {
-      return svcItems.map(function (it, i) {
-        return _outcomeFromLine(_findOutcomeForItem(co, it, i) || {}, it);
-      });
-    }
-    /* No service lines left — do not resurrect orphan AI outcomes. */
-    return [];
+    if (!svcItems.length) return [];
+    var groups = [];
+    var index = {};
+    svcItems.forEach(function (it) {
+      var name = _serviceGroupName(it);
+      var rate = _lineRate(it);
+      var key = name.toLowerCase() + '|' + String(Math.round(rate * 100) / 100);
+      var g = index[key];
+      if (!g) {
+        g = { name: name, rate: rate, items: [] };
+        index[key] = g;
+        groups.push(g);
+      }
+      g.items.push(it);
+    });
+    return groups.map(function (g) {
+      return _outcomeForServiceGroup(docData, g.name, g.rate, g.items);
+    });
   }
 
   /** Pure design-services / hours invoices never show client sales tax (WO-067 fail #3). */
@@ -515,7 +593,8 @@
     ['.foot-line', 'font-size:11px;color:#56616E;margin-top:7px;'],
     ['.ds-dates', 'display:none;'],
     ['.ds-hours', 'display:none;'],
-    ['.ds-rate', 'display:none;']
+    ['.ds-rate', 'display:none;'],
+    ['.ds-notes', 'display:none;']
   ];
   function _css(prefix) { return RULES.map(function (r) { return prefix + r[0] + '{' + r[1] + '}'; }).join(''); }
 
@@ -627,7 +706,7 @@
       var metaHtml = _metaHtml(o);
       outcomesHtml += '<div class="outcome"><div class="o-num">' + n + '</div><div>' +
         '<div class="o-head"><div class="o-title">' + esc(o.title) + '</div>' + metaHtml + '</div>' +
-        (o.desc ? '<div class="o-desc">' + esc(o.desc) + '</div>' : '') + '</div></div>';
+        (o.desc ? '<div class="o-desc ds-notes">' + esc(o.desc) + '</div>' : '') + '</div></div>';
     });
     var expenseHtml = _expenseTableHtml(c.expenseRows);
     var hoursBlock = '';
@@ -685,19 +764,19 @@
 
   function _dsDisplayBootScript(disp) {
     disp = disp || {};
-    return '<script>(function(){var d=' + JSON.stringify({ dates: !!disp.dates, hours: !!disp.hours, rate: !!disp.rate }) + ';' +
+    return '<script>(function(){var d=' + JSON.stringify({ dates: !!disp.dates, hours: !!disp.hours, rate: !!disp.rate, notes: disp.notes !== false }) + ';' +
       'function cchDsToggleDisplay(k,on){d[k]=!!on;var els=document.querySelectorAll(".ds-"+k);for(var i=0;i<els.length;i++){els[i].style.display=on?(els[i].tagName==="SPAN"?"inline":"block"):"none";}}' +
-      '["dates","hours","rate"].forEach(function(k){if(d[k])cchDsToggleDisplay(k,true);});})();<\/script>';
+      '["dates","hours","rate","notes"].forEach(function(k){if(d[k])cchDsToggleDisplay(k,true);});})();<\/script>';
   }
 
   function _defaultDsDisplay() {
-    return { dates: false, hours: false, rate: false };
+    return { dates: false, hours: false, rate: false, notes: true };
   }
 
   global.cchApplyDsDisplay = function () {
     var disp = global._cchDsDisplay || _defaultDsDisplay();
-    ['dates', 'hours', 'rate'].forEach(function (k) {
-      var on = !!disp[k];
+    ['dates', 'hours', 'rate', 'notes'].forEach(function (k) {
+      var on = k === 'notes' ? disp.notes !== false : !!disp[k];
       var e = document.querySelectorAll('#cchInvClientLanding .ds-' + k);
       for (var i = 0; i < e.length; i++) e[i].style.display = on ? (e[i].tagName === 'SPAN' ? 'inline' : 'block') : 'none';
     });
@@ -705,7 +784,7 @@
 
   global.cchDsToggleDisplay = function (key, on) {
     if (!global._cchDsDisplay) global._cchDsDisplay = _defaultDsDisplay();
-    if (key === 'dates' || key === 'hours' || key === 'rate') global._cchDsDisplay[key] = !!on;
+    if (key === 'dates' || key === 'hours' || key === 'rate' || key === 'notes') global._cchDsDisplay[key] = !!on;
     try { localStorage.setItem('cchDsClientDisplay', JSON.stringify(global._cchDsDisplay)); } catch (_eLs) {}
     document.querySelectorAll('[data-cch-ds="' + key + '"]').forEach(function (cb) { cb.checked = !!on; });
     global.cchApplyDsDisplay();
@@ -719,11 +798,12 @@
         disp.dates = !!saved.dates;
         disp.hours = !!saved.hours;
         disp.rate = !!saved.rate;
+        disp.notes = saved.notes !== false;
       }
     } catch (_eParse) {}
     global._cchDsDisplay = disp;
-    ['dates', 'hours', 'rate'].forEach(function (k) {
-      document.querySelectorAll('[data-cch-ds="' + k + '"]').forEach(function (cb) { cb.checked = !!disp[k]; });
+    ['dates', 'hours', 'rate', 'notes'].forEach(function (k) {
+      document.querySelectorAll('[data-cch-ds="' + k + '"]').forEach(function (cb) { cb.checked = k === 'notes' ? disp.notes !== false : !!disp[k]; });
     });
     global.cchApplyDsDisplay();
   };
@@ -735,7 +815,32 @@
     function chk(k, text) {
       return '<label style="' + lbl + '"><input type="checkbox" data-cch-ds="' + k + '" onchange="cchDsToggleDisplay(\'' + k + '\',this.checked)"> ' + text + '</label>';
     }
-    return chk('dates', 'Show date') + chk('hours', 'Show hours') + chk('rate', 'Show rate');
+    var lay = global.cchInvClientLayout ? global.cchInvClientLayout() : 'simple';
+    function layBtn(mode, text) {
+      var on = lay === mode;
+      return '<button type="button" class="btn btn-sm ' + (on ? 'btn-primary' : 'btn-secondary') + '" style="padding:4px 10px;font-size:12px;" onclick="cchSetInvClientLayout(\'' + mode + '\')">' + text + '</button>';
+    }
+    return layBtn('simple', 'Simple') + layBtn('itemized', 'Itemized') + chk('notes', 'Show notes') + chk('dates', 'Show date') + chk('hours', 'Show hours') + chk('rate', 'Show rate');
+  };
+
+  global.cchInvClientLayout = function () {
+    try { if (localStorage.getItem('cchInvClientLayout') === 'itemized') return 'itemized'; } catch (_eL) {}
+    return 'simple';
+  };
+  global.cchSetInvClientLayout = function (mode) {
+    mode = mode === 'itemized' ? 'itemized' : 'simple';
+    try { localStorage.setItem('cchInvClientLayout', mode); } catch (_eS) {}
+    var x = global._cchInvViewCtx || global._cchDsCtx || {};
+    if (x.projectId && x.docId && typeof global.db !== 'undefined' && global.db) {
+      global.db.collection('boards').doc(x.projectId).collection('invoices').doc(x.docId).update({ clientInvoiceLayout: mode }).catch(function () {});
+    }
+    if (mode === 'itemized' && x.projectId && x.docId && typeof global.previewDocument === 'function') {
+      global.previewDocument('invoice', x.projectId, x.docId);
+      return;
+    }
+    if (x.projectId && x.docId && typeof global.renderInvoiceDetail === 'function' && document.getElementById('cchInvClientLanding')) {
+      global.renderInvoiceDetail(x.projectId, x.docId);
+    }
   };
 
   global.cchDocSetViewMode = function (mode) {
@@ -764,6 +869,10 @@
           items = docData.items || [];
         }
       } catch (_eLd) { items = []; }
+    }
+    if (global.cchInvClientLayout && global.cchInvClientLayout() === 'itemized' && typeof global.previewDocument === 'function') {
+      await global.previewDocument('invoice', projectId, docId);
+      return;
     }
     if (items && typeof global.cchInvoiceUsesDesignServicesLayout === 'function' &&
         global.cchInvoiceUsesDesignServicesLayout(docData, items)) {
@@ -815,6 +924,7 @@
         disp.dates = !!saved.dates;
         disp.hours = !!saved.hours;
         disp.rate = !!saved.rate;
+        disp.notes = saved.notes !== false;
       }
     } catch (_eLs) {}
     global._cchDsDisplay = disp;
@@ -825,9 +935,11 @@
     }
     var _portalOpen = !!global._cchPortalDocOpen;
     if (_portalOpen) global._cchPortalDocOpen = false;
+    var layoutBtns = '<button type="button" class="tb-btn tb-btn-primary" onclick="cchPickLayout(\'simple\')">Simple</button>' +
+      '<button type="button" class="tb-btn" onclick="cchPickLayout(\'itemized\')">Itemized</button>';
     var toggles = _portalOpen
       ? ''
-      : (chk('dates', 'Show date', disp.dates) + chk('hours', 'Show hours', disp.hours) + chk('rate', 'Show rate', disp.rate));
+      : (layoutBtns + chk('notes', 'Show notes', disp.notes !== false) + chk('dates', 'Show date', disp.dates) + chk('hours', 'Show hours', disp.hours) + chk('rate', 'Show rate', disp.rate));
     var _invPay = Object.assign({ id: docId }, docData);
     /* One Pay in toolbar only — CC + Zelle are on the portal Pay page. */
     var payTb = (typeof global.cchInvoiceClientPayBarHtml === 'function')
@@ -858,9 +970,10 @@
       '<div class="preview-body">' + payBar + '<div id="cchInvClientLanding">' + _sheet(c) + '</div></div>' +
       '<script>var _cchDsDisp=' + JSON.stringify(disp) + ';' +
       'function cchDsPrevToggle(k,on){_cchDsDisp[k]=!!on;try{localStorage.setItem("cchDsClientDisplay",JSON.stringify(_cchDsDisp));}catch(e){}' +
-      '["dates","hours","rate"].forEach(function(key){var show=!!_cchDsDisp[key];document.querySelectorAll(".ds-"+key).forEach(function(el){el.style.display=show?(el.tagName==="SPAN"?"inline":"block"):"none";});});' +
+      '["dates","hours","rate","notes"].forEach(function(key){var show=!!_cchDsDisp[key];document.querySelectorAll(".ds-"+key).forEach(function(el){el.style.display=show?(el.tagName==="SPAN"?"inline":"block"):"none";});});' +
       'document.querySelectorAll("[data-cch-ds]").forEach(function(cb){cb.checked=!!_cchDsDisp[cb.getAttribute("data-cch-ds")];});}' +
-      '["dates","hours","rate"].forEach(function(k){if(_cchDsDisp[k])cchDsPrevToggle(k,true);});<\/script></body></html>'
+      'function cchPickLayout(mode){try{localStorage.setItem("cchInvClientLayout",mode==="itemized"?"itemized":"simple");}catch(e){}if(window.opener&&opener.cchPreviewInvoiceAgain){opener.cchPreviewInvoiceAgain(window,' + JSON.stringify(projectId) + ',' + JSON.stringify(docId) + ');}}' +
+      '["dates","hours","rate","notes"].forEach(function(k){if(_cchDsDisp[k])cchDsPrevToggle(k,true);});<\/script></body></html>'
     );
     win.document.close();
     try { win.focus(); } catch (_eF) {}
@@ -969,18 +1082,21 @@
       prevOut.some(function (o) {
         return !!(String((o && o.title) || '').trim() || String((o && o.description) || '').trim());
       }));
-    if (!hasHuman) {
+    function _aiOutcomeRows(list) {
+      return (list || []).map(function (o) {
+        o = o || {};
+        return {
+          title: String(o.title || '').trim(),
+          description: String(o.description || '').trim(),
+          dateRange: String(o.dateRange || '').trim(),
+          hours: o.hours != null ? o.hours : ''
+        };
+      }).filter(function (o) { return o.title || o.description; });
+    }
+    if (!hasHuman || (aiOut.length && aiOut.length < prevOut.length)) {
       return {
-        summary: String(ai.summary || '').trim(),
-        outcomes: aiOut.map(function (o) {
-          o = o || {};
-          return {
-            title: String(o.title || '').trim(),
-            description: String(o.description || '').trim(),
-            dateRange: String(o.dateRange || '').trim(),
-            hours: o.hours != null ? o.hours : ''
-          };
-        })
+        summary: String(ai.summary || '').trim() || String(existing.summary || '').trim(),
+        outcomes: _aiOutcomeRows(aiOut.length ? aiOut : prevOut)
       };
     }
     var summary = String(existing.summary || '').trim() || String(ai.summary || '').trim();

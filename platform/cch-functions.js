@@ -1099,6 +1099,7 @@ async function showNewVendorModal(existingId, categoryHint) {
     '<div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="vnPhone" value="' + escAttr(v.phone||'') + '"></div>' +
     '<div class="form-group"><label class="form-label">Email</label><input class="form-input" id="vnEmail" value="' + escAttr(v.email||'') + '"></div>' +
     '<div class="form-group"><label class="form-label">Account #</label><input class="form-input" id="vnAccount" value="' + escAttr(v.account||'') + '"></div>' +
+    '<div class="form-group"><label class="form-label">QuickBooks vendor Id</label><input class="form-input" id="vnQbVendorId" value="' + escAttr(v.qbVendorId != null ? String(v.qbVendorId) : '') + '" placeholder="QuickBooks vendor Id" inputmode="numeric"></div>' +
     '<div class="form-group" style="grid-column:span 2;"><label class="form-label">Address</label><input class="form-input" id="vnAddress1" value="' + escAttr(addrParts.line1) + '" placeholder="Street address"></div>' +
     '<div class="form-group" style="grid-column:span 2;"><label class="form-label">Address 2</label><input class="form-input" id="vnAddress2" value="' + escAttr(addrParts.line2) + '" placeholder="Suite, unit, etc (optional)"></div>' +
     '<div class="form-group" style="grid-column:span 2;display:grid;grid-template-columns:1fr 120px 120px;gap:12px;">' +
@@ -1176,6 +1177,7 @@ async function saveVendor(existingId, category) {
     state: addrParts.state,
     zip: addrParts.zip,
     account: ((document.getElementById('vnAccount') || {}).value || '').trim(),
+    qbVendorId: String(((document.getElementById('vnQbVendorId') || {}).value || '')).replace(/\D/g, ''),
     leadTime: ((document.getElementById('vnLeadTime') || {}).value || '').trim(),
     description: ((document.getElementById('vnDescription') || {}).value || '').trim(),
     tags: ((document.getElementById('vnTags') || {}).value || '').trim(),
@@ -1710,6 +1712,112 @@ function renderContractorsView(query) {
 }
 window.renderContractorsView = renderContractorsView;
 
+function cchContactNameHits(hay, needle) {
+  hay = String(hay || '').toLowerCase().trim();
+  needle = String(needle || '').toLowerCase().trim();
+  if (!hay || !needle) return false;
+  if (hay === needle) return true;
+  if (needle.length > 3 && hay.length > 3 && (hay.indexOf(needle) >= 0 || needle.indexOf(hay) >= 0)) return true;
+  return false;
+}
+
+function cchPoBelongsToContact(po, name, kind) {
+  po = po || {};
+  if (cchContactNameHits(po.vendor, name) || cchContactNameHits(po.vendorName, name) || cchContactNameHits(po._displayVendor, name)) return true;
+  var items = po.items || [];
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i] || {};
+    if (cchContactNameHits(it.vendor, name) || cchContactNameHits(it.vendorName, name)) return true;
+    if (cchContactNameHits(it.shipTo, name) || cchContactNameHits(it.deliverTo, name)) return true;
+  }
+  if (cchContactNameHits(po.workroom, name) || cchContactNameHits(po.receiver, name)) return true;
+  if (cchContactNameHits(po.shipTo, name) || cchContactNameHits(po.deliverTo, name) || cchContactNameHits(po.location, name)) return true;
+  if (typeof window.cchPoResolveReceivingLocation === 'function') {
+    if (cchContactNameHits(window.cchPoResolveReceivingLocation(po, kind), name)) return true;
+  }
+  if (typeof window.cchPoListShipToLabel === 'function') {
+    if (cchContactNameHits(window.cchPoListShipToLabel(po), name)) return true;
+  }
+  return false;
+}
+
+async function cchLoadPosForContacts() {
+  if (typeof window.cchPoLoadAllPosForVendorBills === 'function') {
+    var loaded = await window.cchPoLoadAllPosForVendorBills();
+    return (loaded && loaded.pos) || [];
+  }
+  return [];
+}
+
+function cchContactPoRowsHtml(pos) {
+  if (!pos || !pos.length) {
+    return '<div style="padding:8px 12px 12px 28px;font-size:12px;color:var(--gray-400);">No purchase orders.</div>';
+  }
+  var rows = pos.slice().sort(function(a, b) {
+    return String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || ''));
+  }).map(function(po) {
+    var total = typeof window.cchPoDocTotal === 'function' ? window.cchPoDocTotal(po) : (parseFloat(po.total) || 0);
+    var st = typeof window.cchPoProcurementStatusLabel === 'function' ? window.cchPoProcurementStatusLabel(po) : (po.status || 'Draft');
+    var when = po.issueDate || po.orderDate || po.poDate || po.date || po.createdAt || '';
+    var whenLabel = typeof formatDate === 'function' ? formatDate(when) : String(when || '').slice(0, 10);
+    var num = typeof window.cchPoListDisplayNumber === 'function' ? window.cchPoListDisplayNumber(po) : (po.number || po.num || '');
+    var href = '#/project/' + encodeURIComponent(po.projectId || '') + '/po/' + encodeURIComponent(po.id || '');
+    return '<tr style="cursor:pointer;" onclick="event.stopPropagation();navigate(\'' + href + '\')">' +
+      '<td style="padding:8px 10px;font-weight:600;font-family:monospace;color:var(--gold);">' + esc(num || '—') + '</td>' +
+      '<td style="padding:8px 10px;">' + esc(po.projectName || '') + '</td>' +
+      '<td style="padding:8px 10px;color:var(--gray-500);">' + esc(po._displayVendor || po.vendor || '') + '</td>' +
+      '<td style="padding:8px 10px;">' + esc(whenLabel) + '</td>' +
+      '<td style="padding:8px 10px;">' + (typeof statusBadge === 'function' ? statusBadge(st) : esc(st)) + '</td>' +
+      '<td style="padding:8px 10px;text-align:right;font-family:var(--font-mono);font-weight:600;">' + (typeof formatMoney === 'function' ? formatMoney(total) : esc(String(total))) + '</td>' +
+      '</tr>';
+  }).join('');
+  return '<div style="padding:0 12px 14px 28px;">' +
+    '<table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff;">' +
+    '<thead><tr style="border-bottom:1px solid var(--gray-200);">' +
+    '<th style="padding:6px 10px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);">PO #</th>' +
+    '<th style="padding:6px 10px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);">Project</th>' +
+    '<th style="padding:6px 10px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);">Vendor</th>' +
+    '<th style="padding:6px 10px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);">Date</th>' +
+    '<th style="padding:6px 10px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);">Status</th>' +
+    '<th style="padding:6px 10px;text-align:right;font-size:10px;text-transform:uppercase;color:var(--gray-400);">Amount</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+
+async function openContactPoDetail(id, kind) {
+  var isRecv = kind === 'receiver';
+  var listLabel = isRecv ? 'Delivery / Receivers' : 'Workrooms';
+  var listHash = isRecv ? '#/deliveryreceivers' : '#/workrooms';
+  var cat = isRecv ? 'Delivery / Receiver' : 'Workroom';
+  var T = document.getElementById('contentArea');
+  T.innerHTML = '<div style="text-align:center;padding:60px;color:var(--gray-400);">Loading...</div>';
+  var items = isRecv ? (window._allReceivers || []) : (window._allWorkrooms || []);
+  var v = null;
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].id === id) { v = items[i]; break; }
+  }
+  if (!v) {
+    var vd = await db.collection('vendors').doc(id).get();
+    if (!vd.exists) {
+      T.innerHTML = '<div class="empty-state"><div class="empty-text">Not found.</div></div>';
+      return;
+    }
+    v = Object.assign({ id: vd.id }, vd.data());
+  }
+  if (!window._allContactPos) window._allContactPos = await cchLoadPosForContacts();
+  var mine = (window._allContactPos || []).filter(function(po) {
+    return cchPoBelongsToContact(po, v.name, isRecv ? 'receiver' : 'workroom');
+  });
+  setBreadcrumb([{ label: listLabel, hash: listHash }, { label: v.name || '' }]);
+  setTopbarActions('<button class="btn btn-secondary" onclick="showNewVendorModal(\'' + id + '\',\'' + cat + '\')">Edit</button>');
+  var sub = [v.contact, v.phone, v.email].filter(Boolean).map(function(s) { return esc(s); }).join(' · ');
+  T.innerHTML = '<h1 class="page-title">' + esc(v.name || '') + '</h1>' +
+    (sub ? '<p style="color:var(--gray-500);margin:-8px 0 16px;">' + sub + '</p>' : '') +
+    '<p style="color:var(--gray-400);margin-bottom:12px;font-size:13px;">' + mine.length + ' purchase orders</p>' +
+    '<div class="card" style="overflow:hidden;">' + cchContactPoRowsHtml(mine) + '</div>';
+}
+window.openWorkroomDetail = function(id) { return openContactPoDetail(id, 'workroom'); };
+window.openReceiverDetail = function(id) { return openContactPoDetail(id, 'receiver'); };
+
 // ==================== WORKROOMS ====================
 async function renderWorkrooms() {
   setBreadcrumb([{ label: 'Workrooms' }]);
@@ -1722,10 +1830,13 @@ async function renderWorkrooms() {
     snap.forEach(function(d) { items.push(Object.assign({ id: d.id }, d.data())); });
     items.sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
     window._allWorkrooms = items;
+    window._cchWorkroomsCache = items.map(function(v) { return { name: v.name || '' }; });
+    window._allContactPos = await cchLoadPosForContacts();
     renderWorkroomsView('');
   } catch(e) { T.innerHTML = '<div class="empty-state"><div class="empty-text">Error: ' + esc(e.message) + '</div></div>'; }
 }
 window.renderWorkrooms = renderWorkrooms;
+window.renderDeliveryReceivers = renderDeliveryReceivers;
 
 function renderWorkroomsView(query) {
   var T = document.getElementById('contentArea');
@@ -1743,13 +1854,16 @@ function renderWorkroomsView(query) {
     T.innerHTML = '<h1 class="page-title">Workrooms</h1><p style="color:var(--gray-400);margin-bottom:20px;">Upholsterers, drapery workrooms, installers, and fabricators</p><div class="empty-state"><div class="empty-icon">🔨</div><div class="empty-text">No workrooms yet. Run the Vendor Import tool or add manually.</div><button class="btn btn-primary" onclick="showNewVendorModal(null,\'Workroom\')">+ New Workroom</button></div>';
     return;
   }
+  var allPos = window._allContactPos || [];
   var rows = filtered.map(function(v) {
-    return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="showNewVendorModal(\'' + v.id + '\',\'Workroom\')">' +
+    var mine = allPos.filter(function(po) { return cchPoBelongsToContact(po, v.name, 'workroom'); });
+    return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="navigate(\'#/workrooms/' + encodeURIComponent(v.id) + '\')">' +
       '<td style="padding:10px 12px;font-weight:600;">' + esc(v.name||'') + '</td>' +
       '<td style="padding:10px 12px;font-size:12px;color:var(--gray-500);">' + esc(v.description||v.type||'') + '</td>' +
       '<td style="padding:10px 12px;">' + esc(v.contact||'') + '</td>' +
       '<td style="padding:10px 12px;">' + esc(v.phone||'') + (v.email ? '<br><span style="font-size:11px;color:var(--gray-400);">' + esc(v.email) + '</span>' : '') + '</td>' +
       '<td style="padding:10px 12px;font-size:11px;color:var(--gray-400);">' + esc(v.tags||'') + '</td>' +
+      '<td style="padding:10px 12px;font-weight:600;text-align:right;">' + mine.length + '</td>' +
       '<td style="padding:10px 8px;"><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();showNewVendorModal(\'' + v.id + '\',\'Workroom\')">Edit</button></td></tr>';
   }).join('');
   T.innerHTML = '<h1 class="page-title">Workrooms</h1>' +
@@ -1764,6 +1878,7 @@ function renderWorkroomsView(query) {
     '<th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Contact</th>' +
     '<th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Phone / Email</th>' +
     '<th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Tags</th>' +
+    '<th style="text-align:right;padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">POs</th>' +
     '<th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
 
@@ -1783,6 +1898,7 @@ async function renderDeliveryReceivers() {
     snap.forEach(function(d) { items.push(Object.assign({ id: d.id }, d.data())); });
     items.sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
     window._allReceivers = items;
+    window._allContactPos = window._allContactPos || await cchLoadPosForContacts();
     renderReceiversView('');
   } catch(e) { T.innerHTML = '<div class="empty-state"><div class="empty-text">Error: ' + esc(e.message) + '</div></div>'; }
 }
@@ -1813,12 +1929,14 @@ function renderReceiversView(query) {
       addrDisp = v.address || '';
     }
     addrDisp = String(addrDisp).replace(/\n/g, ', ');
-    return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="showNewVendorModal(\'' + v.id + '\',\'Delivery / Receiver\')">' +
+    var mine = (window._allContactPos || []).filter(function(po) { return cchPoBelongsToContact(po, v.name, 'receiver'); });
+    return '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;" onclick="navigate(\'#/deliveryreceivers/' + encodeURIComponent(v.id) + '\')">' +
       '<td style="padding:10px 12px;font-weight:600;">' + esc(v.name||'') + '</td>' +
       '<td style="padding:10px 12px;font-size:12px;color:var(--gray-500);">' + esc(v.description||v.type||'') + '</td>' +
       '<td style="padding:10px 12px;">' + esc(v.contact||'') + '</td>' +
       '<td style="padding:10px 12px;">' + esc(v.phone||'') + (v.email ? '<br><span style="font-size:11px;color:var(--gray-400);">' + esc(v.email) + '</span>' : '') + '</td>' +
       '<td style="padding:10px 12px;font-size:12px;">' + esc(addrDisp).substring(0,40) + '</td>' +
+      '<td style="padding:10px 12px;font-weight:600;text-align:right;">' + mine.length + '</td>' +
       '<td style="padding:10px 8px;"><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();showNewVendorModal(\'' + v.id + '\',\'Delivery / Receiver\')">Edit</button></td></tr>';
   }).join('');
   T.innerHTML = '<h1 class="page-title">Delivery / Receivers</h1>' +
@@ -1833,6 +1951,7 @@ function renderReceiversView(query) {
     '<th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Contact</th>' +
     '<th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Phone / Email</th>' +
     '<th style="text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">Address</th>' +
+    '<th style="text-align:right;padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--gray-400);font-weight:600;">POs</th>' +
     '<th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
 

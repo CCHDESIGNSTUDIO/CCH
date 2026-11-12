@@ -3089,13 +3089,16 @@
     .proj-file-menu-wrap.is-open { z-index: 9000; }
     .proj-file-kebab-btn { border: 1px solid rgba(15,26,46,0.12); background: #fff; color: var(--gray-500); font-size: 18px; line-height: 1; padding: 4px 10px; cursor: pointer; border-radius: 0; min-width: 36px; font-weight: 700; }
     .proj-file-kebab-btn:hover { color: var(--gold); border-color: rgba(196,164,100,0.45); }
-    .proj-file-dropdown { display: none; position: absolute; right: 0; top: 100%; margin-top: 6px; min-width: 220px; max-height: min(70vh, 420px); overflow-y: auto; background: #fff; border: 1px solid rgba(15,26,46,0.14); box-shadow: 0 14px 40px rgba(15,26,46,0.2); z-index: 9001; padding: 6px 0; text-align: left; }
+    .proj-file-dropdown { display: none; position: absolute; right: 0; top: 100%; margin-top: 6px; min-width: 220px; max-height: min(70vh, 420px); overflow-y: auto; background: #0A1F3D; border: 1px solid rgba(196,164,100,0.45); box-shadow: 0 14px 40px rgba(15,26,46,0.35); z-index: 9001; padding: 6px 0; text-align: left; scrollbar-color: #C4A464 #0A1F3D; }
+    .proj-file-dropdown::-webkit-scrollbar { width: 10px; }
+    .proj-file-dropdown::-webkit-scrollbar-track { background: #0A1F3D; }
+    .proj-file-dropdown::-webkit-scrollbar-thumb { background: #C4A464; }
     /* Grid cards: open menu upward so it is not clipped by the next row */
     .proj-file-grid-card .proj-file-dropdown { top: auto; bottom: 100%; margin-top: 0; margin-bottom: 6px; }
-    .proj-file-dd-item { display: block; width: 100%; text-align: left; padding: 11px 18px; border: none; background: none; cursor: pointer; font-size: 11px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: #0F1A2E; font-family: inherit; }
-    .proj-file-dd-item:hover:not([disabled]) { background: rgba(196,164,100,0.12); }
+    .proj-file-dd-item { display: block; width: 100%; text-align: left; padding: 11px 18px; border: none; background: none; cursor: pointer; font-size: 11px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: #F4F0E6; font-family: inherit; }
+    .proj-file-dd-item:hover:not([disabled]) { background: rgba(196,164,100,0.28); color: #FFFFFF; }
     .proj-file-dd-item[disabled] { opacity: 0.4; cursor: not-allowed; }
-    .proj-file-dd-item.proj-file-dd-danger { color: #B91C1C; }
+    .proj-file-dd-item.proj-file-dd-danger { color: #F3B4B4; }
     .doc-edit-footer { display:flex; justify-content:space-between; gap:24px; padding-top:20px; border-top:2px solid rgba(196,164,100,0.15); }
     .doc-edit-footer-left { flex:1; }
     .doc-edit-totals { min-width:260px; }
@@ -4415,11 +4418,37 @@
         var key = num ? ('num:' + num.toLowerCase()) : ('id:' + String(inv && inv.id || ''));
         var prev = byKey[key];
         if (!prev) { byKey[key] = inv; return; }
-        var prevDate = getDocDate(prev) || '';
-        var curDate = getDocDate(inv) || '';
-        if (curDate >= prevDate) byKey[key] = inv;
+        byKey[key] = cchPreferInvoiceTwin(prev, inv);
       });
-      return Object.values(byKey);
+      var out = Object.values(byKey);
+      function collapseLinked(field) {
+        var groups = {};
+        out.forEach(function(inv) {
+          var id = String(inv && inv[field] || '').trim();
+          if (!id) return;
+          if (!groups[id]) groups[id] = [];
+          groups[id].push(inv);
+        });
+        var drop = new Set();
+        Object.keys(groups).forEach(function(id) {
+          var g = groups[id];
+          if (g.length < 2) return;
+          var keep = g[0];
+          for (var i = 1; i < g.length; i++) keep = cchPreferInvoiceTwin(keep, g[i]);
+          g.forEach(function(inv) { if (inv !== keep) drop.add(inv); });
+        });
+        if (drop.size) out = out.filter(function(inv) { return !drop.has(inv); });
+      }
+      collapseLinked('qbDocId');
+      collapseLinked('houzzInvoiceId');
+      return out;
+    }
+    function cchPreferInvoiceTwin(a, b) {
+      function qb(inv) { return String(inv && (inv.qbDocId || inv.qbInvoiceId) || '').trim(); }
+      var aq = qb(a), bq = qb(b);
+      if (aq && !bq) return a;
+      if (bq && !aq) return b;
+      return (getDocDate(b) || '') >= (getDocDate(a) || '') ? b : a;
     }
 
     /** Sent-to-client lifecycle only — Draft/void/clip placeholders and QB-pushed-not-sent do not count. */
@@ -4444,13 +4473,15 @@
       if (st === 'suggested' || st === 'rejected' || st === 'discarded') return false;
       return true;
     }
+    /** Rate stored on the time entry. Zero and blank stay zero — do not substitute the $250 principal rate. */
+    function cchEntryBillRate(t) {
+      var rate = parseFloat(t && (t.rate || t.hourlyRate || t.billableRate));
+      if (!isNaN(rate) && rate > 0.001) return rate;
+      return 0;
+    }
     function loggedValueFromTimeEntries(entries) {
       return (entries || []).filter(timeEntryCountsForLoggedValue).reduce(function(s, t) {
-        var memberStr = t.member || t.user || '';
-        var rate = _isOwnerMember(memberStr)
-          ? _ownerLaborRateForEntry(t)
-          : (parseFloat(t.rate || t.hourlyRate || t.billableRate) || _getMemberRate(memberStr));
-        return s + ((parseFloat(t.hours) || 0) * rate);
+        return s + ((parseFloat(t.hours) || 0) * cchEntryBillRate(t));
       }, 0);
     }
     /** Sum design / professional service line amounts on sent invoices (fee stream only). */
@@ -4459,7 +4490,9 @@
         var items = inv.items || inv.lineItems || [];
         if (!items.length) {
           if (inv.source === 'time-tracker' || (Array.isArray(inv.timeEntryIds) && inv.timeEntryIds.length)) {
-            return sum + (parseFloat(inv.total) || parseFloat(inv.amount) || 0);
+            var whole = parseFloat(inv.total) || parseFloat(inv.amount) || 0;
+            var taxOnly = parseFloat(inv.taxAmount || inv.tax) || 0;
+            return sum + Math.max(0, whole - taxOnly);
           }
           return sum;
         }
@@ -4474,82 +4507,322 @@
         }, 0);
       }, 0);
     }
+    /** Pre-tax, tax, real payments, and open balance for one invoice. Does not write. */
+    function cchInvoiceDisplayMoney(inv) {
+      if (!inv) return { preTax: 0, tax: 0, inclusive: 0, paid: 0, credit: 0, balance: 0, assumed: false };
+      var b = (typeof invoiceTotalsBreakdown === 'function') ? invoiceTotalsBreakdown(inv) : { grandTotal: parseFloat(inv.total) || 0, tax: 0 };
+      var inclusive = _num2(b.grandTotal || 0);
+      var tax = _num2(b.tax || 0);
+      var items = inv.items || [];
+      if (!items.length) {
+        var storedTax = _num2(parseFloat(inv.taxAmount || inv.tax) || 0);
+        if (storedTax > 0.01) tax = storedTax;
+      }
+      var preTax = _num2(Math.max(0, inclusive - tax));
+      var rows = (typeof _dedupeInvoicePaymentRows === 'function') ? _dedupeInvoicePaymentRows(inv.payments || []) : (inv.payments || []);
+      var realPaid = _num2(rows.reduce(function(s, p) {
+        if (typeof invoicePaymentCountsTowardPaid === 'function' && !invoicePaymentCountsTowardPaid(p)) return s;
+        return s + (parseFloat(p.amount) || 0);
+      }, 0));
+      var assumed = false;
+      var paid = realPaid;
+      if (realPaid <= 0.01 && String(inv.status || '').toLowerCase() === 'paid') {
+        paid = inclusive;
+        assumed = true;
+      }
+      var credit = (!assumed && realPaid > inclusive + 0.01) ? _num2(realPaid - inclusive) : 0;
+      var balance = assumed ? 0 : _num2(Math.max(0, inclusive - realPaid));
+      return { preTax: preTax, tax: tax, inclusive: inclusive, paid: _num2(paid), credit: credit, balance: balance, assumed: assumed };
+    }
+
+    function cchBuildPoCoverage(pos) {
+      var coverageByKey = {};
+      (pos || []).forEach(function(po) {
+        if (!po) return;
+        if (String(po.id || '').indexOf('clip-po-') === 0) return;
+        if (typeof _poStatusSkipsCoverage === 'function' && _poStatusSkipsCoverage(po)) return;
+        var num = po.number || po.poNum || po.num || String(po.id || '').slice(0, 8);
+        var keys = [];
+        if (Array.isArray(po.sourceItemKeys)) po.sourceItemKeys.forEach(function(k) { if (k) keys.push(String(k)); });
+        (po.items || []).forEach(function(it) {
+          if (typeof _poItemCoverageKeys === 'function') _poItemCoverageKeys(it).forEach(function(k) { keys.push(k); });
+        });
+        keys.forEach(function(k) {
+          if (!k) return;
+          var list = coverageByKey[k] = coverageByKey[k] || [];
+          if (list.indexOf(num) < 0) list.push(num);
+        });
+      });
+      return coverageByKey;
+    }
+    function cchInvoiceLineNeedsPurchaseOrder(it) {
+      if (!it) return false;
+      if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it)) return false;
+      if (it.source === 'po_bill_variance' || it.timeEntryId) return false;
+      var src = String(it.source || '').toLowerCase();
+      if (src === 'time' || src === 'time-tracker') return false;
+      var et = String(it.expenseType || '').toLowerCase();
+      if (['sales_tax', 'tax', 'shipping', 'freight', 'handling', 'discount', 'retainer_credit', 'service', 'expense', 'labor'].indexOf(et) >= 0) return false;
+      var cat = String(it.category || '').toLowerCase();
+      if (cat.indexOf('freight') >= 0 || cat.indexOf('shipping') >= 0) return false;
+      var cls = (typeof _cchSidebarClassifyItem === 'function') ? _cchSidebarClassifyItem(it) : 'product';
+      if (cls !== 'product' && cls !== 'bundle') return false;
+      return true;
+    }
+    function cchInvoiceLinesNeedingPo(invoices, pos, proj, opts) {
+      var coverage = cchBuildPoCoverage(pos);
+      var rows = [];
+      var count = 0;
+      var amount = 0;
+      var paidCount = 0;
+      (invoices || []).forEach(function(inv) {
+        if (!invoiceCountsAsSent(inv)) return;
+        var paid = String(inv.status || '').toLowerCase() === 'paid';
+        var paidDate = '';
+        if (paid) {
+          paidDate = String(inv.paidAt || '').slice(0, 10);
+          (inv.payments || []).forEach(function(p) {
+            var d = String((p && (p.date || p.paidAt)) || '').slice(0, 10);
+            if (d > paidDate) paidDate = d;
+          });
+        }
+        (inv.items || []).forEach(function(it) {
+          if (!cchInvoiceLineNeedsPurchaseOrder(it)) return;
+          if (it.poId || it.linkedPOId || it.purchaseOrderId || it.linkedPoId) return;
+          if (typeof _poCoveredBy === 'function' && _poCoveredBy(it, coverage).length) return;
+          var amt = (typeof invoiceLineAmountForTotals === 'function')
+            ? (invoiceLineAmountForTotals(it).lineAmt || 0)
+            : (parseFloat(it.amount) || parseFloat(it.total) || 0);
+          if (Math.abs(amt) < 0.01) return;
+          count += 1;
+          amount += amt;
+          if (paid) paidCount += 1;
+          var rowCap = (opts && opts.allRows) ? 100000 : 60;
+          if (rows.length >= rowCap) return;
+          var title = (typeof window.invoiceLineDisplayTitle === 'function')
+            ? window.invoiceLineDisplayTitle(it)
+            : (it.title || it.name || 'Item');
+          rows.push({
+            invoiceId: inv.id,
+            projectId: inv.projectId || (proj && proj.id) || '',
+            number: inv.invoiceNum || inv.number || 'Invoice',
+            title: title,
+            amount: amt,
+            paid: paid,
+            paidDate: paidDate
+          });
+        });
+      });
+      return { count: count, amount: _num2(amount), paidCount: paidCount, rows: rows };
+    }
+    function cchPoCountsInSummary(po) {
+      if (!po) return false;
+      if (String(po.id || '').indexOf('clip-po-') === 0) return false;
+      var st = String(po.status || po.poStatus || '').toLowerCase();
+      if (st === 'draft' || st === 'cancelled' || st === 'canceled' || st === 'void') return false;
+      return true;
+    }
+
     /**
-     * Single source of truth for project Logged / Invoiced / Paid / Outstanding / Leakage / profit.
-     * Financial Health card, Overview KPI row, Open Invoices card, and Financials tab must all call this.
+     * One money summary for the project header, sidebar, Financials tab, and company dashboard.
+     * Display only. from / periodStart and to are YYYY-MM-DD. Blank from means all time.
      */
-    function computeProjectFinancials(opts) {
+    function cchPoVarianceLinesForSummary(po) {
+      po = po || {};
+      if (typeof window.cchPoDeriveVarianceComponents === 'function') {
+        var derived = window.cchPoDeriveVarianceComponents(po.bill || {}, po.variance || null);
+        return (derived && derived.components) || [];
+      }
+      var rows = ((po.bill || {}).vendorInvoices) || [];
+      return rows.map(function(r) {
+        return {
+          amount: parseFloat(r.amount) || 0,
+          disposition: r.disposition || 'undecided',
+          invoicedOnId: r.invoicedOnId || '',
+          reasonCode: r.type || '',
+          label: r.description || r.type || ''
+        };
+      });
+    }
+
+    function cchFinancialSummary(opts) {
       opts = opts || {};
       var proj = opts.proj || {};
-      var timeEntries = opts.timeEntries || [];
-      var invoices = invoicesForFinancialKpis(opts.invoices || []);
-      var pos = opts.pos || [];
-      var periodStart = opts.periodStart || null;
-
-      function inPeriod(dateStr) {
-        if (!periodStart || periodStart === '2000-01-01') return true;
-        return normalizeDate(dateStr) >= periodStart;
+      var from = opts.from || opts.periodStart || null;
+      var to = opts.to || null;
+      function inRange(dateStr) {
+        var d = normalizeDate(dateStr);
+        if (!d) return !from || from === '2000-01-01';
+        if (from && from !== '2000-01-01' && d < from) return false;
+        if (to && d > to) return false;
+        return true;
       }
-
-      var timeFiltered = timeEntries.filter(function(t) { return inPeriod(t.date); });
-      var sentInvs = sentInvoicesForFinancialKpis(invoices).filter(function(i) { return inPeriod(getDocDate(i)); });
-      var posFiltered = pos.filter(function(p) { return inPeriod(getDocDate(p)); });
+      var timeFiltered = (opts.timeEntries || []).filter(function(t) { return inRange(t.date); });
+      var sentInvs = sentInvoicesForFinancialKpis(opts.invoices || []).filter(function(i) { return inRange(getDocDate(i)); });
+      var posFiltered = (opts.pos || []).filter(function(p) { return cchPoCountsInSummary(p) && inRange(getDocDate(p)); });
 
       var loggedValue = loggedValueFromTimeEntries(timeFiltered);
-      var invoiced = sentInvs.reduce(function(s, i) {
-        return s + (typeof invoiceListRowTotal === 'function' ? invoiceListRowTotal(i) : (invoiceComputedGrandTotal(i) || parseFloat(i.total) || 0));
+      var loggedHours = timeFiltered.filter(timeEntryCountsForLoggedValue).reduce(function(s, t) {
+        return s + (parseFloat(t.hours) || 0);
       }, 0);
-      var paid = sentInvs.reduce(function(s, i) { return s + invoiceListRowCollected(i); }, 0);
-      var outstanding = _num2(invoiced - paid);
+      var invoiced = 0, tax = 0, paid = 0, credit = 0, inclusive = 0, assumedPaid = 0, clientCreditHeld = 0;
+      var openInvoices = [];
+      sentInvs.forEach(function(inv) {
+        var m = cchInvoiceDisplayMoney(inv);
+        invoiced += m.preTax;
+        tax += m.tax;
+        paid += m.paid;
+        credit += m.credit;
+        inclusive += m.inclusive;
+        if (m.assumed) assumedPaid += m.paid;
+        if (m.balance > 0.01) openInvoices.push(inv);
+        (inv.clientCredits || []).forEach(function(c) {
+          var rem = c && c.remaining != null && c.remaining !== '' ? parseFloat(c.remaining) : parseFloat(c && c.amount);
+          if (rem > 0.01) clientCreditHeld += rem;
+        });
+      });
+      var openInvoicesBalance = openInvoices.reduce(function(s, inv) {
+        return s + cchInvoiceDisplayMoney(inv).balance;
+      }, 0);
       var designFeesInvoiced = _num2(designFeesFromSentInvoices(sentInvs));
-      var leakage = Math.max(0, _num2(loggedValue - designFeesInvoiced));
+      var leakage = _num2(loggedValue - designFeesInvoiced);
+      var leakageUnbilled = _num2(Math.max(0, leakage));
+      var billedAbove = _num2(Math.max(0, -leakage));
+      var linkedTime = {};
+      sentInvs.forEach(function(inv) {
+        (inv.timeEntryIds || []).forEach(function(id) { if (id) linkedTime[String(id)] = true; });
+      });
+      var leakageHours = 0;
+      if (Object.keys(linkedTime).length) {
+        timeFiltered.filter(timeEntryCountsForLoggedValue).forEach(function(t) {
+          if (linkedTime[String(t.id)]) return;
+          leakageHours += parseFloat(t.hours) || 0;
+        });
+      }
 
-      var poCosts = posFiltered.reduce(function(s, po) { return s + vendorBillCostForProfit(po); }, 0);
-      var contractorCosts = timeFiltered.reduce(function(s, t) {
+      var poCosts = 0, poCostEstimated = 0, poPaid = 0, openPoCount = 0, openPoBalance = 0, noBillCount = 0;
+      var undecidedCount = 0, undecidedAmount = 0, passOnUnbilled = 0;
+      var poRecon = [];
+      posFiltered.forEach(function(po) {
+        var billTotal = (typeof window.cchPoListBillTotalForRow === 'function') ? window.cchPoListBillTotalForRow(po) : null;
+        var hasBill = billTotal != null && billTotal > 0.01;
+        var poAmt = (typeof window.cchPoListPoAtSend === 'function') ? (window.cchPoListPoAtSend(po) || 0) : 0;
+        var figure = hasBill ? billTotal : poAmt;
+        if (!(figure > 0.01)) figure = vendorBillCostForProfit(po) || 0;
+        poCosts += figure;
+        if (!hasBill && figure > 0.01) { poCostEstimated += figure; noBillCount += 1; }
+        var paidRaw = (typeof window.cchPoListPaidForRow === 'function') ? (window.cchPoListPaidForRow(po) || 0) : 0;
+        if (!(paidRaw > 0)) paidRaw = (typeof poResolvedPaidAmount === 'function') ? (poResolvedPaidAmount(po) || 0) : 0;
+        var paidOnFigure = Math.min(Math.max(paidRaw, 0), Math.max(figure, 0));
+        var open = _num2(Math.max(0, figure - paidRaw));
+        poPaid += paidOnFigure;
+        if (open > 0.01) { openPoCount += 1; openPoBalance += open; }
+        var lines = cchPoVarianceLinesForSummary(po);
+        var status = '—';
+        var billedTo = '';
+        var hot = false;
+        lines.forEach(function(ln) {
+          var d = String(ln.disposition || 'undecided');
+          var tax = /tax|prepaid/i.test(String(ln.reasonCode || ln.label || ''));
+          if (tax) return;
+          if (!ln.invoicedOnId && (d === 'undecided' || d === 'pending' || d === '')) {
+            undecidedCount += 1;
+            undecidedAmount += Math.abs(parseFloat(ln.amount) || 0);
+            status = 'Undecided';
+            hot = true;
+          } else if (!ln.invoicedOnId && d === 'billable') {
+            passOnUnbilled += Math.abs(parseFloat(ln.amount) || 0);
+            if (status === '—') status = 'Pass on';
+            hot = true;
+          } else if (d === 'absorbed' && status === '—') status = 'Absorbed';
+          if (ln.invoicedOnId && !billedTo) billedTo = ln.invoicedOnId;
+        });
+        var variance = hasBill ? _num2(billTotal - poAmt) : null;
+        poRecon.push({
+          id: po.id || '',
+          number: po.number || po.poNum || po.name || '',
+          vendor: po.vendor || '',
+          poAmount: _num2(poAmt),
+          billAmount: hasBill ? _num2(billTotal) : null,
+          variance: variance,
+          status: status,
+          billedTo: billedTo,
+          hot: hot,
+          projectId: po.projectId || ''
+        });
+      });
+
+      var ownerLaborCost = timeFiltered.filter(timeEntryCountsForLoggedValue).reduce(function(s, t) {
+        if (!_isOwnerMember(t.member || t.user || '')) return s;
+        return s + ((parseFloat(t.hours) || 0) * cchEntryBillRate(t));
+      }, 0);
+      var contractorCosts = timeFiltered.filter(timeEntryCountsForLoggedValue).reduce(function(s, t) {
         if (_isOwnerMember(t.member || t.user || '')) return s;
-        return s + ((parseFloat(t.hours) || 0) * (parseFloat(t.internalCostRate) || _getContractorRate(t.member || t.user || '')));
-      }, 0) + _subcontractorCostFromInvoices(sentInvs);
-      var ownerLaborCost = _ownerLaborCostInvoiced(timeFiltered, sentInvs);
+        var h = parseFloat(t.hours) || 0;
+        var r = parseFloat(t.internalCostRate);
+        if (!(r > 0) || isNaN(r)) r = _getContractorRate(t.member || t.user || '');
+        return s + h * r;
+      }, 0);
 
       var contractFee = parseFloat(proj.contractFee || proj.flatFee || proj.budget) || 0;
       var billingModel = proj.billingModel || (contractFee > 0 ? 'flat_fee' : 'hourly');
-      var revenue = contractFee > 0 ? contractFee : invoiced;
-      var cashProfit = revenue - poCosts - contractorCosts;
-      var loadedProfit = cashProfit - ownerLaborCost;
-      var cashMargin = revenue > 0 ? (cashProfit / revenue * 100) : 0;
-      var efficiency = loggedValue > 0.01 ? (invoiced / loggedValue * 100) : (invoiced > 0 ? 100 : 0);
-
-      var openInvoices = sentInvs.filter(function(inv) {
-        var bal = typeof invoiceListRowBalance === 'function' ? invoiceListRowBalance(inv) : Math.max(0, (parseFloat(inv.total) || 0) - invoiceListRowCollected(inv));
-        return bal > 0.01 && String(inv.status || '').toLowerCase() !== 'paid';
-      });
-      var openInvoicesBalance = openInvoices.reduce(function(s, inv) {
-        return s + (typeof invoiceListRowBalance === 'function' ? invoiceListRowBalance(inv) : 0);
-      }, 0);
+      var revenue = _num2(invoiced);
+      var grossProfit = _num2(revenue - poCosts);
+      var loadedProfit = _num2(grossProfit - ownerLaborCost);
+      var cashMargin = revenue > 0 ? (grossProfit / revenue * 100) : 0;
+      var efficiency = loggedValue > 0.01 ? (revenue / loggedValue * 100) : (revenue > 0 ? 100 : 0);
+      var needPo = cchInvoiceLinesNeedingPo(sentInvs, opts.posAll || opts.pos || [], proj);
 
       return {
         loggedValue: _num2(loggedValue),
-        invoiced: _num2(invoiced),
+        loggedHours: _num2(loggedHours),
+        invoiced: revenue,
+        tax: _num2(tax),
+        invoiceInclusive: _num2(inclusive),
         paid: _num2(paid),
-        outstanding: outstanding,
+        paidAssumed: _num2(assumedPaid),
+        clientCredit: _num2(credit),
+        clientCreditHeld: _num2(clientCreditHeld),
+        outstanding: _num2(openInvoicesBalance),
         leakage: leakage,
+        leakageUnbilled: leakageUnbilled,
+        leakageHours: _num2(leakageHours),
+        billedAbove: billedAbove,
         designFeesInvoiced: designFeesInvoiced,
         poCosts: _num2(poCosts),
+        poPaid: _num2(poPaid),
+        poCostEstimated: _num2(poCostEstimated),
+        noBillCount: noBillCount,
+        openPoCount: openPoCount,
+        openPoBalance: _num2(openPoBalance),
+        undecidedCount: undecidedCount,
+        undecidedAmount: _num2(undecidedAmount),
+        passOnUnbilled: _num2(passOnUnbilled),
+        linesNeedingPo: needPo.rows,
+        linesNeedingPoCount: needPo.count,
+        linesNeedingPoAmount: needPo.amount,
+        linesNeedingPoPaid: needPo.paidCount,
+        poRecon: poRecon,
         contractorCosts: _num2(contractorCosts),
         ownerLaborCost: _num2(ownerLaborCost),
-        cashProfit: _num2(cashProfit),
-        loadedProfit: _num2(loadedProfit),
+        cashProfit: grossProfit,
+        grossProfit: grossProfit,
+        loadedProfit: loadedProfit,
         cashMargin: cashMargin,
         efficiency: efficiency,
-        revenue: _num2(revenue),
+        revenue: revenue,
         contractFee: contractFee,
         billingModel: billingModel,
         openInvoices: openInvoices,
         openInvoicesCount: openInvoices.length,
         openInvoicesBalance: _num2(openInvoicesBalance),
-        loggedHours: timeFiltered.reduce(function(s, t) { return s + (parseFloat(t.hours) || 0); }, 0),
         sentInvoiceCount: sentInvs.length
       };
+    }
+    window.cchFinancialSummary = cchFinancialSummary;
+
+    function computeProjectFinancials(opts) {
+      return cchFinancialSummary(opts);
     }
     window.computeProjectFinancials = computeProjectFinancials;
 
@@ -4560,7 +4833,118 @@
       return { text: Math.round(pct) + '%', note: 'invoiced ÷ logged value' };
     }
 
-    function buildFinancialHealthBarHtml(fin, proj, projPOs) {
+    function cchBilledAboveNoteHtml(fin, proj) {
+      var note = String((proj && proj.finHoursNote) || '');
+      var pid = String((proj && proj.id) || '').replace(/[^a-zA-Z0-9_-]/g, '');
+      return '<div style="margin-top:8px;font-size:13px;color:#3E8E5C;font-weight:600;">+' + formatMoney(fin.billedAbove) + ' billed above logged hours</div>' +
+        '<input value="' + escAttr(note) + '" placeholder="Note, for example flat fee or unlogged design time" ' +
+        'onblur="cchSaveFinHoursNote(\'' + pid + '\', this.value)" ' +
+        'style="margin-top:4px;width:min(420px,100%);border:1px solid rgba(15,26,46,0.15);padding:6px 8px;font-size:13px;font-family:inherit;color:#0F1A2E;">';
+    }
+    window.cchSaveFinHoursNote = async function(projectId, text) {
+      if (!projectId) return;
+      try {
+        await db.collection('boards').doc(projectId).update({
+          finHoursNote: String(text || '').slice(0, 240),
+          finHoursNoteAt: new Date().toISOString()
+        });
+        if (typeof showToast === 'function') showToast('Note saved');
+      } catch (e) {
+        if (typeof showToast === 'function') showToast('Note did not save', 'error');
+      }
+    };
+    window.cchTogglePoRecon = function(id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.style.display = (el.style.display === 'none' || !el.style.display) ? 'block' : 'none';
+    };
+    function cchAttentionStripHtml(fin, proj, extra) {
+      extra = extra || {};
+      fin = fin || {};
+      var cols = { open: [], follow: [], missing: [] };
+      function add(col, label, detail, tab, tone) {
+        cols[col].push({ label: label, detail: detail || '', tab: tab, tone: tone || 'amber' });
+      }
+      if (fin.openInvoicesCount > 0) add('open', fin.openInvoicesCount + ' open invoices', formatMoney(fin.openInvoicesBalance), 'invoices', 'red');
+      if (fin.openPoCount > 0) add('open', fin.openPoCount + ' POs to pay', formatMoney(fin.openPoBalance), 'pos', 'red');
+      if (fin.noBillCount > 0) add('open', fin.noBillCount + ' POs with no bill', formatMoney(fin.poCostEstimated), 'pos', 'amber');
+      var waiting = (extra.proposals || []).filter(function(p) {
+        return typeof proposalNeedsClientReview === 'function' && proposalNeedsClientReview(p);
+      });
+      if (waiting.length) add('open', waiting.length + ' proposals to review', '', 'proposals', 'amber');
+      var today = new Date().toISOString().slice(0, 10);
+      var overdue = (extra.tasks || []).filter(function(t) {
+        return t && t.status !== 'Done' && t.dueDate && String(t.dueDate) < today;
+      });
+      if (overdue.length) add('follow', overdue.length + ' overdue tasks', '', 'tasks', 'red');
+      if (fin.undecidedCount > 0) add('follow', fin.undecidedCount + ' variances to decide', formatMoney(fin.undecidedAmount), 'discrepancies', 'amber');
+      if (fin.clientCreditHeld > 0.01) add('follow', 'Client credit not applied', formatMoney(fin.clientCreditHeld), 'invoices', 'amber');
+      if (fin.linesNeedingPoCount > 0) add('follow', fin.linesNeedingPoCount + ' invoice lines need a PO', formatMoney(fin.linesNeedingPoAmount), 'needpo', fin.linesNeedingPoPaid > 0 ? 'red' : 'amber');
+      if (fin.passOnUnbilled > 0.01) add('missing', 'Passed on, not billed', formatMoney(fin.passOnUnbilled), 'discrepancies', 'red');
+      if (fin.leakageUnbilled > 0.01) add('missing', 'Design hours not invoiced', formatMoney(fin.leakageUnbilled) + (fin.leakageHours > 0.01 ? (' · ' + _num2(fin.leakageHours) + 'h') : ''), 'time', 'red');
+      var titles = { open: 'Open', follow: 'Follow-up', missing: 'Missing money / hours' };
+      var any = false;
+      var html = '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px;">';
+      ['open', 'follow', 'missing'].forEach(function(k) {
+        cols[k].sort(function(a, b) { return (a.tone === 'red' ? 0 : 1) - (b.tone === 'red' ? 0 : 1); });
+        html += '<div style="min-width:0;">';
+        if (cols[k].length) {
+          any = true;
+          html += '<div class="pp-fin-v5-sec">' + titles[k] + '</div>';
+          cols[k].forEach(function(it) {
+            var color = it.tone === 'red' ? '#C2604F' : '#8B7355';
+            var click = it.tab === 'needpo' ? 'cchTogglePoRecon(\'cchNeedPoList\')' : ('switchProjectTab(\'' + it.tab + '\')');
+            html += '<div onclick="' + click + '" style="cursor:pointer;padding:6px 0;border-top:1px solid rgba(15,26,46,0.06);">' +
+              '<div style="font-size:14px;font-weight:600;color:' + color + ';">' + it.label + '</div>' +
+              (it.detail ? '<div style="font-size:14px;font-family:var(--font-mono);color:#0F1A2E;">' + it.detail + '</div>' : '') +
+            '</div>';
+          });
+        }
+        html += '</div>';
+      });
+      html += '</div>';
+      return any ? html : '';
+    }
+    function cchPoReconTableHtml(fin, id) {
+      var rows = (fin && fin.poRecon) || [];
+      if (!rows.length) return '';
+      var banner = _num2((fin.passOnUnbilled || 0) + (fin.undecidedAmount || 0));
+      var body = rows.slice(0, 80).map(function(r) {
+        var bg = r.hot ? 'background:rgba(194,96,79,0.08);' : '';
+        return '<tr style="' + bg + '"><td style="padding:4px 6px;">' + esc(r.number) + '</td><td style="padding:4px 6px;">' + esc(r.vendor) + '</td>' +
+          '<td style="padding:4px 6px;text-align:right;font-family:var(--font-mono);">' + formatMoney(r.poAmount) + '</td>' +
+          '<td style="padding:4px 6px;text-align:right;font-family:var(--font-mono);">' + (r.billAmount == null ? '\u2014' : formatMoney(r.billAmount)) + '</td>' +
+          '<td style="padding:4px 6px;text-align:right;font-family:var(--font-mono);">' + (r.variance == null ? '\u2014' : formatMoney(r.variance)) + '</td>' +
+          '<td style="padding:4px 6px;">' + esc(r.status) + '</td>' +
+          '<td style="padding:4px 6px;">' + (r.billedTo ? ('Y \u00B7 ' + esc(String(r.billedTo).slice(0, 18))) : 'N') + '</td></tr>';
+      }).join('');
+      return '<div id="' + id + '" style="display:none;margin-top:12px;max-width:100%;overflow-x:auto;">' +
+        '<div style="font-size:12px;font-weight:700;color:#C2604F;margin-bottom:6px;">Variances not billed yet: ' + formatMoney(banner) + '</div>' +
+        '<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr>' +
+        ['PO', 'Vendor', 'PO amount', 'Bill amount', 'Variance', 'Status', 'Billed to client?'].map(function(h) {
+          return '<th style="text-align:left;font-size:9px;letter-spacing:0.06em;text-transform:uppercase;color:#A3A39C;padding:4px 6px;border-bottom:1px solid rgba(15,26,46,0.08);">' + h + '</th>';
+        }).join('') + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+    }
+    function cchNeedPoListHtml(fin, id) {
+      var rows = (fin && fin.linesNeedingPo) || [];
+      if (!rows.length) return '';
+      var body = rows.map(function(r) {
+        var color = r.paid ? '#C2604F' : '#0F1A2E';
+        var pid = escJsStr(r.projectId || '');
+        var iid = escJsStr(r.invoiceId || '');
+        return '<tr style="color:' + color + ';"><td style="padding:6px 8px;vertical-align:top;">' + esc(r.number) + '</td>' +
+          '<td style="padding:6px 8px;vertical-align:top;">' + esc(r.title) + '</td>' +
+          '<td style="padding:6px 8px;text-align:right;font-family:var(--font-mono);white-space:nowrap;">' + formatMoney(r.amount) + '</td>' +
+          '<td style="padding:6px 8px;white-space:nowrap;">' + esc(r.paid ? (r.paidDate || 'Paid') : '') + '</td>' +
+          '<td style="padding:6px 8px;"><button type="button" class="btn btn-primary btn-sm" style="border-radius:0;" onclick="event.stopPropagation();generatePOsFromDoc(\'' + pid + '\',\'invoices\',\'' + iid + '\')">Create PO</button></td></tr>';
+      }).join('');
+      return '<div id="' + id + '" style="display:none;margin-top:12px;max-width:100%;">' +
+        '<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr>' +
+        ['Invoice', 'Line', 'Amount', 'Paid', ''].map(function(h) {
+          return '<th style="text-align:left;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:#5C6B80;padding:6px 8px;border-bottom:1px solid rgba(15,26,46,0.08);">' + h + '</th>';
+        }).join('') + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+    }
+    function buildFinancialHealthBarHtml(fin, proj, projPOs, extra) {
       if (!fin) return '';
       var _billingModel = fin.billingModel;
       var _contractFee = fin.contractFee;
@@ -4583,18 +4967,19 @@
         '<style>' +
         '.pp-fin-v5-wrap{margin-bottom:16px;padding:14px 16px 12px;background:#FFFFFF;border:1px solid rgba(15,26,46,0.08);}' +
         '.pp-fin-v5-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}' +
-        '.pp-fin-v5-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#7A7A7A;}' +
-        '.pp-fin-v5-badge{font-size:9px;padding:2px 8px;font-weight:700;background:rgba(200,169,126,0.12);color:#8B7355;}' +
-        '.pp-fin-v5-warn{font-size:9px;padding:2px 8px;font-weight:700;background:rgba(194,96,79,0.1);color:#C2604F;}' +
-        '.pp-fin-v5-sec{font-size:9.5px;letter-spacing:0.08em;text-transform:uppercase;color:#A3A39C;font-weight:600;margin:12px 0 6px 1px;}' +
+        '.pp-fin-v5-wrap{max-width:100%;overflow-x:hidden;}' +
+        '.pp-fin-v5-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#7A7A7A;}' +
+        '.pp-fin-v5-badge{font-size:12px;padding:2px 8px;font-weight:700;background:rgba(200,169,126,0.12);color:#8B7355;}' +
+        '.pp-fin-v5-warn{font-size:12px;padding:2px 8px;font-weight:700;background:rgba(194,96,79,0.1);color:#C2604F;}' +
+        '.pp-fin-v5-sec{font-size:13px;letter-spacing:0.06em;text-transform:uppercase;color:#5C6B80;font-weight:600;margin:12px 0 6px 1px;}' +
         '.pp-fin-v5-sec:first-of-type{margin-top:0;}' +
-        '.pp-fin-v5-row{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;}' +
-        '@media(max-width:1100px){.pp-fin-v5-row{grid-template-columns:repeat(3,minmax(0,1fr));}}' +
-        '@media(max-width:640px){.pp-fin-v5-row{grid-template-columns:repeat(2,minmax(0,1fr));}}' +
-        '.pp-fin-v5-tile{background:#FFFFFF;padding:9px 10px 8px;}' +
-        '.pp-fin-v5-lbl{font-size:8.5px;letter-spacing:0.05em;text-transform:uppercase;color:#A3A39C;font-weight:600;margin-bottom:3px;}' +
-        '.pp-fin-v5-val{font-size:14px;font-weight:600;line-height:1.15;color:#0F1A2E;font-family:var(--font-mono);font-variant-numeric:tabular-nums;}' +
-        '.pp-fin-v5-sub{font-size:9px;color:#B7B7B2;margin-top:2px;line-height:1.3;}' +
+        '.pp-fin-v5-groups{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.3fr) minmax(120px,0.7fr);gap:12px;}' +
+        '.pp-fin-v5-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}' +
+        '@media(max-width:1100px){.pp-fin-v5-groups{grid-template-columns:1fr;}}' +
+        '.pp-fin-v5-tile{background:#FFFFFF;padding:9px 10px 8px;min-width:0;}' +
+        '.pp-fin-v5-lbl{font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:#5C6B80;font-weight:600;margin-bottom:3px;}' +
+        '.pp-fin-v5-val{font-size:16px;font-weight:600;line-height:1.2;color:#0F1A2E;font-family:var(--font-mono);font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}' +
+        '.pp-fin-v5-sub{font-size:13px;color:#5C6B80;margin-top:2px;line-height:1.35;overflow-wrap:anywhere;}' +
         '.pp-fin-v5-flag{display:inline-block;font-size:7.5px;background:#FDEDEC;color:#B3392E;border-radius:2px;padding:0 4px;margin-left:4px;font-weight:700;vertical-align:middle;}' +
         '</style>' +
         '<div class="pp-fin-v5-head">' +
@@ -4603,30 +4988,46 @@
           (fin.leakage > 500 ? '<span class="pp-fin-v5-warn">Leakage ' + formatMoney(fin.leakage) + '</span>' : '') +
           (_contractFee > 0 && _feeBurnPct > 80 ? '<span class="pp-fin-v5-warn">\u26A0 ' + _feeBurnPct + '% Fee Burned</span>' : '') +
         '</div>' +
-        '<div class="pp-fin-v5-sec">Fee Stream + Billing</div>' +
-        '<div class="pp-fin-v5-row">' +
-          _tile('Logged (Time)', fin.loggedValue, 'Hrs × rate', 'tan') +
-          _tile('Design Fees', fin.designFeesInvoiced || 0, 'Sent, fees only', 'tan') +
-          _tile('Leakage', fin.leakage, 'Logged - fees', 'navy') +
-          _tile('Invoiced', fin.invoiced, fin.sentInvoiceCount + ' sent, all', 'tan') +
-          _tile('Paid', fin.paid, 'On sent', 'green') +
-          _tile(_outLabel, Math.abs(fin.outstanding), fin.outstanding < -0.01 ? 'Paid exceeds invoiced' : 'Inv - paid', 'gray') +
+        '<div class="pp-fin-v5-groups">' +
+          '<div onclick="switchProjectTab(\'invoices\')" style="cursor:pointer;">' +
+            '<div class="pp-fin-v5-sec">Invoices</div>' +
+            '<div class="pp-fin-v5-row">' +
+              _tile('Invoiced', fin.invoiced, fin.sentInvoiceCount + ' sent, pre-tax', 'tan') +
+              _tile('Paid', fin.paid, fin.paidAssumed > 0.01 ? formatMoney(fin.paidAssumed) + ' no payment record' : 'Payment rows', 'green') +
+              _tile('Open', fin.openInvoicesBalance, fin.openInvoicesCount + ' unpaid · QBO is AR truth', 'gray') +
+            '</div>' +
+          '</div>' +
+          '<div onclick="cchTogglePoRecon(\'cchProjPoRecon\')" style="cursor:pointer;" title="PO and bill reconciliation">' +
+            '<div class="pp-fin-v5-sec">POs / Bills</div>' +
+            '<div class="pp-fin-v5-row">' +
+              _tile('PO total', fin.poCosts, (fin.poCostEstimated > 0.01 ? formatMoney(fin.poCostEstimated) + ' est.' : (_poCount + ' POs')), 'red') +
+              _tile('Paid', fin.poPaid || 0, 'Against that total', 'green') +
+              _tile('Open', fin.openPoBalance, fin.openPoCount + ' still to pay', 'red') +
+            '</div>' +
+          '</div>' +
+          '<div>' +
+            '<div class="pp-fin-v5-sec">Profit</div>' +
+            _tile('Profit', fin.grossProfit, 'Invoiced − PO total', fin.grossProfit < 0 ? 'red' : 'tan') +
+          '</div>' +
         '</div>' +
-        '<div class="pp-fin-v5-sec">Costs + Profitability</div>' +
+        '<div class="pp-fin-v5-sec">Design fees</div>' +
         '<div class="pp-fin-v5-row">' +
-          _tile('PO + Variance', fin.poCosts, _poCount + ' PO' + (_poCount === 1 ? '' : 's'), 'red') +
-          _tile('Subs/Expenses', fin.contractorCosts, 'Vanessa + other', 'red') +
-          _tile('Owner Labor', fin.ownerLaborCost, 'Invoiced hrs only', 'tan') +
-          _tile('Cash Profit', fin.cashProfit, 'Inv - PO - subs', 'tan') +
-          _tile('Loaded Profit', fin.loadedProfit, '- owner labor', 'navy') +
-          _tile('Efficiency', _eff.text + (_effCheck ? '<span class="pp-fin-v5-flag">CHECK</span>' : ''), _eff.note, 'gray') +
+          _tile('Logged', fin.loggedValue, _num2(fin.loggedHours) + 'h × entry rate', 'tan') +
+          _tile('Design invoiced', fin.designFeesInvoiced || 0, 'Pre-tax', 'tan') +
+          (fin.leakageUnbilled > 0.01
+            ? _tile('Leakage', fin.leakageUnbilled, (fin.leakageHours > 0.01 ? _num2(fin.leakageHours) + 'h not invoiced' : 'Logged, not invoiced'), 'navy')
+            : '<div></div>') +
         '</div>' +
+        (fin.billedAbove > 0.01 ? cchBilledAboveNoteHtml(fin, proj) : '') +
+        cchAttentionStripHtml(fin, proj, extra) +
+        cchNeedPoListHtml(fin, 'cchNeedPoList') +
+        cchPoReconTableHtml(fin, 'cchProjPoRecon') +
       '</div>';
     }
     window.buildFinancialHealthBarHtml = buildFinancialHealthBarHtml;
 
     // -- Platform Version --
-      const CCH_BUILD = { version: '9.9.440', date: '2026-10-26', tag: 'variance-pending-only' };
+      const CCH_BUILD = { version: '9.9.502', date: '2026-11-11', tag: 'checklist-notes' };
     window.CCH_BUILD = CCH_BUILD;
 
     /** ASCII-safe UI glyphs — always \u escapes so Windows re-encodes cannot turn them into '?'. */
@@ -6025,8 +6426,14 @@
         else if (typeof renderContractors === 'function') renderContractors();
         else navigate('#/vendors');
       }
-      else if (page === 'workrooms') renderWorkrooms();
-      else if (page === 'deliveryreceivers') renderDeliveryReceivers();
+      else if (page === 'workrooms') {
+        if (parts[1] && typeof window.openWorkroomDetail === 'function') window.openWorkroomDetail(decodeURIComponent(parts[1]));
+        else renderWorkrooms();
+      }
+      else if (page === 'deliveryreceivers') {
+        if (parts[1] && typeof window.openReceiverDetail === 'function') window.openReceiverDetail(decodeURIComponent(parts[1]));
+        else renderDeliveryReceivers();
+      }
       else if (page === 'platformstatus') renderPlatformStatus();
       else if (page === 'releasenotes') renderReleaseNotes();
       else if (page === 'feedbackrequests') renderFeedbackRequests();
@@ -7107,9 +7514,23 @@
       // Load time entries
       let _allTimeEntries = [];
       try {
-        const teSnap = await db.collection('timeEntries').limit(5000).get();
-        teSnap.forEach(d => _allTimeEntries.push({ id: d.id, ...d.data() }));
-      } catch(e) {}
+        var _teLast = null;
+        while (_allTimeEntries.length < 20000) {
+          var _teQ = db.collection('timeEntries').orderBy(firebase.firestore.FieldPath.documentId()).limit(800);
+          if (_teLast) _teQ = _teQ.startAfter(_teLast);
+          var teSnap = await _teQ.get();
+          if (!teSnap.size) break;
+          teSnap.forEach(d => _allTimeEntries.push({ id: d.id, ...d.data() }));
+          _teLast = teSnap.docs[teSnap.docs.length - 1];
+          if (teSnap.size < 800) break;
+        }
+      } catch (e) {
+        try {
+          _allTimeEntries = [];
+          const teSnap = await db.collection('timeEntries').limit(5000).get();
+          teSnap.forEach(d => _allTimeEntries.push({ id: d.id, ...d.data() }));
+        } catch (e2) {}
+      }
       const memberName = currentMemberName();
 
       // When owner views contractor dashboard, show Vanessa's data
@@ -7230,9 +7651,10 @@
 
       // Financial calcs — will be recalculated after period filter is applied
       // All-time totals (for portfolio snapshot)
-      const _allTimeInvoiced = allInvoices.reduce((s, i) => s + _sumInvoiceAmount(i), 0);
-      const _allTimeCollected = allInvoices.filter(i => _normStatus(i.status) === 'paid').reduce((s, i) => s + _sumInvoiceAmount(i), 0);
-      const _allTimePOCost = allPOs.reduce((s, po) => s + _sumPOAmount(po), 0);
+      var _allTimeFin = cchFinancialSummary({ invoices: allInvoices, pos: allPOs, timeEntries: _allTimeEntries });
+      const _allTimeInvoiced = _allTimeFin.invoiced;
+      const _allTimeCollected = _allTimeFin.paid;
+      const _allTimePOCost = _allTimeFin.poCosts;
 
       // Time calcs (all time for sidebar)
       const totalHours = myTimeEntries.reduce((s, t) => s + (parseFloat(t.hours) || 0), 0);
@@ -7250,7 +7672,10 @@
       });
 
       // Snapshot counts
-      const unpaidInvoices = allInvoices.filter(i => _normStatus(i.status) !== 'paid' && _sumInvoiceAmount(i) > 0);
+      const unpaidInvoices = allInvoices.filter(function(i) {
+        if (!invoiceCountsAsSent(i)) return false;
+        return cchInvoiceDisplayMoney(i).balance > 0.01;
+      });
       const pendingPOs = allPOs.filter(function(po) {
         if (typeof window.cchPoIsOpen === 'function') return window.cchPoIsOpen(po);
         var s = _normStatus(po.status);
@@ -7302,7 +7727,7 @@
       });
 
       // -- Period selector --
-      window._dashPeriod = window._dashPeriod || 'month';
+      window._dashPeriod = window._dashPeriod || 'year';
       const now = new Date();
       const todayStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
       const weekStart = new Date(now); weekStart.setDate(weekStart.getDate() - weekStart.getDay());
@@ -7313,10 +7738,10 @@
       // Period-filtered entries
       var periodStart = weekStr;
       var periodLabel = 'This Week';
-      if (window._dashPeriod === 'week') { periodStart = weekStr; periodLabel = 'This Week'; }
-      else if (window._dashPeriod === 'month') { periodStart = monthStr; periodLabel = 'This Month'; }
-      else if (window._dashPeriod === 'year') { periodStart = yearStr; periodLabel = 'This Year'; }
-      else if (window._dashPeriod === 'all') { periodStart = '2000-01-01'; periodLabel = 'All Time'; }
+      if (window._dashPeriod === 'week') { periodStart = weekStr; periodLabel = weekStr + ' – ' + todayStr; }
+      else if (window._dashPeriod === 'month') { periodStart = monthStr; periodLabel = monthStr + ' – ' + todayStr; }
+      else if (window._dashPeriod === 'year') { periodStart = yearStr; periodLabel = yearStr + ' – ' + todayStr; }
+      else if (window._dashPeriod === 'all') { periodStart = '2000-01-01'; periodLabel = 'All time'; }
 
       const userRate = (isOwner && window._dashboardView !== 'contractor') ? TEAM_CONFIG.owner.rate : (avgRate || DEFAULT_CONTRACTOR_RATE);
 
@@ -7359,24 +7784,36 @@
       var periodInvoices = allInvoices.filter(function(i) { return getDocDate(i) >= periodStart; });
       var periodPOs = allPOs.filter(function(po) { return getDocDate(po) >= periodStart; });
 
-      // Period-filtered financial totals (used by Financial Overview panel)
-      const totalInvoiced = periodInvoices.reduce((s, i) => s + _sumInvoiceAmount(i), 0);
-      const totalCollected = periodInvoices.filter(i => _normStatus(i.status) === 'paid').reduce((s, i) => s + _sumInvoiceAmount(i), 0);
-      const totalOutstanding = totalInvoiced - totalCollected;
-      const totalPOCost = periodPOs.reduce((s, po) => s + _sumPOAmount(po), 0);
-      const totalVendorBillCost = periodPOs.reduce((s, po) => s + vendorBillCostForProfit(po), 0);
+      // Period-filtered financial totals — same function as the project header
+      var dashFin = cchFinancialSummary({
+        invoices: periodInvoices,
+        pos: periodPOs,
+        posAll: allPOs,
+        timeEntries: _allTimeEntries,
+        from: periodStart
+      });
+      const totalInvoiced = dashFin.invoiced;
+      const totalCollected = dashFin.paid;
+      const totalOutstanding = dashFin.outstanding;
+      const totalPOCost = dashFin.poCosts;
+      const totalVendorBillCost = dashFin.poCosts;
 
-      // Per-project profit data (for owner's profit tracker) — uses period-filtered data
+      // Per-project profit — same function, so a project row matches that project's header for this date range
       const projectFinancials = currentProjects.map(p => {
         const name = p.name || p.id;
         const pi = periodInvoices.filter(i => i.projectId === p.id);
         const ppo = periodPOs.filter(po => po.projectId === p.id);
-        const fee = pi.reduce((s,i) => s + _sumInvoiceAmount(i), 0);
-        const collected = pi.filter(i => _normStatus(i.status) === 'paid').reduce((s,i) => s + _sumInvoiceAmount(i), 0);
-        const costs = ppo.reduce((s,po) => s + vendorBillCostForProfit(po), 0);
+        const pte = _allTimeEntries.filter(function(t) {
+          var pn = String(t.project || t.projectName || '').trim();
+          return pn === name || pn === p.id || String(t.projectId || '') === p.id;
+        });
+        var fin = cchFinancialSummary({ invoices: pi, pos: ppo, timeEntries: pte, from: periodStart, proj: p });
         const tp = timeByProject[name] || timeByProject[p.id] || { hours: 0, billable: 0 };
-        const laborCost = tp.hours * getMemberRate(currentUser ? currentUser.email : '');
-        const profit = fee - costs - laborCost;
+        const fee = fin.invoiced;
+        const collected = fin.paid;
+        const costs = fin.poCosts;
+        const laborCost = fin.contractorCosts;
+        const profit = fin.grossProfit;
         const margin = fee > 0 ? Math.round((profit / fee) * 100) : 0;
         return { id: p.id, name, clientName: p.clientName || '', status: p.status || 'Active', fee, collected, costs, laborCost, profit, margin, hours: tp.hours, cover: roomCovers[p.id] || '', lastActivity: projectActivity[p.id] || '' };
       });
@@ -7410,35 +7847,24 @@
       const dateStr = days[now.getDay()] + ', ' + mos[now.getMonth()] + ' ' + now.getDate();
       const firstName = isOwner ? 'Cindy' : (memberName ? memberName.split(' ')[0] : '');
 
-      // Studio-wide KPIs — same scope as Financial Overview (all period invoices/POs, not only "current" 90-day projects)
-      const kpiTotalInvoiced = totalInvoiced;
-      const kpiPOCost = totalPOCost;
-      const kpiVendorBillCost = totalVendorBillCost;
-      const kpiLaborCost = periodEntries.reduce(function(s, t) {
-        var h = parseFloat(t.hours) || 0;
-        if (h <= 0) return s;
-        if (_isOwnerMember(t.member || t.user || '')) return s;
-        var r = parseFloat(t.internalCostRate);
-        if (!(r >= 0) || isNaN(r)) r = _getContractorRate(t.member || t.user || (t.email && String(t.email)) || '');
-        return s + h * r;
-      }, 0) + _subcontractorCostFromInvoices(periodInvoices);
-      const kpiProfit = kpiTotalInvoiced - kpiVendorBillCost - kpiLaborCost;
-      const kpiMargin = kpiTotalInvoiced > 0 ? Math.round((kpiProfit / kpiTotalInvoiced) * 100) : 0;
+      // Studio-wide KPIs — same summary as the project header
+      const kpiTotalInvoiced = dashFin.invoiced;
+      const kpiPOCost = dashFin.poCosts;
+      const kpiVendorBillCost = dashFin.poCosts;
+      const kpiLaborCost = dashFin.contractorCosts;
+      const kpiProfit = dashFin.grossProfit;
+      const kpiMargin = dashFin.invoiced > 0 ? Math.round((dashFin.grossProfit / dashFin.invoiced) * 100) : 0;
 
-      // Profit totals — P&L breakdown (top strip + footer match Financial Overview)
-      const totalDesignFees = periodEntries.filter(t => _isBillableEntry(t)).reduce((s,t) => s + ((parseFloat(t.hours)||0) * (parseFloat(t.rate)||userRate)), 0);
-      const totalSubcontractors = periodEntries.filter(t => {
-        var m = (t.member || t.user || '').toLowerCase();
-        return !TEAM_CONFIG.owner.names.some(n => m.includes(n));
-      }).reduce((s,t) => s + ((parseFloat(t.hours)||0) * (parseFloat(t.internalCostRate) || _getContractorRate(t.member || t.user || ''))), 0);
-      const totalLaborCost = kpiLaborCost;
-      const totalVendorCost = kpiVendorBillCost;
-      const totalFees = kpiTotalInvoiced;
-      const totalProfit = kpiProfit;
+      const totalDesignFees = dashFin.designFeesInvoiced;
+      const totalSubcontractors = dashFin.contractorCosts;
+      const totalLaborCost = dashFin.contractorCosts;
+      const totalVendorCost = dashFin.poCosts;
+      const totalFees = dashFin.invoiced;
+      const totalProfit = dashFin.grossProfit;
       const profitMargin = kpiMargin;
-      const loggedHours = periodEntries.reduce((s,t) => s + (parseFloat(t.hours)||0), 0);
-      const loggedValue = periodEntries.filter(t => _isBillableEntry(t)).reduce((s,t) => s + ((parseFloat(t.hours)||0) * (parseFloat(t.rate)||userRate)), 0);
-      const leakage = loggedValue > 0 && kpiTotalInvoiced > 0 ? Math.round((1 - kpiTotalInvoiced / loggedValue) * 100) : 0;
+      const loggedHours = dashFin.loggedHours;
+      const loggedValue = dashFin.loggedValue;
+      const leakage = dashFin.leakage;
 
       if (showOwnerView) {
         // ----------------------------------------------
@@ -7459,9 +7885,9 @@
           .db-ins-card.c2::before { background: linear-gradient(90deg, var(--gold), transparent); }
           .db-ins-card.c3::before { background: linear-gradient(90deg, #E16A5B, transparent); }
           .db-ins-card.c4::before { background: linear-gradient(90deg, #5FA56B, transparent); }
-          .db-ins-label { font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: var(--gold); font-weight: 600; margin-bottom: 10px; }
-          .db-ins-val { font-size: 28px; font-weight: 700; color: #0F1A2E; font-family: var(--font-mono); line-height: 1; }
-          .db-ins-sub { font-size: 11px; color: rgba(15,26,46,0.5); margin-top: 6px; }
+          .db-ins-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gold); font-weight: 600; margin-bottom: 10px; }
+          .db-ins-val { font-size: 28px; font-weight: 700; color: #0F1A2E; font-family: var(--font-mono); line-height: 1.15; overflow-wrap: anywhere; }
+          .db-ins-sub { font-size: 13px; color: rgba(15,26,46,0.62); margin-top: 6px; }
 
           /* Main layout */
           .db-grid { display: grid; grid-template-columns: 1fr 340px; gap: 24px; }
@@ -7566,38 +7992,45 @@
           </div>
 
           <!-- P&L Overview -->
-          <div class="db-insights" style="grid-template-columns:repeat(6,1fr);">
+          <div class="db-insights" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
             <div class="db-ins-card c1">
-              <div class="db-ins-label">Total Invoiced</div>
+              <div class="db-ins-label">Invoiced</div>
               <div class="db-ins-val">${formatMoney(kpiTotalInvoiced)}</div>
-              <div class="db-ins-sub">${periodInvoices.length} invoices</div>
-            </div>
-            <div class="db-ins-card c2">
-              <div class="db-ins-label">Design Fees</div>
-              <div class="db-ins-val">${formatMoney(totalDesignFees)}</div>
-              <div class="db-ins-sub">${loggedHours.toFixed(1)}h logged</div>
-            </div>
-            <div class="db-ins-card" style="background:linear-gradient(135deg,rgba(171,71,188,0.15),rgba(171,71,188,0.05));border-color:rgba(171,71,188,0.2);">
-              <div class="db-ins-label">Subcontractors</div>
-              <div class="db-ins-val">${formatMoney(totalSubcontractors)}</div>
-              <div class="db-ins-sub">labor cost</div>
-            </div>
-            <div class="db-ins-card c3">
-              <div class="db-ins-label">Vendor Bills</div>
-              <div class="db-ins-val">${formatMoney(kpiVendorBillCost)}</div>
-              <div class="db-ins-sub">received bill totals</div>
+              <div class="db-ins-sub">${dashFin.sentInvoiceCount} sent, pre-tax</div>
             </div>
             <div class="db-ins-card c4">
-              <div class="db-ins-label">Total Profit</div>
-              <div class="db-ins-val" style="color:${totalProfit >= 0 ? 'var(--green)' : 'var(--red)'};">${formatMoney(totalProfit)}</div>
-              <div class="db-ins-sub">${profitMargin}% margin</div>
-            </div>
-            <div class="db-ins-card" style="background:linear-gradient(135deg,rgba(0,184,212,0.15),rgba(0,184,212,0.05));border-color:rgba(0,184,212,0.2);">
-              <div class="db-ins-label">Collected</div>
+              <div class="db-ins-label">Invoices paid</div>
               <div class="db-ins-val">${formatMoney(totalCollected)}</div>
-              <div class="db-ins-sub">${totalInvoiced > 0 ? Math.round(totalCollected / totalInvoiced * 100) : 0}% of invoiced</div>
+              <div class="db-ins-sub">Payment rows</div>
+            </div>
+            <div class="db-ins-card">
+              <div class="db-ins-label">Invoices open</div>
+              <div class="db-ins-val">${formatMoney(totalOutstanding)}</div>
+              <div class="db-ins-sub">${dashFin.openInvoicesCount} unpaid</div>
+            </div>
+            <div class="db-ins-card c3" onclick="cchTogglePoRecon('cchDashPoRecon')" style="cursor:pointer;">
+              <div class="db-ins-label">POs / Bills</div>
+              <div class="db-ins-val">${formatMoney(kpiVendorBillCost)}</div>
+              <div class="db-ins-sub">${dashFin.poCostEstimated > 0.01 ? formatMoney(dashFin.poCostEstimated) + ' est.' : 'bill, else PO'}</div>
+            </div>
+            <div class="db-ins-card">
+              <div class="db-ins-label">POs paid</div>
+              <div class="db-ins-val">${formatMoney(dashFin.poPaid || 0)}</div>
+              <div class="db-ins-sub">Against that total</div>
+            </div>
+            <div class="db-ins-card">
+              <div class="db-ins-label">POs open</div>
+              <div class="db-ins-val">${formatMoney(dashFin.openPoBalance || 0)}</div>
+              <div class="db-ins-sub">${dashFin.openPoCount || 0} still to pay</div>
+            </div>
+            <div class="db-ins-card c2">
+              <div class="db-ins-label">Profit</div>
+              <div class="db-ins-val" style="color:${totalProfit >= 0 ? 'var(--green)' : 'var(--red)'};">${formatMoney(totalProfit)}</div>
+              <div class="db-ins-sub">Invoiced − PO total</div>
             </div>
           </div>
+          ${(dashFin.linesNeedingPoCount > 0) ? '<div onclick="cchTogglePoRecon(\'cchDashNeedPo\')" style="cursor:pointer;margin:12px 0 4px;font-size:14px;font-weight:600;color:' + (dashFin.linesNeedingPoPaid > 0 ? '#C2604F' : '#8B7355') + ';">' + dashFin.linesNeedingPoCount + ' invoice lines need a PO · ' + formatMoney(dashFin.linesNeedingPoAmount) + '</div>' + cchNeedPoListHtml(dashFin, 'cchDashNeedPo') : ''}
+          ${cchPoReconTableHtml(dashFin, 'cchDashPoRecon')}
 
           ${(function() {
             var uDays = [];
@@ -7807,10 +8240,11 @@
               <!-- Financial Overview -->
               <div class="db-panel">
                 <div class="db-panel-head">Financial Overview · ${periodLabel}</div>
-                <div class="db-panel-row"><span class="db-panel-rl">Total Invoiced</span><span class="db-panel-rv">${formatMoney(totalInvoiced)}</span></div>
-                <div class="db-panel-row"><span class="db-panel-rl">Payments Received</span><span class="db-panel-rv">${formatMoney(totalCollected)}</span></div>
-                <div class="db-panel-row"><span class="db-panel-rl">Outstanding</span><span class="db-panel-rv" style="color:${totalOutstanding > 0 ? '#D4A574' : '#C4A464'};">${formatMoney(totalOutstanding)}</span></div>
-                <div class="db-panel-row"><span class="db-panel-rl">Vendor Bills</span><span class="db-panel-rv">${formatMoney(totalVendorBillCost)}</span></div>
+                <div class="db-panel-row"><span class="db-panel-rl">Invoiced, pre-tax</span><span class="db-panel-rv">${formatMoney(totalInvoiced)}</span></div>
+                <div class="db-panel-row"><span class="db-panel-rl">Invoices paid</span><span class="db-panel-rv">${formatMoney(totalCollected)}</span></div>
+                <div class="db-panel-row"><span class="db-panel-rl">Invoices open</span><span class="db-panel-rv" style="color:${totalOutstanding > 0 ? '#D4A574' : '#C4A464'};">${formatMoney(totalOutstanding)}</span></div>
+                <div class="db-panel-row"><span class="db-panel-rl">POs / Bills</span><span class="db-panel-rv">${formatMoney(totalVendorBillCost)}</span></div>
+                <div class="db-panel-row"><span class="db-panel-rl">POs open</span><span class="db-panel-rv">${formatMoney(dashFin.openPoBalance || 0)}</span></div>
                 <div class="db-panel-row" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:10px;margin-top:4px;"><span class="db-panel-rl" style="font-weight:600;color:#0F1A2E;">Net Revenue</span><span class="db-panel-rv">${formatMoney(totalCollected - totalVendorBillCost)}</span></div>
               </div>
 
@@ -7834,8 +8268,8 @@
                 <div class="db-panel-head">Portfolio Snapshot</div>
                 <div class="db-panel-row"><span class="db-panel-rl">Current / Active</span><span class="db-panel-rv">${currentProjects.length} <span style="font-size:10px;color:var(--gold);">/ ${allProjects.length}</span></span></div>
                 <div class="db-panel-row"><span class="db-panel-rl">Proposals Value</span><span class="db-panel-rv">${formatMoney(totalProposalValue)}</span></div>
-                <div class="db-panel-row"><span class="db-panel-rl">Avg Invoice</span><span class="db-panel-rv">${allInvoices.length > 0 ? formatMoney(_allTimeInvoiced / allInvoices.length) : '\u2014'}</span></div>
-                <div class="db-panel-row"><span class="db-panel-rl">Collection Rate</span><span class="db-panel-rv">${_allTimeInvoiced > 0 ? Math.round(_allTimeCollected / _allTimeInvoiced * 100) + '%' : '\u2014'}</span></div>
+                <div class="db-panel-row"><span class="db-panel-rl">Avg Invoice</span><span class="db-panel-rv">${_allTimeFin.sentInvoiceCount > 0 ? formatMoney(_allTimeFin.invoiced / _allTimeFin.sentInvoiceCount) : '\u2014'}</span></div>
+                <div class="db-panel-row"><span class="db-panel-rl">Collection Rate</span><span class="db-panel-rv">${_allTimeFin.invoiceInclusive > 0 ? Math.round(_allTimeFin.paid / _allTimeFin.invoiceInclusive * 100) + '%' : '\u2014'}</span></div>
               </div>
 
               <!-- Studio Activity -->
@@ -9828,7 +10262,10 @@
         var raw = String(candidates[i] == null ? '' : candidates[i]).trim();
         if (!raw) continue;
         var n = cchNormLineTextForCompare(raw);
-        if (descN && n === descN) continue;
+        if (descN && n === descN) {
+          var _svcNote = it.expenseType === 'service' || it.itemType === 'service' || it._isService === true;
+          if (!_svcNote) continue;
+        }
         if (titleN && n === titleN) continue;
         return raw;
       }
@@ -19221,13 +19658,22 @@
       const _contractFee = parseFloat(proj.contractFee || proj.flatFee || proj.budget) || 0;
       const _projFin = computeProjectFinancials({ proj: proj, timeEntries: _projTime, invoices: _projInvoices, pos: _projPOs });
       window._projFinancialsCanonical = { projectId: proj.id, fin: _projFin };
+      var _barProposals = [], _barTasks = [];
+      try {
+        var _bp = await db.collection('boards').doc(proj.id).collection('proposals').get();
+        _bp.forEach(function(d) { _barProposals.push({ id: d.id, ...d.data() }); });
+      } catch (e) {}
+      try {
+        var _bt = await db.collection('boards').doc(proj.id).collection('tasks').get();
+        _bt.forEach(function(d) { _barTasks.push({ id: d.id, ...d.data() }); });
+      } catch (e) {}
 
       // === BUILD FINANCIAL HEALTH BAR ===
       const _hasData = _projFin.loggedHours > 0 || _projFin.invoiced > 0 || _projFin.poCosts > 0;
       // Main project dashboard only. Detail tabs should stay focused on their lists/forms.
       const _showFinancialHealthTabs = new Set(['overview']);
       _profitBarHtml = (_isAdminUser && _hasData && _showFinancialHealthTabs.has(currentProjectTab))
-        ? buildFinancialHealthBarHtml(_projFin, proj, _projPOs)
+        ? buildFinancialHealthBarHtml(_projFin, proj, _projPOs, { proposals: _barProposals, tasks: _barTasks })
         : '';
       }
 
@@ -19622,8 +20068,15 @@
         document.querySelectorAll('.proj-file-menu-wrap').forEach(function(w) { w.classList.remove('is-open'); });
       } catch (e2) {}
       drop.style.display = opening ? 'block' : 'none';
-      if (opening) wrap.classList.add('is-open');
-      else wrap.classList.remove('is-open');
+      if (opening) {
+        wrap.classList.add('is-open');
+        drop.style.maxHeight = '';
+        var menuRect = drop.getBoundingClientRect();
+        var menuRoom = window.innerHeight - menuRect.top - 12;
+        if (menuRoom < 180) menuRoom = 180;
+        if (menuRoom > 420) menuRoom = 420;
+        drop.style.maxHeight = Math.round(menuRoom) + 'px';
+      } else wrap.classList.remove('is-open');
     };
     window.projFileSetShelfCategory = async function(projectId, fileId, category) {
       projectId = String(projectId || '').trim();
@@ -23614,15 +24067,7 @@
             var propList = (_ovProposalsAwaiting.length ? _ovProposalsAwaiting : _pipelineProposals);
             var propOpen = _ovActionPanel === 'proposals';
             var invOpen = _ovActionPanel === 'invoices';
-            var html = '<div class="dpo-section"><div class="dpo-section-title">Action required</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">' +
-              '<div class="dpo-sc dpo-action-card' + (propOpen ? ' is-open' : '') + '" onclick="window._ovToggleActionPanel(\'' + escJsStr(proj.id) + '\',\'proposals\')">' +
-                '<div class="dpo-sc-title" style="display:flex;justify-content:space-between;align-items:center;">Proposals awaiting review <span style="font-size:11px;color:var(--gray-400);">' + (propOpen ? '\u25BE' : '\u25B8') + '</span></div>' +
-                '<div class="dpo-stat-val" style="color:var(--gold);">' + _ovProposalsAwaiting.length + '</div>' +
-                '<div class="dpo-stat-hint">Click to ' + (propOpen ? 'hide' : 'show') + ' list · ' + propList.length + ' open</div></div>' +
-              '<div class="dpo-sc dpo-action-card' + (invOpen ? ' is-open' : '') + '" onclick="window._ovToggleActionPanel(\'' + escJsStr(proj.id) + '\',\'invoices\')">' +
-                '<div class="dpo-sc-title" style="display:flex;justify-content:space-between;align-items:center;">Open invoices <span style="font-size:11px;color:var(--gray-400);">' + (invOpen ? '\u25BE' : '\u25B8') + '</span></div>' +
-                '<div class="dpo-stat-val">' + _ovFin.openInvoicesCount + '</div>' +
-                '<div class="dpo-stat-hint">Outstanding ' + formatMoney(balDue) + ' · click to ' + (invOpen ? 'hide' : 'show') + '</div></div>' +
+            var html = '<div class="dpo-section"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">' +
               '<div class="dpo-sc" style="cursor:pointer;margin:0;" onclick="switchProjectTab(\'selections\')"><div class="dpo-sc-title">Selections</div>' +
                 '<div class="dpo-stat-val">' + _selectionsCount + '</div>' +
                 '<div class="dpo-stat-hint">' + formatMoney(_selectionsTotal) + ' · FFE clips by room</div></div>' +
@@ -23930,10 +24375,12 @@
                 <div class="dpo-sc-row"><span style="color:var(--gold);">Total Hours</span><span style="font-weight:600;font-family:var(--font-mono);color:var(--cyan);">${_timeHrs.toFixed(1)}</span></div>
                 <div class="dpo-sc-row"><span style="color:var(--gold);">Billable</span><span style="font-weight:600;font-family:var(--font-mono);">${_timeBillHrs.toFixed(1)}</span></div>
                 <div class="dpo-sc-row"><span style="color:var(--gold);">Invoiced</span><span style="font-weight:600;font-family:var(--font-mono);">${formatMoney(_ovFin.invoiced)}</span></div>
-                <div class="dpo-sc-row"><span style="color:var(--gold);">Paid</span><span style="font-weight:600;font-family:var(--font-mono);color:var(--green);">${formatMoney(_ovFin.paid)}</span></div>
-                <div class="dpo-sc-row"><span style="color:var(--gold);">${_ovOutLabel}</span><span style="font-weight:600;font-family:var(--font-mono);color:${balance > 0.01 ? '#E16A5B' : 'var(--green)'};">${formatMoney(Math.abs(balance))}</span></div>
-                <div class="dpo-sc-row"><span style="color:var(--gold);">Leakage</span><span style="font-weight:600;font-family:var(--font-mono);color:${_ovFin.leakage > 0 ? '#E16A5B' : 'var(--gray-400)'};">${formatMoney(_ovFin.leakage)}</span></div>
-                <div class="dpo-sc-row"><span style="color:var(--gold);">PO Costs</span><span style="font-weight:600;font-family:var(--font-mono);">${formatMoney(_poTotal)}</span></div>
+                <div class="dpo-sc-row"><span style="color:var(--gold);">Invoices paid</span><span style="font-weight:600;font-family:var(--font-mono);color:var(--green);">${formatMoney(_ovFin.paid)}</span></div>
+                <div class="dpo-sc-row"><span style="color:var(--gold);">Invoices open</span><span style="font-weight:600;font-family:var(--font-mono);color:${balance > 0.01 ? '#E16A5B' : 'var(--green)'};">${formatMoney(Math.abs(balance))}</span></div>
+                <div class="dpo-sc-row"><span style="color:var(--gold);">POs / Bills</span><span style="font-weight:600;font-family:var(--font-mono);">${formatMoney(_ovFin.poCosts)}</span></div>
+                <div class="dpo-sc-row"><span style="color:var(--gold);">POs paid</span><span style="font-weight:600;font-family:var(--font-mono);">${formatMoney(_ovFin.poPaid || 0)}</span></div>
+                <div class="dpo-sc-row"><span style="color:var(--gold);">POs open</span><span style="font-weight:600;font-family:var(--font-mono);">${formatMoney(_ovFin.openPoBalance || 0)}</span></div>
+                <div class="dpo-sc-row"><span style="color:var(--gold);">Profit</span><span style="font-weight:600;font-family:var(--font-mono);">${formatMoney(_ovFin.grossProfit || 0)}</span></div>
               </div>
 
               <!-- PROJECT TEAM -->
@@ -26073,9 +26520,11 @@ async function renderBoardsTab(T, proj) {
             '<button type="button" class="btn btn-secondary btn-sm" ' + (_ibCanDown ? '' : 'disabled ') + 'onclick="ibMoveSection(\'' + pidEsc + '\',\'' + escJsStr(activeSec.id) + '\',1)" title="Move this board down in the list">\u25BC</button>') +
           '</div></div>';
         var _ibPub = activeSec.clientPublished === true;
+        var _ibCon = activeSec.sharedWithContractors === true;
         var boardActionsHtml = clientIbReadOnly ? '' :
           '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">' +
-          '<button type="button" class="btn ' + (_ibPub ? 'btn-secondary' : 'btn-primary') + ' btn-sm" onclick="ibToggleClientPublish(\'' + pidEsc + '\',\'' + escJsStr(activeSec.id) + '\')" title="' + (_ibPub ? 'Visible to the client — click to unpublish' : 'Not visible to the client yet — click to publish') + '">' + (_ibPub ? '🔒 Unpublish' : '🌐 Publish to client') + '</button>' +
+          '<button type="button" class="btn ' + (_ibPub ? 'btn-secondary' : 'btn-primary') + ' btn-sm" onclick="ibToggleClientPublish(\'' + pidEsc + '\',\'' + escJsStr(activeSec.id) + '\')" title="' + (_ibPub ? 'Visible to the client — click to unpublish' : 'Not visible to the client yet — click to publish') + '">' + (_ibPub ? 'Unpublish this board' : 'Publish this board') + '</button>' +
+          (isStyleLib ? '' : '<button type="button" class="btn btn-secondary btn-sm" onclick="ibToggleContractorShare(\'' + pidEsc + '\',\'' + escJsStr(activeSec.id) + '\')" title="' + (_ibCon ? 'On the contractor portal — click to remove' : 'Share this board only. No prices.') + '">' + (_ibCon ? 'Unshare with contractors' : 'Share with contractors') + '</button>') +
           '<button type="button" class="btn btn-secondary btn-sm" onclick="ibShareBoardClientLink(\'' + pidEsc + '\',\'' + escJsStr(activeSec.id) + '\',\'' + escJsStr(activeSec.name || 'Inspiration board') + '\',' + (_ibPub ? 'true' : 'false') + ')" title="Copy a client portal link to this board">Link to client</button>' +
           '<button type="button" class="btn btn-sm" style="background:#C4A464;color:#0F1A2E;border:none;font-weight:600;" onclick="void cpOpenPostIdeabookDecisionModal(\'' + pidEsc + '\',\'' + escJsStr(activeSec.id) + '\')" title="Post to client Decisions with cover + Open board link">\u25C7 Post Decision</button>' +
           '<span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap;' + (_ibPub ? 'background:rgba(95,165,107,0.14);color:#5FA56B;' : 'background:rgba(15,26,46,0.06);color:var(--gray-500);') + '">' + (_ibPub ? '● Live to client' : '○ Draft — not shared') + '</span>' +
@@ -26157,6 +26606,12 @@ async function renderBoardsTab(T, proj) {
         var pubBadge = isStyleLib ? '' : (s.clientPublished === true
           ? ' · <span style="color:#5FA56B;font-weight:600;">● Live to client</span>'
           : ' \u00B7 <span style="color:var(--gray-400);font-weight:600;">○ Draft</span>');
+        var pubFace = '';
+        if (!isStyleLib) {
+          var _ibPubFace = s.clientPublished === true;
+          pubFace = '<button type="button" class="btn ' + (_ibPubFace ? 'btn-secondary' : 'btn-primary') + ' btn-sm" style="margin-top:8px;width:100%;" onclick="event.preventDefault();event.stopPropagation();ibToggleClientPublish(\'' + pidEsc + '\',\'' + sidEsc + '\')">' + (_ibPubFace ? 'Unpublish this board' : 'Publish this board') + '</button>' +
+            '<button type="button" class="btn btn-secondary btn-sm" style="margin-top:6px;width:100%;" onclick="event.preventDefault();event.stopPropagation();ibToggleContractorShare(\'' + pidEsc + '\',\'' + sidEsc + '\')">' + (s.sharedWithContractors === true ? 'Unshare with contractors' : 'Share with contractors') + '</button>';
+        }
         var _ciBadge = (String(s.id || '') === 'client-ideas' || String(s.boardKind || '').toLowerCase() === 'clientideas')
           ? ' <span style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#C4A464;font-weight:700;">Client Ideas</span>'
           : '';
@@ -26172,7 +26627,7 @@ async function renderBoardsTab(T, proj) {
           '<div class="ib-p2-card-order">' +
           '<button type="button" ' + (canUp ? '' : 'disabled ') + 'onclick="event.preventDefault();event.stopPropagation();ibMoveSection(\'' + pidEsc + '\',\'' + sidEsc + '\',-1)" title="Move board up">\u25B2</button>' +
           '<button type="button" ' + (canDown ? '' : 'disabled ') + 'onclick="event.preventDefault();event.stopPropagation();ibMoveSection(\'' + pidEsc + '\',\'' + sidEsc + '\',1)" title="Move board down">\u25BC</button>' +
-          '</div>' + cardBtn + '</div>';
+          '</div><div style="flex:1;min-width:0;display:flex;flex-direction:column;">' + cardBtn + pubFace + '</div></div>';
       }
       var _ibLandingAct = !isStyleLib ? _ibProjectActivityTotals(sections) : { nStarImg: 0, nCom: 0 };
       var _ibLandingActBar = (!isStyleLib && (_ibLandingAct.nStarImg + _ibLandingAct.nCom > 0))
@@ -26326,8 +26781,9 @@ async function renderBoardsTab(T, proj) {
               <button onclick="ibDuplicateSection('${projectId}','${section.id}')">Duplicate board</button>
               <button onclick="ibToggleNavVisibility('${projectId}','${section.id}')">${section.hiddenInNav ? 'Show in board list' : 'Hide from board list'}</button>
               <div class="divider"></div>
-              <button onclick="ibToggleClientPublish('${projectId}','${section.id}')">${section.clientPublished === true ? '🔒 Unpublish from client' : '🌐 Publish to client'}</button>
+              <button onclick="ibToggleClientPublish('${projectId}','${section.id}')">${section.clientPublished === true ? 'Unpublish this board' : 'Publish this board'}</button>
               <button onclick="ibShareBoardClientLink('${projectId}','${section.id}','${escJsStr(section.name || 'Inspiration board')}',${section.clientPublished === true})">🔗 Link to client</button>
+              <button onclick="ibToggleContractorShare('${projectId}','${section.id}')">${section.sharedWithContractors === true ? 'Unshare with contractors' : 'Share with contractors'}</button>
               <div class="divider"></div>
               <button onclick="ibSetSectionShowVendor('${projectId}','${section.id}',${_ibShowVendor ? 0 : 1})">${_ibShowVendor ? 'Hide vendor &amp; source' : 'Show vendor &amp; source'}</button>
               <div class="divider"></div>
@@ -26758,11 +27214,59 @@ async function renderBoardsTab(T, proj) {
           await logBoardUpdate(projectId, secName, next ? 'inspiration board published to client' : 'inspiration board unpublished from client', { boardKind: 'inspiration', sectionId: sectionId, clientPublished: next });
         }
         window._ibRestoreScrollTo = sectionId;
-        renderProjectDetail();
+        var _ibHash = (window.location.hash || '').replace(/^#\/?/, '').split('/').filter(function(s) { return s !== ''; });
+        if (_ibHash[0] === 'ideabooks') renderIdeabooksList();
+        else renderProjectDetail();
         showToast(next ? '\u2713 Published \u2014 now visible to the client' : 'Unpublished \u2014 hidden from the client', next ? 3500 : 3000);
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
     window.ibToggleClientPublish = ibToggleClientPublish;
+
+    /** One inspiration board on the contractor portal. Does not publish the board to the client, and does not post a decision. */
+    async function ibToggleContractorShare(projectId, sectionId) {
+      try {
+        var ref = db.collection('boards').doc(projectId).collection('ideabooks').doc(sectionId);
+        var doc = await ref.get();
+        if (!doc.exists) { showToast('Board not found', 'error'); return; }
+        var data = doc.data() || {};
+        var next = data.sharedWithContractors !== true;
+        var now = new Date().toISOString();
+        var patch = { sharedWithContractors: next, updatedAt: now };
+        patch.sharedWithContractorsAt = next ? now : firebase.firestore.FieldValue.delete();
+        await ref.update(patch);
+        window._ibRestoreScrollTo = sectionId;
+        var _ibHash = (window.location.hash || '').replace(/^#\/?/, '').split('/').filter(function(s) { return s !== ''; });
+        if (_ibHash[0] === 'ideabooks') renderIdeabooksList();
+        else renderProjectDetail();
+        showToast(next ? 'Shared with contractors — this board only' : 'Hidden from contractors');
+      } catch (e) { showToast('Error: ' + e.message, 'error'); }
+    }
+    window.ibToggleContractorShare = ibToggleContractorShare;
+
+    /** Design Hub project card: one action for every board in the project. */
+    async function ibToggleProjectClientPublish(projectId) {
+      try {
+        var snap = await db.collection('boards').doc(projectId).collection('ideabooks').get();
+        var docs = snap.docs || [];
+        if (!docs.length) { showToast('No boards to publish'); return; }
+        var allLive = docs.every(function(d) { return (d.data() || {}).clientPublished === true; });
+        var next = !allLive;
+        var now = new Date().toISOString();
+        var batch = db.batch();
+        docs.forEach(function(d) {
+          var patch = { clientPublished: next, updatedAt: now };
+          patch.clientPublishedAt = next ? now : firebase.firestore.FieldValue.delete();
+          batch.update(d.ref, patch);
+        });
+        await batch.commit();
+        if (typeof logBoardUpdate === 'function') {
+          await logBoardUpdate(projectId, 'Inspiration', next ? 'inspiration boards published to client' : 'inspiration boards unpublished from client', { boardKind: 'inspiration', clientPublished: next, count: docs.length });
+        }
+        renderIdeabooksList();
+        showToast(next ? '\u2713 Published \u2014 now visible to the client' : 'Unpublished \u2014 hidden from the client', next ? 3500 : 3000);
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+    window.ibToggleProjectClientPublish = ibToggleProjectClientPublish;
 
     function ibFilterGrid(query, gridId) {
       var q = (query || '').toLowerCase().trim();
@@ -31795,6 +32299,10 @@ async function renderBoardsTab(T, proj) {
       if (!item || (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(item))) return { lineAmt: 0 };
       var qty = parseFloat(item.qty) || 1;
       var cost = parseFloat(item.cost) || 0;
+      // Freight lives in shipping. A leftover rate must not bill it again as product.
+      if (Math.abs(cost) < 0.005 && Math.abs(parseFloat(item.amount) || 0) < 0.005 && Math.abs(parseFloat(item.shipping) || 0) > 0.005) {
+        return { lineAmt: 0 };
+      }
       var rate = parseFloat(item.rate) || parseFloat(item.unitPrice) || 0;
       var sell = parseFloat(item.amount) || 0;
       if (!sell) sell = parseMoney(item.totalSelling);
@@ -32074,6 +32582,7 @@ async function renderBoardsTab(T, proj) {
           date: p.date || p.paidAt || p.recordedAt || '',
           method: String(p.method || p.paymentMethod || '').trim(),
           note: String(p.note || p.memo || '').trim(),
+          vendorInvoiceNumber: String(p.vendorInvoiceNumber || p.invoiceNumber || '').trim(),
           reference: String(p.reference || p.ref || p.qbPaymentId || p.transactionId || p.id || '').trim(),
           qbPaymentId: String(p.qbPaymentId || '').trim(),
           source: String(p.source || '').trim(),
@@ -34580,12 +35089,12 @@ async function renderBoardsTab(T, proj) {
           '<div style="text-align:center;">' +
             '<div style="font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:1px;">Cash Profit</div>' +
             '<div style="font-size:26px;font-weight:700;color:' + (cashProfit >= 0 ? '#5FA56B' : '#E16A5B') + ';font-family:var(--font-mono);margin-top:6px;">' + formatMoney(cashProfit) + '</div>' +
-            '<div style="font-size:10px;color:var(--gray-500);margin-top:2px;">revenue - POs - contractors</div>' +
+            '<div style="font-size:10px;color:var(--gray-500);margin-top:2px;">pre-tax invoiced − PO cost</div>' +
           '</div>' +
           '<div style="text-align:center;">' +
             '<div style="font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:1px;">Loaded Profit</div>' +
             '<div style="font-size:26px;font-weight:700;color:' + (loadedProfit >= 0 ? 'var(--gold)' : '#E16A5B') + ';font-family:var(--font-mono);margin-top:6px;">' + formatMoney(loadedProfit) + '</div>' +
-            '<div style="font-size:10px;color:var(--gray-500);margin-top:2px;">cash profit - owner labor</div>' +
+            '<div style="font-size:10px;color:var(--gray-500);margin-top:2px;">gross profit − owner time at the entry rate</div>' +
           '</div>' +
           '<div style="text-align:center;">' +
             '<div style="font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:1px;">Profit Margin</div>' +
@@ -36996,6 +37505,7 @@ async function renderBoardsTab(T, proj) {
       }
       _shipToReceivers = [];
       _shipToWorkrooms = [];
+      window._cchVendorContactByName = Object.create(null);
       var wrSeen = {};
       var rcSeen = {};
       function pushWorkroom(name, entry) {
@@ -37052,6 +37562,19 @@ async function renderBoardsTab(T, proj) {
           var v = d.data() || {};
           var name = String(v.name || v.company || v.vendor || '').trim();
           if (!name) return;
+          var addrText = '';
+          try {
+            if (typeof cchComposeAddressMultiline === 'function' && typeof cchAddressPartsFromRecord === 'function') {
+              addrText = String(cchComposeAddressMultiline(cchCoerceStructuredAddressParts(cchAddressPartsFromRecord(v))) || '').trim();
+            }
+          } catch (_eAddrMap) {}
+          if (!addrText) addrText = String(v.address || v.addr || '').trim();
+          window._cchVendorContactByName[name.toLowerCase()] = {
+            address: addrText,
+            phone: String(v.phone || v.contactPhone || v.tel || '').trim(),
+            email: String(v.email || v.contactEmail || '').trim(),
+            contact: String(v.contact || '').trim()
+          };
           var entry = _shipToContactEntry(name, v, v.phone || v.contactPhone);
           if (isWorkroomVendor(v)) pushWorkroom(name, entry);
           if (isReceiverVendor(v)) pushReceiver(name, entry);
@@ -41958,13 +42481,17 @@ async function renderBoardsTab(T, proj) {
         }
         const isSvcLine = item.expenseType === 'service' || item.itemType === 'service' || item._isService === true;
         var invLineUseRate = isInvoice && rateInv > 0 && cost <= 0 && (designNoMk || isSvcLine);
-        const total = isPO
+        var total = isPO
           ? (cost * qty)
           : (isInvoice && typeof invoiceLineAmountForTotals === 'function'
             ? invoiceLineAmountForTotals(item).lineAmt
             : (invLineUseRate
               ? (Math.round(rateInv * qty * 100) / 100 + shipping)
               : ((cost === 0 && sellAmt > 0) ? sellAmt + shipping : (cost * qty * (1 + markupPct / 100)) + shipping)));
+        if (isInvoice && Math.abs(total) < 0.005 && Math.abs(shipping) > 0.005) {
+          var _etShip = String(item.expenseType || '').toLowerCase();
+          if (_etShip === 'freight' || _etShip === 'shipping') total = shipping;
+        }
         const markupDollar = isPO ? 0 : (cost * qty * (markupPct / 100));
         const imgSrc = (isPO && typeof cchPoLineDisplayImageUrl === 'function')
           ? (cchPoLineDisplayImageUrl(item) || '')
@@ -41974,9 +42501,9 @@ async function renderBoardsTab(T, proj) {
         const isServiceLine = item.expenseType === 'service' || item.itemType === 'service' || item._isService === true;
         var rateVal = parseFloat(item.rate);
         if (!(rateVal > 0)) rateVal = parseFloat(item.unitPrice) || 0;
-        if (!(rateVal > 0) && isInvoice && isServiceLine && cost <= 0 && qty > 0 && sellAmt > 0) {
-          rateVal = sellAmt / qty;
-        }
+        var rateShown = '';
+        if (item.rate != null && String(item.rate) !== '' && isFinite(parseFloat(item.rate))) rateShown = parseFloat(item.rate).toFixed(2);
+        else if (rateVal > 0) rateShown = rateVal.toFixed(2);
         var unitSell = isPO
           ? cost
           : ((cost > 0) ? (cost * (1 + markupPct / 100)) : (sellAmt > 0 ? sellAmt / (qty || 1) : 0));
@@ -42019,7 +42546,7 @@ async function renderBoardsTab(T, proj) {
           if (isNaN(credAmt)) credAmt = parseFloat(item.cost) || 0;
           costCell = '<input type="text" inputmode="decimal" class="doc-edit-num-input doc-edit-num-field doc-edit-num-field--money" value="' + (credAmt || credAmt === 0 ? credAmt.toFixed(2) : '') + '" data-idx="' + idx + '" data-field="amount" onchange="docEditCreditAmountChange(this)" title="Credit amount (enter negative to subtract)">';
         } else if (isInvoice && isServiceLine && cost <= 0) {
-          costCell = '<input type="number" step="0.01" min="0" class="doc-edit-num-field doc-edit-num-field--money" value="' + (rateVal > 0 ? rateVal.toFixed(2) : '') + '" data-idx="' + idx + '" data-field="rate" onchange="docEditRateChange(this)" title="Billable rate (design / service line)">';
+          costCell = '<input type="number" step="0.01" min="0" class="doc-edit-num-field doc-edit-num-field--money" value="' + rateShown + '" data-idx="' + idx + '" data-field="rate" onchange="docEditRateChange(this)" title="Billable rate (design / service line)">';
         } else {
           costCell = '<input type="text" inputmode="decimal" class="doc-edit-num-input doc-edit-num-field doc-edit-num-field--money" value="' + (cost || cost === 0 ? cost.toFixed(2) : '') + '" data-idx="' + idx + '" data-field="cost" onchange="docEditNumChange(this)" title="Trade cost per unit (negative = credit / adjustment)">';
         }
@@ -42149,7 +42676,19 @@ async function renderBoardsTab(T, proj) {
           '</td>' +
         '</tr>';
 
-        return mainRow + notesRow + detailRow;
+        var svcGroupBanner = '';
+        if (isInvoice && isServiceLine && item.timeEntryId) {
+          var svcName = String(item.category || '').trim();
+          var prevIt = idx > 0 ? items[idx - 1] : null;
+          var prevName = '';
+          if (prevIt && (prevIt.timeEntryId || prevIt.expenseType === 'service' || prevIt.itemType === 'service')) {
+            prevName = String(prevIt.category || '').trim();
+          }
+          if (svcName && svcName !== prevName) {
+            svcGroupBanner = '<tr class="doc-edit-group-banner"><td colspan="' + _poLineColspan + '" style="background:#F4F6FA;font-weight:700;padding:8px 10px;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#7A7060;border-bottom:1px solid rgba(15,26,46,0.1);">' + esc(svcName) + '</td></tr>';
+          }
+        }
+        return svcGroupBanner + mainRow + notesRow + detailRow;
       }).join('') + '</tbody></table></div>';
 
       docEditRecalcTotals();
@@ -42749,6 +43288,14 @@ async function renderBoardsTab(T, proj) {
       }
     }
 
+    function docEditPOVendorNameFromDom() {
+      var elV = document.getElementById('docEditPOVendor');
+      var custom = document.getElementById('docEditPOVendorCustom');
+      if (!elV) return '';
+      if (String(elV.value || '') === '__other__') return custom ? String(custom.value || '').trim() : '';
+      return String(elV.value || '').trim();
+    }
+
     function docEditPOVendorShipChange() {
       if (!_docEdit || _docEdit.type !== 'po') return;
       var elV = document.getElementById('docEditPOVendor');
@@ -42756,7 +43303,7 @@ async function renderBoardsTab(T, proj) {
       var elS = document.getElementById('docEditPOShipTo');
       var elAddr = document.getElementById('docEditPOShipToAddress');
       var elD = document.getElementById('docEditPODate');
-      if (elV) _docEdit.docData.vendor = elV.value.trim();
+      if (elV) _docEdit.docData.vendor = docEditPOVendorNameFromDom();
       if (elA) _docEdit.docData.vendorAddress = elA.value.trim();
       if (elS) {
         _docEdit.docData.shipTo = elS.value.trim();
@@ -42781,41 +43328,104 @@ async function renderBoardsTab(T, proj) {
       docEditAutoSave();
     }
 
-    async function docEditPOVendorNameChange() {
-      if (!_docEdit || _docEdit.type !== 'po') return;
-      var elV = document.getElementById('docEditPOVendor');
+    function docEditApplyVendorContactFromMap(name) {
+      if (!_docEdit || _docEdit.type !== 'po') return false;
+      var key = String(name || '').trim().toLowerCase();
+      var mapped = key && window._cchVendorContactByName ? window._cchVendorContactByName[key] : null;
+      if (!mapped || !mapped.address) return false;
       var elA = document.getElementById('docEditPOVendorAddress');
-      var name = elV ? elV.value.trim() : '';
-      _docEdit.docData.vendor = name;
-      if (elA && !elA.value.trim() && name && typeof window.cchPoVendorAddressResolved === 'function') {
-        try {
-          var resolved = await window.cchPoVendorAddressResolved({ vendor: name });
-          if (resolved) {
-            elA.value = resolved;
-            _docEdit.docData.vendorAddress = resolved;
-          }
-        } catch (_eVenFill) {}
+      if (elA) elA.value = mapped.address;
+      _docEdit.docData.vendorAddress = mapped.address;
+      _docEdit.docData.vendorPhone = mapped.phone || '';
+      _docEdit.docData.vendorEmail = mapped.email || '';
+      _docEdit.docData.vendorContact = mapped.contact || '';
+      var contactEl = document.getElementById('docEditPOVendorContact');
+      if (contactEl) {
+        var bits = [];
+        if (mapped.contact) bits.push(mapped.contact);
+        if (mapped.phone) bits.push(mapped.phone);
+        if (mapped.email) bits.push(mapped.email);
+        contactEl.textContent = bits.join(' · ');
       }
-      docEditAutoSave();
+      return true;
     }
 
     async function docEditPOVendorNameChange() {
       if (!_docEdit || _docEdit.type !== 'po') return;
       var elV = document.getElementById('docEditPOVendor');
+      var custom = document.getElementById('docEditPOVendorCustom');
       var elA = document.getElementById('docEditPOVendorAddress');
-      var name = elV ? elV.value.trim() : '';
-      _docEdit.docData.vendor = name;
-      if (elA && !elA.value.trim() && name && typeof window.cchPoVendorAddressResolved === 'function') {
-        try {
-          var resolved = await window.cchPoVendorAddressResolved({ vendor: name });
-          if (resolved) {
-            elA.value = resolved;
-            _docEdit.docData.vendorAddress = resolved;
-          }
-        } catch (_eVenFill) {}
+      if (elV && custom) {
+        if (String(elV.value || '') === '__other__') custom.style.display = '';
+        else custom.style.display = 'none';
       }
-      docEditAutoSave();
+      var name = docEditPOVendorNameFromDom();
+      _docEdit.docData.vendor = name;
+      var beforeAddr = elA ? String(elA.value || '') : '';
+      docEditApplyVendorContactFromMap(name);
+      var info = null;
+      if (name && typeof window.cchPoDirectoryContactByName === 'function') {
+        try { info = await window.cchPoDirectoryContactByName(name); } catch (_eVenFill) { info = null; }
+      }
+      if (elA && info && info.address) {
+        elA.value = info.address;
+        _docEdit.docData.vendorAddress = info.address;
+      }
+      _docEdit.docData.vendorPhone = info && info.phone ? info.phone : '';
+      _docEdit.docData.vendorEmail = info && info.email ? info.email : '';
+      _docEdit.docData.vendorContact = info && info.contact ? info.contact : '';
+      var contactEl = document.getElementById('docEditPOVendorContact');
+      if (contactEl) {
+        var bits = [];
+        if (_docEdit.docData.vendorContact) bits.push(_docEdit.docData.vendorContact);
+        if (_docEdit.docData.vendorPhone) bits.push(_docEdit.docData.vendorPhone);
+        if (_docEdit.docData.vendorEmail) bits.push(_docEdit.docData.vendorEmail);
+        contactEl.textContent = bits.join(' · ');
+      }
+      if (name && (!info || !info.address)) {
+        try { showToast('No address on file for ' + name + '. The address box was left as it was.', 'warning'); } catch (_eNoAddr) {}
+      }
+      if (!elA || String(elA.value || '') !== beforeAddr) docEditAutoSave();
     }
+
+    async function docEditPOVendorNameChange() {
+      if (!_docEdit || _docEdit.type !== 'po') return;
+      var elV = document.getElementById('docEditPOVendor');
+      var custom = document.getElementById('docEditPOVendorCustom');
+      var elA = document.getElementById('docEditPOVendorAddress');
+      if (elV && custom) {
+        if (String(elV.value || '') === '__other__') custom.style.display = '';
+        else custom.style.display = 'none';
+      }
+      var name = docEditPOVendorNameFromDom();
+      _docEdit.docData.vendor = name;
+      var beforeAddr = elA ? String(elA.value || '') : '';
+      docEditApplyVendorContactFromMap(name);
+      var info = null;
+      if (name && typeof window.cchPoDirectoryContactByName === 'function') {
+        try { info = await window.cchPoDirectoryContactByName(name); } catch (_eVenFill) { info = null; }
+      }
+      if (elA && info && info.address) {
+        elA.value = info.address;
+        _docEdit.docData.vendorAddress = info.address;
+      }
+      _docEdit.docData.vendorPhone = info && info.phone ? info.phone : '';
+      _docEdit.docData.vendorEmail = info && info.email ? info.email : '';
+      _docEdit.docData.vendorContact = info && info.contact ? info.contact : '';
+      var contactEl = document.getElementById('docEditPOVendorContact');
+      if (contactEl) {
+        var bits = [];
+        if (_docEdit.docData.vendorContact) bits.push(_docEdit.docData.vendorContact);
+        if (_docEdit.docData.vendorPhone) bits.push(_docEdit.docData.vendorPhone);
+        if (_docEdit.docData.vendorEmail) bits.push(_docEdit.docData.vendorEmail);
+        contactEl.textContent = bits.join(' · ');
+      }
+      if (name && (!info || !info.address)) {
+        try { showToast('No address on file for ' + name + '. The address box was left as it was.', 'warning'); } catch (_eNoAddr) {}
+      }
+      if (!elA || String(elA.value || '') !== beforeAddr) docEditAutoSave();
+    }
+    window.docEditPOVendorNameChange = docEditPOVendorNameChange;
 
     function _stripUndefinedDeep(v) {
       if (Array.isArray(v)) return v.map(_stripUndefinedDeep);
@@ -42967,45 +43577,7 @@ async function renderBoardsTab(T, proj) {
           if (_paidSave < 0.001 && d.docData) _paidSave = parseFloat(d.docData.paidAmount || d.docData.paid || 0) || 0;
           _updatePayload.balance = Math.max(0, Math.round((grandTotal - _paidSave) * 100) / 100);
         }
-        /* Keep clientOutcomes aligned with live service lines — never leave orphan AI outcomes after line edits. */
-        if (d.type === 'invoice' && d.docData && Array.isArray(d.docData.clientOutcomes) && d.docData.clientOutcomes.length) {
-          var _coPrev = d.docData.clientOutcomes;
-          var _svcForCo = (_safeItems || []).filter(function(it) {
-            if (!it) return false;
-            if (typeof isProposalGroupHeaderItem === 'function' && isProposalGroupHeaderItem(it)) return false;
-            var et = String(it.expenseType || '').toLowerCase();
-            var itype = String(it.itemType || '').toLowerCase();
-            if (et === 'product' || itype === 'product' || itype === 'ffe') return false;
-            if (et === 'shipping' || et === 'sales_tax' || et === 'handling' || et === 'discount' || et === 'retainer_credit') return false;
-            if (et === 'service' || itype === 'service') return true;
-            if (typeof cchInvoiceLineUseServiceStyleInView === 'function' && cchInvoiceLineUseServiceStyleInView(it)) return true;
-            var txt = (String(it.title || '') + ' ' + String(it.description || '')).toLowerCase();
-            return /design service|design fee|professional service|time billing|consultation|retainer/.test(txt);
-          });
-          var _coNext = _svcForCo.map(function(it, i) {
-            var old = null;
-            var t = String(it.title || it.name || '').trim().toLowerCase();
-            if (t) {
-              for (var cj = 0; cj < _coPrev.length; cj++) {
-                var ot = String((_coPrev[cj] && _coPrev[cj].title) || '').trim().toLowerCase();
-                if (ot && ot === t) { old = _coPrev[cj]; break; }
-              }
-            }
-            if (!old && _coPrev[i]) old = _coPrev[i];
-            var desc = '';
-            if (old) desc = String(old.description || old.desc || '').trim();
-            if (!desc && typeof cchLineNotesBodyText === 'function') desc = String(cchLineNotesBodyText(it) || '').trim();
-            if (!desc) desc = String(it.lineNotes || it.description || '').trim();
-            return {
-              title: (old && old.title) || it.title || it.name || 'Design Services',
-              description: desc,
-              dateRange: (old && old.dateRange) || '',
-              hours: (old && old.hours != null && old.hours !== '') ? old.hours : (parseFloat(it.qty) || '')
-            };
-          });
-          _updatePayload.clientOutcomes = _coNext;
-          d.docData.clientOutcomes = _coNext;
-        }
+        /* clientOutcomes stay as saved. Do not expand a short AI summary into one row per time entry. */
         if (d.collection === 'proposals') {
           var _metaPatch = _proposalDocMetaPatchFromDom(d.docData);
           if (_metaPatch) {
@@ -43036,13 +43608,16 @@ async function renderBoardsTab(T, proj) {
           var _ps = document.getElementById('docEditPOShipTo');
           var _pdt = document.getElementById('docEditPODate');
           if (_pv) {
-            d.docData.vendor = String(_pv.value || '').trim();
+            d.docData.vendor = docEditPOVendorNameFromDom();
             _updatePayload.vendor = d.docData.vendor;
           }
           if (_pa) {
             d.docData.vendorAddress = String(_pa.value || '').trim();
             _updatePayload.vendorAddress = d.docData.vendorAddress;
           }
+          _updatePayload.vendorPhone = String(d.docData.vendorPhone || '').trim();
+          _updatePayload.vendorEmail = String(d.docData.vendorEmail || '').trim();
+          _updatePayload.vendorContact = String(d.docData.vendorContact || '').trim();
           if (_ps) {
             d.docData.shipTo = String(_ps.value || '').trim();
             _updatePayload.shipTo = d.docData.shipTo;
@@ -43095,7 +43670,7 @@ async function renderBoardsTab(T, proj) {
         if (typeof cchLibraryUsageLibIdsFromItems === 'function') {
           _updatePayload._libraryUsageLibIds = cchLibraryUsageLibIdsFromItems(d.collection, _safeItems);
         }
-        await db.collection('boards').doc(d.projectId).collection(d.collection).doc(d.docId).update(_updatePayload);
+        await db.collection('boards').doc(d.projectId).collection(d.collection).doc(d.docId).update(_stripUndefinedDeep(_updatePayload));
         if (typeof cchLibraryUsageSyncDocument === 'function') {
           try {
             await cchLibraryUsageSyncDocument(
@@ -49364,10 +49939,12 @@ async function renderBoardsTab(T, proj) {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
             <div>
               <div style="font-size:12px;text-transform:uppercase;letter-spacing:2px;color:#0F1A2E;font-weight:700;margin-bottom:10px;">Bill to (vendor)</div>
-              <label style="font-size:11px;color:#0F1A2E;font-weight:600;display:block;margin-bottom:4px;">Vendor name</label>
-              <input class="form-input" id="docEditPOVendor" value="${escAttr(docData.vendor || '')}" placeholder="Vendor / payee name" onchange="docEditPOVendorNameChange()" style="font-size:14px;padding:10px 12px;">
+              <label style="font-size:11px;color:#0F1A2E;font-weight:600;display:block;margin-bottom:4px;">Vendor / workroom</label>
+              <select class="form-input" id="docEditPOVendor" onchange="docEditPOVendorNameChange()" style="font-size:14px;padding:10px 12px;"><option value="">— Vendor / workroom —</option>${docData.vendor ? '<option value="' + escAttr(docData.vendor) + '" selected>' + esc(docData.vendor) + '</option>' : ''}</select>
+              <input class="form-input" id="docEditPOVendorCustom" value="" placeholder="Type a vendor or workroom" onchange="docEditPOVendorNameChange()" style="display:none;margin-top:8px;font-size:14px;padding:10px 12px;">
               <label style="font-size:11px;color:#0F1A2E;font-weight:600;display:block;margin-top:12px;margin-bottom:4px;">Vendor address <span style="font-weight:400;color:var(--gray-500);">(optional)</span></label>
               <textarea class="form-textarea" id="docEditPOVendorAddress" rows="3" placeholder="Street, city, state — remit-to / vendor billing" onchange="docEditPOVendorShipChange()" style="font-size:13px;">${esc(docData.vendorAddress || '')}</textarea>
+              <div id="docEditPOVendorContact" style="font-size:12px;color:#5C6B80;margin-top:6px;line-height:1.4;">${esc([docData.vendorContact, docData.vendorPhone, docData.vendorEmail].filter(Boolean).join(' · '))}</div>
             </div>
             <div>
               <div style="font-size:12px;text-transform:uppercase;letter-spacing:2px;color:#0F1A2E;font-weight:700;margin-bottom:10px;">Ship to</div>
@@ -49606,6 +50183,11 @@ async function renderBoardsTab(T, proj) {
       docEditRenderAttachments();
       if (type === 'po') {
         docEditUpdatePOShipToResolvedPreview();
+        if (typeof window.mountDocEditPOVendorSelect === 'function') {
+          window.mountDocEditPOVendorSelect(projectId, (_docEdit && _docEdit.docData && _docEdit.docData.vendor) || '').catch(function(eVen) {
+            console.warn('[docEdit] vendor list', eVen);
+          });
+        }
         var _poShipSel = document.getElementById('docEditPOShipTo');
         if (_poShipSel && _docEdit && _docEdit.docData) {
           var _poShipNorm = _normalizePoShipToSelection(_docEdit.docData.shipTo || _docEdit.docData.deliverTo || '', projData);
@@ -50367,6 +50949,25 @@ async function renderBoardsTab(T, proj) {
           }
         }
       }
+      if (docData.vendor && window._cchVendorContactByName) {
+        var _vcHit = window._cchVendorContactByName[String(docData.vendor).trim().toLowerCase()];
+        if (_vcHit && _vcHit.address && String(docData.vendorAddress || '').trim() !== _vcHit.address) {
+          docData.vendorAddress = _vcHit.address;
+          docData.vendorPhone = _vcHit.phone || '';
+          docData.vendorEmail = _vcHit.email || '';
+          docData.vendorContact = _vcHit.contact || '';
+          try {
+            await db.collection('boards').doc(projectId).collection('purchaseOrders').doc(poId).update({
+              vendorAddress: docData.vendorAddress,
+              vendorPhone: docData.vendorPhone,
+              vendorEmail: docData.vendorEmail,
+              vendorContact: docData.vendorContact
+            });
+          } catch (_eVa) {
+            console.warn('[po] vendor address', _eVa && _eVa.message ? _eVa.message : _eVa);
+          }
+        }
+      }
       if (window._forceEditMode) {
         window._forceEditMode = false;
         await renderDocEditPage('po', projectId, poId, docData, items, projData);
@@ -50528,7 +51129,8 @@ async function renderBoardsTab(T, proj) {
               imageCount: _coerceImageIterable(data.images).length,
               name: data.name,
               createdAt: data.createdAt,
-              source: data.source
+              source: data.source,
+              clientPublished: data.clientPublished === true
             });
           });
         });
@@ -50653,10 +51255,7 @@ async function renderBoardsTab(T, proj) {
                 '<button class="ideabook-card-menu" onclick="event.stopPropagation();toggleActionMenu(this)" style="background:none;border:1px solid var(--gray-200);border-radius:4px;padding:4px 10px;cursor:pointer;font-size:18px;color:var(--gray-500);line-height:1;">\u22EE</button>' +
                 '<div class="action-dropdown" style="display:none;right:0;left:auto;min-width:180px;">' +
                   '<a onclick="event.stopPropagation();navigate(\'#/project/' + b.projectId + '/ideabooks\');closeAllMenus()">📂 Open Project Boards</a>' +
-                  b.sections.map(function(s) {
-                    return '<a onclick="event.stopPropagation();renameIdeabookFromList(\'' + b.projectId + '\',\'' + s.id + '\',\'' + escAttr(s.name || '') + '\');closeAllMenus()">✏️ Rename: ' + esc((s.name || '').substring(0, 20)) + '</a>' +
-                    '<a onclick="event.stopPropagation();deleteIdeabookFromList(\'' + b.projectId + '\',\'' + s.id + '\',\'' + escAttr(s.name || '') + '\');closeAllMenus()" style="color:var(--red);">🗑️ Delete: ' + esc((s.name || '').substring(0, 20)) + '</a>';
-                  }).join('') +
+                  '<a onclick="event.stopPropagation();ibToggleProjectClientPublish(\'' + escJsStr(b.projectId) + '\');closeAllMenus()">' + (b.sections.length > 0 && b.sections.every(function(s) { return s.clientPublished === true; }) ? 'Unpublish this board' : 'Publish this board') + '</a>' +
                 '</div>' +
               '</div></div>' +
             '</div>';
@@ -51349,8 +51948,16 @@ async function renderBoardsTab(T, proj) {
 
       // Load time entries
       try {
-        const teSnap = await db.collection('timeEntries').limit(2000).get();
-        teSnap.forEach(d => allTimeEntries.push({ id: d.id, ...d.data() }));
+        var _ptLast = null;
+        while (allTimeEntries.length < 20000) {
+          var _ptQ = db.collection('timeEntries').orderBy(firebase.firestore.FieldPath.documentId()).limit(800);
+          if (_ptLast) _ptQ = _ptQ.startAfter(_ptLast);
+          var teSnap = await _ptQ.get();
+          if (!teSnap.size) break;
+          teSnap.forEach(d => allTimeEntries.push({ id: d.id, ...d.data() }));
+          _ptLast = teSnap.docs[teSnap.docs.length - 1];
+          if (teSnap.size < 800) break;
+        }
       } catch(e) {}
 
       // Build per-project profit data
@@ -51361,53 +51968,35 @@ async function renderBoardsTab(T, proj) {
 
         // Time entries for this project
         const pTime = allTimeEntries.filter(t => t.project === pName || t.projectId === p.id || t.project === p.id);
-        const loggedHours = pTime.reduce((s, t) => s + (parseFloat(t.hours) || 0), 0);
-        const billableTime = pTime.filter(t => t.billable !== false);
-        const loggedValue = billableTime.reduce((s, t) => {
-          const memberStr = t.member || t.user || '';
-          const rate = _isOwnerMember(memberStr)
-            ? _ownerLaborRateForEntry(t)
-            : (parseFloat(t.rate || t.hourlyRate || t.billableRate) || _getMemberRate(memberStr));
-          return s + ((parseFloat(t.hours) || 0) * rate);
-        }, 0);
-        // Contractor cost (non-owner team + invoice labor lines) — uses TEAM_CONFIG
-        const contractorCost = pTime.reduce((s, t) => {
-          const memberStr = t.member || t.user || '';
-          if (_isOwnerMember(memberStr)) return s;
-          const costRate = parseFloat(t.internalCostRate) || _getContractorRate(memberStr);
-          return s + ((parseFloat(t.hours) || 0) * costRate);
-        }, 0) + _subcontractorCostFromInvoices(pInv);
+        const pPO = allPOs.filter(po => po.projectId === p.id);
+        const pInv = allInvoices.filter(i => i.projectId === p.id);
+        const _ptFin = cchFinancialSummary({ proj: p, timeEntries: pTime, invoices: pInv, pos: pPO });
+        const loggedHours = _ptFin.loggedHours;
+        const loggedValue = _ptFin.loggedValue;
+        const contractorCost = _ptFin.contractorCosts;
 
-        // Owner's logged hours & value (separate tracking) — uses TEAM_CONFIG
         const cynthiaTime = pTime.filter(t => _isOwnerMember(t.member || t.user || ''));
         const cynthiaHours = cynthiaTime.reduce((s, t) => s + (parseFloat(t.hours) || 0), 0);
-        const cynthiaValue = _ownerLaborValueFromEntries(pTime);
+        const cynthiaValue = _ptFin.ownerLaborCost;
 
         // First contractor's hours — uses TEAM_CONFIG
         const _fc = TEAM_CONFIG.contractors[0] || { names: [], rate: DEFAULT_CONTRACTOR_RATE };
         const vanessaTime = pTime.filter(t => { var m = (t.member || t.user || '').toLowerCase(); return _fc.names.some(function(n) { return m.indexOf(n) >= 0; }); });
         const vanessaHours = vanessaTime.reduce((s, t) => s + (parseFloat(t.hours) || 0), 0);
 
-        // POs for this project
-        const pPO = allPOs.filter(po => po.projectId === p.id);
-        const poCost = pPO.reduce((s, po) => s + vendorBillCostForProfit(po), 0);
+        const poCost = _ptFin.poCosts;
+        const invoicedValue = _ptFin.invoiced;
+        const collectedValue = _ptFin.paid;
 
-        // Invoices for this project
-        const pInv = allInvoices.filter(i => i.projectId === p.id);
-        const invoicedValue = pInv.reduce((s, i) => s + (invoiceListRowTotal(i) || invoiceComputedGrandTotal(i) || parseFloat(i.total || i.amount) || 0), 0);
-        const collectedValue = pInv.filter(i => i.status === 'Paid').reduce((s, i) => s + (parseFloat(i.total || i.amount) || 0), 0);
+        const directCosts = poCost;
+        const ownerLaborValue = cynthiaValue;
 
-        // === THREE BUCKETS ===
-        const directCosts = poCost; // vendor bill totals
-        const ownerLaborValue = cynthiaValue; // tracked but not cash expense
-
-        // === DUAL PROFIT ===
-        const revenue = contractFee > 0 ? contractFee : invoicedValue;
-        const cashProfit = revenue - directCosts - contractorCost;
-        const loadedProfit = cashProfit - ownerLaborValue;
-        const cashMargin = revenue > 0 ? (cashProfit / revenue * 100) : 0;
+        const revenue = _ptFin.revenue;
+        const cashProfit = _ptFin.cashProfit;
+        const loadedProfit = _ptFin.loadedProfit;
+        const cashMargin = _ptFin.cashMargin;
         const feeBurnPct = contractFee > 0 ? Math.round((directCosts + contractorCost) / contractFee * 100) : 0;
-        const revenueEfficiency = loggedValue > 0 ? (invoicedValue / loggedValue * 100) : 0;
+        const revenueEfficiency = _ptFin.efficiency;
 
         return {
           id: p.id, name: pName, status: p.status || 'Active',
@@ -51545,14 +52134,14 @@ async function renderBoardsTab(T, proj) {
               <div class="pt-kc-sub">outsourced labor</div>
             </div>
             <div class="pt-kc green">
-              <div class="pt-kc-label">Cash Profit</div>
+              <div class="pt-kc-label">Gross profit</div>
               <div class="pt-kc-val" style="color:${totals.cashProfit >= 0 ? '#5FA56B' : '#E16A5B'};">${formatMoney(totals.cashProfit)}</div>
               <div class="pt-kc-sub">${portfolioCashMargin.toFixed(0)}% margin</div>
             </div>
             <div class="pt-kc amber">
               <div class="pt-kc-label">Owner Labor Value</div>
               <div class="pt-kc-val" style="color:#C4A464;">${formatMoney(totals.ownerLaborValue)}</div>
-              <div class="pt-kc-sub">Cindy @ $${TEAM_CONFIG.owner.rate}/hr</div>
+              <div class="pt-kc-sub">Cindy at the rate on each entry</div>
             </div>
             <div class="pt-kc cyan">
               <div class="pt-kc-label">Loaded Profit</div>
@@ -65122,17 +65711,20 @@ async function renderBoardsTab(T, proj) {
     function cchTimeEntryInvoiceLine(t, includeNote) {
       var svc = cchTimeServiceLabel(t.service);
       var hrs = parseFloat(t.hours) || 0;
+      var rate = parseFloat(t.rate);
+      if (!isFinite(rate)) rate = parseFloat(t.hourlyRate);
+      if (!isFinite(rate)) rate = parseFloat(t.billableRate);
+      if (!isFinite(rate)) rate = 0;
       var tot = parseFloat(t.total);
-      if (!isFinite(tot)) tot = 0;
-      var rate = (hrs > 0 && tot) ? Math.round((tot / hrs) * 10000) / 10000 : (parseFloat(t.rate) || parseFloat(t.hourlyRate) || 0);
-      if (!tot && rate && hrs) tot = Math.round(rate * hrs * 100) / 100;
+      if (!isFinite(tot)) tot = (hrs && rate) ? Math.round(rate * hrs * 100) / 100 : 0;
       var note = String(t.notes || t.note || t.description || '').trim();
       var d = String(t.date || '').slice(0, 10);
       var when = cchTimeShortDate(d);
+      var noteText = (includeNote && note) ? note : '';
       return {
         title: when ? (svc + ' \u2014 ' + when) : svc,
-        description: '',
-        lineNotes: (includeNote && note) ? note : '',
+        description: noteText,
+        lineNotes: noteText,
         serviceDateStart: d,
         serviceDateEnd: d,
         expenseType: 'service',
@@ -65155,7 +65747,7 @@ async function renderBoardsTab(T, proj) {
       var ids = Array.isArray(docData.timeEntryIds) ? docData.timeEntryIds.filter(Boolean) : [];
       if (ids.length < 2) return items || [];
       var st = String(docData.status || 'draft').toLowerCase();
-      if (st !== 'draft') return items || [];
+      if (st !== 'draft' && st !== 'unsent') return items || [];
       if (docData.qbDocId) return items || [];
       var lines = Array.isArray(items) ? items : [];
       var withId = 0;
@@ -65167,10 +65759,13 @@ async function renderBoardsTab(T, proj) {
       }
       if (!entries.length) return lines;
       entries.sort(function(a, b) {
+        var sa = cchTimeServiceLabel(a.service);
+        var sb = cchTimeServiceLabel(b.service);
+        if (sa !== sb) return sa < sb ? -1 : 1;
         var da = String(a.date || '');
         var dbv = String(b.date || '');
         if (da !== dbv) return da < dbv ? -1 : 1;
-        return String(a.service || '').localeCompare(String(b.service || ''));
+        return 0;
       });
       var newItems = entries.map(function(t) { return cchTimeEntryInvoiceLine(t, true); });
       lines.forEach(function(it) {
@@ -65179,8 +65774,10 @@ async function renderBoardsTab(T, proj) {
       if (newItems.length <= lines.length) return lines;
       var newTotal = Math.round(newItems.reduce(function(s, li) { return s + (parseFloat(li.amount) || 0); }, 0) * 100) / 100;
       var oldTotal = Math.round(lines.reduce(function(s, li) { return s + (parseFloat(li.amount) || 0); }, 0) * 100) / 100;
-      if (Math.abs(newTotal - oldTotal) > 0.05) {
-        console.warn('[cchExpandDraftTimeInvoiceItems] total mismatch', newTotal, oldTotal);
+      var storedTotal = parseFloat(docData.total);
+      if (!isFinite(storedTotal)) storedTotal = oldTotal;
+      if (Math.abs(newTotal - oldTotal) > 0.25 && Math.abs(newTotal - storedTotal) > 0.25) {
+        console.warn('[cchExpandDraftTimeInvoiceItems] total mismatch', newTotal, oldTotal, storedTotal);
         return lines;
       }
       await db.collection('boards').doc(projectId).collection('invoices').doc(docData.id).update({
@@ -65211,10 +65808,13 @@ async function renderBoardsTab(T, proj) {
         console.warn('[createTimeInvoice] fresh check failed; continuing with selection', eFresh);
       }
       var lineItems = entries.slice().sort(function(a, b) {
+        var sa = cchTimeServiceLabel(a.service);
+        var sb = cchTimeServiceLabel(b.service);
+        if (sa !== sb) return sa < sb ? -1 : 1;
         var da = String(a.date || '');
         var dbv = String(b.date || '');
         if (da !== dbv) return da < dbv ? -1 : 1;
-        return String(a.service || '').localeCompare(String(b.service || ''));
+        return 0;
       }).map(function(t) {
         var includeNote = includeNoteEntryIds == null || includeNoteEntryIds.has(t.id);
         return cchTimeEntryInvoiceLine(t, includeNote);
@@ -67303,8 +67903,10 @@ async function renderBoardsTab(T, proj) {
       renderLibraryView();
     }
 
-    // Import payment data from Houzz payment exports
+    // Import payment data from Houzz payment exports. WO-410: turned off. One run replaces payments from payment_compact.json.
     async function importPaymentData() {
+      await cchAlert('Import Payments is turned off. It replaces paid amounts from the old Houzz export.', 'Import Payments');
+      return;
       if (!(await cchConfirm('Import payment data from Houzz? This will update Paid amounts on ~3,700 invoices and POs.', 'Import Payments', { confirmText: 'Import' }))) return;
       showToast('Loading payment data...');
       try {
@@ -67780,6 +68382,8 @@ async function renderBoardsTab(T, proj) {
 
     // Same as importPaymentData() but skips PO/clips/top PO paths; only uses payment_compact keys IN-/INV-/ES- (not keys starting with PO).
     async function importInvoicePaymentsOnly() {
+      await cchAlert('Import Payments is turned off. It replaces paid amounts from the old Houzz export.', 'Import Payments');
+      return;
       if (!(await cchConfirm('Import invoice payments only? Updates board + top-level invoices from IN-/INV-/ES- entries in payment_compact.json. RR- retainers and PO rows are skipped — use full Import Payments for POs.', 'Import Invoice Payments', { confirmText: 'Import' }))) return;
       showToast('Loading payment data...');
       try {
@@ -72799,6 +73403,9 @@ async function renderBoardsTab(T, proj) {
 
     // ==================== DELIVERY / RECEIVERS PAGE ====================
     async function renderDeliveryReceivers() {
+      if (typeof window.renderDeliveryReceivers === 'function' && window.renderDeliveryReceivers !== renderDeliveryReceivers) {
+        return window.renderDeliveryReceivers();
+      }
       setBreadcrumb([{ label: 'Receivers' }]);
       setTopbarActions('<a class="btn btn-secondary btn-sm" style="margin-right:8px;" href="#/ordermanagement/receiving" onclick="event.preventDefault();navigate(\'#/ordermanagement/receiving\')">Order Management → Receiving</a>');
       const T = document.getElementById('contentArea');
@@ -74479,9 +75086,9 @@ async function renderBoardsTab(T, proj) {
             <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(0,0,0,0.2);border-radius:0;border:1px solid rgba(255,255,255,0.04);">
               <div>
                 <div style="font-weight:600;font-size:13px;color:#FFFFFF;">💰 Import Houzz Payments</div>
-                <div style="font-size:11px;color:var(--gray-400);">Use Invoices page ? 💰 Import Payments button</div>
+                <div style="font-size:11px;color:var(--gray-400);">Turned off. That import replaces payments from the old Houzz file.</div>
               </div>
-              <span style="font-size:11px;color:var(--gray-400);">Use Invoices page</span>
+              <span style="font-size:11px;color:var(--gray-400);">Off</span>
             </div>
             <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(0,0,0,0.2);border-radius:0;border:1px solid rgba(255,255,255,0.04);">
               <div>
@@ -75566,7 +76173,7 @@ async function renderBoardsTab(T, proj) {
       var _qbPaidSyncBtn = userCanPushToQB()
         ? '<button class="btn btn-secondary" style="margin-right:8px;" onclick="batchSyncInvoiceBalancesFromQB()" title="Reads up to 200 invoices per run in QuickBooks (numeric qbDocId, or match by invoice #). Updates Paid and balance when QB shows paid. Re-run for the next batch.">↻ Sync QB paid</button>'
         : '';
-      setTopbarActions('<button class="btn btn-secondary" style="margin-right:8px;" onclick="applyHouzzQBIds()">🟢 Apply QB IDs</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="autoLinkAllDocs()">🔗 Auto-Link Docs</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="importPaymentData()">💰 Import Payments</button>' + _qbPaidSyncBtn + '<button class="btn btn-secondary" style="margin-right:8px;" onclick="bulkInvoiceCleanup()">🧹 Cleanup</button><button class="btn btn-primary" onclick="showNewInvoiceModalGlobal()">+ New Invoice</button>');
+      setTopbarActions('<button class="btn btn-secondary" style="margin-right:8px;" onclick="applyHouzzQBIds()">🟢 Apply QB IDs</button><button class="btn btn-secondary" style="margin-right:8px;" onclick="autoLinkAllDocs()">🔗 Auto-Link Docs</button>' + _qbPaidSyncBtn + '<button class="btn btn-secondary" style="margin-right:8px;" onclick="bulkInvoiceCleanup()">🧹 Cleanup</button><button class="btn btn-primary" onclick="showNewInvoiceModalGlobal()">+ New Invoice</button>');
       const T = document.getElementById('contentArea');
       // Instant render from cache (even if stale) so the page never blanks on "back".
       // When the cache is stale, refresh in the background and re-render quietly.
@@ -76790,7 +77397,7 @@ async function renderBoardsTab(T, proj) {
         }
         return out;
       }
-      if (slug === 'documents' || slug === 'communications' || slug === 'messages' || slug === 'meetings' || slug === 'checklist' || slug === 'progress' || slug === 'activity' || slug === 'tasks' || slug === 'home' ||
+      if (slug === 'documents' || slug === 'contractors' || slug === 'communications' || slug === 'messages' || slug === 'meetings' || slug === 'checklist' || slug === 'progress' || slug === 'activity' || slug === 'tasks' || slug === 'home' ||
           slug === 'rooms' || slug === 'concepts' || slug === 'inspiration' || slug === 'inspirations' || slug === 'designboards' ||
           slug === 'proposals' || slug === 'invoices' || slug === 'updates') {
         if (slug === 'communications') out.page = 'messages';
@@ -80120,6 +80727,7 @@ async function renderBoardsTab(T, proj) {
           '<button type="button" class="cp-sb-item' + (sbAct('invoices') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/invoices') + '><span class="cp-sb-icon">\u25A6</span> Invoices' + (_invBadgeCt ? '<span class="cp-sb-badge">' + esc(_invBadgeCt) + '</span>' : '') + '</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('proposals') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/proposals') + '><span class="cp-sb-icon">\u25F0</span> Proposals' + (_propBadgeCt ? '<span class="cp-sb-badge">' + esc(_propBadgeCt) + '</span>' : '') + '</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('documents') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/documents') + '><span class="cp-sb-icon">\u25A4</span> Documents</button>' +
+          '<button type="button" class="cp-sb-item' + (sbAct('contractors') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/contractors') + '><span class="cp-sb-icon">\u25A3</span> Contractors</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('tasks') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/tasks') + '><span class="cp-sb-icon">\u2713</span> Tasks' + (_taskBadgeCt ? '<span class="cp-sb-badge">' + esc(_taskBadgeCt) + '</span>' : '') + '</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('activity') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/activity') + '><span class="cp-sb-icon">\u25C7</span> Activity' + (_actBadgeCt ? '<span class="cp-sb-badge">' + esc(_actBadgeCt) + '</span>' : '') + '</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('progress') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/progress') + '><span class="cp-sb-icon">\u23F1</span> Time &amp; Progress</button>' +
@@ -80750,6 +81358,10 @@ async function renderBoardsTab(T, proj) {
         html += typeof window.cchZelleInstructionsHtml === 'function'
           ? window.cchZelleInstructionsHtml(projectId, _zelleInv)
           : '<div style="padding:24px;color:#6B7280;">Zelle page is not loaded.</div>';
+      } else if (activePage === 'contractors') {
+        html += typeof window.cchContractorPortalListHtml === 'function'
+          ? await window.cchContractorPortalListHtml(projectId)
+          : '<div class="cp-section-label">Shared with contractors</div><div class="cp-card" style="padding:16px;font-size:13px;color:#6B7280;">This list did not load. Hard refresh.</div>';
       } else if (activePage === 'documents') {
         var docList = (Array.isArray(portalMergedDocs) && portalMergedDocs.length) ? portalMergedDocs : clientDocuments;
         var docFolderFilt = (window._cpDocFolderFilterByProject && window._cpDocFolderFilterByProject[projectId]) || 'all';
@@ -88005,6 +88617,8 @@ async function renderBoardsTab(T, proj) {
 
     // -- PAYMENT IMPORT FROM HOUZZ --
     async function importHouzzPayments() {
+      await cchAlert('Import Payments is turned off. It replaces paid amounts from the old Houzz export.', 'Import Payments');
+      return;
       if (!(await cchConfirm('Import Houzz payment data into all invoices and POs?\nThis will add a payments[] array to each document.\n\n4,657 payments -> 3,739 documents', 'Import Houzz Payments', { confirmText: 'Import' }))) return;
 
       showToast('Loading payment data...');
@@ -89730,10 +90344,11 @@ async function renderBoardsTab(T, proj) {
       }
       if (type === 'invoice') {
         var ids = sb.selectedSources || [];
+        var useAllInvoices = !ids.length;
         var out = [];
         var seen = {};
         (data.invoices || []).forEach(function(inv) {
-          if (ids.indexOf(inv.id) < 0) return;
+          if (!useAllInvoices && ids.indexOf(inv.id) < 0) return;
           (inv.lines || []).forEach(function(line) {
             if (seen[line.id]) return;
             seen[line.id] = true;
@@ -89995,7 +90610,7 @@ async function renderBoardsTab(T, proj) {
       var selCount = (data.items || []).filter(function(i) { return i._source === 'clips' || i._source === 'selections'; }).length;
 
       if (sb.sourceType === 'invoice') {
-        html += '<p style="font-size:13px;color:#6B6760;margin:0 0 12px;">Click a <strong>product invoice</strong> to open its furnishings. Design-services / hours invoices are not listed.</p>';
+        html += '<p style="font-size:13px;color:#6B6760;margin:0 0 12px;">Next opens every product invoice, grouped by category. Lighting on two invoices is one Lighting section. Check invoices only when you want a smaller set. Design-services / hours invoices are not listed.</p>';
         if (!invList.length) {
           html += '<div style="padding:28px;text-align:center;color:#9E9A8F;font-size:14px;border:1px solid #e8e6e0;">No product invoices on this project. Design-services invoices are omitted. Use <strong>Selections</strong> to pick items, or create a product invoice first.</div>';
         } else {
@@ -90034,7 +90649,7 @@ async function renderBoardsTab(T, proj) {
             }
             html += '</div>';
           });
-          canNext = sb.selectedSources.length > 0;
+          canNext = invList.length > 0;
         }
       } else if (sb.sourceType === 'selections') {
         html += '<div style="padding:20px 18px;border:1px solid #e8e6e0;background:#FAFAF8;margin-bottom:8px;">' +
@@ -90104,7 +90719,7 @@ async function renderBoardsTab(T, proj) {
       const sb = window._specBook;
       const data = window._specBookData;
       if (step === 2 && sb.step === 1) {
-        if (sb.sourceType === 'invoice' && (!sb.selectedSources || !sb.selectedSources.length)) return;
+        if (sb.sourceType === 'invoice' && !(data.invoices || []).length) return;
         if ((sb.sourceType === 'room' || sb.sourceType === 'category') && (!sb.selectedSources || !sb.selectedSources.length)) return;
         if (sb.sourceType === 'selections') {
           var selN = (data.items || []).filter(function(i) { return i._source === 'clips' || i._source === 'selections'; }).length;
@@ -90148,6 +90763,40 @@ async function renderBoardsTab(T, proj) {
     }
     window._specBookOpenSelections = _specBookOpenSelections;
 
+    function _specBookInvoiceCategoryGroups(items) {
+      var order = [];
+      var map = {};
+      (items || []).forEach(function(item) {
+        var name = String(item.category || '').trim() || 'Uncategorized';
+        if (!map[name]) { map[name] = []; order.push(name); }
+        map[name].push(item);
+      });
+      return order.map(function(name) { return { name: name, items: map[name] }; });
+    }
+    window._specBookSelectCategory = function(name, checked) {
+      var sb = window._specBook;
+      var data = window._specBookData;
+      if (!sb || !data) return;
+      _specBookGetWorkingItems(data, sb).forEach(function(item) {
+        var cat = String(item.category || '').trim() || 'Uncategorized';
+        if (cat !== name) return;
+        var idx = sb.selectedItems.indexOf(item.id);
+        if (checked && idx < 0) sb.selectedItems.push(item.id);
+        if (!checked && idx >= 0) sb.selectedItems.splice(idx, 1);
+      });
+      window._specBookRefresh();
+    };
+    function _specBookRowsWithCategoryHeads(items, sb) {
+      if (!sb || sb.sourceType !== 'invoice') return items || [];
+      var out = [];
+      _specBookInvoiceCategoryGroups(items).forEach(function(g) {
+        var allOn = g.items.length > 0 && g.items.every(function(it) { return sb.selectedItems.indexOf(it.id) >= 0; });
+        out.push({ _sbHeader: g.name, _sbCount: g.items.length, _sbAllOn: allOn });
+        g.items.forEach(function(it) { out.push(it); });
+      });
+      return out;
+    }
+
     // STEP 2 — Item Selection
     function _specBookStep2(data, sb) {
       const filtered = _specBookGetWorkingItems(data, sb);
@@ -90174,6 +90823,7 @@ async function renderBoardsTab(T, proj) {
       html += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:#0F1A2E;">' +
         '<input type="checkbox" ' + (allSelected ? 'checked' : '') + ' onchange="window._specBookSelectAll(this.checked)"> Select All</label>';
       html += '<span style="font-size:12px;color:#9E9A8F;">' + selectedCount + ' of ' + visible.length + ' selected</span>';
+      html += '<button type="button" onclick="window._specBookDownloadAll()" style="margin-left:auto;padding:6px 12px;background:#fff;border:1px solid #0F1A2E;color:#0F1A2E;font-size:12px;font-weight:600;cursor:pointer;">Download all specs</button>';
       html += '</div>';
 
       if (visible.length === 0) {
@@ -90181,12 +90831,20 @@ async function renderBoardsTab(T, proj) {
       } else if (sb.viewMode === 'grid') {
         // Grid view · 3 columns
         html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">';
-        visible.forEach(item => {
+        _specBookRowsWithCategoryHeads(visible, sb).forEach(item => {
+          if (item && item._sbHeader) {
+            html += '<div style="grid-column:1 / -1;display:flex;align-items:center;gap:12px;padding:14px 0 4px;border-bottom:2px solid #0F1A2E;">' +
+              '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:16px;font-weight:700;color:#0F1A2E;">' +
+              '<input type="checkbox" ' + (item._sbAllOn ? 'checked' : '') + ' onchange="window._specBookSelectCategory(\'' + escAttr(item._sbHeader) + '\', this.checked)">' +
+              esc(item._sbHeader) + '</label>' +
+              '<span style="font-size:12px;color:#9E9A8F;">' + item._sbCount + '</span></div>';
+            return;
+          }
           const checked = sb.selectedItems.includes(item.id);
           var cardKey = String(item.id || '').replace(/[^a-zA-Z0-9_-]/g, '_');
           html += '<div data-sb-card="' + escAttr(cardKey) + '" style="background:#fff;border:1px solid ' + (checked ? '#C9A96E' : '#e8e6e0') + ';overflow:hidden;position:relative;transition:border-color 0.15s;">';
           // Status bar
-          html += '<div style="background:#0F1A2E;color:#fff;text-align:center;font-size:10px;font-weight:600;letter-spacing:1px;padding:4px 8px;text-transform:uppercase;">' + esc(item.room || item.category || item._invoiceNum || 'Unassigned') + '</div>';
+          html += '<div style="background:#0F1A2E;color:#fff;text-align:center;font-size:10px;font-weight:600;letter-spacing:1px;padding:4px 8px;text-transform:uppercase;">' + esc((sb.sourceType === 'invoice' ? (item.category || item._invoiceNum) : (item.room || item.category || item._invoiceNum)) || 'Unassigned') + '</div>';
           // Checkbox overlay
           html += '<div style="position:absolute;top:28px;left:8px;z-index:2;"><input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="window._specBookToggleItem(\'' + escAttr(item.id) + '\')" style="width:18px;height:18px;cursor:pointer;accent-color:#C9A96E;"></div>';
           // Image — click to enlarge (Esc / click image to close)
@@ -90201,6 +90859,7 @@ async function renderBoardsTab(T, proj) {
           html += '<div style="padding:12px 14px;">';
           html += '<div style="font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#0F1A2E;margin-bottom:2px;">' + esc(item.vendor || 'Unknown Vendor') + '</div>';
           html += '<div style="font-size:13px;color:#0F1A2E;font-weight:500;margin-bottom:4px;line-height:1.3;">' + esc(item.title || 'Untitled') + '</div>';
+          if (sb.sourceType === 'invoice' && item._invoiceNum) html += '<div style="font-size:11px;color:#9E9A8F;margin-bottom:4px;">' + esc(item._invoiceNum) + '</div>';
           if (item.lineTag) html += '<div style="font-size:11px;color:#0F1A2E;font-weight:700;letter-spacing:0.6px;margin-bottom:2px;">TAG #: <span style="color:#C9A96E;">' + esc(item.lineTag) + '</span></div>';
           if (item.modelNum || item.sku) html += '<div style="font-size:11px;color:#9E9A8F;">MODEL #: <span style="font-weight:600;color:#6B6760;">' + esc(item.modelNum || item.sku) + '</span></div>';
           if (item.upc) html += '<div style="font-size:11px;color:#9E9A8F;">UPC #: <span style="font-weight:600;color:#6B6760;">' + esc(item.upc) + '</span></div>';
@@ -90208,6 +90867,7 @@ async function renderBoardsTab(T, proj) {
           html += '<div style="margin-top:8px;padding-top:6px;border-top:1px solid #f0efeb;font-size:12px;color:#C9A96E;font-weight:600;">QTY: ' + (item.qty || 1) + '</div>';
           if (item.hasSpec || (item.docs && item.docs.length)) {
             html += '<div style="margin-top:6px;font-size:11px;color:#9E9A8F;cursor:pointer;" onclick="window._specBookExpandItem(\'' + escAttr(item.id) + '\')">TECHNICAL DOCUMENTS → <span style="font-weight:600;">' + (item.docs.length || 0) + '</span></div>';
+            html += _specBookItemDownloadBtn(item.id);
           } else {
             html += '<div style="margin-top:6px;font-size:11px;color:#C9A96E;font-weight:600;cursor:pointer;" onclick="window._specBookExpandItem(\'' + escAttr(item.id) + '\')">⚠ No spec on file</div>';
           }
@@ -90216,7 +90876,15 @@ async function renderBoardsTab(T, proj) {
         html += '</div>';
       } else {
         // List view — single column rows
-        visible.forEach(item => {
+        _specBookRowsWithCategoryHeads(visible, sb).forEach(item => {
+          if (item && item._sbHeader) {
+            html += '<div style="display:flex;align-items:center;gap:12px;padding:14px 0 6px;border-bottom:2px solid #0F1A2E;margin-top:8px;">' +
+              '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:16px;font-weight:700;color:#0F1A2E;">' +
+              '<input type="checkbox" ' + (item._sbAllOn ? 'checked' : '') + ' onchange="window._specBookSelectCategory(\'' + escAttr(item._sbHeader) + '\', this.checked)">' +
+              esc(item._sbHeader) + '</label>' +
+              '<span style="font-size:12px;color:#9E9A8F;">' + item._sbCount + '</span></div>';
+            return;
+          }
           const checked = sb.selectedItems.includes(item.id);
           var cardKey = String(item.id || '').replace(/[^a-zA-Z0-9_-]/g, '_');
           html += '<div data-sb-card="' + escAttr(cardKey) + '" style="display:flex;flex-wrap:wrap;align-items:center;background:#fff;border:1px solid ' + (checked ? '#C9A96E' : '#e8e6e0') + ';margin-bottom:8px;overflow:hidden;transition:border-color 0.15s;">';
@@ -90247,6 +90915,7 @@ async function renderBoardsTab(T, proj) {
           html += '<div style="padding:10px 16px;text-align:right;flex-shrink:0;">';
           html += '<div style="font-size:11px;color:#9E9A8F;cursor:pointer;" onclick="window._specBookExpandItem(\'' + escAttr(item.id) + '\')">TECHNICAL DOCUMENTS →</div>';
           html += '<div style="font-size:11px;color:#6B6760;margin-top:4px;">' + (item.docs.length || 0) + ' docs</div>';
+          if (item.docs && item.docs.length) html += _specBookItemDownloadBtn(item.id);
           html += '</div></div>';
         });
       }
@@ -90331,6 +91000,7 @@ async function renderBoardsTab(T, proj) {
           ph += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0efeb;">' +
             '<span style="font-size:13px;">\u25C7</span>' +
             '<a href="' + escAttr(doc.url) + '" target="_blank" rel="noopener" style="font-size:12px;color:#0F1A2E;text-decoration:none;flex:1;">' + esc(doc.name) + '</a>' +
+            '<button type="button" onclick="window._specBookDownloadDoc(\'' + escAttr(id) + '\',' + di + ')" style="background:#fff;border:1px solid #0F1A2E;color:#0F1A2E;padding:2px 8px;font-size:10px;font-weight:600;cursor:pointer;">Download</button>' +
             '<button type="button" onclick="window._specBookRemoveDoc(\'' + escAttr(id) + '\',' + di + ')" style="background:none;border:none;color:#c44;cursor:pointer;font-size:14px;" title="Remove">\u00D7</button>' +
             '</div>';
         });
@@ -90382,6 +91052,74 @@ async function renderBoardsTab(T, proj) {
     }
     window._specBookRemoveDoc = _specBookRemoveDoc;
 
+    function _specBookSafeFileName(name) {
+      var n = String(name || 'spec').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+      return n || 'spec';
+    }
+    function _specBookDocsForItem(item) {
+      return (item && item.docs) ? item.docs.filter(function(d) { return d && String(d.url || '').trim(); }) : [];
+    }
+    async function _specBookSaveUrl(url, name) {
+      url = String(url || '').trim();
+      if (!url) return false;
+      name = _specBookSafeFileName(name);
+      try {
+        var res = await fetch(url, { mode: 'cors', credentials: 'omit' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var blob = await res.blob();
+        var a = document.createElement('a');
+        var obj = URL.createObjectURL(blob);
+        a.href = obj;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function() { URL.revokeObjectURL(obj); }, 4000);
+        return true;
+      } catch (e) {
+        window.open(url, '_blank', 'noopener');
+        return false;
+      }
+    }
+    async function _specBookDownloadDoc(itemId, docIdx) {
+      var item = _specBookFindItem(itemId);
+      var docs = _specBookDocsForItem(item);
+      var doc = docs[docIdx];
+      if (!doc) { if (typeof showToast === 'function') showToast('No spec on file', 'warning'); return; }
+      await _specBookSaveUrl(doc.url, (item.title || 'item') + ' - ' + (doc.name || 'spec'));
+    }
+    async function _specBookDownloadItem(itemId) {
+      var item = _specBookFindItem(itemId);
+      var docs = _specBookDocsForItem(item);
+      if (!docs.length) { if (typeof showToast === 'function') showToast('No spec on file', 'warning'); return; }
+      for (var i = 0; i < docs.length; i++) {
+        await _specBookSaveUrl(docs[i].url, (item.title || 'item') + ' - ' + (docs[i].name || 'spec'));
+        if (i < docs.length - 1) await new Promise(function(r) { setTimeout(r, 350); });
+      }
+    }
+    async function _specBookDownloadAll() {
+      var selected = _specBookResolveByIds(window._specBookData, (window._specBook && window._specBook.selectedItems) || []);
+      var jobs = [];
+      selected.forEach(function(item) {
+        _specBookDocsForItem(item).forEach(function(doc) {
+          jobs.push({ url: doc.url, name: (item.title || 'item') + ' - ' + (doc.name || 'spec') });
+        });
+      });
+      if (!jobs.length) { if (typeof showToast === 'function') showToast('No spec sheets on the selected items', 'warning'); return; }
+      if (typeof showToast === 'function') showToast('Downloading ' + jobs.length + ' spec sheet' + (jobs.length === 1 ? '' : 's'));
+      for (var i = 0; i < jobs.length; i++) {
+        await _specBookSaveUrl(jobs[i].url, jobs[i].name);
+        if (i < jobs.length - 1) await new Promise(function(r) { setTimeout(r, 400); });
+      }
+    }
+    window._specBookDownloadDoc = _specBookDownloadDoc;
+    window._specBookDownloadItem = _specBookDownloadItem;
+    window._specBookDownloadAll = _specBookDownloadAll;
+
+    function _specBookItemDownloadBtn(itemId) {
+      return '<button type="button" onclick="event.stopPropagation();window._specBookDownloadItem(\'' + escAttr(itemId) + '\')" style="margin-top:6px;padding:4px 10px;background:#fff;border:1px solid #0F1A2E;color:#0F1A2E;font-size:10px;font-weight:600;cursor:pointer;">Download spec</button>';
+    }
+
     // STEP 3 — Review
     function _specBookStep3(data, sb) {
       const selected = _specBookResolveByIds(data, sb.selectedItems);
@@ -90421,17 +91159,19 @@ async function renderBoardsTab(T, proj) {
 
       // Items list grouped by source
       const groups = {};
+      var groupOrder = [];
       selected.forEach(i => {
         var g;
-        if (sb.sourceType === 'invoice') g = i._invoiceNum || i.room || 'Invoice';
+        if (sb.sourceType === 'invoice') g = i.category || 'Uncategorized';
         else if (sb.sourceType === 'selections') g = i.room || i.category || 'Selections';
         else if (sb.sourceType === 'room') g = i.room || 'Unassigned';
         else g = i.category || 'Uncategorized';
-        if (!groups[g]) groups[g] = [];
+        if (!groups[g]) { groups[g] = []; groupOrder.push(g); }
         groups[g].push(i);
       });
 
-      Object.keys(groups).sort().forEach(gName => {
+      var reviewNames = sb.sourceType === 'invoice' ? groupOrder : Object.keys(groups).sort();
+      reviewNames.forEach(gName => {
         html += '<div style="margin-bottom:20px;">';
         html += '<div style="font-size:14px;font-weight:700;color:#0F1A2E;padding:8px 0;border-bottom:2px solid #0F1A2E;margin-bottom:8px;">' + esc(gName) + ' (' + groups[gName].length + ')</div>';
         groups[gName].forEach(item => {
@@ -90444,7 +91184,9 @@ async function renderBoardsTab(T, proj) {
           html += '<div style="flex:1;"><div style="font-size:13px;font-weight:600;color:#0F1A2E;">' + (item.lineTag ? '<span style="color:#C9A96E;margin-right:8px;">' + esc(item.lineTag) + '</span>' : '') + esc(item.title || 'Untitled') + '</div>';
           html += '<div style="font-size:11px;color:#9E9A8F;">' + esc(item.vendor) + (item.sku ? ' · ' + esc(item.sku) : '') + '</div></div>';
           if (hasDocs) {
-            html += '<div style="font-size:12px;color:#0F1A2E;font-weight:600;">' + item.docs.length + ' docs</div>';
+            html += '<div style="display:flex;align-items:center;gap:8px;">' +
+              '<div style="font-size:12px;color:#0F1A2E;font-weight:600;">' + item.docs.length + ' docs</div>' +
+              _specBookItemDownloadBtn(item.id) + '</div>';
           } else {
             html += '<div style="display:flex;align-items:center;gap:8px;">' +
               '<span style="font-size:12px;color:#C9A96E;font-weight:600;">⚠ No spec on file</span>' +
@@ -90457,9 +91199,10 @@ async function renderBoardsTab(T, proj) {
       });
 
       // Nav buttons
-      html += '<div style="margin-top:28px;display:flex;justify-content:space-between;">';
-      html += '<button onclick="_specBookGoStep(2)" style="padding:12px 36px;background:#fff;color:#0F1A2E;border:1px solid #d4d2cd;font-size:14px;font-weight:600;cursor:pointer;">← Back</button>';
-      html += '<button onclick="_specBookGoStep(4)" style="padding:12px 36px;background:#0F1A2E;color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;">Next \u203A</button>';
+      html += '<div style="margin-top:28px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;">';
+      html += '<button type="button" onclick="window._specBookGoStep(2)" style="padding:12px 36px;background:#fff;color:#0F1A2E;border:1px solid #d4d2cd;font-size:14px;font-weight:600;cursor:pointer;">← Back</button>';
+      html += '<button type="button" onclick="window._specBookDownloadAll()" style="padding:12px 24px;background:#fff;color:#0F1A2E;border:1px solid #0F1A2E;font-size:14px;font-weight:600;cursor:pointer;">Download all specs</button>';
+      html += '<button type="button" onclick="window._specBookGoStep(4)" style="padding:12px 36px;background:#0F1A2E;color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;">Next \u203A</button>';
       html += '</div></div>';
       return html;
     }
@@ -90640,16 +91383,17 @@ async function renderBoardsTab(T, proj) {
 
       // Group items
       const groups = {};
+      var groupOrder = [];
       selected.forEach(i => {
         var g;
-        if (sb.sourceType === 'invoice') g = i._invoiceNum || i.room || 'Invoice';
+        if (sb.sourceType === 'invoice') g = i.category || 'Uncategorized';
         else if (sb.sourceType === 'selections') g = i.room || i.category || 'Selections';
         else if (sb.sourceType === 'room') g = i.room || 'Unassigned';
         else g = i.category || 'Uncategorized';
-        if (!groups[g]) groups[g] = [];
+        if (!groups[g]) { groups[g] = []; groupOrder.push(g); }
         groups[g].push(i);
       });
-      const groupNames = Object.keys(groups).sort();
+      const groupNames = sb.sourceType === 'invoice' ? groupOrder : Object.keys(groups).sort();
 
       // Build HTML
       let coverPage = '';
@@ -90915,7 +91659,10 @@ async function renderBoardsTab(T, proj) {
         pricingMode: sb.pricingMode,
         itemCount: selected.length,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      }).catch(e => console.warn('Could not save spec book config:', e));
+      }).catch(function(e) {
+        console.warn('Could not save spec book config:', e);
+        if (typeof showToast === 'function') showToast('Spec book opened, but the saved copy did not store', 'warning');
+      });
 
       showToast(selected.length + ' items — Spec Book ready');
     }
@@ -91669,13 +92416,13 @@ async function renderBoardsTab(T, proj) {
 
   </script>
   <script src="cch-invoice-tax-rules.js?v=20260827freight2"></script>
-  <script src="cch-functions.js?v=20260820sr1"></script>
+  <script src="cch-functions.js?v=20261027wo372"></script>
   <script src="cch-design-board.js?v=20260821pr1"></script>
   <script src="cch-client-activity.js?v=20261023wo331"></script>
   <script src="cch-client-pepper.js?v=20261016wo303"></script>
   <script src="cch-client-ideas.js?v=20260807ci091b"></script>
   <script src="cch-pepper.js?v=20261023wo332"></script>
-  <script src="cch-project-subpanel.js?v=20261026wo353"></script>
+  <script src="cch-project-subpanel.js?v=20261029wo397"></script>
   <script src="cch-followups.js?v=20260726fu9"></script>
   <script src="cch-staff-chat.js?v=20260811sc090"></script>
   <script src="cch-bugs-requests.js?v=20260905fb191"></script>
@@ -91684,18 +92431,18 @@ async function renderBoardsTab(T, proj) {
   <script src="cch-progress-updates.js?v=20260714pu18"></script>
   <script src="cch-client-board.js?v=1774994684878"></script>
   <script src="cch-line-icons.js?v=20260821wo026"></script>
-  <script src="cch-invoice-redesign.js?v=20261024wo342"></script>
-  <script src="cch-proposals-invoices-fix.js?v=20261026wo352"></script>
+  <script src="cch-invoice-redesign.js?v=20261105wo406"></script>
+  <script src="cch-proposals-invoices-fix.js?v=20261109wo408"></script>
   <script src="cch-vendor-bid-import.js?v=20261001costline"></script>
   <script src="cch-qb-dashboard.js?v=20260528"></script>
   <script src="cch-airtable-push.js?v=20261026wo354"></script>
-  <script src="cch-po-bill-variance.js?v=20261026wo358"></script>
-  <script src="cch-order-management.js?v=20260825pobill1"></script>
+  <script src="cch-po-bill-variance.js?v=20261111wo420"></script>
+  <script src="cch-order-management.js?v=20261111wo427"></script>
   <script src="cch-po-vendor-comms.js?v=20261026wo354"></script>
   <script src="cch-rfq.js?v=20260903rfq2"></script>
   <script src="cch-ffe-procurement.js?v=ffeprod2"></script>
-  <script src="cch-contractor-access.js?v=20260814ca5"></script>
+  <script src="cch-contractor-access.js?v=20261111wo424"></script>
   <script src="cch-square-pay.js?v=20260930mailclose"></script>
-  <script src="cch-portal-records.js?v=20261023wo327"></script>
+  <script src="cch-portal-records.js?v=20261111wo425"></script>
 </body>
 </html>

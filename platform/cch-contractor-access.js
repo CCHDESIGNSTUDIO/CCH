@@ -190,41 +190,109 @@
   /**
    * Staff project tab — who has access, last seen, what's shared, invite/revoke.
    */
+  function studioSharedFileRow(f) {
+    var url = studioFilePublicUrl(f);
+    var title = String(f.name || 'Document').trim() || 'Document';
+    var shelf = fileShelfLabel(f);
+    var when = f.sharedWithContractorsAt || f.createdAt;
+    var dateStr = '';
+    if (when) {
+      var dt = new Date(when);
+      if (!isNaN(dt.getTime())) dateStr = dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    var urlEsc = _escAttr(url).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    var open = url ? ' onclick="window.cchContractorOpenFile(\'' + urlEsc + '\')"' : '';
+    return '<button type="button"' + open + ' style="display:flex;width:100%;text-align:left;gap:12px;align-items:center;padding:12px 14px;border:none;border-bottom:1px solid rgba(15,26,46,0.08);background:#FFFFFF;cursor:' + (url ? 'pointer' : 'default') + ';font-family:inherit;">' +
+      '<span style="flex:1;min-width:0;font-size:14px;font-weight:600;color:#0F1A2E;">' + _esc(title) + '</span>' +
+      '<span style="font-size:11px;color:#6B7280;flex-shrink:0;">' + _esc(shelf) + (dateStr ? ' · ' + _esc(dateStr) : '') + (url ? '' : ' · no link') + '</span>' +
+      '</button>';
+  }
+
+  function studioSharedWithContractorHtml(files, decisions, boards) {
+    var fileRows = (files || []).map(studioSharedFileRow).join('');
+    var decisionRows = (decisions || []).map(contractorDecisionCardHtml).join('');
+    var boardRows = (boards || []).map(contractorBoardCardHtml).join('');
+    if (!fileRows) fileRows = '<div style="padding:16px 14px;font-size:13px;color:#6B7280;background:#FFFFFF;">No files are shared with contractors.</div>';
+    if (!decisionRows) decisionRows = '<div style="padding:16px 14px;font-size:13px;color:#6B7280;background:#FFFFFF;border:1px solid rgba(15,26,46,0.08);">No decisions are shared with contractors.</div>';
+    if (!boardRows) boardRows = '<div style="padding:16px 14px;font-size:13px;color:#6B7280;background:#FFFFFF;border:1px solid rgba(15,26,46,0.08);">No inspiration boards are shared with contractors.</div>';
+    return '<div style="margin-bottom:28px;">' +
+      '<div style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#0F1A2E;margin-bottom:10px;">Inspiration boards</div>' +
+      boardRows +
+      '<div style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#0F1A2E;margin:22px 0 10px;">Shared files</div>' +
+      '<div style="border:1px solid rgba(15,26,46,0.08);background:#FFFFFF;">' + fileRows + '</div>' +
+      '<div style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#0F1A2E;margin:22px 0 10px;">Shared decisions</div>' +
+      decisionRows +
+      '</div>';
+  }
+
   async function renderContractorAccessTab(container, proj) {
     if (!container || !proj || !proj.id) return;
     var projectId = String(proj.id);
     container.innerHTML = '<div style="padding:40px;text-align:center;color:#6B7280;font-size:13px;">Loading contractors…</div>';
 
     var list = [];
-    var sharedFiles = 0;
-    var sharedDecisions = 0;
+    var sharedFileDocs = [];
+    var sharedDecisionDocs = [];
     try {
       list = await listContractorAccess(projectId);
     } catch (_e) {}
     try {
       var fs = await _db().collection('boards').doc(projectId).collection('files')
         .where('sharedWithContractors', '==', true).get();
-      sharedFiles = fs.size;
+      fs.forEach(function (d) {
+        sharedFileDocs.push(Object.assign({ id: d.id }, d.data() || {}));
+      });
     } catch (_eF) {
       try {
         var fall = await _db().collection('boards').doc(projectId).collection('files').get();
         fall.forEach(function (d) {
-          if (fileIsSharedWithContractors(Object.assign({ id: d.id }, d.data() || {}))) sharedFiles++;
+          var row = Object.assign({ id: d.id }, d.data() || {});
+          if (fileIsSharedWithContractors(row)) sharedFileDocs.push(row);
         });
       } catch (_eF2) {}
     }
     try {
       var ds = await _db().collection('boards').doc(projectId).collection('clientDecisions')
         .where('sharedWithContractors', '==', true).get();
-      sharedDecisions = ds.size;
+      ds.forEach(function (d) {
+        sharedDecisionDocs.push(Object.assign({ id: d.id }, d.data() || {}));
+      });
     } catch (_eD) {
       try {
         var dall = await _db().collection('boards').doc(projectId).collection('clientDecisions').get();
         dall.forEach(function (d) {
-          if (decisionIsSharedWithContractors(Object.assign({ id: d.id }, d.data() || {}))) sharedDecisions++;
+          var row = Object.assign({ id: d.id }, d.data() || {});
+          if (decisionIsSharedWithContractors(row)) sharedDecisionDocs.push(row);
         });
       } catch (_eD2) {}
     }
+    sharedFileDocs.sort(function (a, b) {
+      return String(a.name || '').localeCompare(String(b.name || ''));
+    });
+    sharedDecisionDocs.sort(function (a, b) {
+      return String(a.title || '').localeCompare(String(b.title || ''));
+    });
+    var sharedBoardDocs = [];
+    try {
+      var bs = await _db().collection('boards').doc(projectId).collection('ideabooks')
+        .where('sharedWithContractors', '==', true).get();
+      bs.forEach(function (d) {
+        sharedBoardDocs.push(Object.assign({ id: d.id }, d.data() || {}));
+      });
+    } catch (_eB) {
+      try {
+        var ball = await _db().collection('boards').doc(projectId).collection('ideabooks').get();
+        ball.forEach(function (d) {
+          var row = Object.assign({ id: d.id }, d.data() || {});
+          if (row.sharedWithContractors === true) sharedBoardDocs.push(row);
+        });
+      } catch (_eB2) {}
+    }
+    sharedBoardDocs.sort(function (a, b) {
+      return String(a.name || '').localeCompare(String(b.name || ''));
+    });
+    var sharedFiles = sharedFileDocs.length;
+    var sharedDecisions = sharedDecisionDocs.length;
 
     var active = list.filter(function (r) { return !r.revoked; });
     var revoked = list.filter(function (r) { return !!r.revoked; });
@@ -282,7 +350,7 @@
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:20px;flex-wrap:wrap;">' +
           '<div>' +
             '<div style="font-family:var(--font-display);font-size:22px;color:#0F1A2E;">Contractors</div>' +
-            '<div style="font-size:12px;color:var(--gray-400);margin-top:4px;line-height:1.45;max-width:520px;">External collaborators with a money-free link. Separate from Studio Subcontractors (labor). They only see items you mark Share with contractors.</div>' +
+            '<div style="font-size:12px;color:var(--gray-400);margin-top:4px;line-height:1.45;max-width:520px;">External collaborators with a money-free link. Separate from Studio Subcontractors (labor). The lists below are the boards, files, and decisions those links can open.</div>' +
           '</div>' +
         '</div>' +
         '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:22px;">' +
@@ -299,6 +367,7 @@
             '<div style="font-size:22px;font-weight:700;color:#0F1A2E;margin-top:4px;">' + sharedDecisions + '</div>' +
           '</div>' +
         '</div>' +
+        studioSharedWithContractorHtml(sharedFileDocs, sharedDecisionDocs, sharedBoardDocs) +
         '<div style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#0F1A2E;margin-bottom:10px;">Who has access</div>' +
         rowsHtml +
         '<div style="margin-top:28px;padding:18px 20px;border:1px solid rgba(15,26,46,0.08);background:#FFFFFF;">' +
@@ -617,6 +686,47 @@
     }
   }
 
+  function contractorBoardImages(board) {
+    var raw = board && board.images;
+    var list = [];
+    if (Array.isArray(raw)) list = raw;
+    else if (raw && typeof raw === 'object') list = Object.keys(raw).map(function (k) { return raw[k]; });
+    var out = [];
+    list.forEach(function (img) {
+      var url = '';
+      var caption = '';
+      if (typeof img === 'string') url = img.trim();
+      else if (img && typeof img === 'object') {
+        url = String(img.imageUrl || img.url || img.src || '').trim();
+        caption = String(img.caption || img.title || '').trim();
+      }
+      if (!/^https?:\/\//i.test(url)) return;
+      out.push({ url: url, caption: caption });
+    });
+    return out;
+  }
+
+  function contractorBoardCardHtml(board) {
+    var title = String(board.name || board.title || 'Inspiration board').trim() || 'Inspiration board';
+    var desc = String(board.description || '').trim();
+    var imgs = contractorBoardImages(board);
+    var grid = imgs.length
+      ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:12px;">' +
+        imgs.map(function (img) {
+          return '<div style="border:1px solid #E2E2E2;background:#FFFFFF;overflow:hidden;">' +
+            '<img src="' + _escAttr(img.url) + '" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:120px;object-fit:cover;display:block;background:#F8FAFC;" onclick="window.cchContractorOpenFile(\'' + _escAttr(img.url).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\')">' +
+            (img.caption ? '<div style="padding:6px 8px;font-size:11px;color:#0A1F3D;line-height:1.35;">' + _esc(img.caption) + '</div>' : '') +
+            '</div>';
+        }).join('') +
+        '</div>'
+      : '<div style="margin-top:10px;font-size:12px;color:#6B7280;">No images on this board.</div>';
+    return '<div style="border:1px solid #E2E2E2;background:#FFFFFF;padding:16px 18px;margin-bottom:10px;">' +
+      '<div style="font-size:15px;font-weight:600;color:#0A1F3D;line-height:1.35;">' + _esc(title) + '</div>' +
+      (desc ? '<div style="font-size:12px;color:#6B7280;margin-top:8px;line-height:1.5;">' + _esc(desc) + '</div>' : '') +
+      grid +
+      '</div>';
+  }
+
   function contractorFileCardHtml(f) {
     var url = studioFilePublicUrl(f);
     var title = String(f.name || 'Document').trim() || 'Document';
@@ -798,6 +908,22 @@
       return String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''));
     });
 
+    var boards = [];
+    try {
+      var bq = await db.collection('boards').doc(projectId).collection('ideabooks')
+        .where('sharedWithContractors', '==', true).get();
+      bq.forEach(function (d) { boards.push(Object.assign({ id: d.id }, d.data() || {})); });
+    } catch (_eB) {
+      try {
+        var ball = await db.collection('boards').doc(projectId).collection('ideabooks').get();
+        ball.forEach(function (d) {
+          var row = Object.assign({ id: d.id }, d.data() || {});
+          if (row.sharedWithContractors === true) boards.push(row);
+        });
+      } catch (_eB2) {}
+    }
+    boards.sort(function (a, b) { return String(a.name || '').localeCompare(String(b.name || '')); });
+
     var nameLabel = String(access.name || 'Collaborator').trim();
     var listHtml;
     if (!files.length) {
@@ -815,12 +941,18 @@
       decisionsHtml = decisions.map(contractorDecisionCardHtml).join('');
     }
 
+    var boardsHtml = boards.length
+      ? boards.map(contractorBoardCardHtml).join('')
+      : '<div style="padding:20px;text-align:center;border:1px solid #E2E2E2;background:#FFFFFF;color:#6B7280;font-size:13px;line-height:1.5;">No inspiration boards shared yet.</div>';
+
     T.innerHTML =
       '<div class="cp-contractor-view" style="max-width:920px;margin:0 auto;padding:32px 20px 64px;font-family:\'DM Sans\',sans-serif;background:#FFFFFF;min-height:100vh;box-sizing:border-box;">' +
         '<div style="font-family:\'Playfair Display\',Georgia,serif;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#0A1F3D;margin-bottom:8px;">CCH Design</div>' +
         '<h1 style="font-family:\'Playfair Display\',Georgia,serif;font-size:28px;font-weight:500;color:#0A1F3D;margin:0 0 6px;line-height:1.2;">' + _esc(projName) + '</h1>' +
-        '<p style="font-size:13px;color:#6B7280;margin:0 0 28px;line-height:1.5;">Shared documents and decisions for ' + _esc(nameLabel) + '. Open, download, or print — no pricing or invoices on this page.</p>' +
-        '<div style="font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#0A1F3D;margin-bottom:12px;">Documents</div>' +
+        '<p style="font-size:13px;color:#6B7280;margin:0 0 28px;line-height:1.5;">Shared documents, decisions, and inspiration boards for ' + _esc(nameLabel) + '. No pricing or invoices on this page.</p>' +
+        '<div style="font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#0A1F3D;margin-bottom:12px;">Inspiration boards</div>' +
+        boardsHtml +
+        '<div style="font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#0A1F3D;margin:28px 0 12px;">Documents</div>' +
         listHtml +
         '<div style="font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#0A1F3D;margin:28px 0 12px;">Decisions</div>' +
         decisionsHtml +
@@ -836,6 +968,64 @@
     );
   }
 
+  async function loadSharedContractorDocs(projectId) {
+    var db = _db();
+    var files = [];
+    var decisions = [];
+    if (!db || !projectId) return { files: files, decisions: decisions, boards: [] };
+    try {
+      var fq = await db.collection('boards').doc(projectId).collection('files')
+        .where('sharedWithContractors', '==', true).get();
+      fq.forEach(function (d) { files.push(Object.assign({ id: d.id }, d.data() || {})); });
+    } catch (_eF) {
+      try {
+        var fall = await db.collection('boards').doc(projectId).collection('files').get();
+        fall.forEach(function (d) {
+          var row = Object.assign({ id: d.id }, d.data() || {});
+          if (fileIsSharedWithContractors(row)) files.push(row);
+        });
+      } catch (_eF2) {}
+    }
+    try {
+      var dq = await db.collection('boards').doc(projectId).collection('clientDecisions')
+        .where('sharedWithContractors', '==', true).get();
+      dq.forEach(function (d) { decisions.push(Object.assign({ id: d.id }, d.data() || {})); });
+    } catch (_eD) {
+      try {
+        var dall = await db.collection('boards').doc(projectId).collection('clientDecisions').get();
+        dall.forEach(function (d) {
+          var row = Object.assign({ id: d.id }, d.data() || {});
+          if (decisionIsSharedWithContractors(row)) decisions.push(row);
+        });
+      } catch (_eD2) {}
+    }
+    files.sort(function (a, b) { return String(a.name || '').localeCompare(String(b.name || '')); });
+    decisions.sort(function (a, b) { return String(a.title || '').localeCompare(String(b.title || '')); });
+    var boards = [];
+    try {
+      var bq = await db.collection('boards').doc(projectId).collection('ideabooks')
+        .where('sharedWithContractors', '==', true).get();
+      bq.forEach(function (d) { boards.push(Object.assign({ id: d.id }, d.data() || {})); });
+    } catch (_eB) {
+      try {
+        var ball = await db.collection('boards').doc(projectId).collection('ideabooks').get();
+        ball.forEach(function (d) {
+          var row = Object.assign({ id: d.id }, d.data() || {});
+          if (row.sharedWithContractors === true) boards.push(row);
+        });
+      } catch (_eB2) {}
+    }
+    boards.sort(function (a, b) { return String(a.name || '').localeCompare(String(b.name || '')); });
+    return { files: files, decisions: decisions, boards: boards };
+  }
+
+  async function contractorPortalListHtml(projectId) {
+    var loaded = await loadSharedContractorDocs(projectId);
+    return '<div class="cp-section-label">Shared with contractors</div>' +
+      '<p style="font-size:13px;color:#6B7280;margin:0 0 16px;line-height:1.5;">Files and decisions the contractor can open.</p>' +
+      studioSharedWithContractorHtml(loaded.files, loaded.decisions, loaded.boards);
+  }
+
   global.cchCloseContractorAccessModal = _closeContractorModal;
   global.cchOpenContractorAccessPanel = openContractorAccessPanel;
   global.cchSubmitContractorInvite = submitContractorInvite;
@@ -847,6 +1037,7 @@
   global.cchDecisionIsSharedWithContractors = decisionIsSharedWithContractors;
   global.cchRenderContractorView = renderContractorView;
   global.cchRenderContractorAccessTab = renderContractorAccessTab;
+  global.cchContractorPortalListHtml = contractorPortalListHtml;
   global.cchContractorPortalUrl = contractorPortalUrl;
   global.cchContractorOpenFile = contractorOpenFile;
   global.cchContractorPrintFile = contractorPrintFile;

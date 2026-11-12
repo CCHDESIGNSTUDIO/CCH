@@ -475,7 +475,7 @@
     html += spItem('Bill Variances', 'discrepancies', {
       badge: spState.varOpenCount,
       hot: spState.varOpenCount > 0,
-      title: 'Variances still waiting for Pass on or Bury'
+      title: 'Variances still waiting for Pass on or Absorbed'
     });
     html += spOpenCreditSelect(proj.id);
     if (isAdmin) html += spItem('Financials', 'financials');

@@ -278,6 +278,10 @@ service cloud.firestore {
         allow read: if true;
         allow write: if isAuth();
       }
+      match /specBooks/{docId} {
+        allow read: if isAuth();
+        allow write: if isAuth();
+      }
       // External contractor invites (capability URL + token). Not TEAM_CONFIG.contractors.
       match /contractorAccess/{token} {
         allow get: if true;

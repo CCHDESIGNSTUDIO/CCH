@@ -5,7 +5,7 @@
 (function() {
   'use strict';
 
-  var OM_BUILD = '20260726om37';
+  var OM_BUILD = '20261111wo427';
   var OM_NAVY = '#0F1A2E';
   var OM_NAVY_MID = '#1B3352';
   var OM_BORDER = 'rgba(15,26,46,0.12)';
@@ -87,6 +87,22 @@
 
   window.cchOmIsStudioPo = function(po) {
     return !window.cchOmIsHouzzPo(po);
+  };
+
+  /** Studio client invoices are INV-6000+. Houzz legacy is IN-10xxx / IN-11xxx / IN-12xxx. IN-6024 is the same Studio number as INV-6024. */
+  window.cchOmIsStudioInvoice = function(inv) {
+    if (!inv) return false;
+    var n = String(inv.invoiceNum || inv.number || inv.num || inv.id || '').trim().toUpperCase().replace(/\s+/g, '');
+    if (/^INV-?\d+/.test(n)) return true;
+    var m = n.match(/^IN-?(\d+)$/);
+    if (m) {
+      var num = parseInt(m[1], 10);
+      return num >= 6000 && num < 10000;
+    }
+    if (inv.houzzImport === true || inv.isHouzz === true || inv.houzzInvoice) return false;
+    var src = String(inv.source || inv.importedFrom || inv.dataSource || inv.origin || '').toLowerCase();
+    if (src.indexOf('houzz') >= 0) return false;
+    return false;
   };
 
   function poTotal(po) {
@@ -323,7 +339,7 @@
     }).filter(function(seg) { return seg !== ''; });
     if (parts[0] !== 'ordermanagement' && parts[0] !== 'ordermgmt') return 'open';
     var seg = parts[1] || 'open';
-    if (seg === 'open' || seg === 'noeta' || seg === 'noconfirm' || seg === 'nobill' || seg === 'receiving' ||
+    if (seg === 'open' || seg === 'noeta' || seg === 'noconfirm' || seg === 'needpo' || seg === 'nobill' || seg === 'receiving' ||
         seg === 'bills' || seg === 'variances' || seg === 'qb') return seg;
     return 'open';
   }
@@ -465,6 +481,7 @@
       { id: 'open', label: 'Open POs', hash: '#/ordermanagement/open' },
       { id: 'noeta', label: 'Missing ETA', hash: '#/ordermanagement/noeta' },
       { id: 'noconfirm', label: 'Missing confirmations', hash: '#/ordermanagement/noconfirm' },
+      { id: 'needpo', label: 'Invoices missing POs', hash: '#/ordermanagement/needpo' },
       { id: 'nobill', label: 'Missing bills', hash: '#/ordermanagement/nobill' },
       { id: 'receiving', label: 'Receiving status', hash: '#/ordermanagement/receiving' },
       { id: 'bills', label: 'Vendor bills', hash: '#/ordermanagement/bills' },
@@ -502,6 +519,9 @@
     }
     if (tab === 'noconfirm') {
       return 'Open Studio POs without a vendor order confirmation — includes Draft POs.';
+    }
+    if (tab === 'needpo') {
+      return 'Studio invoices only. Sent and paid product lines that are not on a purchase order. Houzz invoices and drafts are not listed.';
     }
     return 'Studio PO operations — status, aging, and ETA gaps. Click a row to open the PO. Houzz legacy imports excluded.';
   }
@@ -1905,6 +1925,74 @@
     }
   };
 
+  function omMoney(n) {
+    var v = parseFloat(n) || 0;
+    if (typeof window.formatMoney === 'function') return window.formatMoney(v);
+    return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function omJsId(v) {
+    return String(v || '').replace(/\\/g, '\\\\').replace(/'/g, '\\\'');
+  }
+
+  window.cchOmOpenMissingPoInvoice = function(projectId, invoiceId) {
+    if (!projectId || !invoiceId) return;
+    if (typeof navigate === 'function') navigate('#/project/' + projectId + '/invoice/' + invoiceId);
+  };
+
+  async function cchOmLoadMissingPoRows(pos, projNames) {
+    if (typeof cchInvoiceLinesNeedingPo !== 'function') return [];
+    var ids = Object.keys(projNames || {});
+    var chunks = await Promise.all(ids.map(async function(pid) {
+      var invoices = [];
+      try {
+        var snap = await firebase.firestore().collection('boards').doc(pid).collection('invoices').get();
+        snap.forEach(function(d) {
+          var inv = Object.assign({ id: d.id, projectId: pid }, d.data() || {});
+          if (!window.cchOmIsStudioInvoice(inv)) return;
+          invoices.push(inv);
+        });
+      } catch (_eInv) {}
+      var projectPos = (pos || []).filter(function(p) { return p.projectId === pid; });
+      var result = cchInvoiceLinesNeedingPo(invoices, projectPos, { id: pid, name: projNames[pid] }, { allRows: true });
+      return (result.rows || []).map(function(r) {
+        r.projectName = projNames[pid] || pid;
+        if (!r.projectId) r.projectId = pid;
+        return r;
+      });
+    }));
+    var rows = [];
+    chunks.forEach(function(part) { rows = rows.concat(part); });
+    rows.sort(function(a, b) {
+      var pn = String(a.projectName || '').localeCompare(String(b.projectName || ''));
+      if (pn) return pn;
+      return String(a.number || '').localeCompare(String(b.number || ''), undefined, { numeric: true });
+    });
+    return rows;
+  }
+
+  function missingPoReport(rows) {
+    if (!rows.length) {
+      return '<div class="empty-state"><div class="empty-icon">✓</div><div class="empty-text">No sent product lines are missing a purchase order.</div></div>';
+    }
+    var total = rows.reduce(function(s, r) { return s + (parseFloat(r.amount) || 0); }, 0);
+    var paidN = rows.filter(function(r) { return r.paid; }).length;
+    var html = '<p style="font-size:12px;color:#5C6B80;margin:0 0 12px;">' + rows.length + ' lines · ' + omMoney(total) +
+      (paidN ? ' · ' + paidN + ' on a paid invoice' : '') + '. Click a row to open the invoice.</p>';
+    html += '<div class="cch-var-fit"><table class="data-table" style="width:100%;"><thead><tr>' +
+      '<th>Project</th><th>Invoice</th><th>Product</th><th style="text-align:right;">Amount</th><th>Paid</th></tr></thead><tbody>';
+    rows.forEach(function(r) {
+      html += '<tr style="cursor:pointer;" onclick="window.cchOmOpenMissingPoInvoice(\'' + omJsId(r.projectId) + '\',\'' + omJsId(r.invoiceId) + '\')">' +
+        '<td style="padding:8px;">' + esc(r.projectName || r.projectId || '') + '</td>' +
+        '<td style="padding:8px;font-weight:600;color:#0F1A2E;">' + esc(r.number || '') + '</td>' +
+        '<td style="padding:8px;">' + esc(r.title || '') + '</td>' +
+        '<td style="padding:8px;text-align:right;font-family:var(--font-mono);">' + omMoney(r.amount) + '</td>' +
+        '<td style="padding:8px;">' + (r.paid ? 'Paid' : 'Sent') + '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+    return html;
+  }
+
   window.renderOrderManagementPage = async function() {
     var T = document.getElementById('contentArea');
     if (!T) return;
@@ -1933,6 +2021,7 @@
 
     var forceLoad = !!window._omForceLoad;
     window._omForceLoad = false;
+    if (forceLoad) window._omMissingPoCache = null;
     var hasShell = !!document.getElementById('cchOmPanel');
     var useCache = hasShell && window._omPosCache && window._omPosCache.pos && !forceLoad;
 
@@ -1951,7 +2040,9 @@
     window._omLastTab = tab;
     window._omTab = tab;
 
-    var loadingMsg = tab === 'receiving'
+    var loadingMsg = tab === 'needpo'
+      ? 'Loading invoices missing purchase orders…'
+      : tab === 'receiving'
       ? 'Loading receiving status across projects…'
       : tab === 'qb'
         ? 'Loading QuickBooks status…'
@@ -2057,6 +2148,13 @@
         missingEtaReport(allOpen);
     } else if (tab === 'noconfirm') {
       panel = missingConfirmReport(noConfirm, missingEtaLines);
+    } else if (tab === 'needpo') {
+      var needRows = window._omMissingPoCache;
+      if (!needRows || forceLoad) {
+        needRows = await cchOmLoadMissingPoRows(pos, projNames);
+        window._omMissingPoCache = needRows;
+      }
+      panel = missingPoReport(needRows);
     } else if (tab === 'nobill') {
       panel = missingBillsReport(noBill);
     } else if (tab === 'receiving') {

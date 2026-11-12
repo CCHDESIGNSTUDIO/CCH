@@ -1813,6 +1813,44 @@
     }
   };
 
+  window.mountDocEditPOVendorSelect = async function(projectId, selectedVendor) {
+    var selEl = document.getElementById('docEditPOVendor');
+    if (!selEl || String(selEl.tagName || '').toUpperCase() !== 'SELECT') return;
+    var vendors = [];
+    try {
+      vendors = await window.loadProjectVendors(projectId);
+    } catch (e) {
+      console.warn('[mountDocEditPOVendorSelect]', e);
+    }
+    vendors = (vendors || []).slice();
+    try {
+      if (typeof window.cchPoLoadWorkrooms === 'function') {
+        var rooms = await window.cchPoLoadWorkrooms();
+        (rooms || []).forEach(function(w) {
+          var n = String(w && w.name || '').trim();
+          if (!n) return;
+          var has = vendors.some(function(x) { return String(x).trim().toLowerCase() === n.toLowerCase(); });
+          if (!has) vendors.push(n);
+        });
+      }
+    } catch (eWr) {
+      console.warn('[mountDocEditPOVendorSelect] workrooms', eWr);
+    }
+    vendors.sort(function(a, b) { return String(a).localeCompare(String(b), undefined, { sensitivity: 'base' }); });
+    selEl.innerHTML = window.docEditBuildVendorOptions(vendors, selectedVendor || '');
+    var customEl = document.getElementById('docEditPOVendorCustom');
+    var sv = String(selectedVendor || '').trim();
+    if (selEl.value === '__other__' && customEl && sv) {
+      customEl.style.display = '';
+      customEl.value = sv;
+    } else if (customEl) {
+      customEl.style.display = 'none';
+    }
+    if (sv && typeof window.docEditPOVendorNameChange === 'function') {
+      try { await window.docEditPOVendorNameChange(); } catch (_eFill) {}
+    }
+  };
+
   window.mountPiVendorSelect = async function(projectId, selectedVendor) {
     var selEl = document.getElementById('piVendorSel');
     if (!selEl) return;
@@ -2867,6 +2905,7 @@
     var tearJs = "typeof generateTearSheetsFromDoc==='function'&&generateTearSheetsFromDoc('" + pj + "','" + collection + "','" + dj + "','" + cchEscJsStr(projName) + "')";
     var cancelJs = 'cchClearDocEditSession();window._forceEditMode=false;navigate(window.location.hash)';
     var saveJs = 'docEditSyncLineItemsFromDom();docEditSave(true)';
+    var sendJs = "docEditSyncLineItemsFromDom();Promise.resolve(docEditSave(false)).then(function(){sendInvoiceToClient('" + pj + "','" + dj + "');}).catch(function(){if(typeof showToast==='function')showToast('Save before send failed','error');});";
     var deleteJs = type === 'invoice'
       ? "void deleteInvoice('" + pj + "','" + dj + "')"
       : type === 'po'
@@ -2887,6 +2926,7 @@
       more += cchDocMoreItem('🖼 Refresh images', "refreshDocumentLineImagesFromClips('" + type + "','" + pj + "','" + dj + "')");
     }
     if (type === 'invoice') {
+      more += cchDocMoreItem('\uD83D\uDCE7 Send / email client', sendJs);
       more += cchDocMoreItem('📑 Tear sheets', tearJs);
       more += cchDocMoreItem('📦 Generate POs by vendor', "generatePOsFromDoc('" + pj + "','invoices','" + dj + "')");
       if (typeof duplicateInvoice === 'function') {
@@ -2936,6 +2976,9 @@
     return '<div class="cch-doc-edit-topbar">' +
       '<span id="docEditSaveInd"></span>' +
       '<button type="button" class="btn btn-primary btn-sm" onclick="openDocItemsSidebar({mode:\'docEdit\'})">+ Add item</button>' +
+      (type === 'invoice'
+        ? '<button type="button" class="btn btn-primary btn-sm" style="background:#1B3352;color:#EDE8E0;" onclick="' + sendJs + '">\uD83D\uDCE7 Send</button>'
+        : '') +
       '<button type="button" class="btn btn-primary btn-sm" onclick="' + saveJs + '">💾 Save</button>' +
       '<button type="button" class="btn btn-secondary btn-sm" onclick="' + cancelJs + '">Cancel</button>' +
       '<button type="button" class="btn btn-secondary btn-sm" style="color:#B91C1C;border-color:rgba(185,28,28,0.35);" onclick="' + deleteJs + '">🗑 Delete</button>' +
@@ -2990,6 +3033,10 @@
       void window.ensureLibraryProductsForLineItems(items);
     }
     window._docEdit = { type: type, projectId: projectId, docId: docId, collection: collection, docData: docData, items: items };
+    if (type === 'invoice' && typeof window.cchPoPersistCleanClientInvoiceLines === 'function') {
+      items = window.cchPoPersistCleanClientInvoiceLines(projectId, docId, docData, items);
+      window._docEdit.items = items;
+    }
     var projName = projData.name || projectId;
     var typeLabel = type === 'invoice' ? 'Invoice' : type === 'po' ? 'Purchase Order' : 'Proposal';
     var backTab = type === 'invoice' ? 'invoices' : type === 'po' ? 'pos' : 'proposals';
@@ -3322,6 +3369,10 @@
             : (type === 'proposal' && typeof window.proposalLineClientTotal === 'function'
               ? window.proposalLineClientTotal(item)
               : (cost > 0 ? cost * qty * (1 + mkup / 100) : amt)));
+        if (type === 'invoice' && Math.abs(lineAmtForRow) < 0.005 && Math.abs(ship) > 0.005) {
+          var _etFr = String(item.expenseType || '').toLowerCase();
+          if (_etFr === 'freight' || _etFr === 'shipping') lineAmtForRow = ship;
+        }
         var isTaxable = (typeof window.cchInvoiceLineIsTaxable === 'function') ? window.cchInvoiceLineIsTaxable(item) : (item.taxable !== false && (item.taxable === true || item.expenseType === 'product' || (!item.expenseType && item.taxable !== false)));
         var isSvcRow = item.expenseType === 'service' || item.itemType === 'service';
         if (type === 'invoice' && typeof window.cchInvoiceLineUseServiceStyleInView === 'function' && window.cchInvoiceLineUseServiceStyleInView(item)) {
@@ -3364,12 +3415,16 @@
         if (type === 'invoice' && isSvcRow && (!imgTag || imgTag.indexOf('<img ') < 0)) {
           imgTag = '<div style="width:64px;height:64px;background:transparent;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--gray-300);border:1px dashed var(--gray-200);">—</div>';
         }
-        var lineTag = (typeof window.cchLineTagText === 'function') ? window.cchLineTagText(item) : '';
-        var lineNotes = (typeof window.cchLineNotesBodyText === 'function')
+        var lineTag = (type === 'invoice')
+          ? ((typeof window.cchLineTagExplicit === 'function') ? window.cchLineTagExplicit(item) : String(item.lineTag || '').trim())
+          : ((typeof window.cchLineTagText === 'function') ? window.cchLineTagText(item) : '');
+        var lineNotes = (type === 'invoice' && typeof window.cchLineExplicitNotesText === 'function')
+          ? window.cchLineExplicitNotesText(item)
+          : ((typeof window.cchLineNotesBodyText === 'function')
           ? window.cchLineNotesBodyText(item)
           : ((typeof window.cchLineExplicitNotesText === 'function')
             ? window.cchLineExplicitNotesText(item)
-            : String(item.lineNotes || '').trim());
+            : String(item.lineNotes || '').trim()));
         var descRaw = item.description || '';
         if (type === 'invoice' && typeof window.cchStripInvoiceVendorParens === 'function') {
           descRaw = window.cchStripInvoiceVendorParens(descRaw, item);
@@ -3396,9 +3451,10 @@
         }
         var descHtmlInner = (type === 'po')
           ? poSpecsHtml
-          : (poSpecsHtml + (descTrim ? '<div style="margin-top:6px;"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Description</div><div style="font-size:12px;color:var(--gray-400);margin-top:2px;white-space:pre-wrap;line-height:1.45;">' + esc(descRaw) + '</div></div>' : ''));
+          : (poSpecsHtml + (descTrim ? '<div style="margin-top:6px;"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#C4A464;font-weight:700;">Description</div><div style="font-size:12px;color:var(--gray-400);margin-top:2px;white-space:pre-wrap;line-height:1.45;">' + esc(descTrim) + '</div></div>' : ''));
         var notesHtmlInner = '';
-        if (lineNotes) {
+        var _notesSameAsDesc = !!(descTrim && lineNotes && String(lineNotes).trim() === descTrim);
+        if (lineNotes && !_notesSameAsDesc) {
           if (_nl.length <= 1) {
             notesHtmlInner = '<div style="margin-top:6px;margin-bottom:8px;"><div style="font-size:10px;font-weight:700;color:#1B3352;letter-spacing:0.04em;">NOTE:</div><div style="font-size:11px;color:#1B3352;margin-top:2px;white-space:pre-wrap;line-height:1.45;">' + esc(lineNotes) + '</div></div>';
           } else {
@@ -3438,13 +3494,24 @@
           var _peV = cchEscJsStr(projectId);
           var _deV = cchEscJsStr(docId);
           var _itemLbl = String(item.varianceItemLabel || '').trim();
-          varLineHtml = '<div class="cch-var-line-edit">' +
-            (_itemLbl ? '<div style="font-size:12px;color:#1B3352;margin-top:4px;">' + esc(_itemLbl) + '</div>' : '') +
-            '<textarea rows="3" aria-label="Variance description" style="width:100%;margin-top:6px;font-size:12px;line-height:1.45;min-height:64px;border:1px solid #E2E2E2;padding:6px;font-family:inherit;box-sizing:border-box;" onblur="event.stopPropagation();saveInvoiceVarianceDescription(\'' + _peV + '\',\'' + _deV + '\',' + lineIdx + ',this.value)">' + esc(descRaw) + '</textarea>' +
+          var _srcInv = String(item.sourceInvoiceNum || '').trim();
+          var _srcInvHtml = _srcInv ? '<div style="font-size:12px;color:#5C6B80;margin-top:4px;">Original invoice ' + esc(_srcInv) + '</div>' : '';
+          var _storedDesc = String(descRaw || '').trim();
+          var _printDesc = _storedDesc;
+          if (typeof window.cchPoClientFaceText === 'function') _printDesc = window.cchPoClientFaceText(_printDesc);
+          if (/\bPO-\d+\b|\bPO\s+line\b|\bpurchase\s+order\b/i.test(_printDesc)) _printDesc = '';
+          var _printText = _printDesc || _itemLbl;
+          if (_itemLbl && _printDesc && _itemLbl.toLowerCase() === _printDesc.toLowerCase()) _printText = _itemLbl;
+          var _showLbl = _itemLbl && _itemLbl.toLowerCase() !== _storedDesc.toLowerCase();
+          varLineHtml =
+            '<div class="cch-var-line-edit">' +
+            _srcInvHtml +
+            (_showLbl ? '<div style="font-size:15px;font-weight:700;color:#1B3352;margin-top:6px;">' + esc(_itemLbl) + '</div>' : '') +
+            '<textarea rows="3" aria-label="Variance description" style="width:100%;margin-top:6px;font-size:12px;line-height:1.45;min-height:64px;border:1px solid #E2E2E2;padding:6px;font-family:inherit;box-sizing:border-box;" onblur="event.stopPropagation();saveInvoiceVarianceDescription(\'' + _peV + '\',\'' + _deV + '\',' + lineIdx + ',this.value)">' + esc(_storedDesc) + '</textarea>' +
             '<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:#1B3352;cursor:pointer;" onclick="event.stopPropagation()"><input type="checkbox"' + (item.taxable === true ? ' checked' : '') + ' onchange="event.stopPropagation();saveInvoiceVarianceTax(\'' + _peV + '\',\'' + _deV + '\',' + lineIdx + ',this.checked)"> Tax this line</label>' +
             '</div>' +
-            '<div class="cch-var-line-print" style="display:none;font-size:12px;color:#1B3352;margin-top:4px;white-space:pre-wrap;">' +
-            (_itemLbl ? esc(_itemLbl) : '') + (descRaw ? ( _itemLbl ? '<br>' : '') + esc(descRaw) : '') +
+            '<div class="cch-var-line-print" style="display:none;font-size:14px;font-weight:600;color:#1B3352;margin-top:4px;white-space:pre-wrap;">' +
+            esc(_printText) +
             '</div>';
         }
         var detailBlock = '';
@@ -3488,6 +3555,7 @@
         rows += '<tr style="border-bottom:1px solid var(--gray-100);">' +
           '<td style="padding:10px 8px;">' + imgTag + '</td>' +
           '<td style="padding:10px 8px;"><div style="font-size:14px;font-weight:600;">' + esc(_lineTitle) + '</div>' +
+            (type === 'po' && typeof window.cchPoLineInvoiceHtml === 'function' ? window.cchPoLineInvoiceHtml(docData, item, lineIdx, items) : '') +
             varLineHtml +
             _poRoomTagHtml +
             _libSuggestHtml +
@@ -3564,10 +3632,14 @@
     }
 
     // Notes/memo
-    var memoHTML = (docData.memo || docData.notes) ?
+    var _notesShow = String(docData.memo || docData.notes || '').trim();
+    if (type === 'invoice') {
+      _notesShow = _notesShow.replace(/vendor\s+bill\s+variances?\.?/ig, '').trim();
+    }
+    var memoHTML = _notesShow ?
       '<div style="margin-top:16px;padding:16px;background:var(--gray-50);border-radius:0;">' +
         '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);margin-bottom:6px;">Notes</div>' +
-        '<div style="font-size:13px;color:var(--gray-600);line-height:1.6;">' + esc(docData.memo || docData.notes || '') + '</div></div>' : '';
+        '<div style="font-size:13px;color:var(--gray-600);line-height:1.6;">' + esc(_notesShow) + '</div></div>' : '';
 
     var docAttachments = docData.attachments || [];
     var attachmentsViewHTML = '';
@@ -3869,33 +3941,25 @@
             : '') +
           (lineItemsQbBtn ? '<div style="margin-top:6px;">' + lineItemsQbBtn + '</div>' : '') +
         '</div>';
+      var _poMoney = (typeof window.cchPoShipInvoiceMoney === 'function') ? window.cchPoShipInvoiceMoney(docData) : null;
+      var _poTotalShow = _poMoney ? _poMoney.poTotal : grandTotal;
+      var _poBillsShow = (_poHasVendorBill && _poBillTotal != null) ? _poPayable : (_poMoney ? _poMoney.bills : _poPayable);
       var poRailHTML =
         '<aside class="cch-doc-view-rail">' +
           '<div class="cch-doc-view-rail-card">' +
             '<div class="cch-doc-view-rail-title" style="margin:0 0 6px;">Totals</div>' +
-            '<div class="cch-doc-view-rail-row"><span>Merchandise</span><strong id="cchPoRailMerch">' + formatMoney(subtotal) + '</strong></div>' +
-            '<div class="cch-doc-view-rail-row"><span>Shipping</span><strong id="cchPoRailShip">' + formatMoney(_poHasVendorBill ? _poBillFreight : totalShipping) + '</strong></div>' +
-            _poPrepaidRow +
-            '<div class="cch-doc-view-rail-row cch-doc-view-rail-grand"><span>' + (_poHasVendorBill ? 'Bill total' : 'PO total') + '</span><strong id="cchPoRailBillTotal" data-paid="' + _poPaidShow + '">' + formatMoney(_poPayable) + '</strong></div>' +
-            (_poBillVariance != null && Math.abs(_poBillVariance) >= 0.01
-              ? '<div class="cch-doc-view-rail-row"><span>Variance vs PO</span><strong id="cchPoRailVariance" style="color:' + (_poBillVariance > 0 ? '#B45309' : '#15803D') + ';">' +
-                (_poBillVariance > 0 ? '+' : '−') + formatMoney(Math.abs(_poBillVariance)) + '</strong></div>'
-              : '<div class="cch-doc-view-rail-row" id="cchPoRailVarianceRow" style="display:none;"><span>Variance vs PO</span><strong id="cchPoRailVariance"></strong></div>') +
-            (showPaymentTotals
-              ? '<div class="cch-doc-view-rail-row"><span>Paid</span><strong style="color:#2E7D32;">-' + formatMoney(_poPaidShow) + '</strong></div>' +
-                '<div class="cch-doc-view-rail-row cch-doc-view-rail-balance"><span>' + (_poHasVendorBill ? 'Bill balance' : 'Balance') + '</span><strong id="cchPoRailBalance" style="color:' + (_poDue <= 0.01 ? '#2E7D32' : 'var(--gold)') + ';">' + formatMoney(_poDue) + '</strong></div>'
-              : '<div class="cch-doc-view-rail-row cch-doc-view-rail-balance"><span>Balance due</span><strong id="cchPoRailBalance">' + formatMoney(_poDue) + '</strong></div>') +
-            (Math.abs(_poPrepaid) > 0.01 ? '' : '<p style="margin:8px 0 0;font-size:10px;color:#5C6B80;line-height:1.35;">Sales tax on vendor bill only</p>') +
-            '<div class="cch-doc-view-rail-row" style="margin-top:4px;"><span>Lines</span><strong>' + items.length + '</strong></div>' +
+            '<div class="cch-doc-view-rail-row cch-doc-view-rail-grand"><span>PO total</span><strong>' + formatMoney(_poTotalShow) + '</strong></div>' +
+            '<div class="cch-doc-view-rail-row"><span>Bills</span><strong id="cchPoRailBillTotal" data-paid="' + _poPaidShow + '">' + formatMoney(_poBillsShow) + '</strong></div>' +
+            '<div class="cch-doc-view-rail-row"><span>Paid</span><strong id="cchPoRailPaid" style="color:#2E7D32;">' + formatMoney(_poPaidShow) + '</strong></div>' +
             (_poRailPayCompact
               ? '<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(27,51,82,0.08);"><div class="cch-doc-view-rail-title">Applied payments</div>' + _poRailPayCompact + '</div>'
               : '') +
             (typeof window.cchPoVendorCreditsRailHtml === 'function' ? window.cchPoVendorCreditsRailHtml(docData, projectId, docId) : '') +
           '</div>' +
-          _poRailActions +
           (_poStatusRail
             ? '<div class="cch-doc-view-rail-card cch-po-status-rail-card">' + _poStatusRail + '</div>'
             : '') +
+          _poRailActions +
           _poRailAttach +
         '</aside>';
 
@@ -4107,6 +4171,9 @@
     if (!T) return;
     if (typeof window.cchInvoiceRouteIs === 'function' && !window.cchInvoiceRouteIs(projectId, docId)) return;
     items = items || [];
+    if (typeof window.cchPoPersistCleanClientInvoiceLines === 'function') {
+      items = window.cchPoPersistCleanClientInvoiceLines(projectId, docId, docData, items);
+    }
     projData = projData || {};
     docData = docData || {};
     var projName = projData.name || projectId;
@@ -4186,6 +4253,9 @@
     if (!T) return;
     if (typeof window.cchInvoiceRouteIs === 'function' && !window.cchInvoiceRouteIs(projectId, docId)) return;
     items = items || [];
+    if (typeof window.cchPoPersistCleanClientInvoiceLines === 'function') {
+      items = window.cchPoPersistCleanClientInvoiceLines(projectId, docId, docData, items);
+    }
     projData = projData || {};
     docData = docData || {};
     var projName = projData.name || projectId;
@@ -4310,8 +4380,8 @@
         roomOpts += '<option value="' + (typeof escAttr === 'function' ? escAttr(r) : r) + '"' + (r === curRoom ? ' selected' : '') + '>' + esc(r) + '</option>';
       }
       var lineTagTxt = typeof cchLineTagExplicit === 'function' ? cchLineTagExplicit(item) : String(item.lineTag || '').trim();
-      var clientNoteTxt = typeof cchLineNotesBodyText === 'function'
-        ? cchLineNotesBodyText(item)
+      var clientNoteTxt = typeof cchLineExplicitNotesText === 'function'
+        ? cchLineExplicitNotesText(item)
         : (typeof cchStripDateOnlyNoteLines === 'function'
           ? cchStripDateOnlyNoteLines(String(item.lineNotes || '').trim())
           : String(item.lineNotes || '').trim());
@@ -4767,24 +4837,62 @@
       return s
         .replace(/\bprofessional services\b/gi, 'design services')
         .replace(/\btime billing\b/gi, 'design services')
-        .replace(/\btime-billing\b/gi, 'design services');
+        .replace(/\btime-billing\b/gi, 'design services')
+        .replace(/\s*[·•]?\s*\bPO\s+line\b[^·•\n]*/gi, '')
+        .replace(/\bPO-\d+\b/gi, '')
+        .replace(/\bpurchase\s+orders?\b/gi, '')
+        .replace(/\s{2,}/g, ' ')
+        .replace(/\s*[·•]\s*$/g, '')
+        .trim();
     };
     window.sanitizeInvoiceDocMemoHtml = function(s) {
       if (!s || typeof s !== 'string') return s;
       return s.replace(/\btime entries from\b/gi, 'Service period');
     };
-    /** Hide auto-generated "X hours — design services" on time-invoice lines when dated notes exist. */
+    /** Hide auto-generated "X hours — design services". Qty already shows the hours. */
     window.invoiceSuppressGenericServiceDescription = function(desc, it) {
       var d = String(desc || '').trim();
       if (!d) return '';
-      var low = d.toLowerCase();
+      var low = d.toLowerCase().replace(/[\u2010-\u2015\u2212]/g, '-');
       if (/^design\s+services\s*$/.test(low)) return '';
-      if (/^\d+(\.\d+)?\s*hours?\s*([\u2014—\-]\s*)?design\s+services\s*$/.test(low)) return '';
-      if (/^\d+(\.\d+)?\s*hours?\s*$/.test(low)) {
-        var notes = String((it && (it.lineNotes || it.notes)) || '').trim();
-        if (notes) return '';
-      }
+      if (/^\d+(\.\d+)?\s*hours?\s*(-\s*)?(design\s+services)?\s*$/.test(low)) return '';
       return d;
+    };
+    /** Saved AI summary for the itemized invoice. Title match stays on that line. The rest sit under the intro. */
+    window.cchInvoiceAiClientPack = function(docData, items) {
+      docData = docData || {};
+      var outs = Array.isArray(docData.clientOutcomes) ? docData.clientOutcomes : [];
+      var summary = String(docData.clientSummary || '').trim();
+      function textOf(o) {
+        var title = String((o && o.title) || '').trim();
+        var desc = String((o && (o.description || o.desc)) || '').trim();
+        if (title && desc && title.toLowerCase() !== desc.toLowerCase()) return title + '\n' + desc;
+        return desc || title;
+      }
+      var used = {};
+      var byIndex = [];
+      (items || []).forEach(function(it, idx) {
+        byIndex[idx] = '';
+        var t = String((it && (it.title || it.name)) || '').trim().toLowerCase();
+        if (!t) return;
+        for (var j = 0; j < outs.length; j++) {
+          if (used[j]) continue;
+          var ot = String((outs[j] && outs[j].title) || '').trim().toLowerCase();
+          if (ot && ot === t) {
+            used[j] = true;
+            byIndex[idx] = textOf(outs[j]);
+            break;
+          }
+        }
+      });
+      var unmatched = [];
+      outs.forEach(function(o, j) {
+        if (used[j]) return;
+        var tx = textOf(o);
+        if (tx) unmatched.push(tx);
+      });
+      var hasOutcomes = unmatched.length > 0 || byIndex.some(function(s) { return !!s; });
+      return { summary: summary, byIndex: byIndex, unmatched: unmatched, hasOutcomes: hasOutcomes };
     };
 
     /** Client-facing / PDF line label: real service name, not blank or generic "Item". */
@@ -4921,12 +5029,21 @@
   // 32. PREMIUM PREVIEW — Navy/gold luxury design + taxable column + tear sheets
   // ============================================================
   var _origPreviewDocument = window.previewDocument;
-  window.previewDocument = async function(type, projectId, docId) {
+  window.cchPreviewInvoiceAgain = function(previewWin, projectId, docId) {
+    var mode = 'simple';
+    try { mode = localStorage.getItem('cchInvClientLayout') === 'itemized' ? 'itemized' : 'simple'; } catch (_eM) {}
+    if (typeof db !== 'undefined' && db && projectId && docId) {
+      db.collection('boards').doc(projectId).collection('invoices').doc(docId).update({ clientInvoiceLayout: mode }).catch(function() {});
+    }
+    return window.previewDocument('invoice', projectId, docId, { _previewWin: previewWin });
+  };
+  window.previewDocument = async function(type, projectId, docId, opts) {
+    opts = opts || {};
     var collection = type === 'invoice' ? 'invoices' : type === 'po' ? 'purchaseOrders' : 'proposals';
     var typeLabel = type === 'invoice' ? 'Invoice' : type === 'po' ? 'Purchase Order' : 'Proposal';
 
     // Open synchronously on user click — async Firestore fetch before window.open is blocked on client portal (mobile Safari, etc.).
-    var previewWin = window.open('', '_blank');
+    var previewWin = (opts._previewWin && !opts._previewWin.closed) ? opts._previewWin : window.open('', '_blank');
     if (!previewWin) {
       if (typeof showToast === 'function') showToast('Pop-up blocked — allow pop-ups for this site', 'error');
       else if (typeof cchAlert === 'function') await cchAlert('Pop-up blocked — allow pop-ups for this site', typeLabel);
@@ -4959,6 +5076,10 @@
       if (doc.exists) { docData = { id: doc.id, ...doc.data() }; items = docData.items || []; }
     } catch(e) {}
 
+    if (type === 'invoice' && typeof window.cchPoPersistCleanClientInvoiceLines === 'function') {
+      items = window.cchPoPersistCleanClientInvoiceLines(projectId, docId, docData, items);
+    }
+
     if (!docData) {
       try {
         previewWin.document.open();
@@ -4975,7 +5096,13 @@
     var proj = {};
     try { var pd = await db.collection('boards').doc(projectId).get(); if (pd.exists) proj = pd.data(); } catch(e) {}
 
-    if (type === 'invoice' && typeof window.cchWriteDesignServicesPreviewWindow === 'function' &&
+    var _invLayout = 'simple';
+    if (window._cchPortalDocOpen) {
+      _invLayout = (docData && docData.clientInvoiceLayout === 'itemized') ? 'itemized' : 'simple';
+    } else {
+      try { _invLayout = localStorage.getItem('cchInvClientLayout') === 'itemized' ? 'itemized' : 'simple'; } catch (_eLay) {}
+    }
+    if (_invLayout !== 'itemized' && type === 'invoice' && typeof window.cchWriteDesignServicesPreviewWindow === 'function' &&
         typeof window.cchInvoiceUsesDesignServicesLayout === 'function' &&
         window.cchInvoiceUsesDesignServicesLayout(docData, items)) {
       window.cchWriteDesignServicesPreviewWindow(previewWin, docData, items, proj, projectId, docId);
@@ -5090,6 +5217,8 @@
 
     // Build items table with taxable column
     var itemsHtml = '';
+    var _cchAiPack = (type === 'invoice' && typeof window.cchInvoiceAiClientPack === 'function')
+      ? window.cchInvoiceAiClientPack(docData, items) : null;
     var subtotal = 0, taxableSubtotal = 0, totalShipping = 0;
     // Show thumbnails on invoices/proposals/POs (vendor PDF includes line images).
     var _showPremiumImgCol = true;
@@ -5201,6 +5330,9 @@
       if (type === 'invoice' && typeof window.sanitizeInvoicePreviewLineText === 'function') {
         if (tagLine) tagLine = window.sanitizeInvoicePreviewLineText(tagLine);
         if (notesBody) notesBody = window.sanitizeInvoicePreviewLineText(notesBody);
+      }
+      if (type === 'invoice' && it.source === 'po_bill_variance' && typeof window.cchPoClientFaceText === 'function') {
+        if (notesBody) notesBody = window.cchPoClientFaceText(notesBody);
       }
       if (type === 'invoice' || isSvc) {
         if (tagLine && /^\d{4}-\d{2}-\d{2}\b/.test(String(tagLine).trim())) tagLine = '';
@@ -5339,28 +5471,23 @@
         _rawNotes = window.sanitizeInvoicePreviewLineText(_rawNotes);
         _rawDesc = window.sanitizeInvoicePreviewLineText(_rawDesc);
       }
-      var ds0 = (it.serviceDateStart || '').trim();
-      var ds1 = (it.serviceDateEnd || '').trim();
       var periodHtml = '';
-      if (type === 'invoice' && (ds0 || ds1)) {
-        var p0 = _fmtIsoLong(ds0);
-        var p1 = _fmtIsoLong(ds1);
-        if (p0 && p1 && p0 !== p1) {
-          periodHtml = '<div class="item-svc-period cch-inv-disp-dates">Service period: ' + esc(p0) + ' – ' + esc(p1) + '</div>';
-        } else if (p0) {
-          periodHtml = '<div class="item-svc-period cch-inv-disp-dates">Service date: ' + esc(p0) + '</div>';
-        }
-      }
-      var notesSrc = (typeof window.cchLineNotesBodyText === 'function')
+      var notesSrc = (type === 'invoice' && _rawNotes)
+        ? _rawNotes
+        : ((typeof window.cchLineNotesBodyText === 'function')
         ? window.cchLineNotesBodyText(it)
         : ((typeof window.cchLineExplicitNotesText === 'function')
           ? window.cchLineExplicitNotesText(it)
-          : String(it.lineNotes || it.notes || '').trim());
+          : String(it.lineNotes || it.notes || '').trim()));
       if (type === 'invoice' && notesSrc && typeof window.cchStripDateOnlyNoteLines === 'function') {
         notesSrc = window.cchStripDateOnlyNoteLines(notesSrc);
       }
       if (type === 'invoice' && notesSrc && typeof window.sanitizeInvoicePreviewLineText === 'function') {
         notesSrc = window.sanitizeInvoicePreviewLineText(notesSrc);
+      }
+      if (type === 'invoice' && _cchAiPack && _cchAiPack.hasOutcomes) {
+        var _aiIdx = items.indexOf(it);
+        notesSrc = (_aiIdx >= 0 && _cchAiPack.byIndex[_aiIdx]) ? _cchAiPack.byIndex[_aiIdx] : '';
       }
       var notesUnder = _cchLabeledNoteHtml(notesSrc);
       if (type === 'invoice' && notesUnder) notesUnder = '<div class="cch-inv-disp-notes">' + notesUnder + '</div>';
@@ -5716,7 +5843,8 @@
       : '');
     var premiumDispToolbarHtml = premiumColToolbarHtml + ((premiumIsTimeInv && !_portalOpen)
       ? '<span class="toolbar-sep"></span>' +
-        '<label class="toolbar-check"><input type="checkbox" id="cchPremDispDates" checked onchange="cchPremInvDispToggle(\'dates\',this.checked)"> Show dates</label>' +
+        '<button type="button" class="tb-btn" onclick="cchPickLayout(\'simple\')">Simple</button>' +
+        '<button type="button" class="tb-btn tb-btn-primary" onclick="cchPickLayout(\'itemized\')">Itemized</button>' +
         '<label class="toolbar-check"><input type="checkbox" id="cchPremDispHours" onchange="cchPremInvDispToggle(\'hours\',this.checked)"> Show hours</label>' +
         '<label class="toolbar-check"><input type="checkbox" id="cchPremDispRate" onchange="cchPremInvDispToggle(\'rate\',this.checked)"> Show rate</label>' +
         '<label class="toolbar-check"><input type="checkbox" id="cchPremDispNotes" checked onchange="cchPremInvDispToggle(\'notes\',this.checked)"> Show notes</label>'
@@ -5975,6 +6103,8 @@
         voidBannerPremium +
 
         infoSectionHtml +
+        ((type === 'invoice' && _cchAiPack && _cchAiPack.summary) ? '<p style="font-size:13px;color:#414C59;line-height:1.6;margin:16px 0 8px;">' + esc(_cchAiPack.summary) + '</p>' : '') +
+        ((type === 'invoice' && _cchAiPack && _cchAiPack.unmatched.length) ? '<div class="cch-inv-disp-notes" style="margin:0 0 12px;">' + _cchAiPack.unmatched.map(function(t) { return '<div style="font-size:13px;color:#1B3352;line-height:1.55;margin:0 0 8px;white-space:pre-wrap;">' + esc(t) + '</div>'; }).join('') + '</div>' : '') +
 
         /* Items */
         '<div class="items-section">' + itemsHtml + '</div>' +
@@ -6031,7 +6161,7 @@
     win.document.write('</div>');
     win.document.write('<script>var _tsVisible=false; function toggleTearSheets(){ _tsVisible=!_tsVisible; document.getElementById("tearSheetPages").style.display=_tsVisible?"block":"none"; document.getElementById("tsToggle").style.background=_tsVisible?"#C8B99A":"transparent"; document.getElementById("tsToggle").style.color=_tsVisible?"#1B3352":"#C8B99A"; document.getElementById("tsToggle").textContent=_tsVisible?"📑 Tear Sheets Included":"📑 Include Tear Sheets"; }' +
       ' function cchPremColToggle(k,on){document.body.classList.toggle("cch-prem-hide-"+k,!on);try{var o=JSON.parse(localStorage.getItem("cchPremPropCols")||"{}");o[k]=!!on;localStorage.setItem("cchPremPropCols",JSON.stringify(o));}catch(e){}} (function(){try{var o=JSON.parse(localStorage.getItem("cchPremPropCols")||"{}");["room","tag"].forEach(function(k){if(o[k]===false){cchPremColToggle(k,false);var el=document.getElementById("cchPremDisp"+k.charAt(0).toUpperCase()+k.slice(1));if(el)el.checked=false;}});}catch(e2){}})();' +
-      (premiumIsTimeInv ? ' var _cchPremDisp={dates:true,hours:false,rate:false,notes:true}; function cchPremInvDispToggle(k,on){_cchPremDisp[k]=!!on;var sel={dates:".cch-inv-disp-dates",hours:".cch-inv-disp-hours",rate:".cch-inv-disp-rate",notes:".cch-inv-disp-notes"}[k];if(sel)document.querySelectorAll(sel).forEach(function(el){el.style.display=on?"":"none";});try{localStorage.setItem("cchPremInvDisplay",JSON.stringify(_cchPremDisp));}catch(_e){}} (function(){try{var s=localStorage.getItem("cchPremInvDisplay");if(s)_cchPremDisp=JSON.parse(s);}catch(_e2){} ["dates","hours","rate","notes"].forEach(function(k){cchPremInvDispToggle(k,!!_cchPremDisp[k]);var el=document.getElementById("cchPremDisp"+k.charAt(0).toUpperCase()+k.slice(1));if(el)el.checked=!!_cchPremDisp[k];});})();' : '') +
+      (premiumIsTimeInv ? ' function cchPickLayout(mode){try{localStorage.setItem("cchInvClientLayout",mode==="itemized"?"itemized":"simple");}catch(e){}} if(window.opener&&opener.cchPreviewInvoiceAgain){var _w=window;cchPickLayout=function(mode){try{localStorage.setItem("cchInvClientLayout",mode==="itemized"?"itemized":"simple");}catch(e){} opener.cchPreviewInvoiceAgain(_w,' + JSON.stringify(projectId) + ',' + JSON.stringify(docId) + ');};} var _cchPremDisp={hours:false,rate:false,notes:true}; function cchPremInvDispToggle(k,on){_cchPremDisp[k]=!!on;var sel={hours:".cch-inv-disp-hours",rate:".cch-inv-disp-rate",notes:".cch-inv-disp-notes"}[k];if(sel)document.querySelectorAll(sel).forEach(function(el){el.style.display=on?"":"none";});try{localStorage.setItem("cchPremInvDisplay",JSON.stringify(_cchPremDisp));}catch(_e){}} (function(){try{var s=localStorage.getItem("cchPremInvDisplay");if(s)_cchPremDisp=JSON.parse(s);}catch(_e2){} ["hours","rate","notes"].forEach(function(k){cchPremInvDispToggle(k,!!_cchPremDisp[k]);var el=document.getElementById("cchPremDisp"+k.charAt(0).toUpperCase()+k.slice(1));if(el)el.checked=!!_cchPremDisp[k];});})();' : '') +
       '<\/script>');
     }
 

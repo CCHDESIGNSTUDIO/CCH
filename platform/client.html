@@ -3215,7 +3215,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-functions-compat.js"></script>
-  <script src="cch-contractor-access.js?v=20260814ca5"></script>
+  <script src="cch-contractor-access.js?v=20261111wo424"></script>
   <script>
     // ==================== CCH DESIGN — LIGHTWEIGHT CLIENT PORTAL ====================
     // GENERATED FILE — do not hand-edit. Rebuild with: node _scripts/generate-client-html.js
@@ -6190,7 +6190,7 @@ function cpPortalRouteStateFromHash(projectId) {
         }
         return out;
       }
-      if (slug === 'documents' || slug === 'communications' || slug === 'messages' || slug === 'notes' || slug === 'meetings' || slug === 'checklist' || slug === 'progress' || slug === 'activity' || slug === 'tasks' || slug === 'home' ||
+      if (slug === 'documents' || slug === 'contractors' || slug === 'communications' || slug === 'messages' || slug === 'notes' || slug === 'meetings' || slug === 'checklist' || slug === 'progress' || slug === 'activity' || slug === 'tasks' || slug === 'home' ||
           slug === 'rooms' || slug === 'concepts' || slug === 'inspiration' || slug === 'inspirations' || slug === 'designboards' ||
           slug === 'proposals' || slug === 'invoices' || slug === 'updates') {
         if (slug === 'communications') out.page = 'messages';
@@ -9331,6 +9331,7 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
           '<button type="button" class="cp-sb-item' + (sbAct('invoices') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/invoices') + '><span class="cp-sb-icon">\u25A6</span> Invoices' + (_invBadgeCt ? '<span class="cp-sb-badge">' + esc(_invBadgeCt) + '</span>' : '') + '</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('proposals') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/proposals') + '><span class="cp-sb-icon">\u25F0</span> Proposals' + (_propBadgeCt ? '<span class="cp-sb-badge">' + esc(_propBadgeCt) + '</span>' : '') + '</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('documents') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/documents') + '><span class="cp-sb-icon">\u25A4</span> Documents</button>' +
+          '<button type="button" class="cp-sb-item' + (sbAct('contractors') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/contractors') + '><span class="cp-sb-icon">\u25A3</span> Contractors</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('tasks') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/tasks') + '><span class="cp-sb-icon">\u2713</span> Tasks' + (_taskBadgeCt ? '<span class="cp-sb-badge">' + esc(_taskBadgeCt) + '</span>' : '') + '</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('activity') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/activity') + '><span class="cp-sb-icon">\u25C7</span> Activity' + (_actBadgeCt ? '<span class="cp-sb-badge">' + esc(_actBadgeCt) + '</span>' : '') + '</button>' +
           '<button type="button" class="cp-sb-item' + (sbAct('progress') ? ' active' : '') + '" onclick=' + cpPortalNavigateOnclickAttr(_sbHash + '/progress') + '><span class="cp-sb-icon">\u23F1</span> Time &amp; Progress</button>' +
@@ -9998,6 +9999,10 @@ async function renderClientPortal(projectId, focusProposalId, forcedPage) {
         html += typeof window.cchZelleInstructionsHtml === 'function'
           ? window.cchZelleInstructionsHtml(projectId, _zelleInv)
           : '<div style="padding:24px;color:#6B7280;">Zelle page is not loaded.</div>';
+      } else if (activePage === 'contractors') {
+        html += typeof window.cchContractorPortalListHtml === 'function'
+          ? await window.cchContractorPortalListHtml(projectId)
+          : '<div class="cp-section-label">Shared with contractors</div><div class="cp-card" style="padding:16px;font-size:13px;color:#6B7280;">This list did not load. Hard refresh.</div>';
       } else if (activePage === 'documents') {
         var docList = (Array.isArray(portalMergedDocs) && portalMergedDocs.length) ? portalMergedDocs : clientDocuments;
         var docFolderFilt = (window._cpDocFolderFilterByProject && window._cpDocFolderFilterByProject[projectId]) || 'all';
@@ -12442,8 +12447,8 @@ async function logActivity(type, action, description, projectId, projectName, me
   <script src="cch-client-ideas.js?v=20260807ci091b"></script>
   <script src="cch-invoice-tax-rules.js?v=20260827freight2"></script>
   <script src="cch-square-pay.js?v=20260930mailclose"></script>
-  <script src="cch-invoice-redesign.js?v=20261007wo284"></script>
-  <script src="cch-proposals-invoices-fix.js?v=20260911inv224"></script>
-  <script src="cch-portal-records.js?v=20261023wo327"></script>
+  <script src="cch-invoice-redesign.js?v=20261105wo406"></script>
+  <script src="cch-proposals-invoices-fix.js?v=20261109wo408"></script>
+  <script src="cch-portal-records.js?v=20261111wo425"></script>
 </body>
 </html>

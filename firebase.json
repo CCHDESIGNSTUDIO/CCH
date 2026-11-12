@@ -42,6 +42,6 @@
   },
   "functions": {
     "source": "Functions",
-    "runtime": "nodejs20"
+    "runtime": "nodejs24"
   }
 }

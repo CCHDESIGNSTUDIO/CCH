@@ -2,7 +2,7 @@
   "name": "cch-studio-functions",
   "description": "CCH Studio QuickBooks Integration",
   "engines": {
-    "node": "20"
+    "node": "24"
   },
   "main": "index.js",
   "dependencies": {

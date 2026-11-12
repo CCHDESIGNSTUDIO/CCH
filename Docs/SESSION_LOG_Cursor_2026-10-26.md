@@ -35,6 +35,12 @@ WO-357. The same label now says Price/quantity change. Studio 9.9.439. Staging. 
 
 WO-358. Billable and Pending were the same step. The Billable filter is gone. Pass on moves the line to Pending. Studio 9.9.440. Cindy GO. PRODUCTION hosting ~17:40. Live was 9.9.435. Live confirmed 9.9.440. Also includes WO-354 through WO-357. Functions not deployed. No commit.
 
+Git backup. Working copy since 9.9.281 committed as d38ede9 and pushed to staging-fixes-2026-07-08 at 7:34 PM. Client dumps and index.html restore copies were left out.
+
+WO-359. Project Financial Health and the company dashboard used different math. Owner time was priced at $250. Both now use cchFinancialSummary: entry rate, pre-tax invoiced, real payment rows, open invoices, open POs to pay. Studio 9.9.441. Staging. Display only. No invoice, PO, payment, or QuickBooks writes. Production waiting on GO.
+
+WO-360. Oct 27 layout. Invoices and POs/Bills each show total, paid, and open. Profit is invoiced minus the PO/bill total. Each PO is counted once. Needs-attention strip sits under the money row. Studio 9.9.442. Staging. Production waiting on GO.
+
 Print and PDF were not changed. The same card style is on invoices, proposals, and purchase orders.
 
 ## Verify

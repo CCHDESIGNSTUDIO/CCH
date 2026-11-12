@@ -119,6 +119,63 @@
     return '<select name="room" style="flex:1;min-width:140px;padding:8px;border:1px solid #E2E2E2;background:#fff;">' + opts + '</select>';
   }
 
+  function checklistNotesFromDecision(doc) {
+    doc = doc || {};
+    var entries = typeof cpPortalDecisionHistoryEntries === 'function'
+      ? cpPortalDecisionHistoryEntries(doc)
+      : (Array.isArray(doc.responseHistory) ? doc.responseHistory.slice() : []);
+    return entries.map(function (e) {
+      return {
+        type: e.type || '',
+        decision: e.decision || '',
+        comment: String(e.comment || ''),
+        at: e.at || '',
+        byName: String(e.byName || ''),
+        byRole: e.byRole || ''
+      };
+    }).filter(function (e) {
+      return e.comment || e.byName || e.decision || e.type;
+    });
+  }
+
+  function checklistNoteLabel(entry) {
+    if (typeof cpPortalDecisionHistoryLabel === 'function') return cpPortalDecisionHistoryLabel(entry);
+    return 'Note';
+  }
+
+  function checklistNotesHtml(entries) {
+    entries = entries || [];
+    if (!entries.length) return '';
+    var html = '';
+    entries.forEach(function (e) {
+      var whoName = String(e.byName || '').trim();
+      var comment = String(e.comment || '').trim();
+      var when = e.at ? String(e.at).slice(0, 10) : '';
+      var label = checklistNoteLabel(e);
+      if (!whoName && !comment && !label) return;
+      html += '<div style="font-size:12px;color:#0A1F3D;margin-top:4px;line-height:1.4;">' +
+        '<strong>' + esc(whoName || label) + '</strong>' +
+        (whoName && label ? ' · ' + esc(label) : '') +
+        (when ? ' <span style="color:#9CA3AF;">' + esc(when) + '</span>' : '') +
+        (comment ? '<div style="color:#6B7280;">' + esc(comment) + '</div>' : '') +
+        '</div>';
+    });
+    return html ? '<div style="margin-top:4px;">' + html + '</div>' : '';
+  }
+
+  function checklistHowSelect(current) {
+    var opts = [
+      ['phone', 'Phone'],
+      ['text', 'Text'],
+      ['email', 'Email'],
+      ['site', 'Site meeting'],
+      ['portal', 'Portal']
+    ];
+    return opts.map(function (pair) {
+      return '<option value="' + pair[0] + '"' + (pair[0] === current ? ' selected' : '') + '>' + pair[1] + '</option>';
+    }).join('');
+  }
+
   async function renderChecklist(root, projectId) {
     root.innerHTML = '<div class="cp-section-label">Checklist</div><div style="font-size:13px;color:#6B7280;">Loading…</div>';
     var loaded = await Promise.all([
@@ -132,6 +189,19 @@
     var mode = 'new';
     try { mode = localStorage.getItem('cchChecklistSort:' + projectId) || 'new'; } catch (_e) {}
     rows = sortChecklist(rows, mode);
+    var noteMap = {};
+    var decisionIds = [];
+    rows.forEach(function (r) {
+      if (r.sourceDecisionId && decisionIds.indexOf(r.sourceDecisionId) < 0) decisionIds.push(r.sourceDecisionId);
+    });
+    await Promise.all(decisionIds.map(function (id) {
+      return col(projectId, 'clientDecisions').doc(id).get().then(function (d) {
+        if (d.exists) noteMap[id] = checklistNotesFromDecision(d.data() || {});
+      }).catch(function () {});
+    }));
+    rows.forEach(function (r) {
+      r._notes = noteMap[r.sourceDecisionId] || (Array.isArray(r.notes) ? r.notes : []);
+    });
     var isStaff = staff();
     var html = '<div class="cp-section-label">Approved checklist</div>' +
       '<div style="font-size:12px;color:#6B7280;margin:0 0 14px;line-height:1.5;">A short running list. The big decision posts stay on Decisions.</div>' +
@@ -164,8 +234,12 @@
         (r.how ? ' · ' + esc(r.how) : '') +
         (r.clientName ? ' · ' + esc(r.clientName) : '') + '</div>' +
         (replaced && r.replacedNote ? '<div style="font-size:12px;color:#6B7280;margin-top:4px;">Replaced: ' + esc(r.replacedNote) + '</div>' : '') +
+        checklistNotesHtml(r._notes) +
         '</div>' +
-        (isStaff && !replaced ? '<button type="button" class="cp-btn cp-btn-outline" data-replace="' + esc(r.id) + '" style="font-size:11px;">Mark replaced</button>' : '') +
+        (isStaff ? '<div style="display:flex;flex-direction:column;gap:6px;">' +
+          (!replaced ? '<button type="button" class="cp-btn cp-btn-outline" data-replace="' + esc(r.id) + '" style="font-size:11px;">Mark replaced</button>' : '') +
+          '<button type="button" class="cp-btn cp-btn-outline" data-edit="' + esc(r.id) + '" style="font-size:11px;">Edit</button>' +
+          '<button type="button" class="cp-btn cp-btn-outline" data-delete="' + esc(r.id) + '" style="font-size:11px;">Delete</button></div>' : '') +
         '</div>';
     });
     root.innerHTML = html;
@@ -211,6 +285,52 @@
         });
       });
     });
+    root.querySelectorAll('[data-edit]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var id = btn.getAttribute('data-edit');
+        var row = null;
+        rows.forEach(function (r) { if (r.id === id) row = r; });
+        if (!row) return;
+        var box = document.createElement('div');
+        box.style.cssText = 'margin-top:8px;display:flex;flex-direction:column;gap:6px;max-width:420px;';
+        box.innerHTML = '<input data-f="what" value="' + esc(row.what || '') + '" style="padding:6px;border:1px solid #E2E2E2;">' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+          '<input data-f="room" value="' + esc(row.room || '') + '" placeholder="Room" style="flex:1;min-width:120px;padding:6px;border:1px solid #E2E2E2;">' +
+          '<input data-f="decidedOn" type="date" value="' + esc(String(row.decidedOn || '').slice(0, 10)) + '" style="padding:6px;border:1px solid #E2E2E2;">' +
+          '<select data-f="how" style="padding:6px;border:1px solid #E2E2E2;">' + checklistHowSelect(row.how || 'phone') + '</select></div>' +
+          '<div style="display:flex;gap:6px;">' +
+          '<button type="button" class="cp-btn cp-btn-primary" data-save="1">Save</button>' +
+          '<button type="button" class="cp-btn cp-btn-outline" data-cancel="1">Cancel</button></div>';
+        btn.parentNode.appendChild(box);
+        btn.style.display = 'none';
+        box.querySelector('[data-cancel]').addEventListener('click', function () { renderChecklist(root, projectId); });
+        box.querySelector('[data-save]').addEventListener('click', function () {
+          col(projectId, 'decisionChecklist').doc(id).update({
+            what: String(box.querySelector('[data-f="what"]').value || '').trim(),
+            room: String(box.querySelector('[data-f="room"]').value || '').trim(),
+            decidedOn: String(box.querySelector('[data-f="decidedOn"]').value || ''),
+            how: String(box.querySelector('[data-f="how"]').value || 'phone'),
+            updatedAt: new Date().toISOString(),
+            updatedBy: who()
+          }).then(function () { toast('Checklist updated'); renderChecklist(root, projectId); })
+            .catch(function (e) { alertBox((e && e.message) || e, 'Checklist'); });
+        });
+      });
+    });
+    root.querySelectorAll('[data-delete]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var id = btn.getAttribute('data-delete');
+        var ask = typeof cchConfirm === 'function'
+          ? cchConfirm('Remove this line from the checklist?', 'Checklist', { confirmText: 'Delete', danger: true })
+          : Promise.resolve(false);
+        ask.then(function (ok) {
+          if (!ok) return;
+          col(projectId, 'decisionChecklist').doc(id).delete()
+            .then(function () { toast('Removed from the checklist'); renderChecklist(root, projectId); })
+            .catch(function (e) { alertBox((e && e.message) || e, 'Checklist'); });
+        });
+      });
+    });
     var printBtn = root.querySelector('[data-print]');
     if (printBtn) printBtn.addEventListener('click', function () { printChecklist(projectId, rows); });
   }
@@ -218,9 +338,16 @@
   function printChecklist(projectId, rows) {
     var body = rows.map(function (r) {
       var style = String(r.status || '') === 'replaced' ? 'text-decoration:line-through;color:#6B7280;' : '';
+      var noteLines = (r._notes || []).map(function (e) {
+        var whoName = String(e.byName || '').trim();
+        var comment = String(e.comment || '').trim();
+        if (!whoName && !comment) return '';
+        return '<div style="font-size:13px;color:#4B5563;margin-top:2px;">' + esc(whoName || 'Note') +
+          (comment ? ': ' + esc(comment) : '') + '</div>';
+      }).join('');
       return '<p style="' + style + 'margin:0 0 10px;"><strong>' + esc(r.decidedOn || '') + '</strong> ' +
         esc(r.room ? r.room + ' — ' : '') + esc(r.what || '') +
-        (r.replacedNote ? ' <em>(' + esc(r.replacedNote) + ')</em>' : '') + '</p>';
+        (r.replacedNote ? ' <em>(' + esc(r.replacedNote) + ')</em>' : '') + noteLines + '</p>';
     }).join('');
     var w = window.open('', '_blank');
     if (!w) return;
@@ -252,6 +379,7 @@
       clientName: String(cr.clientName || cr.name || '').trim(),
       photoUrl: String(photo || ''),
       sourceDecisionId: decisionId,
+      notes: checklistNotesFromDecision(d),
       status: 'active',
       createdAt: new Date().toISOString(),
       createdBy: who()
